@@ -90,14 +90,16 @@ impl<'a> Renderer<'a> {
                     consts.fetch_dyn(*ptr).render(cx, &mut context.writer(f));
                 }
 
-                Instruction::RegionStart(region) => {
+                Instruction::RegionStart { ptr } => {
+                    let region = consts.fetch_region(*ptr);
                     f.write_str("<!--topcoat::region::start(");
-                    f.write_str(region.as_u64().format_into(&mut NumBuffer::new()));
+                    write!(f, "{region}").unwrap();
                     f.write_str(")-->");
                 }
-                Instruction::RegionEnd(region) => {
+                Instruction::RegionEnd { ptr } => {
+                    let region = consts.fetch_region(*ptr);
                     f.write_str("<!--topcoat::region::end(");
-                    f.write_str(region.as_u64().format_into(&mut NumBuffer::new()));
+                    write!(f, "{region}").unwrap();
                     f.write_str(")-->");
                 }
 

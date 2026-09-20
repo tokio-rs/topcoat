@@ -272,8 +272,10 @@ where
 mod tests {
     use std::task::Waker;
 
+    use topcoat_core::identity::{Identity, SiteKey};
+
     use super::*;
-    use crate::{RegionId, region::RegionScope};
+    use crate::RegionId;
 
     /// A live view that delivers one swap for its region per poll, a fixed
     /// number of times.
@@ -308,9 +310,12 @@ mod tests {
 
     #[test]
     fn swaps_are_collected_round_robin() {
-        let mut counter = 1;
-        let _regions = RegionScope::new(&mut counter);
-        let (a, b, c) = (RegionId::next(), RegionId::next(), RegionId::next());
+        let [a, b, c] = [0, 1, 2].map(|ordinal| {
+            RegionId::new(
+                Identity::ROOT,
+                SiteKey::new(file!(), line!(), column!(), ordinal),
+            )
+        });
 
         let ticker = |region, remaining| Ticker { region, remaining };
         let units = JoinUnit::new(

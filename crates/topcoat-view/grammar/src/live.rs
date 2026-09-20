@@ -1,20 +1,31 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
-use syn::parse::{Parse, ParseStream};
-use topcoat_core_grammar::paths::{topcoat_context, topcoat_view};
+use syn::{
+    parse::{Parse, ParseStream},
+    spanned::Spanned,
+};
+use topcoat_core_grammar::{
+    ParseOption,
+    paths::{topcoat_context, topcoat_core, topcoat_view},
+};
 
-use crate::view::{
-    View,
-    hir::{LowerView, ViewBuilder},
+use crate::{
+    leading_cx::LeadingCx,
+    view::{
+        View,
+        hir::{LowerView, ViewBuilder},
+    },
 };
 
 pub struct Live {
+    pub cx: Option<LeadingCx>,
     pub body: Vec<syn::Stmt>,
 }
 
 impl Parse for Live {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
+            cx: input.call(LeadingCx::parse_option)?,
             body: input.call(syn::Block::parse_within)?,
         })
     }
@@ -23,18 +34,56 @@ impl Parse for Live {
 impl ToTokens for Live {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let body = &self.body;
-        quote! {
-            #topcoat_view::internal::LiveView::new(async move {
-                #(#body)*
-            })
+        // Read the input span: line!() and column!() would name the outer
+        // view! invocation and merge its distinct live! sites.
+        let start = body
+            .first()
+            .map(Spanned::span)
+            .unwrap_or_else(Span::call_site)
+            .start();
+        let line = u32::try_from(start.line).expect("source line fits in u32");
+        let column = u32::try_from(start.column + 1).expect("source column fits in u32");
+        let site = quote! {
+            const {
+                #topcoat_core::identity::SiteKey::new(::core::file!(), #line, #column, 0)
+            }
+        };
+        let borrow_cx = self.cx.as_ref().map(|_| quote! { let __cx = &__cx; });
+        let cx = if self.cx.is_some() {
+            quote! { &__cx }
+        } else {
+            quote! { __cx }
+        };
+        let view = quote! {
+            #topcoat_view::internal::LiveView::new(
+                #topcoat_context::identity(#cx),
+                #site,
+                async move {
+                    #borrow_cx
+                    #(#body)*
+                },
+            )
+        };
+        match &self.cx {
+            Some(cx) => {
+                let cx = &cx.cx;
+                quote! {{
+                    let __cx: #topcoat_context::Cx = (#cx).clone();
+                    #view
+                }}
+                .to_tokens(tokens);
+            }
+            None => view.to_tokens(tokens),
         }
-        .to_tokens(tokens);
     }
 }
 
 #[cfg(feature = "pretty")]
 impl topcoat_core_grammar::pretty::PrettyPrint for Live {
     fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        if let Some(cx) = &self.cx {
+            cx.pretty_print(printer);
+        }
         for (index, stmt) in self.body.iter().enumerate() {
             stmt.pretty_print(printer);
             if index < self.body.len() - 1 {
@@ -141,10 +190,6 @@ mod tests {
             .unwrap()
             .to_token_stream()
             .to_string();
-        assert!(
-            tokens.starts_with(":: topcoat_view :: internal :: LiveView :: new (async move {"),
-            "{tokens}"
-        );
-        assert!(tokens.contains("let x = 1 ;"), "{tokens}");
+        assert!(tokens.contains("async move { let x = 1 ;"), "{tokens}");
     }
 }

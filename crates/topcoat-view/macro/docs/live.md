@@ -130,9 +130,21 @@ async fn page() -> Result<impl View> {
 
 Several regions on one page stream independently, each replacing its own content as it becomes ready, and emitted markup can itself contain components and further live regions.
 
+A region's id comes from its source location and the enclosing context's identity, so it stays the same across renders. When a `view!` loop contains live regions, put `#[key(item)]` on the loop to distinguish its iterations, as described in the [`view!`] guide.
+
 # Request Context
 
-Inside a [`component`], `#[page]`, or `#[layout]`, the request context is in scope implicitly and emitted markup can call components with no ceremony. In a plain function, name the context at the start of the emission, the same way [`view!`] does: `emit! { cx => ... }`. See the [`view!`] guide's section on rendering outside a component.
+Inside a [`component`], `#[page]`, or `#[layout]`, the request context is in scope implicitly and emitted markup can call components with no ceremony. In a plain function, name the context at the start of the live region, the same way [`view!`] does:
+
+```rust
+use topcoat::{context::Cx, view::{View, emit, live}};
+
+fn greeting(cx: &Cx) -> impl View {
+    live! { cx => emit! { <p>"Hello"</p> } }
+}
+```
+
+The region owns a clone of the context, and its emissions use that context implicitly. An individual emission can use another context with `emit! { cx => ... }`. See the [`view!`] guide's section on rendering outside a component.
 
 # Suspense And Error Boundaries
 

@@ -11,7 +11,7 @@ use core::fmt::NumBuffer;
 
 #[cfg(feature = "http")]
 use const_buffer::HeadersPtr;
-use const_buffer::{ConstBuffer, DynPtr, StaticStrPtr, StrPtr, StringPtr, ViewPtr};
+use const_buffer::{ConstBuffer, DynPtr, RegionPtr, StaticStrPtr, StrPtr, StringPtr, ViewPtr};
 pub use handle::*;
 use id::ViewBufferId;
 use instruction::Instruction;
@@ -289,12 +289,14 @@ impl ViewBuffer {
 
     #[inline]
     fn push_region_start(&mut self, value: RegionId) {
-        self.push_instruction(Instruction::RegionStart(value));
+        let ptr = self.consts.push_region(value);
+        self.push_instruction(Instruction::RegionStart { ptr });
     }
 
     #[inline]
     fn push_region_end(&mut self, value: RegionId) {
-        self.push_instruction(Instruction::RegionEnd(value));
+        let ptr = self.consts.push_region(value);
+        self.push_instruction(Instruction::RegionEnd { ptr });
     }
 
     #[inline]

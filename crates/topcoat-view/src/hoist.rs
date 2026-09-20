@@ -254,7 +254,10 @@ mod tests {
         task::Waker,
     };
 
-    use topcoat_core::context::Cx;
+    use topcoat_core::{
+        context::Cx,
+        identity::{Identity, SiteKey},
+    };
 
     use super::*;
     use crate::{RegionId, internal::ScopeView};
@@ -317,7 +320,7 @@ mod tests {
             // A swap resolves after the first content was sealed, with no
             // build running, so its replacement is self-contained.
             Poll::Ready(Ok(Some(ViewSwap {
-                region: RegionId::next(),
+                region: RegionId::new(Identity::ROOT, SiteKey::new(file!(), line!(), column!(), 0)),
                 replacement: ViewBuffer::build(|writer| {
                     writer.push_static_str("replacement");
                 }),
@@ -546,7 +549,7 @@ mod tests {
             }
             Self::hoist_twice();
             Poll::Ready(Ok(Some(ViewSwap {
-                region: RegionId::next(),
+                region: RegionId::new(Identity::ROOT, SiteKey::new(file!(), line!(), column!(), 0)),
                 replacement: ViewBuffer::build(|writer| {
                     writer.push_static_str("replacement");
                 }),

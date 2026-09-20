@@ -172,7 +172,7 @@ impl<V: View + 'static> http_body::Body for ViewBody<V> {
                     }
                     write!(f, "<template data-topcoat-swap=\"{region}\">").unwrap();
                     swap.replacement.render_into(this.cx, &mut f);
-                    write!(f, "</template><script>topcoat.swap({region})</script>").unwrap();
+                    write!(f, "</template><script>topcoat.swap(\"{region}\")</script>").unwrap();
                 }
                 Poll::Ready(Some(Ok(Frame::data(envelope.into()))))
             }
@@ -245,11 +245,23 @@ mod tests {
     }
 
     /// The envelope a swap for `region` arrives in.
-    fn swap_envelope(region: u64, replacement: &str) -> String {
+    fn swap_envelope(region: &str, replacement: &str) -> String {
         format!(
             "<template data-topcoat-swap=\"{region}\">{replacement}</template>\
-             <script>topcoat.swap({region})</script>"
+             <script>topcoat.swap(\"{region}\")</script>"
         )
+    }
+
+    fn region_ids(html: &str) -> Vec<&str> {
+        html.split("<!--topcoat::region::start(")
+            .skip(1)
+            .map(|part| {
+                let (id, _) = part.split_once(")-->").unwrap();
+                assert_eq!(id.len(), 32);
+                assert!(id.bytes().all(|byte| byte.is_ascii_hexdigit()));
+                id
+            })
+            .collect()
     }
 
     // Page and layout render functions, since `PageFn`/`LayoutFn` are backed
@@ -423,16 +435,19 @@ mod tests {
         assert_eq!(frames.len(), 2);
         // The first frame is the initial document, the region marked off so
         // the swap can find it.
+        let region = region_ids(&frames[0])[0];
         assert_eq!(
             frames[0],
-            "<main><!--topcoat::region::start(1)--><p>first</p>\
-             <!--topcoat::region::end(1)--></main>"
+            format!(
+                "<main><!--topcoat::region::start({region})--><p>first</p>\
+             <!--topcoat::region::end({region})--></main>"
+            )
         );
         // The swap arrives behind the applier, wrapped in a template the
         // applier splices between the markers.
         assert_eq!(
             frames[1],
-            format!("{SWAP_SCRIPT}{}", swap_envelope(1, "<p>second</p>"))
+            format!("{SWAP_SCRIPT}{}", swap_envelope(region, "<p>second</p>"))
         );
     }
 
@@ -442,12 +457,13 @@ mod tests {
 
         let frames = data_frames(response.into_body()).await;
         assert_eq!(frames.len(), 3);
+        let region = region_ids(&frames[0])[0];
         assert_eq!(
             frames[1],
-            format!("{SWAP_SCRIPT}{}", swap_envelope(1, "<p>two</p>"))
+            format!("{SWAP_SCRIPT}{}", swap_envelope(region, "<p>two</p>"))
         );
         // Later swaps arrive bare: the applier is already installed.
-        assert_eq!(frames[2], swap_envelope(1, "<p>three</p>"));
+        assert_eq!(frames[2], swap_envelope(region, "<p>three</p>"));
     }
 
     #[tokio::test]
@@ -456,37 +472,44 @@ mod tests {
 
         let frames = data_frames(response.into_body()).await;
         // Both regions are marked off in the initial document.
+        let ids = region_ids(&frames[0]);
+        assert_eq!(ids.len(), 2);
+        let (a, b) = (ids[0], ids[1]);
+        assert_ne!(a, b);
         assert_eq!(
             frames[0],
-            "<main>\
-             <section><!--topcoat::region::start(1)--><p>a1</p>\
-             <!--topcoat::region::end(1)--></section>\
-             <section><!--topcoat::region::start(2)--><p>b1</p>\
-             <!--topcoat::region::end(2)--></section>\
+            format!(
+                "<main>\
+             <section><!--topcoat::region::start({a})--><p>a1</p>\
+             <!--topcoat::region::end({a})--></section>\
+             <section><!--topcoat::region::start({b})--><p>b1</p>\
+             <!--topcoat::region::end({b})--></section>\
              </main>"
+            )
         );
 
         // Each region swaps once, and the two share a single applier.
         let swaps = frames[1..].concat();
         assert_eq!(swaps.matches("window.topcoat ??=").count(), 1);
-        assert!(swaps.contains(&swap_envelope(1, "<p>a2</p>")), "{swaps}");
-        assert!(swaps.contains(&swap_envelope(2, "<p>b2</p>")), "{swaps}");
+        assert!(swaps.contains(&swap_envelope(a, "<p>a2</p>")), "{swaps}");
+        assert!(swaps.contains(&swap_envelope(b, "<p>b2</p>")), "{swaps}");
     }
 
     #[tokio::test]
-    async fn each_request_numbers_its_regions_from_the_start() {
+    async fn region_ids_are_stable_across_requests() {
         let router = RouterBuilder::new()
             .page(PageFn::new(Method::GET, "/p", render_live_page))
             .build();
 
+        let mut previous = None;
         for _ in 0..2 {
             let response = send(&router, "/p").await;
             let frames = data_frames(response.into_body()).await;
-            assert!(
-                frames[0].contains("<!--topcoat::region::start(1)-->"),
-                "{}",
-                frames[0]
-            );
+            let region = region_ids(&frames[0])[0];
+            if let Some(previous) = &previous {
+                assert_eq!(region, previous);
+            }
+            previous = Some(region.to_owned());
         }
     }
 
@@ -499,14 +522,17 @@ mod tests {
 
         let response = send(&router, "/p").await;
         let frames = data_frames(response.into_body()).await;
+        let region = region_ids(&frames[0])[0];
         assert_eq!(
             frames[0],
-            "R[<main><!--topcoat::region::start(1)--><p>first</p>\
-             <!--topcoat::region::end(1)--></main>]"
+            format!(
+                "R[<main><!--topcoat::region::start({region})--><p>first</p>\
+             <!--topcoat::region::end({region})--></main>]"
+            )
         );
         assert_eq!(
             frames[1],
-            format!("{SWAP_SCRIPT}{}", swap_envelope(1, "<p>second</p>"))
+            format!("{SWAP_SCRIPT}{}", swap_envelope(region, "<p>second</p>"))
         );
     }
 
@@ -521,7 +547,8 @@ mod tests {
         // The response still streams its swap.
         let frames = data_frames(response.into_body()).await;
         assert_eq!(frames.len(), 2);
-        assert!(frames[1].ends_with(&swap_envelope(1, "<p>second</p>")));
+        let region = region_ids(&frames[0])[0];
+        assert!(frames[1].ends_with(&swap_envelope(region, "<p>second</p>")));
     }
 
     #[tokio::test]
@@ -607,7 +634,7 @@ mod tests {
 
         let mut frames = response.into_body().into_data_stream();
         let first = frames.next().await.unwrap().unwrap();
-        assert!(first.starts_with(b"<main><!--topcoat::region::start(1)-->"));
+        assert!(first.starts_with(b"<main><!--topcoat::region::start("));
         let error = frames.next().await.unwrap().unwrap_err();
         assert_eq!(error.to_string(), "late");
         // The failure ends the stream; the view is not polled again.
@@ -628,7 +655,7 @@ mod tests {
         // failure does instead of unwinding into the connection.
         let mut frames = response.into_body().into_data_stream();
         let first = frames.next().await.unwrap().unwrap();
-        assert!(first.starts_with(b"<main><!--topcoat::region::start(1)-->"));
+        assert!(first.starts_with(b"<main><!--topcoat::region::start("));
         let error = frames.next().await.unwrap().unwrap_err();
         let error = error.downcast::<BodyPanicError>().unwrap();
         assert_eq!(error.message(), Some("late"));
@@ -701,7 +728,7 @@ mod tests {
 
         let frames = data_frames(response.into_body()).await;
         assert_eq!(frames.len(), 2);
-        assert!(frames[0].starts_with("<main><!--topcoat::region::start(1)-->"));
+        assert!(frames[0].starts_with("<main><!--topcoat::region::start("));
         assert_eq!(
             frames[1],
             "<script>window.location.replace(\"/target\")</script>"

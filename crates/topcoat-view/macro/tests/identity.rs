@@ -1,9 +1,9 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, future::poll_fn, pin::pin};
 
 use topcoat::{
     Result,
     context::{Cx, identity, try_identity},
-    view::{Child, View, ViewExt, component, view},
+    view::{Child, View, ViewExt, component, emit, live, view},
 };
 
 fn empty_cx() -> Cx {
@@ -273,4 +273,92 @@ async fn a_key_borrows_the_item_and_is_evaluated_once_per_iteration() {
     let ids = ids(&rendered);
     assert_ne!(ids["a"], ids["b"]);
     assert_eq!(calls.load(std::sync::atomic::Ordering::Relaxed), 2);
+}
+
+fn region_ids(html: &str) -> Vec<&str> {
+    html.split("<!--topcoat::region::start(")
+        .skip(1)
+        .map(|part| {
+            let (id, _) = part.split_once(")-->").unwrap();
+            assert_eq!(id.len(), 32);
+            assert!(id.bytes().all(|byte| byte.is_ascii_hexdigit()));
+            id
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn sibling_region_ids_do_not_depend_on_completion_order() {
+    let cx = &Cx::default();
+    let mut previous = None;
+    for slow_first in [false, true] {
+        let mut view = pin!(view! {
+            cx =>
+            (live! {
+                if slow_first {
+                    tokio::task::yield_now().await;
+                }
+                emit! { <p>"a"</p> }?;
+                emit! { <p>"a updated"</p> }
+            })
+            (live! {
+                if !slow_first {
+                    tokio::task::yield_now().await;
+                }
+                emit! { <p>"b"</p> }?;
+                emit! { <p>"b updated"</p> }
+            })
+        });
+        let first = poll_fn(|cx| view.as_mut().poll_first(cx)).await.unwrap();
+        let html = first.content.render(cx);
+        let ids = region_ids(&html);
+        assert_eq!(ids.len(), 2);
+        assert_ne!(ids[0], ids[1]);
+
+        let mut swaps = HashMap::new();
+        while let Some(swap) = poll_fn(|cx| view.as_mut().poll_swap(cx)).await.unwrap() {
+            swaps.insert(swap.region.to_string(), swap.replacement.render(cx));
+        }
+        assert_eq!(swaps.len(), 2);
+        assert_eq!(swaps[ids[0]], "<p>a updated</p>");
+        assert_eq!(swaps[ids[1]], "<p>b updated</p>");
+        if let Some(previous) = &previous {
+            assert_eq!(&html, previous);
+        }
+        previous = Some(html);
+    }
+}
+
+#[component]
+async fn updating(label: &str) -> Result<impl View> {
+    Ok(live! {
+        emit! { (label) }?;
+        emit! { "updated" }
+    })
+}
+
+#[tokio::test]
+async fn region_ids_follow_component_keys_when_reordered() {
+    let cx = &Cx::default();
+    let render = |labels: [&'static str; 2]| async move {
+        view! {
+            cx =>
+            #[key(label)]
+            for label in labels {
+                updating(label: label)
+            }
+        }
+        .first()
+        .await
+        .unwrap()
+        .render(cx)
+    };
+    let forward = render(["a", "b"]).await;
+    let backward = render(["b", "a"]).await;
+    let forward = region_ids(&forward);
+    let backward = region_ids(&backward);
+    assert_eq!(forward.len(), 2);
+    assert_ne!(forward[0], forward[1]);
+    assert_eq!(forward[0], backward[1]);
+    assert_eq!(forward[1], backward[0]);
 }

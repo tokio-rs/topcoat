@@ -77,8 +77,8 @@ impl InstructionBuffer {
                 Instruction::Str { .. } => "Str",
                 Instruction::String { .. } => "String",
                 Instruction::Dyn { .. } => "Dyn",
-                Instruction::RegionStart(_) => "RegionStart",
-                Instruction::RegionEnd(_) => "RegionEnd",
+                Instruction::RegionStart { .. } => "RegionStart",
+                Instruction::RegionEnd { .. } => "RegionEnd",
                 #[cfg(feature = "http")]
                 Instruction::StatusCode(_) => "StatusCode",
                 #[cfg(feature = "http")]

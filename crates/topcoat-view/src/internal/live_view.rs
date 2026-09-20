@@ -6,7 +6,10 @@ use std::{
 
 use futures_util::TryFutureExt;
 use pin_project_lite::pin_project;
-use topcoat_core::error::Result;
+use topcoat_core::{
+    error::Result,
+    identity::{Identity, SiteKey},
+};
 
 use super::yielder::{DriveFuture, Yield, poll_body};
 use crate::{EmitToken, RegionId, View, ViewBufferScope, ViewFirst, ViewSwap};
@@ -18,12 +21,12 @@ pin_project! {
     /// The body reports each emission out of band while it runs. The first
     /// one becomes the view's first content; when the body is already done
     /// at that point the content is final and needs no markers. Otherwise
-    /// the content is framed with the markers of a freshly allocated region
+    /// the content is framed with the markers of its stable region
     /// and every later emission becomes a swap of that region.
     pub struct LiveView<Fut> {
         #[pin]
         body: Fut,
-        region: Option<RegionId>,
+        region: RegionId,
         stash: Option<ViewSwap>,
     }
 }
@@ -33,10 +36,10 @@ where
     Fut: Future<Output = Result<EmitToken>>,
 {
     #[doc(hidden)]
-    pub fn new(body: Fut) -> Self {
+    pub fn new(identity: Identity, site: SiteKey, body: Fut) -> Self {
         Self {
             body,
-            region: None,
+            region: RegionId::new(identity, site),
             stash: None,
         }
     }
@@ -80,7 +83,7 @@ where
                     }));
                 }
 
-                let region = *this.region.get_or_insert_with(RegionId::next);
+                let region = *this.region;
                 *this.stash = yielded.map(|yielded| yielded.into_swap(region));
 
                 let first = ViewFirst {
@@ -116,7 +119,7 @@ where
             return Poll::Ready(Ok(Some(stash)));
         }
 
-        let region = (*this.region).expect("live view polled for a swap before its first content");
+        let region = *this.region;
 
         match poll_body(this.body, cx) {
             (Poll::Pending, Some(yielded)) => Poll::Ready(Ok(Some(yielded.into_swap(region)))),

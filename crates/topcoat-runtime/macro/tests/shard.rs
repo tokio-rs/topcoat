@@ -12,7 +12,7 @@ use topcoat::{
     context::Cx,
     router::{Body, Route, Router, request::IDENTITY_HEADER, response::Response, to_bytes},
     runtime::{Shard, ShardRoute, Signal, shard, signal},
-    view::{View, ViewExt, component, view},
+    view::{View, ViewExt, component, emit, live, view},
 };
 
 #[shard]
@@ -67,6 +67,14 @@ async fn without_arguments(cx: &Cx) -> Result<impl View> {
     Ok(view! { <p>(page.get())</p> })
 }
 
+#[shard]
+async fn streaming() -> Result<impl View> {
+    Ok(live! {
+        emit! { <p>"first"</p> }?;
+        emit! { <p>"second"</p> }
+    })
+}
+
 /// The shard id and identity arguments of the scope start marker in `html`.
 fn scope_marker(html: &str) -> (&str, &str) {
     let start = html.find("::topcoat::shard::start(").expect(html);
@@ -119,6 +127,28 @@ async fn rerender_with(
 /// carrying the JSON object `signals` of signal values.
 async fn rerender(identity: &str, signals: &str) -> String {
     rerender_with(&stateful, identity, r#"["a"]"#, signals).await
+}
+
+#[tokio::test]
+async fn a_region_keeps_its_id_when_the_shard_reruns() {
+    let cx = &Cx::default();
+    let inline = view! { cx => streaming() }
+        .first()
+        .await
+        .unwrap()
+        .render(cx);
+    let (_, identity) = scope_marker(&inline);
+    let start = inline.split_once("<!--topcoat::region::start(").unwrap().1;
+    let region = start.split_once(")-->").unwrap().0;
+    assert_eq!(region.len(), 32);
+
+    let rerendered = rerender_with(&streaming, identity, "[]", "{}").await;
+    assert!(rerendered.contains(&format!("<!--topcoat::region::start({region})-->")));
+    assert!(rerendered.contains(&format!("<!--topcoat::region::end({region})-->")));
+    assert!(rerendered.contains(&format!(
+        "<template data-topcoat-swap=\"{region}\"><p>second</p></template>"
+    )));
+    assert!(rerendered.contains(&format!("topcoat.swap(\"{region}\")")));
 }
 
 #[tokio::test]

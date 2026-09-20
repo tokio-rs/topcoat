@@ -296,8 +296,7 @@ impl<'a> PartsWriter<'a> {
             "tried to push region start in html context {:?}",
             self.context,
         );
-        // A rendered boundary is a fixed frame around the id's digits.
-        self.size_hint += 42;
+        self.size_hint += "<!--topcoat::region::start()-->".len() + 32;
         self.sink.push_region_start(region);
         self
     }
@@ -314,8 +313,7 @@ impl<'a> PartsWriter<'a> {
             "tried to push region end in html context {:?}",
             self.context,
         );
-        // A rendered boundary is a fixed frame around the id's digits.
-        self.size_hint += 40;
+        self.size_hint += "<!--topcoat::region::end()-->".len() + 32;
         self.sink.push_region_end(region);
         self
     }
