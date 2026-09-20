@@ -38,8 +38,7 @@ impl ToTokens for Live {
         // view! invocation and merge its distinct live! sites.
         let start = body
             .first()
-            .map(Spanned::span)
-            .unwrap_or_else(Span::call_site)
+            .map_or_else(Span::call_site, Spanned::span)
             .start();
         let line = u32::try_from(start.line).expect("source line fits in u32");
         let column = u32::try_from(start.column + 1).expect("source column fits in u32");
