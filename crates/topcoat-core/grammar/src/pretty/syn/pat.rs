@@ -7,6 +7,7 @@ impl PrettyPrint for syn::Pat {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
         match self {
             Self::Const(pat) => pat.pretty_print(printer),
+            Self::Guard(pat) => pat.pretty_print(printer),
             Self::Ident(pat) => pat.pretty_print(printer),
             Self::Lit(pat) => pat.pretty_print(printer),
             Self::Macro(pat) => pat.mac.pretty_print(printer),
@@ -27,6 +28,17 @@ impl PrettyPrint for syn::Pat {
             Self::Wild(pat) => pat.pretty_print(printer),
             _ => common::verbatim(printer, self),
         }
+    }
+}
+
+impl PrettyPrint for syn::PatGuard {
+    fn pretty_print(&self, printer: &mut Printer<'_>) {
+        self.attrs.pretty_print(printer);
+        self.pat.pretty_print(printer);
+        " ".pretty_print(printer);
+        self.if_token.pretty_print(printer);
+        " ".pretty_print(printer);
+        self.guard.pretty_print(printer);
     }
 }
 
