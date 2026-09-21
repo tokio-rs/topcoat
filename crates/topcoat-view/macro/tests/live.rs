@@ -444,25 +444,6 @@ async fn a_region_with_only_an_initial_branch_settles() {
 }
 
 #[tokio::test]
-async fn a_region_with_only_a_connected_branch_renders_empty_in_the_initial_pass() {
-    let cx = &Cx::default();
-    let mut view = pin!(view! { cx =>
-        <main>(live! { Connected => { emit! { <p>"connected"</p> } } })</main>
-    });
-
-    let content = first(&mut view).await.unwrap();
-    assert!(!content.streaming);
-    assert!(content.connecting);
-    let html = content.content.render(cx);
-    assert!(
-        html.contains("--><!--topcoat::region::end("),
-        "the region is empty between its markers: {html}"
-    );
-    assert!(!html.contains("connected"), "{html}");
-    assert!(next_swap(&mut view).await.unwrap().is_none());
-}
-
-#[tokio::test]
 async fn a_region_runs_its_connected_branch_in_the_connected_pass() {
     let cx = &Cx::default().with(Pass::Connected);
     let mut view = pin!(view! { cx =>
@@ -477,6 +458,37 @@ async fn a_region_runs_its_connected_branch_in_the_connected_pass() {
     let content = first(&mut view).await.unwrap();
     assert!(!content.connecting);
     assert_eq!(content.content.render(cx), "<main><p>connected</p></main>");
+}
+
+#[tokio::test]
+async fn a_region_without_a_connected_branch_runs_its_initial_one_in_the_connected_pass() {
+    let cx = &Cx::default().with(Pass::Connected);
+    let mut view = pin!(view! { cx =>
+        <main>(live! { Initial => { emit! { <p>"initial"</p> } } })</main>
+    });
+
+    // A region reached while rendering connected content has nothing else
+    // to show, and nothing connects later.
+    let content = first(&mut view).await.unwrap();
+    assert!(!content.connecting);
+    assert_eq!(content.content.render(cx), "<main><p>initial</p></main>");
+}
+
+#[tokio::test]
+async fn branches_capture_the_same_variable() {
+    let cx = &Cx::default();
+    let label = String::from("shared");
+    let mut view = pin!(view! { cx =>
+        <main>
+            (live! {
+                Initial => { emit! { <p>(label.clone())</p> } }
+                Connected => { emit! { <p>(label)</p> } }
+            })
+        </main>
+    });
+
+    let html = first(&mut view).await.unwrap().content.render(cx);
+    assert!(html.contains("<p>shared</p>"), "{html}");
 }
 
 #[tokio::test]

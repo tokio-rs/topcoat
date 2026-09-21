@@ -1,5 +1,5 @@
 use proc_macro2::{Span, TokenStream};
-use quote::{ToTokens, quote};
+use quote::{ToTokens, quote, quote_spanned};
 use syn::{
     Ident, Token,
     parse::{Parse, ParseStream},
@@ -8,7 +8,7 @@ use syn::{
 };
 use topcoat_core_grammar::{
     ParseOption,
-    paths::{topcoat_context, topcoat_core, topcoat_error, topcoat_view},
+    paths::{topcoat_context, topcoat_core, topcoat_view},
 };
 
 use crate::{
@@ -72,12 +72,7 @@ impl ToTokens for Live {
                 )
             },
             LiveBody::Branches(branches) => {
-                let arms = LiveBranch::arms(branches, &identity, &site, borrow_cx.as_ref());
-                quote! {
-                    match #topcoat_view::pass(#cx) {
-                        #(#arms)*
-                    }
-                }
+                LiveBranch::expand(branches, &identity, &site, &cx, borrow_cx.as_ref())
             }
         };
         match &self.cx {
@@ -131,7 +126,8 @@ pub enum LiveBody {
     /// A single body, run in the initial phase until its first emission and
     /// again in full in the connected phase.
     Single(Vec<syn::Stmt>),
-    /// A body per phase, each named after a `Pass` variant.
+    /// A body per phase, each named after a `Pass` variant. The `Initial`
+    /// branch is required; the `Connected` branch is optional.
     Branches(Vec<LiveBranch>),
 }
 
@@ -178,10 +174,6 @@ pub struct LiveBranch {
 }
 
 impl LiveBranch {
-    /// The variant names a branch may carry, in the order their arms are
-    /// filled in when left out.
-    const PASSES: [&str; 2] = ["Initial", "Connected"];
-
     /// Whether the input starts with a branch, `Ident => {`.
     fn peek(input: ParseStream) -> bool {
         // `=>` spans two token positions, so the brace sits past `peek3`.
@@ -189,70 +181,75 @@ impl LiveBranch {
         fork.parse::<Ident>().is_ok() && fork.parse::<Token![=>]>().is_ok() && fork.peek(Brace)
     }
 
-    /// The `match` arms building the region's view for each pass.
+    /// The region built from `branches`: one body whose `match` on the
+    /// branch to run has an arm per branch.
     ///
-    /// Every written branch becomes an arm in its own order, and a pass with
-    /// no branch gets an arm with no body, so the `match` is exhaustive
-    /// exactly when every name is a pass.
-    fn arms(
+    /// One body keeps everything the branches capture moved exactly once.
+    /// Every written branch becomes an arm in its own order, so a name that
+    /// is not a pass fails to resolve at its own span. The `Connected` arm
+    /// runs only in a connected pass of a region that has the branch; a
+    /// region without it runs its `Initial` branch in either pass.
+    fn expand(
         branches: &[Self],
         identity: &TokenStream,
         site: &TokenStream,
+        cx: &TokenStream,
         borrow_cx: Option<&TokenStream>,
-    ) -> Vec<TokenStream> {
+    ) -> TokenStream {
         let has = |name: &str| branches.iter().any(|branch| branch.pass == name);
-        let connecting = has("Connected");
-        let none = quote! {
-            ::core::option::Option::<
-                ::core::future::Ready<#topcoat_error::Result<#topcoat_view::EmitToken>>,
-            >::None
-        };
+        let connected = has("Connected");
 
         let mut arms: Vec<TokenStream> = branches
             .iter()
             .map(|branch| {
                 let pass = &branch.pass;
                 let stmts = &branch.body.stmts;
-                let body = quote! {
-                    ::core::option::Option::Some(async move {
-                        #borrow_cx
-                        #(#stmts)*
-                    })
-                };
-                let view = if pass == "Initial" {
-                    quote! {
-                        #topcoat_view::internal::LiveView::initial(#identity, #site, #body, #connecting)
-                    }
-                } else if pass == "Connected" {
-                    quote! { #topcoat_view::internal::LiveView::connected(#identity, #site, #body) }
-                } else {
-                    // Not a pass: the pattern fails to resolve, and the body
-                    // stays in the expansion so it is still checked.
-                    quote! {{
-                        let _ = #body;
-                        ::core::unreachable!()
-                    }}
-                };
-                quote! { #topcoat_view::Pass::#pass => #view, }
+                quote! { #topcoat_view::Pass::#pass => { #(#stmts)* } }
             })
             .collect();
-
-        for name in Self::PASSES {
-            if has(name) {
-                continue;
-            }
-            let pass = Ident::new(name, Span::call_site());
-            let view = if name == "Initial" {
-                quote! {
-                    #topcoat_view::internal::LiveView::initial(#identity, #site, #none, #connecting)
-                }
-            } else {
-                quote! { #topcoat_view::internal::LiveView::connected(#identity, #site, #none) }
+        if !has("Initial") {
+            let span = branches
+                .first()
+                .map_or_else(Span::call_site, |branch| branch.pass.span());
+            let error = quote_spanned! {span=>
+                ::core::compile_error!("a `live!` region with branches needs an `Initial` branch");
             };
-            arms.push(quote! { #topcoat_view::Pass::#pass => #view, });
+            arms.push(quote! {
+                #topcoat_view::Pass::Initial => {
+                    #error
+                    ::core::unreachable!()
+                }
+            });
+        }
+        if !connected {
+            arms.push(quote! {
+                #topcoat_view::Pass::Connected => {
+                    ::core::unreachable!("a region without a `Connected` branch runs its `Initial` branch")
+                }
+            });
         }
 
-        arms
+        let branch = if connected {
+            quote! { __pass }
+        } else {
+            quote! { #topcoat_view::Pass::Initial }
+        };
+        quote! {{
+            let __pass = #topcoat_view::pass(#cx);
+            let __branch = #branch;
+            #topcoat_view::internal::LiveView::branches(
+                #identity,
+                #site,
+                __pass,
+                #connected,
+                async move {
+                    #borrow_cx
+                    match __branch {
+                        #(#arms)*
+                    }
+                },
+            )
+        }}
     }
 }
 
@@ -378,39 +375,48 @@ mod tests {
     }
 
     #[test]
-    fn branches_expand_to_a_match_on_the_pass() {
+    fn branches_expand_to_one_body_matching_on_the_branch() {
         let tokens =
             live("Initial => { emit! { <div></div> } } Connected => { emit! { <p></p> } }");
-        assert!(
-            tokens.contains("match :: topcoat_view :: pass ("),
-            "{tokens}"
-        );
-        assert!(tokens.contains(":: Pass :: Initial =>"), "{tokens}");
-        assert!(tokens.contains(":: Pass :: Connected =>"), "{tokens}");
-        assert!(tokens.contains("LiveView :: initial ("), "{tokens}");
-        assert!(tokens.contains("LiveView :: connected ("), "{tokens}");
-        // The initial phase learns it has a connected phase to run later.
-        assert!(tokens.contains(", true) ,"), "{tokens}");
+        assert!(tokens.contains("LiveView :: branches ("), "{tokens}");
+        assert!(tokens.contains("async move { match __branch {"), "{tokens}");
+        assert!(tokens.contains(":: Pass :: Initial => {"), "{tokens}");
+        assert!(tokens.contains(":: Pass :: Connected => {"), "{tokens}");
+        // With a connected branch, the pass decides which one runs.
+        assert!(tokens.contains("let __branch = __pass ;"), "{tokens}");
+        assert!(tokens.contains("__pass , true ,"), "{tokens}");
     }
 
     #[test]
-    fn a_missing_branch_gets_an_arm_without_a_body() {
+    fn a_region_without_a_connected_branch_runs_its_initial_one_in_either_pass() {
         let tokens = live("Initial => { emit! { <div></div> } }");
-        assert!(tokens.contains(":: Pass :: Connected =>"), "{tokens}");
-        assert!(tokens.contains(":: None)"), "{tokens}");
-        assert!(tokens.contains(", false) ,"), "{tokens}");
+        assert!(
+            tokens.contains("let __branch = :: topcoat_view :: Pass :: Initial ;"),
+            "{tokens}"
+        );
+        assert!(tokens.contains("__pass , false ,"), "{tokens}");
+        assert!(
+            tokens.contains(":: Pass :: Connected => { :: core :: unreachable !"),
+            "{tokens}"
+        );
+    }
 
+    #[test]
+    fn a_region_without_an_initial_branch_is_a_compile_error() {
+        // The expansion stays intact so the branch names still resolve.
         let tokens = live("Connected => { emit! { <div></div> } }");
-        assert!(tokens.contains(":: Pass :: Initial =>"), "{tokens}");
-        assert!(tokens.contains(":: None , true) ,"), "{tokens}");
+        assert!(tokens.contains(":: Pass :: Connected => {"), "{tokens}");
+        assert!(
+            tokens.contains(":: Pass :: Initial => { :: core :: compile_error !"),
+            "{tokens}"
+        );
     }
 
     #[test]
     fn a_branch_name_is_emitted_as_a_pass_variant() {
         // The compiler reports the unknown variant at the name's span.
-        let tokens = live("Later => { emit! { <div></div> } }");
-        assert!(tokens.contains(":: Pass :: Later =>"), "{tokens}");
-        assert!(tokens.contains("unreachable !"), "{tokens}");
+        let tokens = live("Initial => { emit! { <div></div> } } Later => { emit! { <p></p> } }");
+        assert!(tokens.contains(":: Pass :: Later => {"), "{tokens}");
     }
 
     #[test]

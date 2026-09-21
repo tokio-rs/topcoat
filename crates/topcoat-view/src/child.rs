@@ -69,7 +69,7 @@ child_from_view! {
 
 child_from_view! {
     /// A `live!` region passes as child content.
-    impl<I, C> for LiveView<I, C>
+    impl<Fut> for LiveView<Fut>
 }
 
 child_from_view! {
