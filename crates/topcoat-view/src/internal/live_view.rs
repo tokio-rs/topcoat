@@ -6,10 +6,7 @@ use std::{
 
 use futures_util::TryFutureExt;
 use pin_project_lite::pin_project;
-use topcoat_core::{
-    error::Result,
-    identity::{Identity, SiteKey},
-};
+use topcoat_core::error::Result;
 
 use super::yielder::DriveFuture;
 use crate::{
@@ -36,28 +33,21 @@ where
     Fut: Future<Output = Result<EmitToken>>,
 {
     #[doc(hidden)]
-    pub fn new(
-        identity: Identity,
-        site: SiteKey,
-        pass: ViewPass,
-        body: impl FnOnce(RegionId) -> Fut,
-    ) -> Self {
-        let mut view = Self::branches(identity, site, pass, true, body);
+    pub fn new(region: RegionId, pass: ViewPass, body: Fut) -> Self {
+        let mut view = Self::branches(region, pass, true, body);
         view.connecting = false;
         view
     }
 
     #[doc(hidden)]
     pub fn branches(
-        identity: Identity,
-        site: SiteKey,
+        region: RegionId,
         pass: ViewPass,
         connected: bool,
-        body: impl FnOnce(RegionId) -> Fut,
+        body: Fut,
     ) -> Self {
-        let region = RegionId::new(identity, site);
         Self {
-            body: body(region),
+            body,
             region,
             pass,
             connected,

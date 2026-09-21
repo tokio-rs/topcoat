@@ -59,19 +59,22 @@ impl ToTokens for Live {
         let view = match &self.body {
             LiveBody::Single(body) => quote! {
                 #topcoat_view::internal::LiveView::new(
-                    #identity,
-                    #site,
+                    __region,
                     #topcoat_view::pass(#cx),
-                    move |__region| async move {
+                    async move {
                         #borrow_cx
                         #(#body)*
                     },
                 )
             },
             LiveBody::Branches(branches) => {
-                LiveBranch::expand(branches, &identity, &site, &cx, borrow_cx.as_ref())
+                LiveBranch::expand(branches, &cx, borrow_cx.as_ref())
             }
         };
+        let view = quote! {{
+            let __region = #topcoat_view::RegionId::new(#identity, #site);
+            #view
+        }};
         match &self.cx {
             Some(cx) => {
                 let cx = &cx.cx;
@@ -188,8 +191,6 @@ impl LiveBranch {
     /// region without it runs its `Initial` branch in either pass.
     fn expand(
         branches: &[Self],
-        identity: &TokenStream,
-        site: &TokenStream,
         cx: &TokenStream,
         borrow_cx: Option<&TokenStream>,
     ) -> TokenStream {
@@ -235,11 +236,10 @@ impl LiveBranch {
             let __pass = #topcoat_view::pass(#cx);
             let __branch = #branch;
             #topcoat_view::internal::LiveView::branches(
-                #identity,
-                #site,
+                __region,
                 __pass,
                 #connected,
-                move |__region| async move {
+                async move {
                     #borrow_cx
                     match __branch {
                         #(#arms)*
