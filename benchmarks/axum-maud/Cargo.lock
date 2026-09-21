@@ -9,12 +9,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
-name = "anyhow"
-version = "1.0.103"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a4385e2e34eb35d6b3efe798b9eb88096925d87726c0798709bf56d9ed84af3"
-
-[[package]]
 name = "anymap3"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -736,10 +730,10 @@ dependencies = [
 
 [[package]]
 name = "topcoat-core"
-version = "0.6.2"
+version = "0.8.1"
 dependencies = [
- "anyhow",
  "anymap3",
+ "base64",
  "elsa",
  "http",
  "pin-project-lite",
@@ -750,7 +744,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-tailwind"
-version = "0.6.2"
+version = "0.8.1"
 dependencies = [
  "sha2",
  "thiserror",

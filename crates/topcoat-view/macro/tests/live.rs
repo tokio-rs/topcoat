@@ -7,7 +7,7 @@ use std::{
 use topcoat::{
     Result,
     context::Cx,
-    view::{Pass, View, ViewExt, ViewFirst, ViewSwap, component, emit, live, view},
+    view::{View, ViewExt, ViewFirst, ViewPass, ViewSwap, component, emit, live, view},
 };
 
 #[component]
@@ -445,7 +445,7 @@ async fn a_region_with_only_an_initial_branch_settles() {
 
 #[tokio::test]
 async fn a_region_runs_its_connected_branch_in_the_connected_pass() {
-    let cx = &Cx::default().with(Pass::Connected);
+    let cx = &Cx::default().with(ViewPass::Connected);
     let mut view = pin!(view! { cx =>
         <main>
             (live! {
@@ -462,7 +462,7 @@ async fn a_region_runs_its_connected_branch_in_the_connected_pass() {
 
 #[tokio::test]
 async fn a_region_without_a_connected_branch_runs_its_initial_one_in_the_connected_pass() {
-    let cx = &Cx::default().with(Pass::Connected);
+    let cx = &Cx::default().with(ViewPass::Connected);
     let mut view = pin!(view! { cx =>
         <main>(live! { Initial => { emit! { <p>"initial"</p> } } })</main>
     });
@@ -493,7 +493,7 @@ async fn branches_capture_the_same_variable() {
 
 #[tokio::test]
 async fn a_single_body_runs_in_the_connected_pass() {
-    let cx = &Cx::default().with(Pass::Connected);
+    let cx = &Cx::default().with(ViewPass::Connected);
     let mut view = pin!(view! { cx =>
         <main>(live! { emit! { <p>"body"</p> } })</main>
     });

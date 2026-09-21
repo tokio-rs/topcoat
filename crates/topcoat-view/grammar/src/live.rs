@@ -204,7 +204,7 @@ impl LiveBranch {
             .map(|branch| {
                 let pass = &branch.pass;
                 let stmts = &branch.body.stmts;
-                quote! { #topcoat_view::Pass::#pass => { #(#stmts)* } }
+                quote! { #topcoat_view::ViewPass::#pass => { #(#stmts)* } }
             })
             .collect();
         if !has("Initial") {
@@ -215,7 +215,7 @@ impl LiveBranch {
                 ::core::compile_error!("a `live!` region with branches needs an `Initial` branch");
             };
             arms.push(quote! {
-                #topcoat_view::Pass::Initial => {
+                #topcoat_view::ViewPass::Initial => {
                     #error
                     ::core::unreachable!()
                 }
@@ -223,7 +223,7 @@ impl LiveBranch {
         }
         if !connected {
             arms.push(quote! {
-                #topcoat_view::Pass::Connected => {
+                #topcoat_view::ViewPass::Connected => {
                     ::core::unreachable!("a region without a `Connected` branch runs its `Initial` branch")
                 }
             });
@@ -232,7 +232,7 @@ impl LiveBranch {
         let branch = if connected {
             quote! { __pass }
         } else {
-            quote! { #topcoat_view::Pass::Initial }
+            quote! { #topcoat_view::ViewPass::Initial }
         };
         quote! {{
             let __pass = #topcoat_view::pass(#cx);

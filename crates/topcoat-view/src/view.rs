@@ -41,6 +41,26 @@ pub struct ViewSwap {
     pub replacement: ViewHandle,
 }
 
+/// Which pass a view is being rendered in.
+///
+/// On the first render, a view may suspend and render skeletons.
+/// However, the goal is to finish an initial representation of the
+/// page as quickly as possible. This is the `Initial` pass.
+/// It must terminate, such that the browser's loading spinner stops spinning,
+/// and the page is interpreted as "fully loaded".
+///
+/// Afterwards, if the view contains `live!` regions that need to be
+/// kept up to date by the server, the client must reconnect to the
+/// server via a WebSocket connection. Once this connection is established,
+/// the server can send as many update events as desired. This is the
+/// second, `Connected` pass.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ViewPass {
+    #[default]
+    Initial,
+    Connected,
+}
+
 /// The value a live region's body returns to show it emitted content.
 ///
 /// The `emit!` macro evaluates to a [`Result`] carrying this token, and a
@@ -67,9 +87,13 @@ pub trait View: Send {
     /// Yields the next replacement for a region of the first content, or
     /// `None` when the view is done changing.
     ///
-    /// Only meaningful after [`poll_first`](Self::poll_first) resolved to
-    /// streaming content.
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>>;
+    /// This may be called without calling `poll_first` first, for example
+    /// on a client-side reconnect that does not require a full re-render of the view.
+    fn poll_swap(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        pass: ViewPass,
+    ) -> Poll<Result<Option<ViewSwap>>>;
 }
 
 /// Methods available on every [`View`].
@@ -135,7 +159,11 @@ impl View for () {
         }))
     }
 
-    fn poll_swap(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
+    fn poll_swap(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        pass: ViewPass,
+    ) -> Poll<Result<Option<ViewSwap>>> {
         Poll::Ready(Ok(None))
     }
 }
