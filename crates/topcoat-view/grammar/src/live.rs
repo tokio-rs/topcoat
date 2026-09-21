@@ -1,12 +1,14 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
 use syn::{
+    Ident, Token,
     parse::{Parse, ParseStream},
     spanned::Spanned,
+    token::Brace,
 };
 use topcoat_core_grammar::{
     ParseOption,
-    paths::{topcoat_context, topcoat_core, topcoat_view},
+    paths::{topcoat_context, topcoat_core, topcoat_error, topcoat_view},
 };
 
 use crate::{
@@ -19,27 +21,30 @@ use crate::{
 
 pub struct Live {
     pub cx: Option<LeadingCx>,
-    pub body: Vec<syn::Stmt>,
+    pub body: LiveBody,
 }
 
 impl Parse for Live {
     fn parse(input: ParseStream) -> syn::Result<Self> {
+        // A branch starts with `Ident => {`, which the leading context
+        // argument never does: its `=>` is followed by a statement.
+        let cx = if LeadingCx::peek(input) && !LiveBranch::peek(input) {
+            Some(input.parse()?)
+        } else {
+            None
+        };
         Ok(Self {
-            cx: input.call(LeadingCx::parse_option)?,
-            body: input.call(syn::Block::parse_within)?,
+            cx,
+            body: input.parse()?,
         })
     }
 }
 
 impl ToTokens for Live {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let body = &self.body;
         // Read the input span: line!() and column!() would name the outer
         // view! invocation and merge its distinct live! sites.
-        let start = body
-            .first()
-            .map_or_else(Span::call_site, Spanned::span)
-            .start();
+        let start = self.body.span().unwrap_or_else(Span::call_site).start();
         let line = u32::try_from(start.line).expect("source line fits in u32");
         let column = u32::try_from(start.column + 1).expect("source column fits in u32");
         let site = quote! {
@@ -53,16 +58,27 @@ impl ToTokens for Live {
         } else {
             quote! { __cx }
         };
-        let view = quote! {
-            #topcoat_view::internal::LiveView::new(
-                #topcoat_context::identity(#cx),
-                #site,
-                #topcoat_view::pass(#cx),
-                async move {
-                    #borrow_cx
-                    #(#body)*
-                },
-            )
+        let identity = quote! { #topcoat_context::identity(#cx) };
+        let view = match &self.body {
+            LiveBody::Single(body) => quote! {
+                #topcoat_view::internal::LiveView::new(
+                    #identity,
+                    #site,
+                    #topcoat_view::pass(#cx),
+                    async move {
+                        #borrow_cx
+                        #(#body)*
+                    },
+                )
+            },
+            LiveBody::Branches(branches) => {
+                let arms = LiveBranch::arms(branches, &identity, &site, borrow_cx.as_ref());
+                quote! {
+                    match #topcoat_view::pass(#cx) {
+                        #(#arms)*
+                    }
+                }
+            }
         };
         match &self.cx {
             Some(cx) => {
@@ -81,21 +97,184 @@ impl ToTokens for Live {
 #[cfg(feature = "pretty")]
 impl topcoat_core_grammar::pretty::PrettyPrint for Live {
     fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        use topcoat_core_grammar::pretty::PrettyPrint;
+
         if let Some(cx) = &self.cx {
             cx.pretty_print(printer);
         }
-        for (index, stmt) in self.body.iter().enumerate() {
-            stmt.pretty_print(printer);
-            if index < self.body.len() - 1 {
+        let items: Vec<&dyn PrettyPrint> = match &self.body {
+            LiveBody::Single(body) => body.iter().map(|stmt| stmt as &dyn PrettyPrint).collect(),
+            LiveBody::Branches(branches) => branches
+                .iter()
+                .map(|branch| branch as &dyn PrettyPrint)
+                .collect(),
+        };
+        for (index, item) in items.iter().enumerate() {
+            item.pretty_print(printer);
+            if index < items.len() - 1 {
                 printer.scan_same_line_trivia();
                 printer.scan_break();
                 " ".pretty_print(printer);
                 printer.scan_trivia(true, true);
             }
         }
-        if self.body.len() > 1 {
+        // Branches are block arms and lay out one per line like a `match`.
+        if items.len() > 1 || matches!(self.body, LiveBody::Branches(_)) {
             printer.scan_force_break();
         }
+    }
+}
+
+/// The body of a `live!` region: one body serving both phases, or a branch
+/// per phase.
+pub enum LiveBody {
+    /// A single body, run in the initial phase until its first emission and
+    /// again in full in the connected phase.
+    Single(Vec<syn::Stmt>),
+    /// A body per phase, each named after a `Pass` variant.
+    Branches(Vec<LiveBranch>),
+}
+
+impl LiveBody {
+    /// The span the region's site key is derived from: where the body starts.
+    fn span(&self) -> Option<Span> {
+        match self {
+            Self::Single(body) => body.first().map(Spanned::span),
+            Self::Branches(branches) => branches.first().map(|branch| branch.pass.span()),
+        }
+    }
+}
+
+impl Parse for LiveBody {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        if !LiveBranch::peek(input) {
+            return Ok(Self::Single(input.call(syn::Block::parse_within)?));
+        }
+        let mut branches: Vec<LiveBranch> = Vec::new();
+        while !input.is_empty() {
+            let branch: LiveBranch = input.parse()?;
+            if branches.iter().any(|seen| seen.pass == branch.pass) {
+                return Err(syn::Error::new(
+                    branch.pass.span(),
+                    format!("duplicate `{}` branch", branch.pass),
+                ));
+            }
+            branches.push(branch);
+        }
+        Ok(Self::Branches(branches))
+    }
+}
+
+/// One phase of a `live!` region, written like a `match` arm:
+/// `Initial => { ... }` or `Connected => { ... }`.
+///
+/// The name is emitted as a `Pass` variant, so the compiler resolves it and
+/// rejects a name that is not a pass.
+pub struct LiveBranch {
+    pub pass: Ident,
+    pub fat_arrow_token: Token![=>],
+    pub body: syn::Block,
+    pub comma: Option<Token![,]>,
+}
+
+impl LiveBranch {
+    /// The variant names a branch may carry, in the order their arms are
+    /// filled in when left out.
+    const PASSES: [&str; 2] = ["Initial", "Connected"];
+
+    /// Whether the input starts with a branch, `Ident => {`.
+    fn peek(input: ParseStream) -> bool {
+        // `=>` spans two token positions, so the brace sits past `peek3`.
+        let fork = input.fork();
+        fork.parse::<Ident>().is_ok() && fork.parse::<Token![=>]>().is_ok() && fork.peek(Brace)
+    }
+
+    /// The `match` arms building the region's view for each pass.
+    ///
+    /// Every written branch becomes an arm in its own order, and a pass with
+    /// no branch gets an arm with no body, so the `match` is exhaustive
+    /// exactly when every name is a pass.
+    fn arms(
+        branches: &[Self],
+        identity: &TokenStream,
+        site: &TokenStream,
+        borrow_cx: Option<&TokenStream>,
+    ) -> Vec<TokenStream> {
+        let has = |name: &str| branches.iter().any(|branch| branch.pass == name);
+        let connecting = has("Connected");
+        let none = quote! {
+            ::core::option::Option::<
+                ::core::future::Ready<#topcoat_error::Result<#topcoat_view::EmitToken>>,
+            >::None
+        };
+
+        let mut arms: Vec<TokenStream> = branches
+            .iter()
+            .map(|branch| {
+                let pass = &branch.pass;
+                let stmts = &branch.body.stmts;
+                let body = quote! {
+                    ::core::option::Option::Some(async move {
+                        #borrow_cx
+                        #(#stmts)*
+                    })
+                };
+                let view = if pass == "Initial" {
+                    quote! {
+                        #topcoat_view::internal::LiveView::initial(#identity, #site, #body, #connecting)
+                    }
+                } else if pass == "Connected" {
+                    quote! { #topcoat_view::internal::LiveView::connected(#identity, #site, #body) }
+                } else {
+                    // Not a pass: the pattern fails to resolve, and the body
+                    // stays in the expansion so it is still checked.
+                    quote! {{
+                        let _ = #body;
+                        ::core::unreachable!()
+                    }}
+                };
+                quote! { #topcoat_view::Pass::#pass => #view, }
+            })
+            .collect();
+
+        for name in Self::PASSES {
+            if has(name) {
+                continue;
+            }
+            let pass = Ident::new(name, Span::call_site());
+            let view = if name == "Initial" {
+                quote! {
+                    #topcoat_view::internal::LiveView::initial(#identity, #site, #none, #connecting)
+                }
+            } else {
+                quote! { #topcoat_view::internal::LiveView::connected(#identity, #site, #none) }
+            };
+            arms.push(quote! { #topcoat_view::Pass::#pass => #view, });
+        }
+
+        arms
+    }
+}
+
+impl Parse for LiveBranch {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        Ok(Self {
+            pass: input.parse()?,
+            fat_arrow_token: input.parse()?,
+            body: input.parse()?,
+            comma: input.parse()?,
+        })
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for LiveBranch {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.pass.pretty_print(printer);
+        " ".pretty_print(printer);
+        self.fat_arrow_token.pretty_print(printer);
+        " ".pretty_print(printer);
+        self.body.pretty_print(printer);
     }
 }
 
@@ -184,12 +363,84 @@ mod tests {
         assert!(tokens.contains("let __cx = & __cx ;"), "{tokens}");
     }
 
-    #[test]
-    fn a_live_body_is_wrapped_in_an_async_block() {
-        let tokens = syn::parse_str::<Live>("let x = 1; emit! { <div></div> }")
+    fn live(source: &str) -> String {
+        syn::parse_str::<Live>(source)
             .unwrap()
             .to_token_stream()
-            .to_string();
+            .to_string()
+    }
+
+    #[test]
+    fn a_live_body_is_wrapped_in_an_async_block() {
+        let tokens = live("let x = 1; emit! { <div></div> }");
         assert!(tokens.contains("async move { let x = 1 ;"), "{tokens}");
+        assert!(tokens.contains("LiveView :: new ("), "{tokens}");
+    }
+
+    #[test]
+    fn branches_expand_to_a_match_on_the_pass() {
+        let tokens = live("Initial => { emit! { <div></div> } } Connected => { emit! { <p></p> } }");
+        assert!(tokens.contains("match :: topcoat_view :: pass ("), "{tokens}");
+        assert!(tokens.contains(":: Pass :: Initial =>"), "{tokens}");
+        assert!(tokens.contains(":: Pass :: Connected =>"), "{tokens}");
+        assert!(tokens.contains("LiveView :: initial ("), "{tokens}");
+        assert!(tokens.contains("LiveView :: connected ("), "{tokens}");
+        // The initial phase learns it has a connected phase to run later.
+        assert!(tokens.contains(", true) ,"), "{tokens}");
+    }
+
+    #[test]
+    fn a_missing_branch_gets_an_arm_without_a_body() {
+        let tokens = live("Initial => { emit! { <div></div> } }");
+        assert!(tokens.contains(":: Pass :: Connected =>"), "{tokens}");
+        assert!(tokens.contains(":: None)"), "{tokens}");
+        assert!(tokens.contains(", false) ,"), "{tokens}");
+
+        let tokens = live("Connected => { emit! { <div></div> } }");
+        assert!(tokens.contains(":: Pass :: Initial =>"), "{tokens}");
+        assert!(tokens.contains(":: None , true) ,"), "{tokens}");
+    }
+
+    #[test]
+    fn a_branch_name_is_emitted_as_a_pass_variant() {
+        // The compiler reports the unknown variant at the name's span.
+        let tokens = live("Later => { emit! { <div></div> } }");
+        assert!(tokens.contains(":: Pass :: Later =>"), "{tokens}");
+        assert!(tokens.contains("unreachable !"), "{tokens}");
+    }
+
+    #[test]
+    fn a_duplicate_branch_is_rejected() {
+        let error = syn::parse_str::<Live>("Initial => {} Initial => {}")
+            .err()
+            .expect("the second branch is rejected");
+        assert_eq!(error.to_string(), "duplicate `Initial` branch");
+    }
+
+    #[test]
+    fn a_leading_cx_precedes_the_branches() {
+        let tokens = live("cx => Initial => { emit! { <div></div> } }");
+        assert!(tokens.contains("Cx = (cx) . clone () ;"), "{tokens}");
+        assert!(tokens.contains(":: Pass :: Initial =>"), "{tokens}");
+        assert!(tokens.contains("let __cx = & __cx ;"), "{tokens}");
+    }
+
+    #[cfg(feature = "pretty")]
+    #[test]
+    fn branches_format_like_match_arms() {
+        use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
+
+        let mut registry = Registry::new();
+        registry.register_macro::<Live>("live");
+        registry.register_macro::<Emit>("emit");
+        let formatted = pretty_print_str(
+            &registry,
+            "live! {Initial => {emit! { <div></div> }}, Connected => {emit! { <p></p> }}}",
+        )
+        .unwrap();
+        assert_eq!(
+            formatted,
+            "live! {\n    Initial => {\n        emit! { <div></div> }\n    }\n    Connected => {\n        emit! { <p></p> }\n    }\n}"
+        );
     }
 }

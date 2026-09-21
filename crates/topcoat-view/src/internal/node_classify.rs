@@ -60,7 +60,7 @@ classify_view! {
 }
 
 classify_view! {
-    impl<Fut> for LiveView<Fut>
+    impl<I, C> for LiveView<I, C>
 }
 
 classify_view! {

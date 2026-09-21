@@ -7,7 +7,7 @@ use std::{
 use topcoat::{
     Result,
     context::Cx,
-    view::{View, ViewExt, ViewFirst, ViewSwap, component, emit, live, view},
+    view::{Pass, View, ViewExt, ViewFirst, ViewSwap, component, emit, live, view},
 };
 
 #[component]
@@ -317,7 +317,7 @@ async fn live_loop_iterations_take_turns_swapping() {
 }
 
 #[tokio::test]
-#[should_panic(expected = "used `.single()` on a View that is live")]
+#[should_panic(expected = "used `.single()` on a View that changes after it went out")]
 async fn single_panics_on_a_region_that_may_update() {
     let cx = &Cx::default();
     let _ = view! {
@@ -404,4 +404,88 @@ async fn joined_emissions_deliver_the_swaps_of_a_nested_region() {
     }
     swaps.sort();
     assert_eq!(swaps, ["<i>2</i>", "<p>b</p>"]);
+}
+
+#[tokio::test]
+async fn a_region_with_both_branches_runs_the_initial_one_in_the_initial_pass() {
+    let cx = &Cx::default();
+    let mut view = pin!(view! { cx =>
+        <main>
+            (live! {
+                Initial => { emit! { <p>"initial"</p> } }
+                Connected => { emit! { <p>"connected"</p> } }
+            })
+        </main>
+    });
+
+    // The initial branch is done after one emission, but the region keeps
+    // its markers for the connected phase to swap into.
+    let content = first(&mut view).await.unwrap();
+    assert!(!content.streaming);
+    assert!(content.connecting);
+    let html = content.content.render(cx);
+    assert!(html.contains("<!--topcoat::region::start("), "{html}");
+    assert!(html.contains("<p>initial</p>"), "{html}");
+    assert!(!html.contains("connected"), "{html}");
+    assert!(next_swap(&mut view).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn a_region_with_only_an_initial_branch_settles() {
+    let cx = &Cx::default();
+    let mut view = pin!(view! { cx =>
+        <main>(live! { Initial => { emit! { <p>"initial"</p> } } })</main>
+    });
+
+    let content = first(&mut view).await.unwrap();
+    assert!(!content.streaming);
+    assert!(!content.connecting);
+    assert_eq!(content.content.render(cx), "<main><p>initial</p></main>");
+}
+
+#[tokio::test]
+async fn a_region_with_only_a_connected_branch_renders_empty_in_the_initial_pass() {
+    let cx = &Cx::default();
+    let mut view = pin!(view! { cx =>
+        <main>(live! { Connected => { emit! { <p>"connected"</p> } } })</main>
+    });
+
+    let content = first(&mut view).await.unwrap();
+    assert!(!content.streaming);
+    assert!(content.connecting);
+    let html = content.content.render(cx);
+    assert!(
+        html.contains("--><!--topcoat::region::end("),
+        "the region is empty between its markers: {html}"
+    );
+    assert!(!html.contains("connected"), "{html}");
+    assert!(next_swap(&mut view).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn a_region_runs_its_connected_branch_in_the_connected_pass() {
+    let cx = &Cx::default().with(Pass::Connected);
+    let mut view = pin!(view! { cx =>
+        <main>
+            (live! {
+                Initial => { emit! { <p>"initial"</p> } }
+                Connected => { emit! { <p>"connected"</p> } }
+            })
+        </main>
+    });
+
+    let content = first(&mut view).await.unwrap();
+    assert!(!content.connecting);
+    assert_eq!(content.content.render(cx), "<main><p>connected</p></main>");
+}
+
+#[tokio::test]
+async fn a_single_body_runs_in_the_connected_pass() {
+    let cx = &Cx::default().with(Pass::Connected);
+    let mut view = pin!(view! { cx =>
+        <main>(live! { emit! { <p>"body"</p> } })</main>
+    });
+
+    let content = first(&mut view).await.unwrap();
+    assert_eq!(content.content.render(cx), "<main><p>body</p></main>");
 }
