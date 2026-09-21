@@ -379,8 +379,12 @@ mod tests {
 
     #[test]
     fn branches_expand_to_a_match_on_the_pass() {
-        let tokens = live("Initial => { emit! { <div></div> } } Connected => { emit! { <p></p> } }");
-        assert!(tokens.contains("match :: topcoat_view :: pass ("), "{tokens}");
+        let tokens =
+            live("Initial => { emit! { <div></div> } } Connected => { emit! { <p></p> } }");
+        assert!(
+            tokens.contains("match :: topcoat_view :: pass ("),
+            "{tokens}"
+        );
         assert!(tokens.contains(":: Pass :: Initial =>"), "{tokens}");
         assert!(tokens.contains(":: Pass :: Connected =>"), "{tokens}");
         assert!(tokens.contains("LiveView :: initial ("), "{tokens}");
