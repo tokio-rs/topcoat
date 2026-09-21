@@ -7,8 +7,11 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
-use super::yielder::{DriveFuture, Yield, poll_body};
-use crate::{View, ViewFirst, ViewPass, ViewSwap};
+use super::yielder::DriveFuture;
+use crate::{
+    View, ViewFirst, ViewPass, ViewSwap,
+    internal::yielder::{poll_first, poll_swap},
+};
 
 pin_project! {
     /// A [`View`] polled through an async body that owns data the view
@@ -51,12 +54,9 @@ where
     fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
         let this = self.project();
 
-        match poll_body(this.body, cx) {
-            (Poll::Pending, Some(Yield::First(first))) => Poll::Ready(Ok(first)),
+        match poll_first(this.body, cx) {
+            (Poll::Pending, Some(first)) => Poll::Ready(Ok(first)),
             (Poll::Pending, None) => Poll::Pending,
-            (Poll::Pending, Some(Yield::Swap(_))) => {
-                panic!("move view future yielded a swap before its first content")
-            }
             (Poll::Ready(_), Some(_)) => {
                 panic!("move view future yielded without returning pending")
             }
@@ -74,12 +74,9 @@ where
     ) -> Poll<Result<Option<ViewSwap>>> {
         let this = self.project();
 
-        match poll_body(this.body, cx) {
-            (Poll::Pending, Some(Yield::Swap(swap))) => Poll::Ready(Ok(Some(swap))),
+        match poll_swap(this.body, cx, pass) {
+            (Poll::Pending, Some(swap)) => Poll::Ready(Ok(Some(swap))),
             (Poll::Pending, None) => Poll::Pending,
-            (Poll::Pending, Some(Yield::First(_))) => {
-                panic!("move view future yielded first content twice")
-            }
             (Poll::Ready(_), Some(_)) => {
                 panic!("move view future yielded without returning pending")
             }
