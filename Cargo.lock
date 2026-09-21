@@ -775,7 +775,7 @@ dependencies = [
  "diplomat_core",
  "proc-macro2",
  "quote",
- "syn 3.0.5",
+ "syn 3.0.6",
 ]
 
 [[package]]
@@ -795,7 +795,7 @@ dependencies = [
  "serde",
  "smallvec",
  "strck",
- "syn 3.0.5",
+ "syn 3.0.6",
 ]
 
 [[package]]
@@ -2739,9 +2739,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "3.0.5"
+version = "3.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12df2e0110f65b775f769bb17ef989067a1d931b2eb822bd4346631eeada89f9"
+checksum = "8593e8e72159ed2257d083c7a454a85cbf854f37a0966d8d483aff8c8a3ebcee"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3207,7 +3207,7 @@ dependencies = [
  "proc-macro2",
  "serde",
  "serde_json",
- "syn 2.0.117",
+ "syn 3.0.6",
  "tokio",
  "toml",
  "topcoat",
@@ -3259,7 +3259,7 @@ dependencies = [
  "proc-macro-crate",
  "proc-macro2",
  "quote",
- "syn 2.0.117",
+ "syn 3.0.6",
 ]
 
 [[package]]
@@ -3269,7 +3269,7 @@ dependencies = [
  "quote",
  "serde",
  "serde_json",
- "syn 2.0.117",
+ "syn 3.0.6",
  "tokio",
  "topcoat",
  "topcoat-core-grammar",
@@ -3313,7 +3313,7 @@ version = "0.8.1"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.117",
+ "syn 3.0.6",
  "topcoat-core-grammar",
  "topcoat-font",
 ]
@@ -3323,7 +3323,7 @@ name = "topcoat-font-macro"
 version = "0.8.1"
 dependencies = [
  "quote",
- "syn 2.0.117",
+ "syn 3.0.6",
  "topcoat",
  "topcoat-font-grammar",
 ]
@@ -3363,7 +3363,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde_json",
- "syn 2.0.117",
+ "syn 3.0.6",
  "topcoat-core-grammar",
  "topcoat-icon",
 ]
@@ -3374,7 +3374,7 @@ version = "0.8.1"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.117",
+ "syn 3.0.6",
  "topcoat",
  "topcoat-icon-grammar",
 ]
@@ -3398,7 +3398,7 @@ version = "0.8.1"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.117",
+ "syn 3.0.6",
  "topcoat-core-grammar",
  "topcoat-mail",
  "topcoat-view-grammar",
@@ -3409,7 +3409,7 @@ name = "topcoat-mail-macro"
 version = "0.8.1"
 dependencies = [
  "quote",
- "syn 2.0.117",
+ "syn 3.0.6",
  "tokio",
  "topcoat",
  "topcoat-mail-grammar",
@@ -3461,7 +3461,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn 2.0.117",
+ "syn 3.0.6",
  "topcoat-core-grammar",
 ]
 
@@ -3472,7 +3472,7 @@ dependencies = [
  "http",
  "quote",
  "serde",
- "syn 2.0.117",
+ "syn 3.0.6",
  "tokio",
  "topcoat",
  "topcoat-router-grammar",
@@ -3514,7 +3514,7 @@ dependencies = [
  "quote",
  "serde",
  "serde_json",
- "syn 2.0.117",
+ "syn 3.0.6",
  "topcoat-core-grammar",
  "topcoat-runtime",
  "uuid",
@@ -3526,7 +3526,7 @@ version = "0.8.1"
 dependencies = [
  "http",
  "quote",
- "syn 2.0.117",
+ "syn 3.0.6",
  "tokio",
  "topcoat",
  "topcoat-runtime-grammar",
@@ -3601,7 +3601,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn 2.0.117",
+ "syn 3.0.6",
  "topcoat-core-grammar",
  "topcoat-view",
 ]
@@ -3612,7 +3612,7 @@ version = "0.8.1"
 dependencies = [
  "futures-core",
  "quote",
- "syn 2.0.117",
+ "syn 3.0.6",
  "tokio",
  "topcoat",
  "topcoat-view-grammar",
@@ -4442,7 +4442,7 @@ checksum = "34df6fc39dbd26ddc9c10e6a2984476e13acce22e64e4487636ef494369225da"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.5",
+ "syn 3.0.6",
 ]
 
 [[package]]

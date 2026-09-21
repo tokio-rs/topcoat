@@ -98,9 +98,9 @@ impl PrettyPrint for syn::TypeParam {
             " ".pretty_print(printer);
             bounds(printer, &self.bounds);
         }
-        if let Some(default) = &self.default {
+        if let Some((eq_token, default)) = &self.default {
             " ".pretty_print(printer);
-            self.eq_token.pretty_print(printer);
+            eq_token.pretty_print(printer);
             " ".pretty_print(printer);
             default.pretty_print(printer);
         }
@@ -116,9 +116,9 @@ impl PrettyPrint for syn::ConstParam {
         self.colon_token.pretty_print(printer);
         " ".pretty_print(printer);
         self.ty.pretty_print(printer);
-        if let Some(default) = &self.default {
+        if let Some((eq_token, default)) = &self.default {
             " ".pretty_print(printer);
-            self.eq_token.pretty_print(printer);
+            eq_token.pretty_print(printer);
             " ".pretty_print(printer);
             default.pretty_print(printer);
         }
@@ -193,9 +193,16 @@ impl PrettyPrint for syn::Signature {
             asyncness.pretty_print(printer);
             " ".pretty_print(printer);
         }
-        if let Some(unsafety) = &self.unsafety {
-            unsafety.pretty_print(printer);
-            " ".pretty_print(printer);
+        match &self.safety {
+            syn::Safety::Safe(token) => {
+                common::verbatim(printer, token);
+                " ".pretty_print(printer);
+            }
+            syn::Safety::Unsafe(token) => {
+                token.pretty_print(printer);
+                " ".pretty_print(printer);
+            }
+            syn::Safety::Default => {}
         }
         if let Some(abi) = &self.abi {
             abi.pretty_print(printer);
@@ -229,17 +236,14 @@ impl PrettyPrint for syn::FnArg {
 impl PrettyPrint for syn::Receiver {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
         self.attrs.pretty_print(printer);
-        if let Some(colon_token) = &self.colon_token {
-            self.self_token.pretty_print(printer);
-            colon_token.pretty_print(printer);
-            " ".pretty_print(printer);
-            self.ty.pretty_print(printer);
-            return;
-        }
-        if let Some((and_token, lifetime)) = &self.reference {
+        if let syn::ReceiverKind::Reference(and_token, lifetime, mutability) = &self.kind {
             and_token.pretty_print(printer);
             if let Some(lifetime) = lifetime {
                 lifetime.pretty_print(printer);
+                " ".pretty_print(printer);
+            }
+            if let Some(mutability) = mutability {
+                mutability.pretty_print(printer);
                 " ".pretty_print(printer);
             }
         }
@@ -248,6 +252,11 @@ impl PrettyPrint for syn::Receiver {
             " ".pretty_print(printer);
         }
         self.self_token.pretty_print(printer);
+        if let syn::ReceiverKind::Typed(colon_token, ty) = &self.kind {
+            colon_token.pretty_print(printer);
+            " ".pretty_print(printer);
+            ty.pretty_print(printer);
+        }
     }
 }
 
@@ -510,7 +519,7 @@ impl PrettyPrint for syn::ItemMod {
 impl PrettyPrint for syn::ItemImpl {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
         self.attrs.pretty_print(printer);
-        if let Some(defaultness) = &self.defaultness {
+        if let Some(defaultness) = &self.modifiers.defaultness {
             defaultness.pretty_print(printer);
             " ".pretty_print(printer);
         }
@@ -521,8 +530,8 @@ impl PrettyPrint for syn::ItemImpl {
         self.impl_token.pretty_print(printer);
         self.generics.pretty_print(printer);
         " ".pretty_print(printer);
-        if let Some((not_token, path, for_token)) = &self.trait_ {
-            not_token.pretty_print(printer);
+        if let Some((path, for_token)) = &self.trait_ {
+            self.modifiers.polarity.pretty_print(printer);
             path.pretty_print(printer);
             " ".pretty_print(printer);
             for_token.pretty_print(printer);
@@ -554,7 +563,7 @@ impl PrettyPrint for syn::ImplItemFn {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
         self.attrs.pretty_print(printer);
         self.vis.pretty_print(printer);
-        if let Some(defaultness) = &self.defaultness {
+        if let Some(defaultness) = &self.modifiers.defaultness {
             defaultness.pretty_print(printer);
             " ".pretty_print(printer);
         }
@@ -572,7 +581,7 @@ impl PrettyPrint for syn::ImplItemConst {
         }
         self.attrs.pretty_print(printer);
         self.vis.pretty_print(printer);
-        if let Some(defaultness) = &self.defaultness {
+        if let Some(defaultness) = &self.modifiers.defaultness {
             defaultness.pretty_print(printer);
             " ".pretty_print(printer);
         }
@@ -599,7 +608,7 @@ impl PrettyPrint for syn::ImplItemType {
         }
         self.attrs.pretty_print(printer);
         self.vis.pretty_print(printer);
-        if let Some(defaultness) = &self.defaultness {
+        if let Some(defaultness) = &self.modifiers.defaultness {
             defaultness.pretty_print(printer);
             " ".pretty_print(printer);
         }
@@ -623,7 +632,7 @@ impl PrettyPrint for syn::ItemTrait {
             unsafety.pretty_print(printer);
             " ".pretty_print(printer);
         }
-        if let Some(auto_token) = &self.auto_token {
+        if let Some(auto_token) = &self.modifiers.auto_token {
             auto_token.pretty_print(printer);
             " ".pretty_print(printer);
         }

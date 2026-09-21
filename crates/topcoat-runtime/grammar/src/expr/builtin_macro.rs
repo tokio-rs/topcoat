@@ -305,9 +305,7 @@ impl<'ast> Visit<'ast> for RawRustLocalCollector<'_> {
     fn visit_arm(&mut self, arm: &'ast syn::Arm) {
         self.push_scope();
         self.bind_pat(&arm.pat);
-        if let Some((_, guard)) = &arm.guard {
-            self.visit_expr(guard);
-        }
+        self.visit_pat(&arm.pat);
         self.visit_expr(&arm.body);
         self.pop_scope();
     }
@@ -319,6 +317,8 @@ struct PatternIdentCollector {
 }
 
 impl<'ast> Visit<'ast> for PatternIdentCollector {
+    fn visit_expr(&mut self, _expr: &'ast syn::Expr) {}
+
     fn visit_pat_ident(&mut self, pat: &'ast syn::PatIdent) {
         self.idents.push(pat.ident.clone());
         visit::visit_pat_ident(self, pat);
