@@ -7,7 +7,7 @@ use pin_project_lite::pin_project;
 use topcoat_core::{context::Cx, error::Result};
 
 use super::Builder;
-use crate::{View, ViewFirst, ViewHandle, ViewPass, ViewSwap};
+use crate::{View, ViewFirst, ViewHandle, ViewSwap};
 
 pin_project! {
     /// A template as a [`View`]: its dynamic node positions driven
@@ -70,7 +70,6 @@ where
     fn poll_swap(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        pass: ViewPass,
     ) -> Poll<Result<Option<ViewSwap>>> {
         let mut this = self.project();
 
@@ -80,7 +79,7 @@ where
         let start = *this.next_swap_index;
         let mut all_done = true;
         for (from, to) in [(start, len), (0, start)] {
-            match this.units.as_mut().poll_swap_range(cx, pass, from, to) {
+            match this.units.as_mut().poll_swap_range(cx, from, to) {
                 Poll::Pending => all_done = false,
                 Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
                 Poll::Ready(Ok(None)) => {}
@@ -132,7 +131,6 @@ pub trait JoinUnits {
     fn poll_swap_range(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        pass: ViewPass,
         from: usize,
         to: usize,
     ) -> Poll<Result<Option<(usize, ViewSwap)>>>;
@@ -160,7 +158,6 @@ impl JoinUnits for () {
     fn poll_swap_range(
         self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
-        _pass: ViewPass,
         _from: usize,
         _to: usize,
     ) -> Poll<Result<Option<(usize, ViewSwap)>>> {
@@ -264,7 +261,6 @@ where
     fn poll_swap_range(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        pass: ViewPass,
         from: usize,
         to: usize,
     ) -> Poll<Result<Option<(usize, ViewSwap)>>> {
@@ -276,7 +272,7 @@ where
         let mut pending = false;
 
         if from == 0 && !*this.done {
-            match this.view.poll_swap(cx, pass) {
+            match this.view.poll_swap(cx) {
                 Poll::Ready(Ok(Some(swap))) => return Poll::Ready(Ok(Some((0, swap)))),
                 Poll::Ready(Ok(None)) => *this.done = true,
                 Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
@@ -286,7 +282,7 @@ where
 
         match this
             .rest
-            .poll_swap_range(cx, pass, from.saturating_sub(1), to - 1)
+            .poll_swap_range(cx, from.saturating_sub(1), to - 1)
         {
             Poll::Ready(Ok(Some((position, swap)))) => Poll::Ready(Ok(Some((position + 1, swap)))),
             // The rest of the range is done, but this unit still owes a swap.
@@ -357,7 +353,7 @@ mod tests {
         let mut task_cx = Context::from_waker(Waker::noop());
         let mut order = Vec::new();
         loop {
-            match view.as_mut().poll_swap(&mut task_cx, ViewPass::Initial) {
+            match view.as_mut().poll_swap(&mut task_cx) {
                 Poll::Ready(Ok(Some(swap))) => order.push(swap.region),
                 Poll::Ready(Ok(None)) => break,
                 Poll::Ready(Err(_)) => panic!("the tickers never fail"),

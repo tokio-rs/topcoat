@@ -62,7 +62,7 @@ impl ToTokens for Live {
                     #identity,
                     #site,
                     #topcoat_view::pass(#cx),
-                    async move {
+                    move |__region| async move {
                         #borrow_cx
                         #(#body)*
                     },
@@ -239,7 +239,7 @@ impl LiveBranch {
                 #site,
                 __pass,
                 #connected,
-                async move {
+                move |__region| async move {
                     #borrow_cx
                     match __branch {
                         #(#arms)*
@@ -292,7 +292,7 @@ impl ToTokens for Emit {
         let view = builder.finish().emit_emit(owns_cx);
 
         let drive = quote! {
-            #topcoat_view::internal::LiveView::drive(#view).await
+            #topcoat_view::internal::LiveView::drive(__region, #view).await
         };
 
         // The view borrows the context rather than moving it, so the binding
@@ -334,7 +334,7 @@ mod tests {
     #[test]
     fn an_emitted_view_is_driven_into_the_live_view() {
         let tokens = emit("<div></div>");
-        assert!(tokens.starts_with(":: topcoat_view :: internal :: LiveView :: drive ("));
+        assert!(tokens.starts_with(":: topcoat_view :: internal :: LiveView :: drive (__region ,"));
         assert!(tokens.ends_with(". await"), "{tokens}");
     }
 
@@ -377,8 +377,8 @@ mod tests {
             live("Initial => { emit! { <div></div> } } Connected => { emit! { <p></p> } }");
         assert!(tokens.contains("LiveView :: branches ("), "{tokens}");
         assert!(tokens.contains("async move { match __branch {"), "{tokens}");
-        assert!(tokens.contains(":: Pass :: Initial => {"), "{tokens}");
-        assert!(tokens.contains(":: Pass :: Connected => {"), "{tokens}");
+        assert!(tokens.contains(":: ViewPass :: Initial => {"), "{tokens}");
+        assert!(tokens.contains(":: ViewPass :: Connected => {"), "{tokens}");
         // With a connected branch, the pass decides which one runs.
         assert!(tokens.contains("let __branch = __pass ;"), "{tokens}");
         assert!(tokens.contains("__pass , true ,"), "{tokens}");
@@ -388,12 +388,12 @@ mod tests {
     fn a_region_without_a_connected_branch_runs_its_initial_one_in_either_pass() {
         let tokens = live("Initial => { emit! { <div></div> } }");
         assert!(
-            tokens.contains("let __branch = :: topcoat_view :: Pass :: Initial ;"),
+            tokens.contains("let __branch = :: topcoat_view :: ViewPass :: Initial ;"),
             "{tokens}"
         );
         assert!(tokens.contains("__pass , false ,"), "{tokens}");
         assert!(
-            tokens.contains(":: Pass :: Connected => { :: core :: unreachable !"),
+            tokens.contains(":: ViewPass :: Connected => { :: core :: unreachable !"),
             "{tokens}"
         );
     }
@@ -402,9 +402,9 @@ mod tests {
     fn a_region_without_an_initial_branch_is_a_compile_error() {
         // The expansion stays intact so the branch names still resolve.
         let tokens = live("Connected => { emit! { <div></div> } }");
-        assert!(tokens.contains(":: Pass :: Connected => {"), "{tokens}");
+        assert!(tokens.contains(":: ViewPass :: Connected => {"), "{tokens}");
         assert!(
-            tokens.contains(":: Pass :: Initial => { :: core :: compile_error !"),
+            tokens.contains(":: ViewPass :: Initial => { :: core :: compile_error !"),
             "{tokens}"
         );
     }
@@ -413,7 +413,7 @@ mod tests {
     fn a_branch_name_is_emitted_as_a_pass_variant() {
         // The compiler reports the unknown variant at the name's span.
         let tokens = live("Initial => { emit! { <div></div> } } Later => { emit! { <p></p> } }");
-        assert!(tokens.contains(":: Pass :: Later => {"), "{tokens}");
+        assert!(tokens.contains(":: ViewPass :: Later => {"), "{tokens}");
     }
 
     #[test]
@@ -428,7 +428,7 @@ mod tests {
     fn a_leading_cx_precedes_the_branches() {
         let tokens = live("cx => Initial => { emit! { <div></div> } }");
         assert!(tokens.contains("Cx = (cx) . clone () ;"), "{tokens}");
-        assert!(tokens.contains(":: Pass :: Initial =>"), "{tokens}");
+        assert!(tokens.contains(":: ViewPass :: Initial =>"), "{tokens}");
         assert!(tokens.contains("let __cx = & __cx ;"), "{tokens}");
     }
 

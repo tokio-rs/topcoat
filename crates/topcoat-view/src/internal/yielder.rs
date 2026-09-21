@@ -8,13 +8,14 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
-use crate::{View, ViewFirst, ViewPass, ViewSwap};
+use crate::{View, ViewFirst, ViewSwap};
 
 pub(super) fn poll_first<Fut: Future>(
     body: Pin<&mut Fut>,
     cx: &mut Context<'_>,
 ) -> (Poll<Fut::Output>, Option<ViewFirst>) {
     let _guard = YieldFirstGuard::new();
+    let _input_guard = DriveInputGuard::new();
     DRIVE_INPUT.set(Some(DriveInput::First));
     (body.poll(cx), YIELD_FIRST.take())
 }
@@ -22,10 +23,10 @@ pub(super) fn poll_first<Fut: Future>(
 pub(super) fn poll_swap<Fut: Future>(
     body: Pin<&mut Fut>,
     cx: &mut Context<'_>,
-    pass: ViewPass,
 ) -> (Poll<Fut::Output>, Option<ViewSwap>) {
     let _guard = YieldSwapGuard::new();
-    DRIVE_INPUT.set(Some(DriveInput::Swap { pass }));
+    let _input_guard = DriveInputGuard::new();
+    DRIVE_INPUT.set(Some(DriveInput::Swap));
     (body.poll(cx), YIELD_SWAP.take())
 }
 
@@ -35,10 +36,10 @@ thread_local! {
     static YIELD_SWAP: Cell<Option<ViewSwap>> = const { Cell::new(None) };
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum DriveInput {
     First,
-    Swap { pass: ViewPass },
+    Swap,
 }
 
 macro_rules! guard {
@@ -63,6 +64,7 @@ macro_rules! guard {
 
 guard!(YieldFirstGuard, YIELD_FIRST: ViewFirst);
 guard!(YieldSwapGuard, YIELD_SWAP: ViewSwap);
+guard!(DriveInputGuard, DRIVE_INPUT: DriveInput);
 
 pin_project! {
     pub(super) struct DriveFuture<V> {
@@ -82,8 +84,8 @@ impl<V: View> Future for DriveFuture<V> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        let Some(input) = DRIVE_INPUT.take() else {
-            panic!("polled DriveFuture without YieldInput");
+        let Some(input) = DRIVE_INPUT.get() else {
+            panic!("polled DriveFuture without DriveInput");
         };
 
         match input {
@@ -103,7 +105,7 @@ impl<V: View> Future for DriveFuture<V> {
                     Poll::Pending => return Poll::Pending,
                 }
             }
-            DriveInput::Swap { pass } => {
+            DriveInput::Swap => {
                 if YIELD_SWAP.with(|cell| {
                     let value = cell.take();
                     let occupied = value.is_some();
@@ -113,7 +115,7 @@ impl<V: View> Future for DriveFuture<V> {
                     cx.waker().wake_by_ref();
                     return Poll::Pending;
                 }
-                match this.view.poll_swap(cx, pass) {
+                match this.view.poll_swap(cx) {
                     Poll::Ready(Ok(Some(swap))) => YIELD_SWAP.with(|cell| cell.set(Some(swap))),
                     Poll::Ready(Ok(None)) => return Poll::Ready(Ok(())),
                     Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),

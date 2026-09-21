@@ -9,7 +9,7 @@ use topcoat_core::error::Result;
 
 use super::yielder::DriveFuture;
 use crate::{
-    View, ViewFirst, ViewPass, ViewSwap,
+    View, ViewFirst, ViewSwap,
     internal::yielder::{poll_first, poll_swap},
 };
 
@@ -70,11 +70,10 @@ where
     fn poll_swap(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        pass: ViewPass,
     ) -> Poll<Result<Option<ViewSwap>>> {
         let this = self.project();
 
-        match poll_swap(this.body, cx, pass) {
+        match poll_swap(this.body, cx) {
             (Poll::Pending, Some(swap)) => Poll::Ready(Ok(Some(swap))),
             (Poll::Pending, None) => Poll::Pending,
             (Poll::Ready(_), Some(_)) => {

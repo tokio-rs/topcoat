@@ -5,7 +5,10 @@ use std::{
     task::{Context, Poll},
 };
 
-use topcoat_core::error::Result;
+use topcoat_core::{
+    context::{Cx, try_request_context},
+    error::Result,
+};
 
 use crate::{RegionId, buffer::ViewHandle};
 
@@ -43,6 +46,9 @@ pub struct ViewSwap {
 
 /// Which pass a view is being rendered in.
 ///
+/// Stored on [`Cx`] for the lifetime of a view tree. Both polling methods
+/// use the pass the view was constructed in.
+///
 /// On the first render, a view may suspend and render skeletons.
 /// However, the goal is to finish an initial representation of the
 /// page as quickly as possible. This is the `Initial` pass.
@@ -59,6 +65,12 @@ pub enum ViewPass {
     #[default]
     Initial,
     Connected,
+}
+
+/// Returns the view pass registered on `cx`, defaulting to the initial pass.
+#[must_use]
+pub fn pass(cx: &Cx) -> ViewPass {
+    try_request_context::<ViewPass>(cx).copied().unwrap_or_default()
 }
 
 /// The value a live region's body returns to show it emitted content.
@@ -89,11 +101,7 @@ pub trait View: Send {
     ///
     /// This may be called without calling `poll_first` first, for example
     /// on a client-side reconnect that does not require a full re-render of the view.
-    fn poll_swap(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        pass: ViewPass,
-    ) -> Poll<Result<Option<ViewSwap>>>;
+    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>>;
 }
 
 /// Methods available on every [`View`].
@@ -162,7 +170,6 @@ impl View for () {
     fn poll_swap(
         self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
-        _pass: ViewPass,
     ) -> Poll<Result<Option<ViewSwap>>> {
         Poll::Ready(Ok(None))
     }
@@ -184,8 +191,7 @@ where
     fn poll_swap(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        pass: ViewPass,
     ) -> Poll<Result<Option<ViewSwap>>> {
-        self.get_mut().as_mut().poll_swap(cx, pass)
+        self.get_mut().as_mut().poll_swap(cx)
     }
 }

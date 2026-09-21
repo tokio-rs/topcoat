@@ -5,7 +5,7 @@ use std::{
 
 use topcoat_core::error::Result;
 
-use crate::{View, ViewBufferScope, ViewFirst, ViewPass, ViewSwap};
+use crate::{View, ViewBufferScope, ViewFirst, ViewSwap};
 
 /// The bodies of a `for` loop in node position, as one [`View`].
 ///
@@ -93,7 +93,6 @@ where
     fn poll_swap(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        pass: ViewPass,
     ) -> Poll<Result<Option<ViewSwap>>> {
         // One full turn around the ring, so every waiting body is polled
         // before this view settles on pending.
@@ -105,7 +104,7 @@ where
             if body.done {
                 continue;
             }
-            match Pin::new(&mut body.view).poll_swap(cx, pass) {
+            match Pin::new(&mut body.view).poll_swap(cx) {
                 Poll::Pending => all_done = false,
                 Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
                 Poll::Ready(Ok(None)) => body.done = true,
