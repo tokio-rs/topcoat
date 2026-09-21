@@ -1,16 +1,12 @@
 use std::{
     future::Ready,
-    panic::Location,
     pin::Pin,
     task::{Context, Poll},
 };
 
 use futures_util::TryFutureExt;
 use pin_project_lite::pin_project;
-use topcoat_core::{
-    error::Result,
-    identity::{Identity, SiteKey},
-};
+use topcoat_core::error::Result;
 
 use super::yielder::DriveFuture;
 use crate::{
@@ -24,7 +20,6 @@ pin_project! {
         initial: I,
         #[pin]
         connected: C,
-        region: RegionId,
     }
 }
 
@@ -34,13 +29,8 @@ where
     C: Future<Output = Result<EmitToken>>,
 {
     #[doc(hidden)]
-    #[track_caller]
-    pub fn new(identity: Identity, initial: I, connected: C) -> Self {
-        Self {
-            initial,
-            connected,
-            region: RegionId::new(identity, SiteKey::from_location(Location::caller())),
-        }
+    pub fn new(initial: I, connected: C) -> Self {
+        Self { initial, connected }
     }
 }
 
@@ -59,17 +49,7 @@ where
         let mut this = self.project();
 
         match poll_first(this.initial.as_mut(), cx) {
-            (Poll::Pending, Some(first)) => Poll::Ready(Ok(ViewFirst {
-                content: ViewBufferScope::with(|buffer| {
-                    buffer.block(|parts| {
-                        parts.push_region_start(*this.region);
-                        parts.push_view_handle(first.content);
-                        parts.push_region_end(*this.region);
-                    })
-                }),
-                streaming: first.streaming,
-                connecting: first.connecting,
-            })),
+            (Poll::Pending, Some(first)) => Poll::Ready(Ok(first)),
             (Poll::Pending, None) => Poll::Pending,
             (Poll::Ready(_), Some(_)) => {
                 panic!("live view future yielded without returning pending")
@@ -107,6 +87,74 @@ where
                 (Poll::Ready(Err(e)), None) => Poll::Ready(Err(e)),
                 (Poll::Ready(Ok(_)), None) => Poll::Ready(Ok(None)),
             },
+        }
+    }
+}
+
+pin_project! {
+    pub struct EmitView<V> {
+        #[pin]
+        view: V,
+        region: RegionId,
+        first: bool,
+    }
+}
+
+impl<V> EmitView<V> {
+    pub fn new(region: RegionId, view: V) -> Self {
+        Self {
+            view,
+            region,
+            first: true,
+        }
+    }
+}
+
+impl<V> View for EmitView<V>
+where
+    V: View,
+{
+    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
+        let this = self.project();
+        match this.view.poll_first(cx) {
+            Poll::Ready(Ok(first)) => {
+                *this.first = false;
+                Poll::Ready(Ok(ViewFirst {
+                    content: ViewBufferScope::with(|buffer| {
+                        buffer.block(|parts| {
+                            parts.push_region_start(*this.region);
+                            parts.push_view_handle(first.content);
+                            parts.push_region_end(*this.region);
+                        })
+                    }),
+                    ..first
+                }))
+            }
+            Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+
+    fn poll_swap(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        pass: ViewPass,
+    ) -> Poll<Result<Option<ViewSwap>>> {
+        let this = self.project();
+        if *this.first {
+            match this.view.poll_first(cx) {
+                Poll::Ready(Ok(first)) => {
+                    *this.first = false;
+                    Poll::Ready(Ok(Some(ViewSwap {
+                        region: *this.region,
+                        replacement: first.content,
+                    })))
+                }
+                Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
+                Poll::Pending => Poll::Pending,
+            }
+        } else {
+            this.view.poll_swap(cx, pass)
         }
     }
 }
