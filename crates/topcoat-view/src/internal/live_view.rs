@@ -12,7 +12,7 @@ use topcoat_core::{
 };
 
 use super::yielder::{DriveFuture, Yield, poll_body};
-use crate::{EmitToken, RegionId, View, ViewBufferScope, ViewFirst, ViewSwap};
+use crate::{EmitToken, Pass, RegionId, View, ViewBufferScope, ViewFirst, ViewSwap};
 
 pin_project! {
     /// A `live!` region as a [`View`]: a body future whose emissions become
@@ -28,6 +28,7 @@ pin_project! {
         body: Fut,
         region: RegionId,
         stash: Option<ViewSwap>,
+        pass: Pass,
     }
 }
 
@@ -36,11 +37,12 @@ where
     Fut: Future<Output = Result<EmitToken>>,
 {
     #[doc(hidden)]
-    pub fn new(identity: Identity, site: SiteKey, body: Fut) -> Self {
+    pub fn new(identity: Identity, site: SiteKey, pass: Pass, body: Fut) -> Self {
         Self {
             body,
             region: RegionId::new(identity, site),
             stash: None,
+            pass,
         }
     }
 }
@@ -73,13 +75,14 @@ where
                     return Poll::Ready(Err(e));
                 }
 
-                let live = poll.is_pending();
-                if !live {
+                let streaming = poll.is_pending();
+                if !streaming {
                     // The body is done, so nothing will replace this content and it needs no
                     // markers.
                     return Poll::Ready(Ok(ViewFirst {
                         content: first.content,
-                        live,
+                        streaming,
+                        connecting: first.connecting,
                     }));
                 }
 
@@ -94,7 +97,8 @@ where
                             parts.push_region_end(region);
                         })
                     }),
-                    live,
+                    streaming,
+                    connecting: first.connecting,
                 };
                 Poll::Ready(Ok(first))
             }

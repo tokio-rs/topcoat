@@ -101,7 +101,7 @@ async fn error_boundary_replaces_streamed_content_on_a_late_error() {
     });
 
     let content = first(&mut view).await.unwrap();
-    assert!(content.live);
+    assert!(content.streaming);
     assert!(content.content.render(cx).contains("<p>partial</p>"));
 
     let _ = tx.send(());

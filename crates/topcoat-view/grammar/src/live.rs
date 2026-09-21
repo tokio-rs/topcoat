@@ -57,6 +57,7 @@ impl ToTokens for Live {
             #topcoat_view::internal::LiveView::new(
                 #topcoat_context::identity(#cx),
                 #site,
+                #topcoat_view::pass(#cx),
                 async move {
                     #borrow_cx
                     #(#body)*

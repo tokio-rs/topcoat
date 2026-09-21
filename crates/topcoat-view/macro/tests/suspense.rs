@@ -41,7 +41,7 @@ async fn suspense_shows_the_fallback_until_the_child_is_ready() {
     });
 
     let content = first(&mut view).await.unwrap();
-    assert!(content.live);
+    assert!(content.streaming);
     assert!(content.content.render(cx).contains("<p>loading</p>"));
 
     tx.send(Ok("done")).unwrap();
@@ -61,7 +61,7 @@ async fn suspense_swaps_in_an_immediate_child() {
         )
     });
 
-    assert!(first(&mut view).await.unwrap().live);
+    assert!(first(&mut view).await.unwrap().streaming);
     let swap = next_swap(&mut view).await.unwrap().unwrap();
     assert_eq!(swap.replacement.render(cx), "<p>content</p>");
     assert!(next_swap(&mut view).await.unwrap().is_none());
@@ -79,7 +79,7 @@ async fn suspense_propagates_a_child_error() {
         )
     });
 
-    assert!(first(&mut view).await.unwrap().live);
+    assert!(first(&mut view).await.unwrap().streaming);
 
     let _ = tx.send(Err(io::Error::other("boom").into()));
     let error = next_swap(&mut view).await.unwrap_err();

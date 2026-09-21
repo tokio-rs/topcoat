@@ -76,13 +76,21 @@ where
         match poll {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
-            Poll::Ready(Ok(ViewFirst { content, live })) => {
+            Poll::Ready(Ok(ViewFirst {
+                content,
+                streaming,
+                connecting,
+            })) => {
                 let content = if let Some(buffer) = this.buffer.take() {
                     content.seal(*buffer)
                 } else {
                     content
                 };
-                Poll::Ready(Ok(ViewFirst { content, live }))
+                Poll::Ready(Ok(ViewFirst {
+                    content,
+                    streaming,
+                    connecting,
+                }))
             }
         }
     }

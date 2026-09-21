@@ -45,7 +45,7 @@ async fn region_emitting_once_is_not_live() {
     let cx = &Cx::default();
     let mut view = pin!(view! { cx => <main>(live! { emit! { load(fail: false) } })</main> });
 
-    assert!(!first(&mut view).await.unwrap().live);
+    assert!(!first(&mut view).await.unwrap().streaming);
     assert!(next_swap(&mut view).await.unwrap().is_none());
 }
 
@@ -171,7 +171,7 @@ async fn swapped_emission_hoisting_sync_control_flow_renders() {
         </main>
     });
 
-    assert!(first(&mut view).await.unwrap().live);
+    assert!(first(&mut view).await.unwrap().streaming);
     let swap = next_swap(&mut view).await.unwrap().unwrap();
     assert_eq!(
         swap.replacement.render(cx),
@@ -195,7 +195,7 @@ async fn region_emitting_twice_swaps_its_content() {
 
     // The first content marks the region off, so the swap can find it again.
     let content = first(&mut view).await.unwrap();
-    assert!(content.live);
+    assert!(content.streaming);
 
     let swap = next_swap(&mut view).await.unwrap().unwrap();
     let region = swap.region;
@@ -228,7 +228,7 @@ async fn region_ids_are_stable_across_root_views() {
         });
 
         let content = first(&mut view).await.unwrap();
-        assert!(content.live);
+        assert!(content.streaming);
         let swap = next_swap(&mut view).await.unwrap().unwrap();
         let region = swap.region;
         assert_eq!(
@@ -260,7 +260,7 @@ async fn region_emitting_three_times_swaps_its_content_twice() {
         </main>
     });
 
-    assert!(first(&mut view).await.unwrap().live);
+    assert!(first(&mut view).await.unwrap().streaming);
     let swap = next_swap(&mut view).await.unwrap().unwrap();
     assert_eq!(swap.replacement.render(cx), "<p>two</p>");
     let swap = next_swap(&mut view).await.unwrap().unwrap();
@@ -284,7 +284,7 @@ async fn first_loop_iteration_delivers_its_swap() {
         </ul>
     });
 
-    assert!(first(&mut view).await.unwrap().live);
+    assert!(first(&mut view).await.unwrap().streaming);
     let swap = next_swap(&mut view).await.unwrap().unwrap();
     assert_eq!(swap.replacement.render(cx), "<i>only2</i>");
     assert!(next_swap(&mut view).await.unwrap().is_none());
@@ -307,7 +307,7 @@ async fn live_loop_iterations_take_turns_swapping() {
         </ul>
     });
 
-    assert!(first(&mut view).await.unwrap().live);
+    assert!(first(&mut view).await.unwrap().streaming);
 
     let mut swaps = Vec::new();
     while let Some(swap) = next_swap(&mut view).await.unwrap() {
@@ -353,7 +353,7 @@ async fn joined_emissions_all_reach_the_region() {
     // Both emissions happen in the same poll of the body. One becomes the
     // first content and the other waits its turn to swap it out.
     let content = first(&mut view).await.unwrap();
-    assert!(content.live);
+    assert!(content.streaming);
     let swap = next_swap(&mut view).await.unwrap().unwrap();
     let region = swap.region;
     assert_eq!(
@@ -392,7 +392,7 @@ async fn joined_emissions_deliver_the_swaps_of_a_nested_region() {
     });
 
     let content = first(&mut view).await.unwrap();
-    assert!(content.live);
+    assert!(content.streaming);
     let html = content.content.render(cx);
     assert!(html.contains("<i>1</i>"), "{html}");
 

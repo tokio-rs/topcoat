@@ -46,7 +46,7 @@ impl Yield {
     /// A region that already emitted has its markers in the document, so
     /// first content arriving after that replaces what sits between them.
     /// A swap already names the region it belongs to, which is a nested one
-    /// when the emitted content is live in its own right.
+    /// when the emitted content streams in its own right.
     pub(super) fn into_swap(self, region: RegionId) -> ViewSwap {
         match self {
             Self::First(first) => ViewSwap {
