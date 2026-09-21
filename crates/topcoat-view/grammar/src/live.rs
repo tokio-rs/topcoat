@@ -26,15 +26,12 @@ pub struct Live {
 
 impl Parse for Live {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        // A branch starts with `Ident => {`, which the leading context
-        // argument never does: its `=>` is followed by a statement.
-        let cx = if LeadingCx::peek(input) && !LiveBranch::peek(input) {
-            Some(input.parse()?)
-        } else {
-            None
-        };
         Ok(Self {
-            cx,
+            cx: if LeadingCx::peek(input) && !LiveBranch::peek(input) {
+                Some(input.parse()?)
+            } else {
+                None
+            },
             body: input.parse()?,
         })
     }
