@@ -162,7 +162,7 @@ impl View for () {
     fn poll_swap(
         self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
-        pass: ViewPass,
+        _pass: ViewPass,
     ) -> Poll<Result<Option<ViewSwap>>> {
         Poll::Ready(Ok(None))
     }
@@ -181,7 +181,11 @@ where
         self.get_mut().as_mut().poll_first(cx)
     }
 
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
-        self.get_mut().as_mut().poll_swap(cx)
+    fn poll_swap(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        pass: ViewPass,
+    ) -> Poll<Result<Option<ViewSwap>>> {
+        self.get_mut().as_mut().poll_swap(cx, pass)
     }
 }

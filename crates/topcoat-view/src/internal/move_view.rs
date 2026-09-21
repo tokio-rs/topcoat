@@ -8,7 +8,7 @@ use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
 use super::yielder::{DriveFuture, Yield, poll_body};
-use crate::{View, ViewFirst, ViewSwap};
+use crate::{View, ViewFirst, ViewPass, ViewSwap};
 
 pin_project! {
     /// A [`View`] polled through an async body that owns data the view
@@ -67,7 +67,11 @@ where
         }
     }
 
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
+    fn poll_swap(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        pass: ViewPass,
+    ) -> Poll<Result<Option<ViewSwap>>> {
         let this = self.project();
 
         match poll_body(this.body, cx) {
