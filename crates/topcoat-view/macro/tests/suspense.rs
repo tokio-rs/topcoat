@@ -2,14 +2,41 @@ use std::{
     future::poll_fn,
     io,
     pin::{Pin, pin},
+    task::{Context, Poll},
 };
 
 use tokio::sync::oneshot;
 use topcoat::{
     Result,
     context::Cx,
-    view::{View, ViewFirst, ViewSwap, component, suspense, view},
+    core::identity::{Identity, SiteKey},
+    view::{
+        RegionId, View, ViewExt, ViewFirst, ViewSwap, component,
+        internal::{SuspenseView, ThenView},
+        suspense, view,
+    },
 };
+
+/// A child whose first content must not be requested on a reconnect.
+struct SwapOnly {
+    swap: Option<Result<ViewSwap>>,
+    pending: bool,
+}
+
+impl View for SwapOnly {
+    fn poll_first(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
+        panic!("child first content was requested");
+    }
+
+    fn poll_swap(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
+        if self.pending {
+            self.pending = false;
+            cx.waker().wake_by_ref();
+            return Poll::Pending;
+        }
+        Poll::Ready(self.swap.take().transpose())
+    }
+}
 
 /// Renders the label the channel delivers, or fails with its error.
 #[component]
@@ -72,26 +99,48 @@ async fn suspense_renders_a_ready_child_in_place() {
 }
 
 #[tokio::test]
-async fn suspense_swaps_in_a_child_without_a_first_poll() {
+async fn suspense_forwards_child_swaps_without_rendering_first_content() {
     let cx = &Cx::default();
-    let (tx, rx) = oneshot::channel();
-    let mut view = pin!(view! {
-        cx =>
-        suspense(
-            fallback: view! { <p>"loading"</p> },
-            slow(rx: rx)
-        )
+    let region = RegionId::new(Identity::ROOT, SiteKey::new(file!(), line!(), column!(), 0));
+    let child_region =
+        RegionId::new(Identity::ROOT, SiteKey::new(file!(), line!(), column!(), 0));
+    let replacement = view! { cx => <i>"update"</i> }.single().await.unwrap();
+    let fallback = ThenView::new(async {
+        Err::<(), _>(io::Error::other("fallback was polled").into())
     });
+    let mut view = pin!(SuspenseView::new(
+        region,
+        fallback,
+        SwapOnly {
+            swap: Some(Ok(ViewSwap {
+                region: child_region,
+                replacement,
+            })),
+            pending: true,
+        },
+    ));
 
-    // Without a first poll, as on a reconnect, the fallback and the child
-    // both go out as swaps of the region.
     let swap = next_swap(&mut view).await.unwrap().unwrap();
-    assert_eq!(swap.replacement.render(cx), "<p>loading</p>");
-
-    tx.send(Ok("done")).unwrap();
-    let swap = next_swap(&mut view).await.unwrap().unwrap();
-    assert_eq!(swap.replacement.render(cx), "<i>done</i>");
+    assert_ne!(region, child_region);
+    assert_eq!(swap.region, child_region);
+    assert_eq!(swap.replacement.render(cx), "<i>update</i>");
     assert!(next_swap(&mut view).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn suspense_forwards_a_child_swap_error() {
+    let region = RegionId::new(Identity::ROOT, SiteKey::new(file!(), line!(), column!(), 0));
+    let mut view = pin!(SuspenseView::new(
+        region,
+        (),
+        SwapOnly {
+            swap: Some(Err(io::Error::other("swap failed").into())),
+            pending: false,
+        },
+    ));
+
+    let error = next_swap(&mut view).await.unwrap_err();
+    assert_eq!(error.to_string(), "swap failed");
 }
 
 #[tokio::test]
