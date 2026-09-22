@@ -122,7 +122,7 @@ impl<V: View> Future for DriveFuture<V> {
                     Poll::Pending => return Poll::Pending,
                 }
             }
-        };
+        }
 
         Poll::Pending
     }
