@@ -1,6 +1,8 @@
 use crate::{
     Error, Result,
-    view::{Child, View, component, emit, live},
+    context::{Cx, identity},
+    core::identity::SiteKey,
+    view::{Child, RegionId, View, component, internal::ErrorBoundaryView},
 };
 
 /// Shows a fallback in place of child content that fails to render.
@@ -41,14 +43,14 @@ use crate::{
 /// }
 /// ```
 ///
-/// The component is a [`live!`] region that emits the child content and
-/// matches on the result. Use [`live!`] and [`emit!`] directly for cases it
-/// does not cover, like retrying the child after an error.
+/// Use [`live!`] and [`emit!`] directly for cases the component does not
+/// cover, like retrying the child after an error.
 ///
 /// [`live!`]: macro@crate::view::live
 /// [`emit!`]: macro@crate::view::emit
 #[component]
 pub async fn error_boundary<V, F>(
+    cx: &Cx,
     /// Builds the view shown when the child content fails, from the error
     /// that caused it. Returns the error itself, or another one, to rethrow.
     fallback: F,
@@ -60,13 +62,7 @@ where
     V: View,
     F: FnOnce(Error) -> Result<V> + Send,
 {
-    Ok(live! {
-        match emit! { (child) } {
-            Err(error) => {
-                let fallback = Child::new(fallback(error)?);
-                emit! { (fallback) }
-            }
-            emitted => emitted,
-        }
-    })
+    const SITE: SiteKey = SiteKey::new(file!(), line!(), column!(), 0);
+    let region = RegionId::new(identity(cx), SITE);
+    Ok(ErrorBoundaryView::new(region, fallback, child))
 }

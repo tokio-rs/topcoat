@@ -1,6 +1,7 @@
 mod builder;
 mod capture;
 mod either_view;
+mod error_boundary_view;
 mod join_view;
 mod live_view;
 mod loop_view;
@@ -14,6 +15,7 @@ mod yielder;
 pub use builder::*;
 pub use capture::*;
 pub use either_view::*;
+pub use error_boundary_view::*;
 pub use join_view::*;
 pub use live_view::*;
 pub use loop_view::*;

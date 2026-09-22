@@ -102,10 +102,30 @@ async fn error_boundary_replaces_streamed_content_on_a_late_error() {
 
     let content = first(&mut view).await.unwrap();
     assert!(content.streaming);
-    assert!(content.content.render(cx).contains("<p>partial</p>"));
+    let html = content.content.render(cx);
+    assert!(html.contains("<!--topcoat::region::start("), "{html}");
+    assert!(html.contains("<p>partial</p>"), "{html}");
 
     let _ = tx.send(());
     let swap = next_swap(&mut view).await.unwrap().unwrap();
     assert_eq!(swap.replacement.render(cx), r#"<p class="error">late</p>"#);
+    assert!(next_swap(&mut view).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn error_boundary_swaps_in_the_fallback_without_a_first_poll() {
+    let cx = &Cx::default();
+    let mut view = pin!(view! {
+        cx =>
+        error_boundary(
+            fallback: |error| Ok(view! { <p class="error">(error.to_string())</p> }),
+            load(fail: true)
+        )
+    });
+
+    // Without a first poll, as on a reconnect, the fallback goes out as a
+    // swap of the boundary's region.
+    let swap = next_swap(&mut view).await.unwrap().unwrap();
+    assert_eq!(swap.replacement.render(cx), r#"<p class="error">boom</p>"#);
     assert!(next_swap(&mut view).await.unwrap().is_none());
 }

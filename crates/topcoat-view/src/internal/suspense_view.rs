@@ -6,7 +6,7 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
-use crate::{RegionId, View, ViewBufferScope, ViewFirst, ViewSwap};
+use crate::{RegionId, View, ViewBufferScope, ViewFirst, ViewSwap, internal::EmitView};
 
 pin_project! {
     /// A [`View`] that shows a fallback until its child content is ready.
@@ -19,13 +19,13 @@ pin_project! {
         #[pin]
         fallback: F,
         #[pin]
-        child: C,
+        child: EmitView<C>,
         region: RegionId,
         state: State,
     }
 }
 
-/// Which content a [`SuspenseView`] currently shows.
+/// What a [`SuspenseView`] has shown so far.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum State {
     /// Nothing has resolved yet.
@@ -42,7 +42,7 @@ impl<F, C> SuspenseView<F, C> {
     pub fn new(region: RegionId, fallback: F, child: C) -> Self {
         Self {
             fallback,
-            child,
+            child: EmitView::new(region, child),
             region,
             state: State::Start,
         }
@@ -96,25 +96,21 @@ where
     fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
         let this = self.project();
 
-        if *this.state == State::Child {
-            return this.child.poll_swap(cx);
-        }
-
-        match this.child.poll_first(cx) {
-            Poll::Ready(Ok(first)) => {
+        // The child's first content goes out as a swap into the region, and
+        // its own swaps pass through after that.
+        match this.child.poll_swap(cx) {
+            Poll::Ready(swap) => {
                 *this.state = State::Child;
-                return Poll::Ready(Ok(Some(ViewSwap {
-                    region: *this.region,
-                    replacement: first.content,
-                })));
+                return Poll::Ready(swap);
             }
-            Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+            Poll::Pending if *this.state == State::Child => return Poll::Pending,
             Poll::Pending => {}
         }
 
+        // The child is still pending, so the fallback shows meanwhile.
         match *this.state {
             // The first content was never requested, so the fallback goes
-            // out as a swap while the child is pending.
+            // out as a swap too.
             State::Start => match this.fallback.poll_first(cx) {
                 Poll::Ready(Ok(first)) => {
                     *this.state = State::Fallback {
@@ -129,16 +125,14 @@ where
                 Poll::Pending => Poll::Pending,
             },
             State::Fallback { streaming: true } => match this.fallback.poll_swap(cx) {
-                Poll::Ready(Ok(Some(swap))) => Poll::Ready(Ok(Some(swap))),
                 Poll::Ready(Ok(None)) => {
                     *this.state = State::Fallback { streaming: false };
                     Poll::Pending
                 }
-                Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
-                Poll::Pending => Poll::Pending,
+                swap => swap,
             },
             State::Fallback { streaming: false } => Poll::Pending,
-            State::Child => unreachable!("child swaps are delegated above"),
+            State::Child => unreachable!("child swaps return above"),
         }
     }
 }
