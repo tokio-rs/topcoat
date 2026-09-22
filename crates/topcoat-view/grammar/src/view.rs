@@ -21,7 +21,7 @@ pub use nodes::*;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::{ParseOption, paths::topcoat_context};
 
 use crate::{
     leading_cx::LeadingCx,
@@ -61,7 +61,7 @@ impl ToTokens for View {
             Some(cx) => {
                 let cx = &cx.cx;
                 quote! {{
-                    let __cx = #cx;
+                    let __cx: #topcoat_context::Cx = (#cx).clone();
                     #view
                 }}
             }
@@ -135,9 +135,8 @@ mod tests {
     #[test]
     fn explicit_cx_binds_the_context_identifier() {
         let tokens = parse("cx => <div></div>").to_token_stream().to_string();
-        assert!(tokens.contains("let __cx = cx ;"), "{tokens}");
+        assert!(tokens.contains("Cx = (cx) . clone () ;"), "{tokens}");
         assert!(tokens.contains("Cx = & __cx ;"), "{tokens}");
-        assert!(!tokens.contains("clone"), "{tokens}");
     }
 
     #[test]

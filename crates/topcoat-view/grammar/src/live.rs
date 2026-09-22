@@ -52,16 +52,13 @@ impl ToTokens for Live {
         };
         let body = &self.body;
         let connecting = body.connecting();
-        let context = match &self.cx {
-            Some(cx) => {
-                let cx = &cx.cx;
-                quote! { #cx }
-            }
-            None => quote! { __cx },
-        };
+        let bind_cx = self.cx.as_ref().map(|cx| {
+            let cx = &cx.cx;
+            quote! { let __cx: #topcoat_context::Cx = (#cx).clone(); }
+        });
 
         quote! {{
-            let __cx = #context;
+            #bind_cx
             let __region = #topcoat_view::RegionId::new(#topcoat_context::identity(&__cx), #site);
             let __pass = #topcoat_view::pass(&__cx);
             #topcoat_view::internal::LiveView::new(

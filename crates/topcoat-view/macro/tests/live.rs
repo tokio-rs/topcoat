@@ -87,11 +87,29 @@ async fn region_remapping_a_failed_emission_renders_as_plain_content() {
 async fn an_explicit_context_is_owned_by_the_live_body() {
     let region = {
         let cx = Cx::default();
-        live! { cx => emit! { load(fail: false) } }
+        let region = live! { cx => emit! { load(fail: false) } };
+        drop(cx);
+        region
     };
     let cx = &Cx::default();
     let html = view! { cx => (region) }.single().await.unwrap().render(cx);
     assert_eq!(html, "<p>loaded</p>");
+}
+
+#[tokio::test]
+async fn an_explicit_context_reference_is_cloned_into_the_view() {
+    let (plain, live) = {
+        let context = Cx::default();
+        let cx = &context;
+        (
+            view! { cx => load(fail: false) },
+            live! { cx => emit! { load(fail: false) } },
+        )
+    };
+    let cx = &Cx::default();
+
+    assert_eq!(plain.single().await.unwrap().render(cx), "<p>loaded</p>");
+    assert_eq!(live.single().await.unwrap().render(cx), "<p>loaded</p>");
 }
 
 #[tokio::test]
@@ -613,5 +631,8 @@ async fn emitted_initial_only_bodies_render_and_keep_streaming() {
         replacements.push(swap.replacement.render(cx));
     }
     replacements.sort();
-    assert_eq!(replacements, ["<b>branch second</b>", "<i>single second</i>"]);
+    assert_eq!(
+        replacements,
+        ["<b>branch second</b>", "<i>single second</i>"]
+    );
 }

@@ -48,9 +48,8 @@ impl Scope {
     /// is driven inside the block that evaluates the template, so what its
     /// expressions borrow from that block is still alive.
     ///
-    /// With `owns_cx`, the block captures the supplied `__cx` by value and
-    /// rebinds it to `&Cx` inside. An owned context moves into the view;
-    /// a borrowed context keeps its original lifetime.
+    /// With `owns_cx`, the block takes ownership of `__cx` and borrows it
+    /// as `&Cx` inside. Otherwise it uses the enclosing body's `&Cx`.
     pub fn emit_view(&self, owns_cx: bool) -> TokenStream {
         let prologue = borrow_cx(owns_cx);
         let inner = self.emit_driven();
