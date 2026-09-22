@@ -1,5 +1,5 @@
 use proc_macro2::{Span, TokenStream};
-use quote::{ToTokens, quote};
+use quote::{ToTokens, quote, quote_spanned};
 use syn::{
     Ident, Token,
     parse::{Parse, ParseStream},
@@ -54,7 +54,7 @@ impl ToTokens for Live {
         let connecting = body.connecting();
 
         quote! {{
-            let __region = #topcoat_view::RegionId::new(identity(__cx), #site);
+            let __region = #topcoat_view::RegionId::new(#topcoat_core::context::identity(__cx), #site);
             let __pass = #topcoat_view::pass(__cx);
             #topcoat_view::internal::LiveView::new(
                 __region,
@@ -110,8 +110,21 @@ impl Parse for LiveBody {
 
 impl ToTokens for LiveBody {
     fn to_tokens(&self, tokens: &mut TokenStream) {
+        let mut diagnostics = TokenStream::new();
+        if let Self::Branches(branches) = self {
+            let initial = format!("{:?}", ViewPass::Initial);
+            if !branches.iter().any(|branch| branch.pass == initial) {
+                let message = format!(
+                    "live! branches require an `{initial}` branch; use `{initial} => {{ emit! {{}} }}` for empty initial content"
+                );
+                diagnostics.extend(quote_spanned! { branches[0].pass.span() =>
+                    ::core::compile_error!(#message);
+                });
+            }
+        }
         quote! {
             async move {
+                #diagnostics
                 match __pass {
 
                 }
@@ -241,5 +254,51 @@ impl ToTokens for Emit {
 impl topcoat_core_grammar::pretty::PrettyPrint for Emit {
     fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         self.view.pretty_print(printer);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use quote::ToTokens;
+
+    use super::{Live, ViewPass};
+
+    #[test]
+    fn connected_only_requires_an_initial_branch() {
+        let initial = format!("{:?}", ViewPass::Initial);
+        let connected = format!("{:?}", ViewPass::Connected);
+        for prefix in ["", "cx => "] {
+            let source = format!("{prefix}{connected} => {{ emit! {{}} }}");
+            let live = syn::parse_str::<Live>(&source).unwrap();
+            let body = syn::parse2::<syn::ExprAsync>(live.body.to_token_stream()).unwrap();
+            let syn::Stmt::Macro(error) = &body.block.stmts[0] else {
+                panic!("expected a compile_error! alongside the body expansion");
+            };
+            assert!(error.mac.path.is_ident("compile_error")
+                || error.mac.path == syn::parse_quote!(::core::compile_error));
+            assert_eq!(
+                syn::parse2::<syn::LitStr>(error.mac.tokens.clone()).unwrap().value(),
+                format!(
+                    "live! branches require an `{initial}` branch; use `{initial} => {{ emit! {{}} }}` for empty initial content"
+                ),
+            );
+            assert!(matches!(body.block.stmts[1], syn::Stmt::Expr(syn::Expr::Match(_), _)));
+        }
+    }
+
+    #[test]
+    fn initial_branch_can_emit_empty_content() {
+        let initial = format!("{:?} => {{ emit! {{}} }}", ViewPass::Initial);
+        let connected = format!("{:?} => {{ emit! {{}} }}", ViewPass::Connected);
+        for source in [
+            initial.clone(),
+            format!("{initial} {connected}"),
+            format!("{connected} {initial}"),
+            format!("cx => {initial} {connected}"),
+            "emit! {}".to_owned(),
+        ] {
+            let live = syn::parse_str::<Live>(&source).unwrap();
+            assert!(!live.to_token_stream().to_string().contains("compile_error"));
+        }
     }
 }
