@@ -10,7 +10,7 @@ use topcoat_core::error::Result;
 
 use super::yielder::DriveFuture;
 use crate::{
-    EmitToken, RegionId, View, ViewBufferScope, ViewFirst, ViewPass, ViewSwap,
+    EmitToken, RegionId, View, ViewBufferScope, ViewFirst, ViewSwap,
     internal::yielder::{poll_first, poll_swap},
 };
 
@@ -19,7 +19,6 @@ pin_project! {
         #[pin]
         body: Fut,
         region: RegionId,
-        pass: ViewPass,
         connecting: bool,
         stash: Option<ViewSwap>,
     }
@@ -30,11 +29,10 @@ where
     Fut: Future<Output = Result<EmitToken>>,
 {
     #[doc(hidden)]
-    pub fn new(region: RegionId, pass: ViewPass, connecting: bool, body: Fut) -> Self {
+    pub fn new(region: RegionId, connecting: bool, body: Fut) -> Self {
         Self {
             body,
             region,
-            pass,
             connecting,
             stash: None,
         }
