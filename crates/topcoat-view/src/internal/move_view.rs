@@ -67,10 +67,7 @@ where
         }
     }
 
-    fn poll_swap(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<Option<ViewSwap>>> {
+    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
         let this = self.project();
 
         match poll_swap(this.body, cx) {

@@ -1,6 +1,6 @@
 # Live
 
-Pages that send their shell immediately and stream slow content in with `live!` and `emit!`: one page swaps a loading message for the data once it arrives, one reports progress step by step, and one catches a failed emission and swaps in a fallback instead.
+Pages that send their shell immediately and stream slow content in with `live!` and `emit!`: suspense swaps a placeholder for the content once it arrives, progress reports a long-running task step by step, and error handling catches a failed emission and swaps in a fallback instead.
 
 Run it with:
 

@@ -90,10 +90,7 @@ where
         }
     }
 
-    fn poll_swap(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<Option<ViewSwap>>> {
+    fn poll_swap(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
         // One full turn around the ring, so every waiting body is polled
         // before this view settles on pending.
         let len = self.bodies.len();

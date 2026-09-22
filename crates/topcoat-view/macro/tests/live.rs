@@ -502,3 +502,116 @@ async fn a_single_body_runs_in_the_connected_pass() {
     let content = first(&mut view).await.unwrap();
     assert_eq!(content.content.render(cx), "<main><p>body</p></main>");
 }
+
+#[tokio::test]
+async fn a_connected_body_sends_every_emission_when_polled_for_swaps_first() {
+    let cx = &Cx::default().with(ViewPass::Connected);
+    let mut view = pin!(view! { cx =>
+        (live! {
+            Initial => { Err(io::Error::other("initial body ran").into()) }
+            Connected => {
+                tokio::task::yield_now().await;
+                emit! { <p>"current"</p> }?;
+                emit! { <p>"updated"</p> }
+            }
+        })
+    });
+
+    let current = next_swap(&mut view).await.unwrap().unwrap();
+    assert_eq!(current.replacement.render(cx), "<p>current</p>");
+    let updated = next_swap(&mut view).await.unwrap().unwrap();
+    assert_eq!(updated.region, current.region);
+    assert_eq!(updated.replacement.render(cx), "<p>updated</p>");
+    assert!(next_swap(&mut view).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn a_swap_only_pass_skips_initial_only_bodies() {
+    let cx = &Cx::default().with(ViewPass::Connected);
+    let mut view = pin!(view! { cx =>
+        (live! {
+            Err(io::Error::other("single body ran").into())
+        })
+        (live! {
+            Initial => { Err(io::Error::other("initial branch ran").into()) }
+        })
+    });
+
+    assert!(next_swap(&mut view).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn an_emitted_live_view_inherits_the_connected_pass() {
+    let cx = &Cx::default().with(ViewPass::Connected);
+    let mut view = pin!(view! { cx =>
+        (live! {
+            Initial => { Err(io::Error::other("outer initial body ran").into()) }
+            Connected => {
+                emit! {
+                    (live! {
+                        Initial => { Err(io::Error::other("inner initial body ran").into()) }
+                        Connected => {
+                            emit! { <i>"current"</i> }?;
+                            emit! { <i>"updated"</i> }
+                        }
+                    })
+                }
+            }
+        })
+    });
+
+    let outer = next_swap(&mut view).await.unwrap().unwrap();
+    let html = outer.replacement.render(cx);
+    let inner = next_swap(&mut view).await.unwrap().unwrap();
+    assert_ne!(outer.region, inner.region);
+    assert_eq!(
+        html,
+        format!(
+            "<!--topcoat::region::start({})--><i>current</i><!--topcoat::region::end({})-->",
+            inner.region, inner.region,
+        ),
+    );
+    assert_eq!(inner.replacement.render(cx), "<i>updated</i>");
+    assert!(next_swap(&mut view).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn emitted_initial_only_bodies_render_and_keep_streaming() {
+    let cx = &Cx::default().with(ViewPass::Connected);
+    let mut view = pin!(view! { cx =>
+        (live! {
+            Initial => { Err(io::Error::other("outer initial body ran").into()) }
+            Connected => {
+                emit! {
+                    (live! {
+                        emit! { <i>"single first"</i> }?;
+                        emit! { <i>"single second"</i> }
+                    })
+                    (live! {
+                        Initial => {
+                            emit! { <b>"branch first"</b> }?;
+                            emit! { <b>"branch second"</b> }
+                        }
+                    })
+                }
+            }
+        })
+    });
+
+    let outer = next_swap(&mut view).await.unwrap().unwrap();
+    let html = outer.replacement.render(cx);
+    assert!(html.contains("<i>single first</i>"), "{html}");
+    assert!(html.contains("<b>branch first</b>"), "{html}");
+
+    let mut replacements = Vec::new();
+    while let Some(swap) = next_swap(&mut view).await.unwrap() {
+        assert_ne!(swap.region, outer.region);
+        assert!(
+            html.contains(&format!("<!--topcoat::region::start({})-->", swap.region)),
+            "{html}",
+        );
+        replacements.push(swap.replacement.render(cx));
+    }
+    replacements.sort();
+    assert_eq!(replacements, ["<b>branch second</b>", "<i>single second</i>"]);
+}

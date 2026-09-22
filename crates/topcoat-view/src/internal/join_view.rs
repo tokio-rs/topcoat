@@ -67,10 +67,7 @@ where
         }))
     }
 
-    fn poll_swap(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<Option<ViewSwap>>> {
+    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
         let mut this = self.project();
 
         // One full turn around the ring in two range scans, so every

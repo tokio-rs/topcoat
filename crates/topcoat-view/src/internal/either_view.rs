@@ -46,10 +46,7 @@ where
         }
     }
 
-    fn poll_swap(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<Option<ViewSwap>>> {
+    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
         match self.project() {
             EitherViewProj::Left { view } => view.poll_swap(cx),
             EitherViewProj::Right { view } => view.poll_swap(cx),

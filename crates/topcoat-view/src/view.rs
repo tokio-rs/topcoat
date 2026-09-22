@@ -70,7 +70,9 @@ pub enum ViewPass {
 /// Returns the view pass registered on `cx`, defaulting to the initial pass.
 #[must_use]
 pub fn pass(cx: &Cx) -> ViewPass {
-    try_request_context::<ViewPass>(cx).copied().unwrap_or_default()
+    try_request_context::<ViewPass>(cx)
+        .copied()
+        .unwrap_or_default()
 }
 
 /// The value a live region's body returns to show it emitted content.
@@ -167,10 +169,7 @@ impl View for () {
         }))
     }
 
-    fn poll_swap(
-        self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
-    ) -> Poll<Result<Option<ViewSwap>>> {
+    fn poll_swap(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
         Poll::Ready(Ok(None))
     }
 }
@@ -188,10 +187,7 @@ where
         self.get_mut().as_mut().poll_first(cx)
     }
 
-    fn poll_swap(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<Option<ViewSwap>>> {
+    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
         self.get_mut().as_mut().poll_swap(cx)
     }
 }
