@@ -193,14 +193,9 @@ impl<V: View> View for HoistView<V> {
             this.view.poll_first(cx)
         };
         match poll {
-            Poll::Ready(Ok(ViewFirst {
-                content,
-                streaming,
-                connecting,
-            })) => Poll::Ready(Ok(ViewFirst {
+            Poll::Ready(Ok(ViewFirst { content, live })) => Poll::Ready(Ok(ViewFirst {
                 content: prepend(this.hoisted, content),
-                streaming,
-                connecting,
+                live,
             })),
             poll => poll,
         }
@@ -307,8 +302,7 @@ mod tests {
                             writer.push_static_str("content");
                         })
                     }),
-                    streaming: true,
-                    connecting: false,
+                    live: true,
                 }))
             } else {
                 Poll::Pending
@@ -388,8 +382,7 @@ mod tests {
             fn poll_first(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
                 Poll::Ready(Ok(ViewFirst {
                     content: ViewHandle::empty(),
-                    streaming: false,
-                    connecting: false,
+                    live: false,
                 }))
             }
 
@@ -457,8 +450,7 @@ mod tests {
                             writer.push_static_str("]");
                         })
                     }),
-                    streaming: false,
-                    connecting: false,
+                    live: false,
                 }))
             }
 
@@ -541,8 +533,7 @@ mod tests {
                             writer.push_static_str("content");
                         })
                     }),
-                    streaming: true,
-                    connecting: false,
+                    live: true,
                 }))
             } else {
                 Poll::Pending

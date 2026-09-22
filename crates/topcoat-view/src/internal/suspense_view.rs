@@ -15,9 +15,6 @@ pin_project! {
     /// away, it renders in place and no region is created. Otherwise the
     /// fallback renders inside a live region and the child's content swaps
     /// into it once it resolves.
-    ///
-    /// When polled for swaps first, forwards the child's swaps without
-    /// rendering first content or the fallback.
     pub struct SuspenseView<F, C> {
         #[pin]
         fallback: F,
@@ -35,10 +32,11 @@ enum State {
     Start,
     /// The fallback went out and the child is still pending. The flag says
     /// whether the fallback still yields swaps of its own.
-    Fallback { streaming: bool },
-    /// The child's swaps pass through, either after its first content went
-    /// out or because only swaps were requested.
+    Fallback { live: bool },
+    /// The child's first content went out and its swaps pass through.
     Child,
+    /// The child has no more updates.
+    Done,
 }
 
 impl<F, C> SuspenseView<F, C> {
@@ -69,7 +67,11 @@ where
 
         match this.child.poll_first(cx) {
             Poll::Ready(Ok(first)) => {
-                *this.state = State::Child;
+                *this.state = if first.live {
+                    State::Child
+                } else {
+                    State::Done
+                };
                 return Poll::Ready(Ok(first));
             }
             Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
@@ -78,9 +80,7 @@ where
 
         match this.fallback.poll_first(cx) {
             Poll::Ready(Ok(first)) => {
-                *this.state = State::Fallback {
-                    streaming: first.streaming,
-                };
+                *this.state = State::Fallback { live: first.live };
                 let content = ViewBufferScope::with(|buffer| {
                     buffer.block(|parts| {
                         parts.push_region_start(*this.region);
@@ -90,8 +90,7 @@ where
                 });
                 Poll::Ready(Ok(ViewFirst {
                     content,
-                    streaming: true,
-                    connecting: first.connecting,
+                    live: true,
                 }))
             }
             Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
@@ -102,15 +101,31 @@ where
     fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
         let this = self.project();
 
-        let State::Fallback { streaming } = *this.state else {
-            *this.state = State::Child;
-            return this.child.poll_swap(cx);
+        let live = match *this.state {
+            State::Start => {
+                panic!("polled a suspense view for swaps before its first content resolved")
+            }
+            State::Child => {
+                return match this.child.poll_swap(cx) {
+                    Poll::Ready(Ok(None)) => {
+                        *this.state = State::Done;
+                        Poll::Ready(Ok(None))
+                    }
+                    poll => poll,
+                };
+            }
+            State::Done => return Poll::Ready(Ok(None)),
+            State::Fallback { live } => live,
         };
 
         // Only replace the suspense region when its fallback went out.
         match this.child.poll_first(cx) {
             Poll::Ready(Ok(first)) => {
-                *this.state = State::Child;
+                *this.state = if first.live {
+                    State::Child
+                } else {
+                    State::Done
+                };
                 return Poll::Ready(Ok(Some(ViewSwap {
                     region: *this.region,
                     replacement: first.content,
@@ -121,10 +136,10 @@ where
         }
 
         // The child is still pending, so the fallback can keep streaming.
-        if streaming {
+        if live {
             match this.fallback.poll_swap(cx) {
                 Poll::Ready(Ok(None)) => {
-                    *this.state = State::Fallback { streaming: false };
+                    *this.state = State::Fallback { live: false };
                     Poll::Pending
                 }
                 swap => swap,

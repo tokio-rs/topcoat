@@ -62,8 +62,7 @@ where
 
         Poll::Ready(Ok(ViewFirst {
             content,
-            streaming: this.units.is_streaming(),
-            connecting: this.units.is_connecting(),
+            live: this.units.is_live(),
         }))
     }
 
@@ -116,11 +115,8 @@ pub trait JoinUnits {
     /// Takes the resolved contents out of the units.
     fn take_contents(self: Pin<&mut Self>) -> Self::Contents;
 
-    /// Whether any unit still updates within the current response.
-    fn is_streaming(&self) -> bool;
-
-    /// Whether any unit's content holds a region with a connected phase.
-    fn is_connecting(&self) -> bool;
+    /// Whether any unit may still update.
+    fn is_live(&self) -> bool;
 
     /// Polls the units at positions `from..to` for the next swap, yielded
     /// with its position, or for `None` once every unit in the range has no
@@ -144,11 +140,7 @@ impl JoinUnits for () {
 
     fn take_contents(self: Pin<&mut Self>) -> Self::Contents {}
 
-    fn is_streaming(&self) -> bool {
-        false
-    }
-
-    fn is_connecting(&self) -> bool {
+    fn is_live(&self) -> bool {
         false
     }
 
@@ -169,11 +161,8 @@ pin_project! {
         view: V,
         // The unit's content, held until the burst takes it.
         content: Option<ViewHandle>,
-        // Whether the view reported it has no further updates within the
-        // current response.
+        // Whether the view reported it has no further updates.
         done: bool,
-        // Whether the view's content holds a region with a connected phase.
-        connecting: bool,
         #[pin]
         rest: Rest,
     }
@@ -190,7 +179,6 @@ where
             view,
             content: None,
             done: false,
-            connecting: false,
             rest,
         }
     }
@@ -211,14 +199,9 @@ where
 
         if this.content.is_none() {
             match this.view.poll_first(cx) {
-                Poll::Ready(Ok(ViewFirst {
-                    content,
-                    streaming,
-                    connecting,
-                })) => {
+                Poll::Ready(Ok(ViewFirst { content, live })) => {
                     *this.content = Some(content);
-                    *this.done = !streaming;
-                    *this.connecting = connecting;
+                    *this.done = !live;
                 }
                 Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
                 Poll::Pending => ready = false,
@@ -247,12 +230,8 @@ where
         (content, this.rest.take_contents())
     }
 
-    fn is_streaming(&self) -> bool {
-        !self.done || self.rest.is_streaming()
-    }
-
-    fn is_connecting(&self) -> bool {
-        self.connecting || self.rest.is_connecting()
+    fn is_live(&self) -> bool {
+        !self.done || self.rest.is_live()
     }
 
     fn poll_swap_range(
@@ -298,8 +277,8 @@ mod tests {
     use super::*;
     use crate::RegionId;
 
-    /// A streaming view that delivers one swap for its region per poll, a
-    /// fixed number of times.
+    /// A live view that delivers one swap for its region per poll, a fixed
+    /// number of times.
     struct Ticker {
         region: RegionId,
         remaining: usize,
@@ -309,8 +288,7 @@ mod tests {
         fn poll_first(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
             Poll::Ready(Ok(ViewFirst {
                 content: ViewHandle::empty(),
-                streaming: true,
-                connecting: false,
+                live: true,
             }))
         }
 

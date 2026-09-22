@@ -59,7 +59,7 @@ where
                 } => match ready!(child.poll_first(cx)) {
                     // A settled child cannot fail anymore, so it needs no
                     // region to swap the fallback into.
-                    Ok(first) if first.is_settled() => return Poll::Ready(Ok(first)),
+                    Ok(first) if !first.live => return Poll::Ready(Ok(first)),
                     Ok(first) => {
                         let content = ViewBufferScope::with(|buffer| {
                             buffer.block(|parts| {
@@ -118,16 +118,19 @@ mod tests {
     };
 
     use super::*;
-    use crate::ViewHandle;
+    use crate::{ViewHandle, internal::ScopeView};
 
-    struct SwapOnly<'a> {
+    struct LiveChild<'a> {
         swap: Option<Result<ViewSwap>>,
         dropped: &'a AtomicBool,
     }
 
-    impl View for SwapOnly<'_> {
+    impl View for LiveChild<'_> {
         fn poll_first(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
-            panic!("a swap-only child must not render first content");
+            Poll::Ready(Ok(ViewFirst {
+                content: ViewHandle::empty(),
+                live: true,
+            }))
         }
 
         fn poll_swap(
@@ -138,7 +141,7 @@ mod tests {
         }
     }
 
-    impl Drop for SwapOnly<'_> {
+    impl Drop for LiveChild<'_> {
         fn drop(&mut self) {
             self.dropped.store(true, Ordering::Relaxed);
         }
@@ -152,17 +155,26 @@ mod tests {
     }
 
     #[test]
-    fn swaps_pass_through_without_rendering_first_content() {
+    fn swaps_pass_through_after_first_content() {
         let dropped = AtomicBool::new(false);
-        let child = SwapOnly {
+        let child = LiveChild {
             swap: Some(Ok(ViewSwap {
                 region: region(1),
                 replacement: ViewHandle::unescaped_unchecked("<p>updated</p>"),
             })),
             dropped: &dropped,
         };
-        let mut view = pin!(ErrorBoundaryView::new(region(0), |_| Ok(()), child));
+        let mut view = pin!(ScopeView::new(ErrorBoundaryView::new(
+            region(0),
+            |_| Ok(()),
+            child,
+        )));
         let mut cx = Context::from_waker(Waker::noop());
+
+        let Poll::Ready(Ok(first)) = view.as_mut().poll_first(&mut cx) else {
+            panic!("expected the child's first content");
+        };
+        assert!(first.live);
 
         let Poll::Ready(Ok(Some(swap))) = view.as_mut().poll_swap(&mut cx) else {
             panic!("expected the child's swap");
@@ -179,19 +191,24 @@ mod tests {
     #[test]
     fn a_swap_error_drops_the_child_and_replaces_the_boundary() {
         let dropped = AtomicBool::new(false);
-        let child = SwapOnly {
-            swap: Some(Err(io::Error::other("connected failure").into())),
+        let child = LiveChild {
+            swap: Some(Err(io::Error::other("late failure").into())),
             dropped: &dropped,
         };
-        let mut view = pin!(ErrorBoundaryView::new(
+        let mut view = pin!(ScopeView::new(ErrorBoundaryView::new(
             region(0),
             |error: Error| {
-                assert_eq!(error.to_string(), "connected failure");
+                assert_eq!(error.to_string(), "late failure");
                 Ok(())
             },
             child,
-        ));
+        )));
         let mut cx = Context::from_waker(Waker::noop());
+
+        let Poll::Ready(Ok(first)) = view.as_mut().poll_first(&mut cx) else {
+            panic!("expected the child's first content");
+        };
+        assert!(first.live);
 
         let Poll::Ready(Ok(Some(swap))) = view.as_mut().poll_swap(&mut cx) else {
             panic!("expected the fallback to replace the boundary");
@@ -213,17 +230,7 @@ mod tests {
         let Poll::Ready(Ok(first)) = view.as_mut().poll_first(&mut cx) else {
             panic!("expected settled content");
         };
-        assert!(first.is_settled());
+        assert!(!first.live);
         assert!(first.content.is_empty());
-        assert!(matches!(
-            view.as_mut().poll_swap(&mut cx),
-            Poll::Ready(Ok(None))
-        ));
-
-        let mut view = pin!(ErrorBoundaryView::new(region(0), |_| Ok(()), ()));
-        assert!(matches!(
-            view.as_mut().poll_swap(&mut cx),
-            Poll::Ready(Ok(None))
-        ));
     }
 }

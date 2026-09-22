@@ -1,4 +1,0 @@
-view! {
-    <main>(live! { Initial => { emit! { <p>"initial"</p> } },
-        Connected => { let  label  =  load().await;  emit! { <p>(label)</p> } } })</main>
-}

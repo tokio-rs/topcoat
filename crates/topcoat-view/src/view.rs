@@ -5,10 +5,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use topcoat_core::{
-    context::{Cx, try_request_context},
-    error::Result,
-};
+use topcoat_core::error::Result;
 
 use crate::{RegionId, buffer::ViewHandle};
 
@@ -17,21 +14,9 @@ use crate::{RegionId, buffer::ViewHandle};
 pub struct ViewFirst {
     /// The content, ready to render with the surrounding document.
     pub content: ViewHandle,
-    /// Whether the view still changes the content through
-    /// [`View::poll_swap`] within the current response.
-    pub streaming: bool,
-    /// Whether the content holds a region with a connected phase, which
-    /// changes the content in a later connect pass.
-    pub connecting: bool,
-}
-
-impl ViewFirst {
-    /// Whether the content stays as it resolved: the view neither streams
-    /// within the current response nor connects afterwards.
-    #[must_use]
-    pub fn is_settled(&self) -> bool {
-        !self.streaming && !self.connecting
-    }
+    /// Whether the view can still change the content through
+    /// [`View::poll_swap`] after it went out.
+    pub live: bool,
 }
 
 /// A replacement for a live region of content that already went out,
@@ -42,37 +27,6 @@ pub struct ViewSwap {
     pub region: RegionId,
     /// The content that replaces what the region currently shows.
     pub replacement: ViewHandle,
-}
-
-/// Which pass a view is being rendered in.
-///
-/// Stored on [`Cx`] for the lifetime of a view tree. Both polling methods
-/// use the pass the view was constructed in.
-///
-/// On the first render, a view may suspend and render skeletons.
-/// However, the goal is to finish an initial representation of the
-/// page as quickly as possible. This is the `Initial` pass.
-/// It must terminate, such that the browser's loading spinner stops spinning,
-/// and the page is interpreted as "fully loaded".
-///
-/// Afterwards, if the view contains `live!` regions that need to be
-/// kept up to date by the server, the client must reconnect to the
-/// server via a WebSocket connection. Once this connection is established,
-/// the server can send as many update events as desired. This is the
-/// second, `Connected` pass.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ViewPass {
-    #[default]
-    Initial,
-    Connected,
-}
-
-/// Returns the view pass registered on `cx`, defaulting to the initial pass.
-#[must_use]
-pub fn pass(cx: &Cx) -> ViewPass {
-    try_request_context::<ViewPass>(cx)
-        .copied()
-        .unwrap_or_default()
 }
 
 /// The value a live region's body returns to show it emitted content.
@@ -88,7 +42,7 @@ pub struct EmitToken;
 ///
 /// A view is polled in two phases. [`poll_first`](Self::poll_first)
 /// resolves once, to the content that renders with the surrounding
-/// document. When that content reports itself as streaming,
+/// document. When that content reports itself as live,
 /// [`poll_swap`](Self::poll_swap) takes over and yields replacements for
 /// regions of it until the view is done.
 ///
@@ -101,8 +55,8 @@ pub trait View: Send {
     /// Yields the next replacement for a region of the first content, or
     /// `None` when the view is done changing.
     ///
-    /// This may be called without calling `poll_first` first, for example
-    /// on a client-side reconnect that does not require a full re-render of the view.
+    /// Only meaningful after [`poll_first`](Self::poll_first) resolved to
+    /// live content.
     fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>>;
 }
 
@@ -110,8 +64,8 @@ pub trait View: Send {
 pub trait ViewExt: View {
     /// Resolves the view's first content and discards the view.
     ///
-    /// Replacements a streaming view would deliver afterwards never happen;
-    /// the content stays as it first resolved.
+    /// Replacements a live view would stream afterwards never happen; the
+    /// content stays as it first resolved.
     fn first(self) -> impl Future<Output = Result<ViewHandle>> + Send
     where
         Self: Sized,
@@ -128,7 +82,7 @@ pub trait ViewExt: View {
     ///
     /// # Panics
     ///
-    /// Panics if the view's first content is streaming or connecting.
+    /// Panics if the view's first content is live.
     fn single(self) -> impl Future<Output = Result<ViewHandle>> + Send
     where
         Self: Sized,
@@ -136,10 +90,7 @@ pub trait ViewExt: View {
         async move {
             let mut view = pin!(self);
             let first = poll_fn(|cx| view.as_mut().poll_first(cx)).await?;
-            assert!(
-                first.is_settled(),
-                "used `.single()` on a View that changes after it went out"
-            );
+            assert!(!first.live, "used `.single()` on a View that is live");
             Ok(first.content)
         }
     }
@@ -164,8 +115,7 @@ impl View for () {
     fn poll_first(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
         Poll::Ready(Ok(ViewFirst {
             content: ViewHandle::empty(),
-            streaming: false,
-            connecting: false,
+            live: false,
         }))
     }
 

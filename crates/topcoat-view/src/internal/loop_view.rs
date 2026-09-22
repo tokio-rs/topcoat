@@ -61,29 +61,26 @@ where
                 Poll::Pending => all_ready = false,
                 Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
                 Poll::Ready(Ok(first)) => {
-                    body.done = !first.streaming;
+                    body.done = !first.live;
                     body.ready = Some(first);
                 }
             }
         }
 
         if all_ready {
-            let mut streaming = false;
-            let mut connecting = false;
+            let mut live = false;
             let handle = ViewBufferScope::with(|buffer| {
                 buffer.block(|parts| {
                     for body in &mut self.bodies {
                         let first = body.ready.take().expect("all loop bodies are ready");
                         parts.push_view_handle(first.content);
-                        streaming |= first.streaming;
-                        connecting |= first.connecting;
+                        live |= first.live;
                     }
                 })
             });
             Poll::Ready(Ok(ViewFirst {
                 content: handle,
-                streaming,
-                connecting,
+                live,
             }))
         } else {
             Poll::Pending

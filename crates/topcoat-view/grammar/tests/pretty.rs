@@ -143,7 +143,6 @@ fixture_test!(local_binding_typed);
 fixture_test!(live_single_emit);
 fixture_test!(live_statements);
 fixture_test!(live_explicit_cx);
-fixture_test!(live_branches);
 
 // -- DOCTYPE -----------------------------------------------------------------
 

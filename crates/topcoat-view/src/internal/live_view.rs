@@ -15,12 +15,14 @@ use crate::{
 };
 
 pin_project! {
+    /// A `live!` region whose body yields its content through `emit!`.
+    ///
+    /// The first emission renders in place. If the body has more updates,
+    /// region markers surround that content and later emissions replace it.
     pub struct LiveView<Fut> {
         #[pin]
         body: Fut,
         region: RegionId,
-        has_connected: bool,
-        first_polled: bool,
         stash: Option<ViewSwap>,
     }
 }
@@ -30,18 +32,17 @@ where
     Fut: Future<Output = Result<EmitToken>>,
 {
     #[doc(hidden)]
-    pub fn new(region: RegionId, has_connected: bool, body: Fut) -> Self {
+    pub fn new(region: RegionId, body: Fut) -> Self {
         Self {
             body,
             region,
-            has_connected,
-            first_polled: false,
             stash: None,
         }
     }
 }
 
 impl LiveView<Ready<Result<EmitToken>>> {
+    /// Drives an emitted view until it has no more updates.
     pub fn drive<V: View>(region: RegionId, view: V) -> impl Future<Output = Result<EmitToken>> {
         DriveFuture::new(EmitView::new(region, view)).map_ok(|()| EmitToken)
     }
@@ -53,7 +54,6 @@ where
 {
     fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
         let mut this = self.project();
-        *this.first_polled = true;
         match poll_first(this.body.as_mut(), cx) {
             (Poll::Pending, Some(first)) => {
                 // The emitted child can be settled while its body still has
@@ -63,9 +63,8 @@ where
                     return Poll::Ready(Err(error));
                 }
                 *this.stash = yielded;
-                let streaming = poll.is_pending();
-                let connecting = *this.has_connected || first.connecting;
-                let content = if streaming || connecting {
+                let live = poll.is_pending();
+                let content = if live {
                     ViewBufferScope::with(|buffer| {
                         buffer.block(|parts| {
                             parts.push_region_start(*this.region);
@@ -76,11 +75,7 @@ where
                 } else {
                     first.content
                 };
-                Poll::Ready(Ok(ViewFirst {
-                    content,
-                    streaming,
-                    connecting,
-                }))
+                Poll::Ready(Ok(ViewFirst { content, live }))
             }
             (Poll::Pending, None) => Poll::Pending,
             (Poll::Ready(_), Some(_)) => {
@@ -95,10 +90,6 @@ where
 
     fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
         let this = self.project();
-
-        if !*this.first_polled && !*this.has_connected {
-            return Poll::Ready(Ok(None));
-        }
 
         if let Some(swap) = this.stash.take() {
             return Poll::Ready(Ok(Some(swap)));
@@ -116,6 +107,10 @@ where
 }
 
 pin_project! {
+    /// Adapts a new view's first content to the enclosing region's lifecycle.
+    ///
+    /// A later emission or error fallback starts during swap polling, so its
+    /// first content becomes a replacement. Subsequent child swaps pass through.
     pub struct EmitView<V> {
         #[pin]
         view: V,
@@ -145,7 +140,7 @@ where
         match this.view.poll_first(cx) {
             Poll::Ready(Ok(first)) => {
                 *this.first = false;
-                *this.done = !first.streaming;
+                *this.done = !first.live;
                 Poll::Ready(Ok(first))
             }
             Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
@@ -162,7 +157,7 @@ where
             match this.view.poll_first(cx) {
                 Poll::Ready(Ok(first)) => {
                     *this.first = false;
-                    *this.done = !first.streaming;
+                    *this.done = !first.live;
                     Poll::Ready(Ok(Some(ViewSwap {
                         region: *this.region,
                         replacement: first.content,

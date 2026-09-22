@@ -45,7 +45,7 @@ async fn stream<V: View + Unpin + 'static>(mut view: V, cx: &Cx) -> Result<Respo
     let mut pinned_view = Pin::new(&mut view);
     let first = poll_fn(|cx| pinned_view.as_mut().poll_first(cx)).await?;
     let rendered = first.content.render_response(cx);
-    if first.streaming {
+    if first.live {
         let body = ViewBody {
             cx: cx.clone(),
             first: Some(rendered.html),
