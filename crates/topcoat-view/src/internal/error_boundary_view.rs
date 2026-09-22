@@ -6,7 +6,10 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::{Error, Result};
 
-use crate::{RegionId, View, ViewBufferScope, ViewFirst, ViewSwap, internal::EmitView};
+use crate::{
+    RegionId, View, ViewBufferScope, ViewFirst, ViewSwap,
+    internal::{EmitView, ScopeView},
+};
 
 pin_project! {
     /// A [`View`] that replaces its child content with a fallback when any
@@ -33,7 +36,7 @@ pin_project! {
         /// The child failed and its fallback is rendering in its place.
         Fallback {
             #[pin]
-            view: EmitView<V>,
+            view: EmitView<ScopeView<V>>,
         },
     }
 }
@@ -81,7 +84,7 @@ where
                     }
                     Err(error) => {
                         let view = fallback.take().expect("the fallback runs once")(error)?;
-                        let view = EmitView::new(*region, view);
+                        let view = EmitView::new(*region, ScopeView::new(view));
                         self.as_mut().set(Self::Fallback { view });
                     }
                 },
@@ -102,6 +105,7 @@ where
                     // The fallback replaces everything the child sent.
                     Err(error) => {
                         let view = fallback.take().expect("the fallback runs once")(error)?;
+                        let view = ScopeView::self_contained(|| view);
                         let view = EmitView::new(*region, view);
                         self.as_mut().set(Self::Fallback { view });
                     }
@@ -127,7 +131,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::{ViewHandle, internal::ScopeView};
+    use crate::ViewHandle;
 
     struct LiveChild<'a> {
         swap: Option<Result<ViewSwap>>,
