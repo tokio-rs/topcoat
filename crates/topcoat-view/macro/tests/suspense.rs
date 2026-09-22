@@ -63,6 +63,7 @@ async fn suspense_shows_the_fallback_until_the_child_is_ready() {
         cx =>
         suspense(
             fallback: view! { <p>"loading"</p> },
+            (view! { <b>"prefix"</b> })
             slow(rx: rx)
         )
     });
@@ -75,7 +76,7 @@ async fn suspense_shows_the_fallback_until_the_child_is_ready() {
 
     tx.send(Ok("done")).unwrap();
     let swap = next_swap(&mut view).await.unwrap().unwrap();
-    assert_eq!(swap.replacement.render(cx), "<i>done</i>");
+    assert_eq!(swap.replacement.render(cx), "<b>prefix</b><i>done</i>");
     assert!(next_swap(&mut view).await.unwrap().is_none());
 }
 
@@ -102,12 +103,10 @@ async fn suspense_renders_a_ready_child_in_place() {
 async fn suspense_forwards_child_swaps_without_rendering_first_content() {
     let cx = &Cx::default();
     let region = RegionId::new(Identity::ROOT, SiteKey::new(file!(), line!(), column!(), 0));
-    let child_region =
-        RegionId::new(Identity::ROOT, SiteKey::new(file!(), line!(), column!(), 0));
+    let child_region = RegionId::new(Identity::ROOT, SiteKey::new(file!(), line!(), column!(), 0));
     let replacement = view! { cx => <i>"update"</i> }.single().await.unwrap();
-    let fallback = ThenView::new(async {
-        Err::<(), _>(io::Error::other("fallback was polled").into())
-    });
+    let fallback =
+        ThenView::new(async { Err::<(), _>(io::Error::other("fallback was polled").into()) });
     let mut view = pin!(SuspenseView::new(
         region,
         fallback,

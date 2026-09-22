@@ -6,7 +6,7 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
-use crate::{RegionId, View, ViewBufferScope, ViewFirst, ViewSwap};
+use crate::{RegionId, View, ViewBufferScope, ViewFirst, ViewSwap, internal::ScopeView};
 
 pin_project! {
     /// A [`View`] that shows a fallback until its child content is ready.
@@ -22,7 +22,7 @@ pin_project! {
         #[pin]
         fallback: F,
         #[pin]
-        child: C,
+        child: ScopeView<C>,
         region: RegionId,
         state: State,
     }
@@ -46,7 +46,9 @@ impl<F, C> SuspenseView<F, C> {
     pub fn new(region: RegionId, fallback: F, child: C) -> Self {
         Self {
             fallback,
-            child,
+            // The child can finish after the surrounding first content
+            // has gone out, so it must keep its own rendering buffer.
+            child: ScopeView::self_contained(|| child),
             region,
             state: State::Start,
         }
