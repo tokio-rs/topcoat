@@ -144,7 +144,7 @@ fn greeting(cx: &Cx) -> impl View {
 }
 ```
 
-The region owns a clone of the context, and its emissions use that context implicitly. An individual emission can use another context with `emit! { cx => ... }`. See the [`view!`] guide's section on rendering outside a component.
+Passing a `Cx` moves it into the returned view. Passing an `&Cx` borrows it, so the context must stay alive as long as the view. Emissions use that context implicitly. An individual emission can use another context with `emit! { cx => ... }`. See the [`view!`] guide's section on rendering outside a component.
 
 # Suspense And Error Boundaries
 

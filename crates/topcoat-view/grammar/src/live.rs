@@ -52,10 +52,18 @@ impl ToTokens for Live {
         };
         let body = &self.body;
         let connecting = body.connecting();
+        let context = match &self.cx {
+            Some(cx) => {
+                let cx = &cx.cx;
+                quote! { #cx }
+            }
+            None => quote! { __cx },
+        };
 
         quote! {{
-            let __region = #topcoat_view::RegionId::new(#topcoat_core::context::identity(__cx), #site);
-            let __pass = #topcoat_view::pass(__cx);
+            let __cx = #context;
+            let __region = #topcoat_view::RegionId::new(#topcoat_context::identity(&__cx), #site);
+            let __pass = #topcoat_view::pass(&__cx);
             #topcoat_view::internal::LiveView::new(
                 __region,
                 #connecting,
@@ -82,7 +90,7 @@ pub enum LiveBody {
 impl LiveBody {
     fn connecting(&self) -> bool {
         match self {
-            Self::Single(_) => true,
+            Self::Single(_) => false,
             Self::Branches(branches) => branches.iter().any(LiveBranch::connecting),
         }
     }
@@ -110,6 +118,26 @@ impl Parse for LiveBody {
 
 impl ToTokens for LiveBody {
     fn to_tokens(&self, tokens: &mut TokenStream) {
+        let arms = match self {
+            Self::Single(body) => quote! {
+                #topcoat_view::ViewPass::Initial | #topcoat_view::ViewPass::Connected => {
+                    #(#body)*
+                }
+            },
+            Self::Branches(branches) => branches
+                .iter()
+                .map(|branch| {
+                    if !self.connecting() && branch.pass == format!("{:?}", ViewPass::Initial) {
+                        let body = &branch.body;
+                        quote! {
+                            #topcoat_view::ViewPass::Initial | #topcoat_view::ViewPass::Connected => #body
+                        }
+                    } else {
+                        quote! { #branch }
+                    }
+                })
+                .collect::<TokenStream>(),
+        };
         let mut diagnostics = TokenStream::new();
         if let Self::Branches(branches) = self {
             let initial = format!("{:?}", ViewPass::Initial);
@@ -125,8 +153,9 @@ impl ToTokens for LiveBody {
         quote! {
             async move {
                 #diagnostics
+                let __cx: &#topcoat_context::Cx = &__cx;
                 match __pass {
-
+                    #arms
                 }
             }
         }
@@ -287,7 +316,7 @@ mod tests {
                 ),
             );
             assert!(matches!(
-                body.block.stmts[1],
+                body.block.stmts[2],
                 syn::Stmt::Expr(syn::Expr::Match(_), _)
             ));
         }

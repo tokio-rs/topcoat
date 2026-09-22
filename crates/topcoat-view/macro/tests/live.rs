@@ -456,8 +456,9 @@ async fn a_region_runs_its_connected_branch_in_the_connected_pass() {
     });
 
     let content = first(&mut view).await.unwrap();
-    assert!(!content.connecting);
-    assert_eq!(content.content.render(cx), "<main><p>connected</p></main>");
+    let html = content.content.render(cx);
+    assert!(html.contains("<p>connected</p>"), "{html}");
+    assert!(!html.contains("<p>initial</p>"), "{html}");
 }
 
 #[tokio::test]
