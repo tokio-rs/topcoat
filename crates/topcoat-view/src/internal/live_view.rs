@@ -121,6 +121,7 @@ pin_project! {
         view: V,
         region: RegionId,
         first: bool,
+        done: bool,
     }
 }
 
@@ -130,6 +131,7 @@ impl<V> EmitView<V> {
             view,
             region,
             first: true,
+            done: false,
         }
     }
 }
@@ -143,6 +145,7 @@ where
         match this.view.poll_first(cx) {
             Poll::Ready(Ok(first)) => {
                 *this.first = false;
+                *this.done = !first.streaming;
                 Poll::Ready(Ok(first))
             }
             Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
@@ -152,10 +155,14 @@ where
 
     fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
         let this = self.project();
+        if *this.done {
+            return Poll::Ready(Ok(None));
+        }
         if *this.first {
             match this.view.poll_first(cx) {
                 Poll::Ready(Ok(first)) => {
                     *this.first = false;
+                    *this.done = !first.streaming;
                     Poll::Ready(Ok(Some(ViewSwap {
                         region: *this.region,
                         replacement: first.content,
@@ -165,7 +172,13 @@ where
                 Poll::Pending => Poll::Pending,
             }
         } else {
-            this.view.poll_swap(cx)
+            match this.view.poll_swap(cx) {
+                Poll::Ready(Ok(None)) => {
+                    *this.done = true;
+                    Poll::Ready(Ok(None))
+                }
+                poll => poll,
+            }
         }
     }
 }

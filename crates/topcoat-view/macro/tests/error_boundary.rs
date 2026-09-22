@@ -129,3 +129,21 @@ async fn error_boundary_swaps_in_the_fallback_without_a_first_poll() {
     assert_eq!(swap.replacement.render(cx), r#"<p class="error">boom</p>"#);
     assert!(next_swap(&mut view).await.unwrap().is_none());
 }
+
+#[tokio::test]
+async fn error_boundary_finishes_after_a_single_emission_fallback() {
+    let cx = &Cx::default();
+    let mut view = pin!(view! {
+        cx =>
+        error_boundary(
+            fallback: |error| Ok(live! {
+                emit! { <p class="error">(error.to_string())</p> }
+            }),
+            load(fail: true)
+        )
+    });
+
+    let swap = next_swap(&mut view).await.unwrap().unwrap();
+    assert_eq!(swap.replacement.render(cx), r#"<p class="error">boom</p>"#);
+    assert!(next_swap(&mut view).await.unwrap().is_none());
+}
