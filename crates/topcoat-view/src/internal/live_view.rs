@@ -20,10 +20,7 @@ pin_project! {
         body: Fut,
         region: RegionId,
         pass: ViewPass,
-        connected: bool,
         connecting: bool,
-        started: bool,
-        done: bool,
         stash: Option<ViewSwap>,
     }
 }
@@ -33,27 +30,12 @@ where
     Fut: Future<Output = Result<EmitToken>>,
 {
     #[doc(hidden)]
-    pub fn new(region: RegionId, pass: ViewPass, body: Fut) -> Self {
-        let mut view = Self::branches(region, pass, true, body);
-        view.connecting = false;
-        view
-    }
-
-    #[doc(hidden)]
-    pub fn branches(
-        region: RegionId,
-        pass: ViewPass,
-        connected: bool,
-        body: Fut,
-    ) -> Self {
+    pub fn new(region: RegionId, pass: ViewPass, connecting: bool, body: Fut) -> Self {
         Self {
             body,
             region,
             pass,
-            connected,
-            connecting: connected && pass == ViewPass::Initial,
-            started: false,
-            done: false,
+            connecting,
             stash: None,
         }
     }
@@ -71,8 +53,6 @@ where
 {
     fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
         let mut this = self.project();
-        *this.started = true;
-
         match poll_first(this.body.as_mut(), cx) {
             (Poll::Pending, Some(first)) => {
                 // The emitted child can be settled while its body still has
@@ -81,9 +61,8 @@ where
                 if let Poll::Ready(Err(error)) = poll {
                     return Poll::Ready(Err(error));
                 }
-                *this.done = poll.is_ready();
                 *this.stash = yielded;
-                let streaming = !*this.done;
+                let streaming = poll.is_pending();
                 let connecting = *this.connecting || first.connecting;
                 let content = if streaming || connecting {
                     ViewBufferScope::with(|buffer| {
@@ -113,20 +92,9 @@ where
         }
     }
 
-    fn poll_swap(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<Option<ViewSwap>>> {
+    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
         let this = self.project();
 
-        if *this.done {
-            return Poll::Ready(Ok(None));
-        }
-        if !*this.started && *this.pass == ViewPass::Connected && !*this.connected {
-            *this.done = true;
-            return Poll::Ready(Ok(None));
-        }
-        *this.started = true;
         if let Some(swap) = this.stash.take() {
             return Poll::Ready(Ok(Some(swap)));
         }
@@ -137,10 +105,7 @@ where
             (Poll::Ready(_), Some(_)) => {
                 panic!("live view future yielded without returning pending")
             }
-            (Poll::Ready(result), None) => {
-                *this.done = true;
-                Poll::Ready(result.map(|_| None))
-            }
+            (Poll::Ready(result), None) => Poll::Ready(result.map(|_| None)),
         }
     }
 }
@@ -180,10 +145,7 @@ where
         }
     }
 
-    fn poll_swap(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<Option<ViewSwap>>> {
+    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
         let this = self.project();
         if *this.first {
             match this.view.poll_first(cx) {
