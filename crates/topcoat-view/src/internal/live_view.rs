@@ -23,6 +23,7 @@ pin_project! {
         #[pin]
         body: Fut,
         region: RegionId,
+        // A swap produced while checking whether the body is still live.
         stash: Option<ViewSwap>,
     }
 }
@@ -31,6 +32,7 @@ impl<Fut> LiveView<Fut>
 where
     Fut: Future<Output = Result<EmitToken>>,
 {
+    /// Creates a live body whose later emissions replace `region`.
     #[doc(hidden)]
     pub fn new(region: RegionId, body: Fut) -> Self {
         Self {
@@ -43,6 +45,12 @@ where
 
 impl LiveView<Ready<Result<EmitToken>>> {
     /// Drives an emitted view until it has no more updates.
+    ///
+    /// Its first content becomes the body's first emission or a replacement
+    /// of `region`, depending on whether the body has already emitted.
+    /// Swaps from the emitted view keep their own target regions. The future
+    /// resolves to an emission token once the view finishes, or propagates
+    /// its rendering error so the body can handle it.
     pub fn drive<V: View>(region: RegionId, view: V) -> impl Future<Output = Result<EmitToken>> {
         DriveFuture::new(EmitView::new(region, view)).map_ok(|()| EmitToken)
     }
@@ -111,6 +119,10 @@ pin_project! {
     ///
     /// A later emission or error fallback starts during swap polling, so its
     /// first content becomes a replacement. Subsequent child swaps pass through.
+    /// The child itself always receives a first-content poll before any swaps.
+    ///
+    /// Completion is remembered, including when the child's first content is
+    /// not live, so further swap polls do not poll a finished child again.
     pub struct EmitView<V> {
         #[pin]
         view: V,
@@ -121,6 +133,7 @@ pin_project! {
 }
 
 impl<V> EmitView<V> {
+    /// Wraps a view whose first content can replace `region` during swap polling.
     pub fn new(region: RegionId, view: V) -> Self {
         Self {
             view,

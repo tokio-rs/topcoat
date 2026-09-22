@@ -16,8 +16,13 @@ pin_project! {
     /// region is created. Otherwise the content renders inside a live
     /// region, so a failure while it streams can still swap the fallback in
     /// over everything the child already sent.
+    ///
+    /// The fallback closure runs once on the first child error. When it
+    /// returns a view, the failed child is dropped and that view takes over,
+    /// including any updates of its own. Errors from the fallback propagate.
     #[project = ErrorBoundaryViewProj]
     pub enum ErrorBoundaryView<C, F, V> {
+        /// The child is rendering and the fallback has not been used.
         Child {
             #[pin]
             child: C,
@@ -25,6 +30,7 @@ pin_project! {
             fallback: Option<F>,
             region: RegionId,
         },
+        /// The child failed and its fallback is rendering in its place.
         Fallback {
             #[pin]
             view: EmitView<V>,
@@ -33,6 +39,9 @@ pin_project! {
 }
 
 impl<C, F, V> ErrorBoundaryView<C, F, V> {
+    /// Guards `child`, replacing `region` with `fallback` after a late error.
+    ///
+    /// An error before first content resolves renders the fallback in place.
     #[doc(hidden)]
     pub fn new(region: RegionId, fallback: F, child: C) -> Self {
         Self::Child {

@@ -15,6 +15,10 @@ pin_project! {
     /// away, it renders in place and no region is created. Otherwise the
     /// fallback renders inside a live region and the child's content swaps
     /// into it once it resolves.
+    ///
+    /// The fallback can stream updates while the child is pending. Once the
+    /// child resolves, only its updates pass through. Errors from either view
+    /// propagate to the caller.
     pub struct SuspenseView<F, C> {
         #[pin]
         fallback: F,
@@ -40,6 +44,7 @@ enum State {
 }
 
 impl<F, C> SuspenseView<F, C> {
+    /// Creates a boundary whose fallback is replaced at `region` when needed.
     #[doc(hidden)]
     pub fn new(region: RegionId, fallback: F, child: C) -> Self {
         Self {
