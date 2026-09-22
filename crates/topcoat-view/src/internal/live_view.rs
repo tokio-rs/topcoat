@@ -19,7 +19,8 @@ pin_project! {
         #[pin]
         body: Fut,
         region: RegionId,
-        connecting: bool,
+        has_connected: bool,
+        first_polled: bool,
         stash: Option<ViewSwap>,
     }
 }
@@ -29,11 +30,12 @@ where
     Fut: Future<Output = Result<EmitToken>>,
 {
     #[doc(hidden)]
-    pub fn new(region: RegionId, connecting: bool, body: Fut) -> Self {
+    pub fn new(region: RegionId, has_connected: bool, body: Fut) -> Self {
         Self {
             body,
             region,
-            connecting,
+            has_connected,
+            first_polled: false,
             stash: None,
         }
     }
@@ -51,6 +53,7 @@ where
 {
     fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
         let mut this = self.project();
+        *this.first_polled = true;
         match poll_first(this.body.as_mut(), cx) {
             (Poll::Pending, Some(first)) => {
                 // The emitted child can be settled while its body still has
@@ -61,7 +64,7 @@ where
                 }
                 *this.stash = yielded;
                 let streaming = poll.is_pending();
-                let connecting = *this.connecting || first.connecting;
+                let connecting = *this.has_connected || first.connecting;
                 let content = if streaming || connecting {
                     ViewBufferScope::with(|buffer| {
                         buffer.block(|parts| {
@@ -92,6 +95,10 @@ where
 
     fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
         let this = self.project();
+
+        if !*this.first_polled && !*this.has_connected {
+            return Poll::Ready(Ok(None));
+        }
 
         if let Some(swap) = this.stash.take() {
             return Poll::Ready(Ok(Some(swap)));
