@@ -274,15 +274,22 @@ mod tests {
             let syn::Stmt::Macro(error) = &body.block.stmts[0] else {
                 panic!("expected a compile_error! alongside the body expansion");
             };
-            assert!(error.mac.path.is_ident("compile_error")
-                || error.mac.path == syn::parse_quote!(::core::compile_error));
+            assert!(
+                error.mac.path.is_ident("compile_error")
+                    || error.mac.path == syn::parse_quote!(::core::compile_error)
+            );
             assert_eq!(
-                syn::parse2::<syn::LitStr>(error.mac.tokens.clone()).unwrap().value(),
+                syn::parse2::<syn::LitStr>(error.mac.tokens.clone())
+                    .unwrap()
+                    .value(),
                 format!(
                     "live! branches require an `{initial}` branch; use `{initial} => {{ emit! {{}} }}` for empty initial content"
                 ),
             );
-            assert!(matches!(body.block.stmts[1], syn::Stmt::Expr(syn::Expr::Match(_), _)));
+            assert!(matches!(
+                body.block.stmts[1],
+                syn::Stmt::Expr(syn::Expr::Match(_), _)
+            ));
         }
     }
 

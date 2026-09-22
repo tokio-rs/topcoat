@@ -42,7 +42,9 @@ async fn suspense_shows_the_fallback_until_the_child_is_ready() {
 
     let content = first(&mut view).await.unwrap();
     assert!(content.streaming);
-    assert!(content.content.render(cx).contains("<p>loading</p>"));
+    let html = content.content.render(cx);
+    assert!(html.contains("<!--topcoat::region::start("), "{html}");
+    assert!(html.contains("<p>loading</p>"), "{html}");
 
     tx.send(Ok("done")).unwrap();
     let swap = next_swap(&mut view).await.unwrap().unwrap();
@@ -51,7 +53,7 @@ async fn suspense_shows_the_fallback_until_the_child_is_ready() {
 }
 
 #[tokio::test]
-async fn suspense_swaps_in_an_immediate_child() {
+async fn suspense_renders_a_ready_child_in_place() {
     let cx = &Cx::default();
     let mut view = pin!(view! {
         cx =>
@@ -61,9 +63,34 @@ async fn suspense_swaps_in_an_immediate_child() {
         )
     });
 
-    assert!(first(&mut view).await.unwrap().streaming);
+    // The child is ready on the first poll, so no region is created and the
+    // fallback never shows.
+    let content = first(&mut view).await.unwrap();
+    assert!(content.is_settled());
+    assert_eq!(content.content.render(cx), "<p>content</p>");
+    assert!(next_swap(&mut view).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn suspense_swaps_in_a_child_without_a_first_poll() {
+    let cx = &Cx::default();
+    let (tx, rx) = oneshot::channel();
+    let mut view = pin!(view! {
+        cx =>
+        suspense(
+            fallback: view! { <p>"loading"</p> },
+            slow(rx: rx)
+        )
+    });
+
+    // Without a first poll, as on a reconnect, the fallback and the child
+    // both go out as swaps of the region.
     let swap = next_swap(&mut view).await.unwrap().unwrap();
-    assert_eq!(swap.replacement.render(cx), "<p>content</p>");
+    assert_eq!(swap.replacement.render(cx), "<p>loading</p>");
+
+    tx.send(Ok("done")).unwrap();
+    let swap = next_swap(&mut view).await.unwrap().unwrap();
+    assert_eq!(swap.replacement.render(cx), "<i>done</i>");
     assert!(next_swap(&mut view).await.unwrap().is_none());
 }
 

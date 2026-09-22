@@ -5,7 +5,7 @@ This module provides Topcoat's HTML templating primitives:
 - [`attributes!`]: builds a reusable runtime [`Attributes`] value from the same attribute syntax used inside [`view!`].
 - [`class!`]: space-separated class lists from static and conditional entries.
 - [`live!`] and [`emit!`]: live regions that stream replacement content into a page after it reached the browser.
-- [`suspense`] and [`error_boundary`]: components that stream child content in behind a fallback, built on the live macros.
+- [`suspense`] and [`error_boundary`]: components that stream child content in behind a fallback.
 
 [`view!`]: macro.view.html
 [`component`]: attr.component.html

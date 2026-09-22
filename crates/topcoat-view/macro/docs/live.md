@@ -148,7 +148,7 @@ The region owns a clone of the context, and its emissions use that context impli
 
 # Suspense And Error Boundaries
 
-The [`suspense`] component is a live region that shows a fallback until its child content is ready:
+The [`suspense`] component shows a fallback until its child content is ready. The child gets the first chance to render: when it is ready right away, it renders in place and the fallback never shows. Otherwise the fallback goes out with the page and the child replaces it once it resolves:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -184,7 +184,7 @@ Ok(view! {
 # }
 ```
 
-Both are small components built on [`live!`] and [`emit!`]. Reach for the macros directly when a region needs more than they cover, like progress updates or retrying after a failure.
+Both are small components over the same region mechanism as [`live!`]. Reach for the macros directly when a region needs more than they cover, like progress updates or retrying after a failure.
 
 [`EmitToken`]: struct.EmitToken.html
 [`Result`]: ../type.Result.html
