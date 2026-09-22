@@ -10,6 +10,7 @@ use topcoat_core_grammar::{
     ParseOption,
     paths::{topcoat_context, topcoat_core, topcoat_view},
 };
+use topcoat_view::ViewPass;
 
 use crate::{
     leading_cx::LeadingCx,
@@ -49,16 +50,27 @@ impl ToTokens for Live {
                 #topcoat_core::identity::SiteKey::new(::core::file!(), #line, #column, 0)
             }
         };
+        let body = &self.body;
+        let connecting = body.connecting();
 
         quote! {{
             let __region = #topcoat_view::RegionId::new(identity(__cx), #site);
             let __pass = #topcoat_view::pass(__cx);
             #topcoat_view::internal::LiveView::new(
                 __region,
-                __pass
+                #connecting,
+                #body,
             )
         }}
         .to_tokens(tokens);
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for Live {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.cx.pretty_print(printer);
+        self.body.pretty_print(printer);
     }
 }
 
@@ -68,6 +80,13 @@ pub enum LiveBody {
 }
 
 impl LiveBody {
+    fn connecting(&self) -> bool {
+        match self {
+            Self::Single(_) => true,
+            Self::Branches(branches) => branches.iter().any(LiveBranch::connecting),
+        }
+    }
+
     fn span(&self) -> Option<Span> {
         match self {
             Self::Single(body) => body.first().map(Spanned::span),
@@ -90,7 +109,41 @@ impl Parse for LiveBody {
 }
 
 impl ToTokens for LiveBody {
-    fn to_tokens(&self, tokens: &mut TokenStream) {}
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        quote! {
+            async move {
+                match __pass {
+
+                }
+            }
+        }
+        .to_tokens(tokens);
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for LiveBody {
+    /// Lays out statements and branches alike on their own lines, like the
+    /// statements of a block, keeping standalone comments and single blank
+    /// lines between them.
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        let len = match self {
+            Self::Single(stmts) => stmts.len(),
+            Self::Branches(branches) => branches.len(),
+        };
+        for index in 0..len {
+            match self {
+                Self::Single(stmts) => stmts[index].pretty_print(printer),
+                Self::Branches(branches) => branches[index].pretty_print(printer),
+            }
+            if index < len - 1 {
+                printer.scan_same_line_trivia();
+                printer.scan_force_break();
+                printer.scan_break();
+                printer.scan_trivia(true, true);
+            }
+        }
+    }
 }
 
 pub struct LiveBranch {
@@ -98,6 +151,12 @@ pub struct LiveBranch {
     pub fat_arrow_token: Token![=>],
     pub body: syn::Block,
     pub comma: Option<Token![,]>,
+}
+
+impl LiveBranch {
+    fn connecting(&self) -> bool {
+        self.pass == format!("{:?}", ViewPass::Connected)
+    }
 }
 
 impl Parse for LiveBranch {
@@ -123,6 +182,19 @@ impl ToTokens for LiveBranch {
         let pass = &self.pass;
         let body = &self.body;
         quote! { #topcoat_view::ViewPass::#pass => #body }.to_tokens(tokens);
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for LiveBranch {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.pass.pretty_print(printer);
+        " ".pretty_print(printer);
+        self.fat_arrow_token.pretty_print(printer);
+        " ".pretty_print(printer);
+        // The block body is self-delimiting, so the trailing comma is dropped
+        // like on a match arm.
+        self.body.pretty_print(printer);
     }
 }
 

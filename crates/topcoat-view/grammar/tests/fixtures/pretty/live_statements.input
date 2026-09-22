@@ -1,0 +1,7 @@
+view! {
+    <h1>"Quote of the day"</h1>
+    (live! { emit! { <p>"Loading..."</p> }?;  let  quote  =  fetch_quote().await;
+        // Replace the loading message.
+
+        emit! { <blockquote>(quote)</blockquote> } })
+}
