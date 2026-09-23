@@ -94,7 +94,7 @@ impl ToTokens for Procedure {
         let docs = item.attrs.iter().filter(|attr| attr.path().is_ident("doc"));
 
         // Marker: the value users register and reference. A unit struct, so
-        // `#ident` stays a value usable directly in `router.procedure(...)`
+        // `#ident` stays a value usable directly in `router.route(...)`
         // and capturable in runtime expressions. `Copy` lets the surrogate
         // hand the marker back out of its `&'static` reference.
         let marker = quote! {

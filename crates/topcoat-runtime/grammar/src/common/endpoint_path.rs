@@ -42,9 +42,10 @@ impl Parse for EndpointPath {
             ));
         }
         let path = Path::from_str(&value).map_err(|err| syn::Error::new(lit.span(), err))?;
-        if path.segments().any(|segment| {
-            matches!(segment, PathSegment::Param(_) | PathSegment::CatchAll(_))
-        }) {
+        if path
+            .segments()
+            .any(|segment| matches!(segment, PathSegment::Param(_) | PathSegment::CatchAll(_)))
+        {
             return Err(syn::Error::new(
                 lit.span(),
                 "the path cannot declare parameters; arguments travel in the request body",
@@ -96,7 +97,10 @@ mod tests {
     #[test]
     fn a_named_path_is_served_verbatim() {
         let path: EndpointPath = syn::parse_str(r#""/search""#).unwrap();
-        assert_eq!(EndpointPath::resolve(Some(&path), "/unused").value(), "/search");
+        assert_eq!(
+            EndpointPath::resolve(Some(&path), "/unused").value(),
+            "/search"
+        );
     }
 
     #[test]

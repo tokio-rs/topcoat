@@ -63,16 +63,32 @@ Awaiting a call yields the procedure's `Ok` value. If the procedure returns `Err
 
 # Registration
 
-Each procedure is served by a route on the [`Router`]. `.discover()` registers every procedure linked into the binary; alternatively, mount procedures individually:
+A procedure is a [`Route`] on the [`Router`], served at its path. `.discover()` registers every procedure linked into the binary; alternatively, register procedures individually:
 
 ```rust
-# use topcoat::{Result, router::Router, runtime::{procedure, RouterBuilderProcedureExt}};
+# use topcoat::{Result, router::Router, runtime::procedure};
 # #[procedure]
 # async fn double(value: usize) -> Result<usize> { Ok(value * 2) }
-let router = Router::builder().procedure(double).build();
+let router = Router::builder().route(double).build();
 ```
+
+# Path
+
+By default, a procedure is served at an internal path that changes with every build. Pass an absolute path to serve it somewhere stable instead:
+
+```rust
+use topcoat::{Result, runtime::procedure};
+
+#[procedure("/api/double")]
+async fn double(value: usize) -> Result<usize> {
+    Ok(value * 2)
+}
+```
+
+The browser posts every call to that path. Arguments travel in the request body, so the path cannot declare parameters.
 
 [`Cx`]: ../context/struct.Cx.html
 [`Result`]: ../type.Result.html
+[`Route`]: ../router/trait.Route.html
 [`Router`]: ../router/struct.Router.html
 [`expr!`]: macro.expr.html

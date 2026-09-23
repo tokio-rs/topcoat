@@ -304,9 +304,7 @@ async fn a_rerender_at_another_identity_derives_another_signal_id() {
 #[tokio::test]
 async fn a_shard_without_a_path_is_served_below_the_runtime_prefix() {
     let path = stateful.path().as_str();
-    let tail = path
-        .strip_prefix("/_topcoat/runtime/shards/")
-        .expect(path);
+    let tail = path.strip_prefix("/_topcoat/runtime/shards/").expect(path);
     assert_eq!(tail.len(), 32, "{path}");
     assert!(tail.bytes().all(|b| b.is_ascii_hexdigit()), "{path}");
     assert_ne!(stateful.path(), by_signal.path());

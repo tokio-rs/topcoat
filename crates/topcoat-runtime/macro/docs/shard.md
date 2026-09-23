@@ -134,18 +134,40 @@ search_results(query: $(query.get()), limit: limit)
 
 # Registration
 
-Each shard is served by a route on the [`Router`]. `.discover()` registers every shard linked into the binary; alternatively, mount shards individually:
+A shard is a [`Route`] on the [`Router`], served at its path. `.discover()` registers every shard linked into the binary; alternatively, register shards individually:
 
 ```rust
-# use topcoat::{Result, router::Router, runtime::{shard, RouterBuilderShardExt}, view::{View, view}};
+# use topcoat::{Result, router::Router, runtime::shard, view::{View, view}};
 # #[shard]
 # async fn search_results(query: String) -> Result<impl View> { Ok(view! { (query) }) }
-let router = Router::builder().shard(search_results).build();
+let router = Router::builder().route(search_results).build();
 ```
+
+# Path
+
+By default, a shard is served at an internal path that changes with every build. Pass an absolute path to serve it somewhere stable instead:
+
+```rust
+use topcoat::{Result, context::Cx, runtime::shard, view::{View, view}};
+
+#[shard("/search/results")]
+async fn search_results(cx: &Cx, query: String) -> Result<impl View> {
+    let products = search_products(cx, &query).await?;
+    Ok(view! {
+        for product in products {
+            <div>(product)</div>
+        }
+    })
+}
+# async fn search_products(_cx: &Cx, _query: &str) -> Result<Vec<String>> { Ok(vec![]) }
+```
+
+The browser sends every re-render request for the shard to that path. Arguments travel in the request body, so the path cannot declare parameters.
 
 [`context`]: ../context/index.html
 [`Cx`]: ../context/struct.Cx.html
 [`Result`]: ../type.Result.html
+[`Route`]: ../router/trait.Route.html
 [`Router`]: ../router/struct.Router.html
 [`signal`]: fn.signal.html
 [`Signal<T>`]: struct.Signal.html

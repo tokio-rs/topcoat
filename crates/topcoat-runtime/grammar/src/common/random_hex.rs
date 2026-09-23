@@ -21,7 +21,10 @@ mod tests {
     fn is_32_lowercase_hex_digits() {
         let hex = random_hex();
         assert_eq!(hex.len(), 32);
-        assert!(hex.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)));
+        assert!(
+            hex.bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        );
     }
 
     #[test]
