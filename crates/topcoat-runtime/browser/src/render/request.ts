@@ -1,3 +1,6 @@
+/** The header marking a request as sent by the runtime. */
+export const RUNTIME_HEADER = "X-Topcoat-Runtime";
+
 /** Batches re-renders and accepts responses only while their owner is live. */
 export class RenderRequest {
 	private controller: AbortController | null = null;

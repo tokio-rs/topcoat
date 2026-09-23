@@ -6,7 +6,7 @@ mod event_handler;
 mod expr;
 mod js;
 #[cfg(feature = "router")]
-mod page;
+mod layer;
 #[cfg(feature = "router")]
 mod procedure;
 mod router;
@@ -23,7 +23,7 @@ pub use event_handler::*;
 pub use expr::*;
 pub use js::*;
 #[cfg(feature = "router")]
-pub use page::*;
+pub use layer::*;
 #[cfg(feature = "router")]
 pub use procedure::*;
 pub use router::*;

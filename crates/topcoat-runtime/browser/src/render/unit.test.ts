@@ -6,7 +6,7 @@ import { Runtime } from "../runtime";
 import type { Scope } from "../scope";
 import type { SignalId } from "../signal-registry";
 import { F64 } from "../surrogate";
-import { PAGE_ROUTE_PREFIX } from "./page";
+import { RUNTIME_HEADER } from "./request";
 import { SHARD_ROUTE_PREFIX, ShardUnit } from "./shard";
 import { RenderUnit } from "./unit";
 
@@ -171,21 +171,24 @@ it("a page posts the values of every signal in the document to the pages route",
 		(e: unknown) => e,
 	);
 
-	expect(stub.url()).toBe(`${PAGE_ROUTE_PREFIX}/search?q=shoes`);
+	expect(stub.url()).toBe("/search?q=shoes");
+	expect(stub.request()?.method).toBe("POST");
+	const headers = stub.request()?.headers as Record<string, string>;
+	expect(headers[RUNTIME_HEADER]).toBe("true");
 	expect(JSON.parse(stub.request()?.body as string)).toEqual({
 		signals: { p1: 1, s1: 2 },
 	});
 	expect(String(error)).toContain("Page request failed");
 });
 
-it("the root page posts to the bare pages route", async () => {
+it("the root page posts to its own URL", async () => {
 	const stub = stubFetch(500, "Internal Server Error");
 	globalThis.location = { pathname: "/", search: "" } as unknown as Location;
 
 	const runtime = new Runtime();
 	await refetch(runtime.page)().catch(() => undefined);
 
-	expect(stub.url()).toBe(PAGE_ROUTE_PREFIX);
+	expect(stub.url()).toBe("/");
 });
 
 it("a page re-run morphs the body, keeping a focused input", async () => {

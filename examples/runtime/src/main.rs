@@ -16,8 +16,8 @@ async fn main() {
     topcoat::start(
         module_router!()
             .assets(AssetBundle::load().unwrap())
-            .runtime()
             .discover()
+            .runtime()
             .build(),
     )
     .await

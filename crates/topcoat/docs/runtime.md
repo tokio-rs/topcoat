@@ -32,14 +32,14 @@ use topcoat::{
 
 pub fn router() -> Router {
     Router::builder()
-        .runtime()
         .discover()
         .assets(AssetBundle::load().unwrap())
+        .runtime()
         .build()
 }
 ```
 
-Register your [procedures](#procedures) and [shards](#shards) separately. The example uses `.discover()` to find them.
+Register your [procedures](#procedures) and [shards](#shards) separately. The example uses `.discover()` to find them. Call `.runtime()` after registering your own layers: it adds a layer that turns the runtime's requests into ordinary page requests, and the layers registered before it only ever see those.
 
 # Runtime expressions
 

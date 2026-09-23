@@ -7,10 +7,8 @@ import { untrack } from "../reactivity";
 import type { Runtime } from "../runtime";
 import type { Scope } from "../scope";
 import type { SignalId } from "../signal-registry";
+import { RUNTIME_HEADER } from "./request";
 import { RenderUnit } from "./unit";
-
-/** The route a page re-run is requested from, with the page's path appended. */
-export const PAGE_ROUTE_PREFIX = "/_topcoat/runtime/pages";
 
 /**
  * The outermost render unit. Requests use the current URL and signal values.
@@ -48,13 +46,15 @@ export class PageUnit extends RenderUnit {
 	protected request(signal: AbortSignal): Promise<Response> {
 		// Include descendant signals so the server can restore the whole page.
 		const signals = untrack(() => this.contentScope.collectSignalValues());
-		// The root page is served at the bare prefix, since the route below
-		// it needs at least one path segment.
-		const path = location.pathname === "/" ? "" : location.pathname;
-		return fetch(`${PAGE_ROUTE_PREFIX}${path}${location.search}`, {
+		// The page's own URL; the header tells the server to run the page as
+		// a `GET` with these signal values rather than as a form submission.
+		return fetch(`${location.pathname}${location.search}`, {
 			method: "POST",
 			cache: "no-store",
-			headers: { "Content-Type": "application/json" },
+			headers: {
+				"Content-Type": "application/json",
+				[RUNTIME_HEADER]: "true",
+			},
 			body: JSON.stringify({ signals }),
 			signal,
 		});

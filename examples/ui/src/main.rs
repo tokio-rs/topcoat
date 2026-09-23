@@ -80,9 +80,9 @@ const REGISTRY: &str = "https://github.com/tokio-rs/topcoat/tree/main/crates/top
 #[tokio::main]
 async fn main() {
     let router = Router::builder()
-        .runtime()
         .assets(AssetBundle::load().unwrap())
         .discover()
+        .runtime()
         .build();
 
     topcoat::start(router).await.unwrap();
