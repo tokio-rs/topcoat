@@ -1,5 +1,6 @@
 import type { Context } from "./context";
 
+/** A compiled expression, run with the runtime's context. */
 export type Expression<T = unknown> = (cx: Context) => T;
 
 /** Compiles server-generated source without evaluating it. */

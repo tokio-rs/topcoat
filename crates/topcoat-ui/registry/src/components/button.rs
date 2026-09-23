@@ -5,35 +5,35 @@ use topcoat::{
 
 /// The visual style of a [`button`].
 ///
-/// [`Default`] is `ButtonVariant::Primary`, used when no variant is given.
+/// The default is `ButtonVariant::Primary`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum ButtonVariant {
-    /// The primary-filled button for the main action.
+    /// Filled with the primary color, for the main action.
     #[default]
     Primary,
-    /// A muted, tinted fill for secondary actions.
+    /// A muted tinted fill, for secondary actions.
     Secondary,
-    /// A hairline-bordered button on the page background.
+    /// A thin border and no fill.
     Outline,
     /// No fill until hovered, for toolbars and inline actions.
     Ghost,
-    /// A destructive-filled button for actions such as deleting data.
+    /// Filled with the destructive color, for actions such as deleting data.
     Destructive,
 }
 
 impl ButtonVariant {
     /// The Tailwind classes for this variant.
     ///
-    /// Hover and press states apply the fill or foreground color at reduced
-    /// opacity, so they hold up in both color schemes without `dark:`
-    /// overrides. Variants with a resting fill cast the theme's control
-    /// shadow. Outline and ghost buttons have no shadow.
+    /// Hover and press states use the fill or foreground color at a lower
+    /// opacity, so they work in both color schemes without `dark:` classes.
+    /// Variants with a fill have a small shadow. Outline and ghost buttons
+    /// have none.
     ///
-    /// Each variant sets its own border color rather than inheriting a
-    /// transparent one from [`BASE`]: with two border-color classes on the
-    /// same element, stylesheet order (not class order) would decide the
-    /// winner.
+    /// Each variant sets its own border color instead of getting a
+    /// transparent one from [`BASE`]. With two border color classes on one
+    /// element, the order in the stylesheet would decide which one wins, not
+    /// the order of the classes.
     fn classes(self) -> StaticClass {
         match self {
             Self::Primary => class!(
@@ -61,7 +61,7 @@ impl ButtonVariant {
 
 /// The size of a [`button`].
 ///
-/// [`Default`] is `ButtonSize::Md`, used when no size is given.
+/// The default is `ButtonSize::Md`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum ButtonSize {
@@ -72,15 +72,15 @@ pub enum ButtonSize {
     Md,
     /// A prominent button.
     Lg,
-    /// A square button sized for a single icon.
+    /// A square button for a single icon.
     Icon,
 }
 
 impl ButtonSize {
     /// The Tailwind classes for this size.
     ///
-    /// Sizes change the control's dimensions while keeping the text size
-    /// consistent.
+    /// Sizes change the dimensions of the button. The text size stays the
+    /// same.
     fn classes(self) -> StaticClass {
         match self {
             Self::Sm => class!("h-8 gap-1.5 rounded-md px-3"),
@@ -93,8 +93,8 @@ impl ButtonSize {
 
 /// The classes shared by every button, regardless of variant or size.
 ///
-/// Every button carries a border (colored per variant) so that the `Outline`
-/// variant, which only recolors it, does not change the button's dimensions.
+/// Every button has a border, colored by its variant. So the `Outline`
+/// variant, which only shows the border, has the same size as the others.
 const BASE: StaticClass = class!(
     "inline-flex shrink-0 items-center justify-center border \
      text-sm font-medium whitespace-nowrap transition-colors outline-none select-none \
@@ -102,10 +102,11 @@ const BASE: StaticClass = class!(
      focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
 );
 
-/// Builds the full class list for a button of the given `variant` and `size`.
+/// Returns the full class list of a button with the given `variant` and
+/// `size`.
 ///
-/// Use it to give button styling to an element that is not a `<button>`, such
-/// as a link styled as a button:
+/// Use it to style an element that is not a `<button>`, such as a link, like
+/// a button:
 ///
 /// ```ignore
 /// view! {
@@ -122,13 +123,12 @@ pub fn button_variants(
     class!(BASE, variant.classes(), size.classes())
 }
 
-/// A button component.
+/// A button.
 ///
-/// The `variant` and `size` parameters select the styling, defaulting to
-/// `Primary` and `Md`. The `attrs` (such as `class`, `type`, `disabled`, or
-/// event handlers) are forwarded to the underlying `<button>`; a `class` among
-/// them is appended to the computed classes. Child nodes become the button's
-/// content.
+/// `variant` and `size` set the style and default to `Primary` and `Md`. The
+/// `attrs` (such as `class`, `type`, `disabled`, or event handlers) are
+/// forwarded to the `<button>`. A `class` among them is appended to the
+/// component's classes. Child nodes become the button's content.
 ///
 /// ```ignore
 /// view! {
@@ -140,8 +140,7 @@ pub fn button_variants(
 /// }
 /// ```
 ///
-/// To style a non-`<button>` element like a button, use [`button_variants`]
-/// directly.
+/// To style another element like a button, use [`button_variants`].
 #[component]
 pub async fn button(
     #[default] variant: ButtonVariant,

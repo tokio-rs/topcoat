@@ -11,20 +11,24 @@ use topcoat_router::{
 
 use crate::BundledAsset;
 
-/// URL prefix every application-served asset is hosted under.
+/// The URL path that every asset served by the application starts with.
 pub(crate) const ASSET_ROUTE_PREFIX: &str = "/_topcoat/assets";
 
-/// `Cache-Control` applied to every served asset. Bundled filenames carry a
-/// content hash, so their contents never change for a given URL.
+/// The `Cache-Control` value of every served asset. Bundled filenames contain
+/// a content hash, so the contents behind a URL never change.
 const CACHE_CONTROL_VALUE: HeaderValue =
     HeaderValue::from_static("public, max-age=31536000, immutable");
 
-/// A [`Route`] that serves a single bundled asset from disk.
+/// A [`Route`] that serves one bundled file from disk.
 ///
-/// One is registered per [`BundledAsset`] by the router's `assets` extension
-/// method when the configuration serves the bundle from the application; the
-/// route reads the file on demand and responds with the appropriate
-/// `Content-Type` and an immutable `Cache-Control`.
+/// The route answers `GET` requests at `/_topcoat/assets/{filename}`. It
+/// reads the file on each request and responds with the file's
+/// `Content-Type` and a `Cache-Control` header that marks the response as
+/// immutable for a year. If the file cannot be read, it responds with
+/// `404 Not Found`.
+///
+/// You usually do not create this route yourself. Registering a bundle with
+/// the router's `assets` method adds one route per bundled file.
 #[derive(Debug, Clone)]
 pub struct AssetRoute {
     /// The identity of this route's handler.
@@ -38,7 +42,7 @@ pub struct AssetRoute {
 }
 
 impl AssetRoute {
-    /// Builds the route that serves `asset` out of the bundle directory `dir`.
+    /// Creates the route that serves `asset` from the bundle directory `dir`.
     ///
     /// # Panics
     ///

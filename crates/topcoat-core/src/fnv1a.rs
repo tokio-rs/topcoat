@@ -1,19 +1,18 @@
 //! A small `const` [FNV-1a] hasher.
 //!
-//! This is not a cryptographic hash; it exists to fold a handful of build
-//! inputs (crate names, paths, options, font settings, ...) into a compact,
-//! stable id at compile time, so derived URLs and identifiers stay
-//! cache-friendly and collision-free across builds.
+//! FNV-1a is fast and simple but not cryptographic. It turns a few inputs,
+//! such as crate names, paths, or options, into a compact id at compile time.
+//! The same inputs always give the same id, across builds and platforms.
 //!
 //! [FNV-1a]: https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
 
 /// A `const` [FNV-1a] hasher over a `u64` or `u128` state.
 ///
-/// [`new`](Self::new) starts a hash at the offset basis, [`write`](Self::write)
-/// folds a run of bytes in, and [`finish`](Self::finish) takes the value out.
-/// Every step moves the hasher, so a running hash threads through a chain of
-/// calls and cannot fork by accident. Separate runs whose boundaries matter
-/// with a delimiter so distinct inputs cannot collide by concatenation.
+/// [`new`](Self::new) starts a hash, [`write`](Self::write) adds bytes to it,
+/// and [`finish`](Self::finish) returns the result. Every step takes the
+/// hasher by value, so the calls form a chain. Separate inputs with a
+/// delimiter when their boundaries matter, so that `"ab" + "c"` and
+/// `"a" + "bc"` hash differently.
 ///
 /// ```
 /// use topcoat_core::fnv1a::Fnv1a;
@@ -41,7 +40,7 @@ macro_rules! fnv1a_impl {
                 Self($offset)
             }
 
-            /// Folds `bytes` into the running hash.
+            /// Adds `bytes` to the hash.
             #[must_use]
             pub const fn write(mut self, bytes: &[u8]) -> Self {
                 let mut i = 0;

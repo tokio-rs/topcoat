@@ -1,9 +1,10 @@
 use std::ops::Deref;
 
-/// A static string held by reference so a view can record it in place.
+/// A string literal held by reference, the cheapest string for a view to
+/// record.
 ///
-/// This is the most efficient way to pass a `&'static str` to a `view!`.
-/// Use it to optimize your rendering, for example for static class strings.
+/// A view records only the reference, without copying the string. Use it
+/// for string constants that render often, such as static class lists.
 ///
 /// ```rust
 /// # use topcoat::view::{PromotedStr, View, component, view};
@@ -15,10 +16,10 @@ use std::ops::Deref;
 /// # }
 /// ```
 ///
-/// The leading `&` is what makes this work: Rust promotes a reference to a
-/// constant into the binary's read-only data. Only a constant can be
-/// promoted, so a string that is only known at run time goes through
-/// [`StaticStr`] instead.
+/// The leading `&` is required. Rust promotes a reference to a constant
+/// into the binary's read-only data, which gives the `&'static &'static str`
+/// this type holds. Only a constant can be promoted, so use [`StaticStr`] for
+/// a `&'static str` that is not a constant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PromotedStr(pub &'static &'static str);
 
@@ -31,11 +32,11 @@ impl Deref for PromotedStr {
     }
 }
 
-/// A static string a view records without copying it.
+/// A `&'static str` that a view records without copying it.
 ///
-/// The `&str` implementations copy their contents into the view, since the
-/// view can outlive the borrow. A `&'static str` outlives every view, so
-/// wrapping one in this type records the string as is:
+/// A plain `&str` is copied into the view, because the view can outlive the
+/// borrow. A `&'static str` outlives every view, so wrapping it in this type
+/// skips the copy:
 ///
 /// ```rust
 /// # use topcoat::view::{StaticStr, View, component, view};
@@ -48,7 +49,7 @@ impl Deref for PromotedStr {
 /// # }
 /// ```
 ///
-/// A string written as a literal can be further optimized by using [`PromotedStr`].
+/// For a string literal, [`PromotedStr`] is cheaper still.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct StaticStr(pub &'static str);
 
@@ -61,20 +62,20 @@ impl Deref for StaticStr {
     }
 }
 
-/// A wrapper that marks its contents as already-safe HTML.
+/// A value that renders without escaping.
 ///
-/// Use this only for trusted markup such as pre-rendered or sanitized HTML.
-/// Passing untrusted input through this type defeats the runtime's escaping.
+/// Wrap trusted markup, such as pre-rendered or sanitized HTML, in this type
+/// to write it into a view verbatim. Create one with
+/// [`new_unchecked`](Self::new_unchecked).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Unescaped<T>(pub(crate) T);
 
 impl<T> Unescaped<T> {
-    /// Wraps `inner` as already-escaped content.
+    /// Wraps `inner` so that it renders without escaping.
     ///
-    /// # Safety (logical)
-    ///
-    /// The caller must ensure `inner` does not contain untrusted HTML.
-    /// Misuse can lead to XSS vulnerabilities.
+    /// The caller must make sure `inner` contains no untrusted input.
+    /// Passing untrusted input skips the escaping that views apply to it and
+    /// can lead to XSS vulnerabilities.
     #[inline]
     pub const fn new_unchecked(inner: T) -> Self {
         Self(inner)

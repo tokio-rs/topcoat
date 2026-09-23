@@ -80,7 +80,8 @@ async fn posts(cx: &Cx) -> Result<impl View> {
 
 // --- Path params ------------------------------------------------------------
 
-// Declares the `{post_id}` segment and the error for a value that is no u32.
+// Declares the `{post_id}` segment and the error returned when its value is
+// not a u32.
 path_param!(
     post_id: u32,
     error = bad_request("Post ID must be a number!"),
@@ -102,8 +103,8 @@ async fn post(cx: &Cx) -> Result<impl View> {
 
 // --- Catch-all params -------------------------------------------------------
 
-// A leading `*` captures every remaining segment. Without a type the parameter
-// reads back as decoded segments.
+// A leading `*` captures every remaining segment. Without a type, the
+// parameter reads back as the percent-decoded segments.
 path_param!(*doc_path);
 
 #[page("/docs/{*doc_path}")]

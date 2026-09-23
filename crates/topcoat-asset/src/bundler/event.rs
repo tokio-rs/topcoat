@@ -4,39 +4,72 @@ use http::Uri;
 
 use crate::AssetId;
 
-/// A step the [`Bundler`](super::Bundler) took while syncing assets.
+/// A step the [`Bundler`](super::Bundler) took while building a bundle.
 ///
-/// Events are reported as they happen, from whichever worker thread did
-/// the work, so they can arrive in any order relative to one another.
-/// [`Scanned`](Self::Scanned) is always first and
-/// [`Finished`](Self::Finished) always last.
+/// Events are reported as they happen, from the worker thread that did the
+/// work, so their order can vary between runs. On a successful run,
+/// [`Scanned`](Self::Scanned) always comes first and
+/// [`Finished`](Self::Finished) always comes last. The [`Display`](fmt::Display)
+/// implementation formats an event as a short log line.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum BundleEvent {
-    /// Scanning the binary turned up `count` asset declarations.
-    Scanned { count: usize },
-    /// A remote asset was already in the download cache.
-    CacheHit { uri: Uri, path: PathBuf },
-    /// A remote asset is not cached and is about to be downloaded.
-    DownloadStarted { uri: Uri },
-    /// A remote asset finished downloading into the cache.
-    Downloaded { uri: Uri, path: PathBuf, bytes: u64 },
+    /// The binary was scanned.
+    Scanned {
+        /// The number of asset declarations found.
+        count: usize,
+    },
+    /// A remote asset was found in the download cache.
+    CacheHit {
+        /// The URL of the asset.
+        uri: Uri,
+        /// The path of the cached file.
+        path: PathBuf,
+    },
+    /// A remote asset is not cached and its download starts now.
+    DownloadStarted {
+        /// The URL of the asset.
+        uri: Uri,
+    },
+    /// A remote asset was downloaded into the cache.
+    Downloaded {
+        /// The URL of the asset.
+        uri: Uri,
+        /// The path of the cached file.
+        path: PathBuf,
+        /// The size of the downloaded file.
+        bytes: u64,
+    },
     /// An asset was written into the bundle directory.
     Bundled {
+        /// The ID of the asset.
         id: AssetId,
+        /// The bundled filename.
         file: String,
+        /// The size of the file.
         bytes: usize,
     },
-    /// An asset was already in the bundle directory with the same
-    /// contents, so it was left alone.
-    Unchanged { id: AssetId, file: String },
-    /// A file that is no longer referenced was deleted from the bundle
+    /// An asset was already in the bundle directory with the same contents,
+    /// so it was not written again.
+    Unchanged {
+        /// The ID of the asset.
+        id: AssetId,
+        /// The bundled filename.
+        file: String,
+    },
+    /// A file that is no longer declared was deleted from the bundle
     /// directory.
-    Removed { file: String },
-    /// Every asset has been processed and the manifest is written.
+    Removed {
+        /// The deleted filename.
+        file: String,
+    },
+    /// Every asset was processed and the manifest was written.
     Finished {
+        /// The number of files written.
         bundled: usize,
+        /// The number of files that were already up to date.
         unchanged: usize,
+        /// The number of files deleted.
         removed: usize,
     },
 }
@@ -65,15 +98,15 @@ impl fmt::Display for BundleEvent {
     }
 }
 
-/// A consumer of [`BundleEvent`]s, registered with
+/// A receiver of [`BundleEvent`]s, registered with
 /// [`BundlerConfig::subscribe`](super::BundlerConfig::subscribe).
 ///
-/// Implemented for any `Fn(&BundleEvent) + Send + Sync + 'static`, so a
-/// closure is usually all you need. Handlers run inline on the bundler's
-/// worker threads: keep them cheap, and hand off to a channel or a
-/// background thread for anything slow.
+/// Every `Fn(&BundleEvent) + Send + Sync + 'static` closure implements this
+/// trait, so you rarely need to implement it yourself. Subscribers run on
+/// the bundler's worker threads and block them while they run. Keep them
+/// cheap, and send slow work to a channel or another thread.
 pub trait BundleSubscriber: Send + Sync + 'static {
-    /// Handle a single event.
+    /// Handles one event.
     fn handle(&self, event: &BundleEvent);
 }
 
@@ -86,10 +119,9 @@ where
     }
 }
 
-/// The set of [`BundleSubscriber`]s a bundler reports to.
+/// The set of [`BundleSubscriber`]s that a bundler reports to.
 ///
-/// Every subscriber sees every event, so a bundle run can drive a
-/// progress bar, a log, and a channel at the same time.
+/// Every subscriber receives every event.
 #[derive(Clone, Default)]
 pub struct BundleEvents(Vec<Arc<dyn BundleSubscriber>>);
 

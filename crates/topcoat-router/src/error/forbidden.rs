@@ -3,10 +3,11 @@ use topcoat_core::{context::Cx, error::Result};
 
 use crate::response::{IntoResponse, Response};
 
-/// Builds a forbidden (HTTP 403) response.
+/// Creates a `403 Forbidden` error.
 ///
-/// Use this when the caller is authenticated but not permitted to access
-/// the resource.
+/// Use it when the client is authenticated but not allowed to access the
+/// resource. For a client that is not authenticated, use
+/// [`unauthorized`](crate::error::unauthorized).
 ///
 /// # Examples
 ///
@@ -29,10 +30,11 @@ pub fn forbidden() -> ForbiddenError {
     ForbiddenError::new()
 }
 
-/// A forbidden response carried as the `Err` variant of a handler `Result`.
+/// A `403 Forbidden` error.
 ///
-/// Construct one with [`forbidden`], or derive one from an `Option` /
-/// `Result` via [`RouterErrorExt`](crate::error::RouterErrorExt).
+/// Create one with [`forbidden`], or turn a missing value into one with
+/// [`RouterErrorExt`](crate::error::RouterErrorExt). Returned from a handler,
+/// it renders as a `403 Forbidden` response.
 #[derive(Debug, Clone)]
 pub struct ForbiddenError {
     _priv: (),

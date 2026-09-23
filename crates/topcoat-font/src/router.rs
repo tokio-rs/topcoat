@@ -31,6 +31,12 @@ fn font_route_path(font: Font, write: &mut dyn std::fmt::Write) -> std::fmt::Res
     write!(write, "-{:016x}.css", font.hash())
 }
 
+/// A route that serves a [`Font`]'s `@font-face` rules as a CSS stylesheet.
+///
+/// The route answers `GET` requests at a path under `/_topcoat/fonts/` that
+/// contains the family name and the font's [`hash`](Font::hash). Browsers may
+/// cache the response for a year, because changing the font also changes the
+/// path. [`RouterBuilderFontExt::font`] adds this route for you.
 pub struct FontRoute {
     id: RouteId,
     path: PathBuf,
@@ -39,6 +45,7 @@ pub struct FontRoute {
 }
 
 impl FontRoute {
+    /// Creates the route for `font`.
     #[must_use]
     pub fn new(font: Font) -> Self {
         let mut path = String::new();
@@ -86,10 +93,20 @@ impl Route for FontRoute {
     }
 }
 
+/// Registers [`Font`]s on a [`RouterBuilder`].
+///
+/// A font must be registered before a page can load it. Registering a font
+/// adds a route that serves its stylesheet and sets up the app context that
+/// views use to render the stylesheet URL.
 pub trait RouterBuilderFontExt {
+    /// Registers `font` so that its stylesheet is served by the router.
     #[must_use]
     fn font(self, font: Font) -> Self;
 
+    /// Registers every font declared with the `font!` or `fontsource_font!`
+    /// macro anywhere in the program.
+    ///
+    /// The router's `discover` method calls this for you.
     #[cfg(feature = "discover")]
     #[must_use]
     fn discover_fonts(self) -> Self;

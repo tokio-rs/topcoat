@@ -8,12 +8,17 @@ import { Integer } from "./integer";
 import { cloneValue, Ref } from "./ref";
 import { String as RuntimeString, type Str } from "./string";
 
+/**
+ * A Rust `Signal` inside a compiled expression: reads and writes of one
+ * signal in the registry.
+ */
 export class WriteSignal<T> {
 	constructor(
 		private readonly id: SignalId,
 		private readonly inner: SignalHandle<T>,
 	) {}
 
+	/** Borrows the current value, tracking the read. */
 	read(): Ref<T> {
 		return new Ref(
 			() => this.inner(),
@@ -21,18 +26,22 @@ export class WriteSignal<T> {
 		);
 	}
 
+	/** Clones the current value, tracking the read. */
 	get(): T {
 		return cloneValue(this.read().deref());
 	}
 
+	/** Replaces the value. */
 	set(v: T): void {
 		this.inner.set(v);
 	}
 
+	/** Negates a `bool` value. */
 	toggle(): void {
 		this.inner.set((prev) => (prev as Bool).not() as T);
 	}
 
+	/** Adds one to a numeric value. */
 	increment(): void {
 		this.inner.set(
 			(prev) =>
@@ -42,6 +51,7 @@ export class WriteSignal<T> {
 		);
 	}
 
+	/** Subtracts one from a numeric value. */
 	decrement(): void {
 		this.inner.set(
 			(prev) =>
@@ -51,6 +61,7 @@ export class WriteSignal<T> {
 		);
 	}
 
+	/** Appends a string to a `String` value. */
 	push_str(s: Str): void {
 		this.inner.set((prev) => new RuntimeString(`${prev}${s}`) as T);
 	}

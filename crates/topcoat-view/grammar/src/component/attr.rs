@@ -1,6 +1,7 @@
 use syn::parse::{Parse, ParseStream};
 
-/// Arguments passed to the `#[component]` attribute itself. It takes none.
+/// The arguments of the `#[component]` attribute itself. It takes none, so
+/// parsing fails on any input.
 pub struct ComponentAttr;
 
 impl Parse for ComponentAttr {

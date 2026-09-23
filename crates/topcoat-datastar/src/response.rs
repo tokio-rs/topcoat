@@ -6,16 +6,17 @@ use topcoat_router::response::IntoResponseParts;
 
 use crate::{ElementPatchMode, common, header};
 
-/// Targets the elements a `text/html` response patches via the
-/// `datastar-selector` header. The value is a CSS selector.
+/// Sets the elements that a `text/html` response patches, using the
+/// `datastar-selector` response header.
 ///
-/// Without it, Datastar matches the response's elements to the DOM by their
-/// `id` attribute.
+/// The value is a CSS selector. Create it from a string with [`From`].
+/// Without this header, Datastar matches the elements of the response to the
+/// page by their `id` attribute.
 ///
 /// # Panics
 ///
-/// Converting from a selector containing a line break panics. Applying a
-/// directly constructed value containing a line break also panics.
+/// Panics if the selector contains a line break, either when converting it
+/// with [`From`] or when it is added to the response.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DatastarSelector(pub String);
 
@@ -39,8 +40,8 @@ impl IntoResponseParts for DatastarSelector {
     }
 }
 
-/// Sets how a `text/html` response's elements are patched into the DOM via
-/// the `datastar-mode` header. See [`ElementPatchMode`].
+/// Sets how the elements of a `text/html` response are patched into the DOM,
+/// using the `datastar-mode` response header.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DatastarMode(pub ElementPatchMode);
 
@@ -57,8 +58,9 @@ impl IntoResponseParts for DatastarMode {
     }
 }
 
-/// Patches a `text/html` response using the View Transition API via the
-/// `datastar-use-view-transition` header when `true`.
+/// Sets whether a `text/html` response is patched in using the
+/// [View Transition API](https://developer.mozilla.org/en-US/docs/Web/API/View_Transition_API),
+/// using the `datastar-use-view-transition` response header.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DatastarUseViewTransition(pub bool);
 
@@ -79,8 +81,8 @@ impl IntoResponseParts for DatastarUseViewTransition {
     }
 }
 
-/// Restricts an `application/json` response to patching signals that do not
-/// exist yet, via the `datastar-only-if-missing` header when `true`.
+/// Sets whether an `application/json` response only patches signals that do
+/// not exist yet, using the `datastar-only-if-missing` response header.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DatastarOnlyIfMissing(pub bool);
 
@@ -101,15 +103,26 @@ impl IntoResponseParts for DatastarOnlyIfMissing {
     }
 }
 
-/// Sets the attributes of the script element a `text/javascript` response
-/// executes, via the `datastar-script-attributes` header.
+/// Sets the attributes of the script element that runs a `text/javascript`
+/// response, using the `datastar-script-attributes` response header.
 ///
-/// The value is a JSON object mapping attribute names to values.
+/// The value is a JSON object that maps attribute names to values.
+///
+/// # Examples
+///
+/// ```rust
+/// use serde_json::json;
+/// use topcoat::datastar::DatastarScriptAttributes;
+///
+/// let attributes = DatastarScriptAttributes::from(json!({ "type": "module" }));
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DatastarScriptAttributes(pub Value);
 
 impl DatastarScriptAttributes {
-    /// Serializes `attributes` into the JSON object the header carries.
+    /// Creates the header value by serializing `attributes` to JSON.
+    ///
+    /// `attributes` should serialize to a JSON object.
     ///
     /// # Errors
     ///

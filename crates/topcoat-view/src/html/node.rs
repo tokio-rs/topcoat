@@ -6,10 +6,10 @@ use topcoat_core::context::Cx;
 
 use crate::{PartsWriter, PromotedStr, StaticStr, Unescaped, buffer::ViewHandle};
 
-/// Converts a value used in node position into view parts.
+/// A value that can be rendered as content in a template.
 ///
-/// When this trait is implemented on a type, it can be used in the node position of an element
-/// in the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
+/// A type that implements this trait can be used in the node position of
+/// the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro, between tags:
 ///
 /// ```rust
 /// # use topcoat::view::{View, component, view};
@@ -21,8 +21,11 @@ use crate::{PartsWriter, PromotedStr, StaticStr, Unescaped, buffer::ViewHandle};
 /// })
 /// # }
 /// ```
+///
+/// Text pushed by a value is escaped for a text node, so strings are safe to
+/// render. Wrap trusted markup in [`Unescaped`] to render it verbatim.
 pub trait NodeViewParts {
-    /// Appends this value to the view being built.
+    /// Pushes this value into `parts`.
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>);
 }
 
@@ -144,7 +147,7 @@ impl NodeViewParts for &String {
     }
 }
 
-/// Sets the response status code; renders no content.
+/// Sets the response status code. Renders no content.
 ///
 /// Competing status codes resolve by render order: the first one rendered
 /// wins. Place a status code before nested content to override whatever the
@@ -159,10 +162,10 @@ impl NodeViewParts for StatusCode {
     }
 }
 
-/// Adds response headers; renders no content.
+/// Adds response headers. Renders no content.
 ///
-/// Competing headers resolve by render order: the first part that mentions a
-/// header name provides all of that name's values. Place headers before
+/// Competing headers resolve by render order: the first declaration that
+/// mentions a header name provides all of that name's values. Place headers before
 /// nested content to override the entries the content declares, or after it
 /// to provide fallbacks.
 #[cfg(feature = "http")]
@@ -173,7 +176,7 @@ impl NodeViewParts for HeaderMap {
     }
 }
 
-/// Adds a single response header; renders no content.
+/// Adds a single response header. Renders no content.
 ///
 /// Equivalent to a [`HeaderMap`] holding just this entry.
 #[cfg(feature = "http")]

@@ -17,34 +17,36 @@ use topcoat_core_grammar::paths::{topcoat_context, topcoat_view, topcoat_view_ma
 
 use crate::component::{ComponentAttr, ComponentItem};
 
-/// A parsed `#[component] async fn ...`. Expands into:
+/// A parsed `#[component]` attribute and the `async fn` it annotates.
 ///
-/// - a props struct named after the function in `PascalCase` plus `Props` (`button` becomes
-///   `ButtonProps`), deriving [`Props`] so it gets a typestate builder. `#[default]` and `#[into]`
-///   on function parameters are forwarded to the corresponding props fields. `impl Trait` parameter
-///   types are lifted into generic type parameters of the props struct.
-/// - a zero-sized marker struct named after the function, carrying the function's doc comments,
-///   that implements [`topcoat::view::Component`] with a `render` method calling the original
-///   function body.
+/// Expands into:
 ///
-/// [`Props`]: derive.Props.html
-/// [`topcoat::view::Component`]: trait.Component.html
+/// - A props struct named after the function in `PascalCase` plus `Props` (`button` becomes
+///   `ButtonProps`), with one field per parameter except `cx`. It derives `Props` (see
+///   [`Props`](crate::props::Props)) to get its builder. `#[default]` and `#[into]` on a parameter
+///   move to the matching field, and each `impl Trait` parameter type becomes a generic type
+///   parameter of the struct.
+/// - A unit struct named after the function that implements [`topcoat_view::Component`]. Its
+///   `render` method calls the original function body with the context and the props.
+///
+/// Both structs carry the function's doc comments.
 pub struct Component {
     item: ComponentItem,
 }
 
 impl Component {
+    /// Creates a component from its parsed attribute and function.
     #[must_use]
     pub fn new(_attr: ComponentAttr, item: ComponentItem) -> Self {
         Self { item }
     }
 
-    /// Parses a `#[component]` attribute and function item from token streams.
+    /// Parses a `#[component]` attribute and the function it annotates.
     ///
     /// # Errors
     ///
-    /// Returns an error if either token stream fails to parse as a
-    /// `ComponentAttr` or `ComponentItem`.
+    /// Returns an error if the attribute has arguments, or if `item` is not a
+    /// valid component function.
     pub fn parse(attr: TokenStream, item: TokenStream) -> syn::Result<Self> {
         Ok(Self::new(syn::parse2(attr)?, syn::parse2(item)?))
     }

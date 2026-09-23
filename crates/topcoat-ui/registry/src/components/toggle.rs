@@ -3,24 +3,24 @@ use topcoat::{
     view::{Attributes, Child, PromotedStr, StaticClass, View, class, component, view},
 };
 
-/// How a [`toggle`] relates to the others sharing its `name`.
+/// How a [`toggle`] behaves together with other toggles with the same
+/// `name`.
 ///
-/// [`Default`] is `ToggleKind::Independent`, used when no kind is given.
+/// The default is `ToggleKind::Independent`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum ToggleKind {
-    /// A toggle that presses and unpresses on its own, like a checkbox.
+    /// A toggle that is pressed and released on its own, like a checkbox.
     #[default]
     Independent,
-    /// A toggle of which only one in its group can be pressed, like a radio
-    /// button. This is the segmented control: pressing one lets go of the
-    /// rest.
+    /// Only one toggle in the group can be pressed, like a radio button.
+    /// Pressing one releases the others, which makes a segmented control.
     Exclusive,
 }
 
 impl ToggleKind {
-    /// The `type` of the underlying `<input>`, which is what makes the
-    /// browser keep the pressed state this kind calls for.
+    /// The `type` of the `<input>`, which makes the browser keep the pressed
+    /// state that this kind needs.
     fn input_type(self) -> PromotedStr {
         match self {
             Self::Independent => PromotedStr(&"checkbox"),
@@ -31,7 +31,7 @@ impl ToggleKind {
 
 /// The size of a [`toggle`].
 ///
-/// [`Default`] is `ToggleSize::Md`, used when no size is given.
+/// The default is `ToggleSize::Md`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum ToggleSize {
@@ -47,8 +47,8 @@ pub enum ToggleSize {
 impl ToggleSize {
     /// The Tailwind classes for this size.
     ///
-    /// The sizes line up with the button's, so a toggle sits in a row of
-    /// buttons without standing out.
+    /// The heights match the button sizes, so a toggle lines up in a row of
+    /// buttons.
     fn classes(self) -> StaticClass {
         match self {
             Self::Sm => class!("h-8 gap-1.5 rounded-md px-2"),
@@ -60,9 +60,9 @@ impl ToggleSize {
 
 /// The classes shared by every toggle, regardless of size.
 ///
-/// The state lives in an `<input>` the label wraps, so the label styles
-/// itself from the state of the control inside it: tinted while pressed, rung
-/// while the control has keyboard focus, and faded while it is disabled.
+/// The state lives in an `<input>` inside the label, and the label styles
+/// itself from that state: tinted while pressed, with a focus ring while the
+/// input has keyboard focus, and faded while it is disabled.
 const BASE: StaticClass = class!(
     "inline-flex shrink-0 cursor-pointer items-center justify-center border \
      border-transparent text-sm font-medium whitespace-nowrap transition-colors select-none \
@@ -73,16 +73,19 @@ const BASE: StaticClass = class!(
      has-[:disabled]:pointer-events-none has-[:disabled]:opacity-50",
 );
 
-/// A toggle component: a button that stays pressed.
+/// A button that stays pressed until it is pressed again.
 ///
-/// The pressed state is the browser's to keep: the toggle is a `<label>`
-/// around a hidden `<input>`, so it needs no scripting and submits with the
-/// form around it. The `kind` decides which input that is, and so whether the
-/// toggle presses on its own or lets go of the others in its group; the
-/// `name` among the `attrs` is what forms the group. Child nodes become the
-/// toggle's content, and the `attrs` (such as `name`, `value`, `checked`, or
-/// `disabled`) are forwarded to the `<input>`; a `class` among them is
-/// appended to the label's computed classes.
+/// The toggle is a `<label>` around a visually hidden `<input>`. The browser
+/// keeps the pressed state, so it works without scripting and is submitted
+/// with its form. `kind` decides whether the input is a checkbox or a radio
+/// button, and so whether the toggle works on its own or releases the others
+/// in its group. Toggles with the same `name` form a group. `kind` defaults
+/// to `Independent` and `size` defaults to `Md`.
+///
+/// Child nodes become the toggle's content. The `attrs` (such as `name`,
+/// `value`, `checked`, or `disabled`) are forwarded to the `<input>`. A
+/// `class` among them is not put on the input but appended to the classes of
+/// the `<label>`.
 ///
 /// ```ignore
 /// view! {
@@ -107,10 +110,10 @@ pub async fn toggle(
     #[default]
     child: Child<'_>,
 ) -> Result<impl View> {
-    // The input is taken out of the layout rather than hidden outright: a
-    // `display: none` control is neither focusable nor announced, while an
-    // `sr-only` one still takes keyboard focus and reads as the checkbox or
-    // radio button it is, named by the label around it.
+    // The input is visually hidden with `sr-only` instead of `display: none`.
+    // A `display: none` control cannot be focused or announced. An `sr-only`
+    // control still takes keyboard focus and is announced as a checkbox or
+    // radio button, named by the label around it.
     Ok(view! {
         <label class=(class!(BASE, size.classes(), attrs.remove("class")))>
             <input type=(kind.input_type()) class="sr-only" (attrs)>
@@ -121,9 +124,10 @@ pub async fn toggle(
 
 /// A row of [`toggle`]s that belong together.
 ///
-/// The group is a rail the toggles sit in, which reads as one control rather
-/// than as loose buttons. It only lays them out: what ties exclusive toggles
-/// together is still the `name` they share.
+/// The toggles sit in a bordered box, so they look like one control. The
+/// group only handles the layout. Exclusive toggles still need the same
+/// `name` to work as a group. The `attrs` are forwarded to the `<div>`, and a
+/// `class` among them is appended to the component's classes.
 ///
 /// ```ignore
 /// view! {

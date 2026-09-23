@@ -1,6 +1,7 @@
 import type { DehydratedSurrogate } from "../expression/serialized";
 import type { SignalId } from "../signal-registry";
 
+/** A marker comment the server renders, parsed. */
 export type CommentMarker =
 	| { kind: "signal"; id: SignalId; value: DehydratedSurrogate }
 	| {
@@ -25,6 +26,7 @@ export type CommentMarker =
 			 * inside the shard as it did for the inline render.
 			 */
 			identity: string;
+			/** The JavaScript source of each shard argument, in order. */
 			exprs: string[];
 	  }
 	| { kind: "shard-end"; identity: string };
@@ -38,6 +40,10 @@ const SHARD_START_RE =
 const SHARD_END_RE = /^\s*::topcoat::shard::end\(("[^"]+")\)\s*$/;
 const QUOTED_RE = /"([^"]*)"/g;
 
+/**
+ * Parses a comment node as a runtime marker, or returns `null` if it is an
+ * ordinary comment.
+ */
 export function parseComment(node: Comment): CommentMarker | null {
 	const text = node.data;
 

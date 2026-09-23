@@ -13,12 +13,17 @@ mod kw {
     custom_keyword!(html);
 }
 
-/// The `<!DOCTYPE html>` declaration. Always renders verbatim.
+/// The `<!DOCTYPE html>` declaration. It always renders as written.
 pub struct DocumentType {
+    /// The `<`.
     pub lt_token: Token![<],
+    /// The `!`.
     pub exclamation_mark_token: Token![!],
+    /// The `DOCTYPE` keyword.
     pub doctype_kw: kw::DOCTYPE,
+    /// The `html` keyword.
     pub html_kw: kw::html,
+    /// The `>`.
     pub gt_token: Token![>],
 }
 

@@ -2,29 +2,26 @@ use std::borrow::Cow;
 
 use crate::pretty::RingBuffer;
 
-/// Controls whether a piece of text is emitted depending on the surrounding
-/// group's break decision.
-///
-/// - `Always`: emit unconditionally.
-/// - `NoBreak`: only emit when the surrounding group fits on one line.
-/// - `Break`: only emit when the surrounding group breaks across lines (e.g. trailing commas added
-///   when wrapping).
+/// Whether a piece of text prints, depending on whether the enclosing group
+/// breaks.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum TextMode {
+    /// The text always prints.
     Always,
+    /// The text prints only when the enclosing group fits on one line.
     NoBreak,
+    /// The text prints only when the enclosing group breaks across lines,
+    /// like a trailing comma.
     Break,
 }
 
-/// How a group's breakpoints behave when it doesn't fit on one line.
-///
-/// - `Consistent`: if any break in the group fires, all of them do (all-or-nothing; useful for
-///   things like function bodies).
-/// - `Inconsistent`: breaks fire individually as needed (useful for word-wrap-style flowing of
-///   comma-separated lists).
+/// How the breaks in a group behave when the group does not fit on one line.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum BreakMode {
+    /// Every break in the group becomes a line break, as in a block body.
     Consistent,
+    /// Each break becomes a line break only when the text after it does not
+    /// fit, which fills lines like word wrapping.
     Inconsistent,
 }
 

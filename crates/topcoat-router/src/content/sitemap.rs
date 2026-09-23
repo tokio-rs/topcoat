@@ -12,21 +12,25 @@ use crate::{
     response::{IntoResponse, Response},
 };
 
-/// An XML sitemap response, assembled URL by URL.
+/// An XML sitemap response.
 ///
-/// A sitemap lists the pages of a site for crawlers. Build one by adding
-/// entries with [`url`](Sitemap::url) and [`urls`](Sitemap::urls), then
-/// return it from a route serving `/sitemap.xml`. The response is sent with
+/// A sitemap lists the pages of a site for search engine crawlers. Add
+/// entries with [`url`](Sitemap::url) and [`urls`](Sitemap::urls), then return
+/// the sitemap from a route that serves `/sitemap.xml`. The response has
 /// `Content-Type: application/xml`.
 ///
-/// An entry holding a root-relative path is resolved against the base URL
-/// registered on the router with `.base_url(...)`, because the sitemap
-/// format requires absolute URLs. An entry that is already an absolute
-/// `http` or `https` URL is used as is.
+/// The sitemap format requires absolute URLs. An entry with a root-relative
+/// path is resolved against the base URL registered on the router with
+/// `.base_url(...)`. An entry that is already an absolute `http` or `https`
+/// URL is used as is.
+///
+/// Converting the sitemap into a response fails with an
+/// [`InvalidSitemapError`] when an entry has a field that the format cannot
+/// represent, such as a priority outside `0.0..=1.0`.
 ///
 /// # Panics
 ///
-/// Converting the sitemap into a response panics if an entry holds a
+/// Converting the sitemap into a response panics if an entry has a
 /// root-relative path and no base URL is registered.
 ///
 /// # Examples
@@ -61,15 +65,14 @@ impl Sitemap {
 
     /// Adds an entry.
     ///
-    /// Accepts a location string or a [`SitemapUrl`] carrying the optional
+    /// Pass a location string, or a [`SitemapUrl`] to also set the optional
     /// fields.
     pub fn url(mut self, url: impl Into<SitemapUrl>) -> Self {
         self.urls.push(url.into());
         self
     }
 
-    /// Adds every entry of an iterator, such as one built from the rows of
-    /// a database query.
+    /// Adds every entry of an iterator.
     pub fn urls<I>(mut self, urls: I) -> Self
     where
         I: IntoIterator,
@@ -141,10 +144,10 @@ impl IntoResponse for Sitemap {
     }
 }
 
-/// One [`Sitemap`] entry, assembled field by field.
+/// One entry of a [`Sitemap`].
 ///
-/// The location is required and set at construction; every other field is
-/// optional and replaced by the builder method that sets it.
+/// The location is required and passed to [`new`](SitemapUrl::new). The other
+/// fields are optional and set with builder methods.
 ///
 /// # Examples
 ///
@@ -168,9 +171,11 @@ pub struct SitemapUrl {
 }
 
 impl SitemapUrl {
-    /// Creates an entry for the page at `location`: a root-relative path
-    /// resolved against the registered base URL, or an absolute `http` or
-    /// `https` URL used as is.
+    /// Creates an entry for the page at `location`.
+    ///
+    /// The location is either a root-relative path, which is resolved against
+    /// the registered base URL, or an absolute `http` or `https` URL, which is
+    /// used as is.
     pub fn new(location: impl Into<String>) -> Self {
         Self {
             location: location.into(),
@@ -182,8 +187,8 @@ impl SitemapUrl {
 
     /// Sets the time the page was last modified.
     ///
-    /// Accepts anything convertible into a [`SystemTime`], which covers the
-    /// timestamp types of the common date and time crates.
+    /// Accepts anything convertible into a [`SystemTime`], which includes the
+    /// timestamp types of common date and time crates.
     pub fn last_modified(mut self, last_modified: impl Into<SystemTime>) -> Self {
         self.last_modified = Some(last_modified.into());
         self
@@ -196,11 +201,11 @@ impl SitemapUrl {
     }
 
     /// Sets the priority of the page relative to the other pages of the
-    /// site, from `0.0` to `1.0`. Crawlers treat an entry without a
-    /// priority as `0.5`.
+    /// site, from `0.0` to `1.0`.
     ///
-    /// A value outside the range is rejected when the sitemap is converted
-    /// into a response.
+    /// Crawlers treat an entry without a priority as `0.5`. A value outside
+    /// the range makes the conversion into a response fail with an
+    /// [`InvalidSitemapError`].
     pub fn priority(mut self, priority: f32) -> Self {
         self.priority = Some(priority);
         self
@@ -219,11 +224,9 @@ impl From<String> for SitemapUrl {
     }
 }
 
-/// How frequently a page is likely to change, hinting crawlers how often to
-/// revisit it.
+/// How often a page is likely to change.
 ///
-/// [`Always`](ChangeFrequency::Always) describes a page that changes on
-/// every access, [`Never`](ChangeFrequency::Never) an archived page.
+/// Crawlers use it as a hint for how often to revisit the page.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ChangeFrequency {
     /// The page changes on every access.
@@ -257,8 +260,8 @@ impl ChangeFrequency {
     }
 }
 
-/// The error produced when a [`Sitemap`] holds a field whose value cannot
-/// be represented in the sitemap format.
+/// The error returned when a [`Sitemap`] entry has a field value that the
+/// sitemap format cannot represent.
 #[derive(Debug)]
 pub struct InvalidSitemapError {
     description: &'static str,

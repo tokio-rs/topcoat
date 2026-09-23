@@ -6,12 +6,14 @@ use topcoat_router::{
 
 use crate::{CookieJarCell, write_cookies};
 
-/// A router layer that makes cookies available for the current request and
-/// writes pending cookie changes onto the response.
+/// A router layer that makes [`cookies`](crate::cookies) available to every
+/// request and writes the pending cookie changes onto the response.
 ///
-/// The changes reach the client whether the handler returns a response or an
-/// error: a cookie added before a redirect or an unauthorized error is set by
-/// the redirect or error response.
+/// The changes are sent whether the handler returns a response or an error. A
+/// cookie added before returning a redirect or an unauthorized error is set by
+/// that response.
+///
+/// Usually installed with [`RouterBuilderCookieExt::cookies`].
 #[derive(Debug, Clone, Copy, Default)]
 pub struct CookieLayer;
 
@@ -50,17 +52,13 @@ impl Layer for CookieLayer {
     }
 }
 
-/// Installs cookie support on a [`RouterBuilder`].
-///
-/// Register it after other same-path layers that should be able to call
-/// [`cookies`](crate::cookies), because the most recently registered root
-/// layer runs first.
+/// Extension trait that adds cookie support to a [`RouterBuilder`].
 pub trait RouterBuilderCookieExt {
-    /// Registers the root cookie layer.
+    /// Registers a [`CookieLayer`] at the root path.
     ///
-    /// The layer stores the request's cookie jar in request context, parses the
-    /// incoming `Cookie` headers on first access, and appends pending changes as
-    /// `Set-Cookie` headers before the response is sent.
+    /// Call this after registering any other root layer that uses
+    /// [`cookies`](crate::cookies), because the most recently registered root
+    /// layer runs first.
     #[must_use]
     fn cookies(self) -> Self;
 }

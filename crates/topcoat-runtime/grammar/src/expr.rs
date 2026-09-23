@@ -31,10 +31,15 @@ use topcoat_core_grammar::paths::topcoat_runtime;
 
 use crate::expr::{js::Js, name_resolver::NameResolver};
 
-/// The top-level `expr! { ... }` AST. A thin wrapper around `syn::Expr`; the
-/// whitelist of supported shapes is enforced when lowering to tokens.
+/// The body of an `expr!` invocation: one expression with an optional
+/// trailing comma.
+///
+/// Parsing accepts any Rust expression. The supported subset is checked when
+/// the expression is lowered with [`expr_to_tokens`](Self::expr_to_tokens).
 pub struct Expr {
+    /// The expression.
     pub inner: syn::Expr,
+    /// The optional trailing comma.
     pub comma_token: Option<syn::Token![,]>,
 }
 
@@ -48,7 +53,8 @@ impl Parse for Expr {
 }
 
 impl Expr {
-    /// Lowers the parsed expression into a token stream.
+    /// Lowers the expression into code that builds a runtime `Expr`: the
+    /// Rust evaluation paired with the JavaScript source.
     ///
     /// # Errors
     ///

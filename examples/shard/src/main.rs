@@ -62,12 +62,13 @@ async fn search_results(cx: &Cx, query: String) -> Result<impl View> {
     // instead of starting over at five.
     let limit = signal(cx, || 5usize);
 
+    let results = search_fruit(cx, &query).await;
+
     // Reading the limit on the server makes the shard depend on it. When the
     // button below changes it in the browser, only the shard renders again,
-    // not the page around it.
-    let results = search_fruit(cx, &query).await;
-    // The limit comes from the client, so a real application would validate
-    // it. Clamping it keeps a bogus value from becoming a huge count.
+    // not the page around it. The limit comes from the client, so a real
+    // application would validate it. Clamping it keeps a bogus value from
+    // becoming a huge count.
     let shown = limit.get().min(100);
 
     Ok(view! {

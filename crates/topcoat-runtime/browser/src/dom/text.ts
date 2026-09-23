@@ -2,6 +2,11 @@ import { compile } from "../expression/compile";
 import type { Scope } from "../scope";
 import { isNodeViewParts } from "./view";
 
+/**
+ * Keeps the text between an expression's start and end markers in sync with
+ * the expression. The first run only subscribes, since the server already
+ * rendered the initial text.
+ */
 export function setupTextExpression(
 	start: Comment,
 	end: Comment,

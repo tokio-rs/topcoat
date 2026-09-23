@@ -15,11 +15,17 @@ use super::common::ErrorAttr;
 
 /// The input to `path_param!`.
 pub struct PathParam {
+    /// The visibility of the generated type and its field.
     pub visibility: Visibility,
+    /// The `*` that marks a catch-all parameter.
     pub star_token: Option<Token![*]>,
+    /// The parameter name, as written in the route path.
     pub name: Ident,
+    /// The type each segment is parsed into, if any.
     pub param_type: Option<PathParamType>,
+    /// The error response for a failed parse, if any.
     pub error: Option<PathParamError>,
+    /// An optional trailing comma.
     pub trailing_comma: Option<Token![,]>,
 }
 
@@ -339,7 +345,9 @@ impl ToTokens for PathParam {
 
 /// A parsed segment type in a `path_param!` declaration.
 pub struct PathParamType {
+    /// The `:` token.
     pub colon_token: Token![:],
+    /// The segment type.
     pub ty: Type,
 }
 
@@ -360,7 +368,9 @@ impl ParseOption for PathParamType {
 
 /// An error mapping in a `path_param!` declaration.
 pub struct PathParamError {
+    /// The `,` before `error`.
     pub comma_token: Token![,],
+    /// The `error = ...` argument.
     pub error: ErrorAttr,
 }
 

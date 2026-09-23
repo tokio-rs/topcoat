@@ -52,7 +52,8 @@ async fn home() -> Result<impl View> {
 async fn echo(upgrade: WebSocketUpgrade) -> Result<Response> {
     upgrade.on_upgrade(|mut socket| async move {
         while let Some(Ok(message)) = socket.recv().await {
-            // Ping, pong, and close messages are already handled for us.
+            // Only data messages are echoed. Incoming pings are answered
+            // automatically.
             if matches!(message, Message::Text(_) | Message::Binary(_))
                 && socket.send(message).await.is_err()
             {

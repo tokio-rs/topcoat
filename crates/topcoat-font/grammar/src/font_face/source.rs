@@ -18,9 +18,13 @@ mod kw {
     custom_keyword!(local);
 }
 
+/// A `src: ...` descriptor in a `font_face!` body.
 pub struct FontSources {
+    /// The `src` name.
     pub key: FontSourcesKey,
+    /// The `:` between the name and the value.
     pub colon_token: Token![:],
+    /// The descriptor's value.
     pub value: FontSourcesValue,
 }
 
@@ -56,7 +60,9 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontSources {
     }
 }
 
+/// The `src` descriptor name.
 pub struct FontSourcesKey {
+    /// The `src` keyword.
     pub src_kw: kw::src,
 }
 
@@ -84,8 +90,11 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontSourcesKey {
     }
 }
 
+/// The value of a `src` descriptor: CSS syntax or a Rust expression.
 pub enum FontSourcesValue {
+    /// A Rust expression that evaluates to `FontSources`.
     Expr(Box<Expr>),
+    /// A comma-separated list of `url(...)` and `local(...)` entries.
     Css(Punctuated<FontSource, Token![,]>),
 }
 
@@ -127,18 +136,29 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontSourcesValue {
     }
 }
 
+/// A single `url(...)` or `local(...)` entry of a `src` descriptor.
 pub enum FontSource {
+    /// A `url(...)` entry with optional `format(...)` and `tech(...)` hints.
     Url {
+        /// The `url` keyword.
         url_kw: kw::url,
+        /// The parentheses around the URL.
         paren_token: Paren,
+        /// The URL: a string, a `String`, or an `Asset`.
         expr: Expr,
 
+        /// The `tech(...)` hint, if written.
         tech: Option<Box<FontTechHint>>,
+        /// The `format(...)` hint, if written.
         format: Option<Box<FontFormatHint>>,
     },
+    /// A `local(...)` entry naming an installed font.
     Local {
+        /// The `local` keyword.
         local_kw: kw::local,
+        /// The parentheses around the name.
         paren_token: Paren,
+        /// The family name of the installed font.
         expr: Expr,
     },
 }

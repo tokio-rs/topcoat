@@ -14,12 +14,20 @@ use crate::{
     view::hir::{ExprKind, LowerView, ViewBuilder},
 };
 
-/// A `:name=(expr)` or `:name=$(expr)` attribute: a one-way binding to a DOM
-/// attribute or property.
+/// A `:name=(expr)` or `:name=$(expr)` bind attribute, which keeps a DOM
+/// attribute or property in sync with an expression in the browser.
+///
+/// The attribute renders with the expression's current value. Unless the
+/// value is static, a `data-topcoat-bind:name` attribute holding the
+/// expression's JavaScript form is rendered next to it.
 pub struct BindAttribute {
+    /// The leading `:`.
     pub colon: Token![:],
+    /// The bound attribute name.
     pub key: AttributeKey,
+    /// The `=` between name and value.
     pub eq: Token![=],
+    /// The bound expression.
     pub value: TemplateOrRuntimeExpr,
 }
 

@@ -3,9 +3,8 @@ use serde::Serialize;
 
 /// How htmx swaps a response into the DOM.
 ///
-/// Mirrors the values accepted by the `hx-swap` attribute. Used by
-/// [`HxReswap`](crate::HxReswap) and as the `swap` field of an
-/// [`HxLocation`](crate::HxLocation).
+/// The variants match the values of the
+/// [`hx-swap`](https://htmx.org/attributes/hx-swap/) attribute.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum SwapOption {
     /// Replace the inner HTML of the target element.
@@ -29,13 +28,13 @@ pub enum SwapOption {
     /// Delete the target element regardless of the response.
     #[serde(rename = "delete")]
     Delete,
-    /// Do not append the response to the target element.
+    /// Do not swap the response into the page.
     #[serde(rename = "none")]
     None,
 }
 
 impl SwapOption {
-    /// Returns the htmx string for this swap option (e.g. `"innerHTML"`).
+    /// Returns the `hx-swap` value for this option, such as `"innerHTML"`.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {

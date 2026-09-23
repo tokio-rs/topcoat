@@ -8,8 +8,8 @@ use topcoat::{
     view::{View, view},
 };
 
-// The `module_router!()` macro call must be placed at the root of your route structure.
-// In this case, the `app` module is marked as the root.
+// Call `module_router!()` in the root module of the route tree. Here that is
+// the `app` module, which maps to `/`.
 pub fn router() -> topcoat::router::Router {
     topcoat::router::module_router!().build()
 }

@@ -11,15 +11,18 @@ use crate::mail::FieldValue;
 
 /// A single `name: value` entry in a `mail!` body.
 ///
-/// The name is any identifier, not just the known field names: an
-/// unrecognized or partially typed name still lowers to a call on
+/// The name can be any identifier, not only a known field name. An unknown
+/// or partly typed name still expands to a call on
 /// [`MailBuilder`](topcoat_mail::MailBuilder), so the compiler reports it as
-/// a missing method there and rust-analyzer can complete the builder's
-/// methods at the name. The colon and value are optional for the same
-/// reason; a field still being typed lowers to a bare builder access.
+/// a missing method and rust-analyzer can suggest the builder's methods. For
+/// the same reason, the colon and value are optional: a field that is still
+/// being typed expands to a plain access on the builder.
 pub struct MailField {
+    /// The field name, which is also the name of the builder method.
     pub name: Ident,
+    /// The `:` after the name, if written.
     pub colon_token: Option<Token![:]>,
+    /// The field value, if written.
     pub value: Option<FieldValue>,
 }
 
@@ -51,7 +54,7 @@ impl MailField {
         self.name.unraw().to_string()
     }
 
-    /// The builder calls this field lowers to inside the generated block.
+    /// The builder calls this field expands to inside the generated block.
     pub(crate) fn builder_calls(&self) -> TokenStream {
         let method = self.method();
         let Some(value) = &self.value else {
@@ -92,8 +95,8 @@ impl MailField {
         }
     }
 
-    /// The builder method the field lowers to: the name as written, with
-    /// keywords escaped to raw identifiers to keep the expansion parseable.
+    /// The builder method the field expands to: the name as written, with
+    /// keywords escaped as raw identifiers so the expansion stays valid.
     fn method(&self) -> Ident {
         match syn::parse_str::<Ident>(&self.name()) {
             Ok(_) => self.name.clone(),

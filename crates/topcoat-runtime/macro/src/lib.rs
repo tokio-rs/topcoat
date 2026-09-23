@@ -1,3 +1,8 @@
+//! Procedural macros for Topcoat's client-side runtime: [`expr!`],
+//! [`#[procedure]`](macro@procedure), and [`#[shard]`](macro@shard).
+//!
+//! Use these through the `topcoat` facade, which re-exports them from
+//! `topcoat::runtime`.
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 use proc_macro::TokenStream;

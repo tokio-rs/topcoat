@@ -3,19 +3,15 @@ use topcoat_core::{context::Cx, error::Result};
 
 use crate::response::{IntoResponse, Response};
 
-/// Builds a too-many-requests (HTTP 429) response carrying a `Retry-After`
-/// hint, in seconds.
+/// Creates a `429 Too Many Requests` error with a `Retry-After` header of
+/// `retry_after_secs` seconds.
 ///
-/// Return this when a caller has exceeded a limit you set for them: a rate
-/// limit, a quota, a per-account cap. It says the request was refused because
-/// of who sent it and how often, which is what separates it from
-/// [`service_unavailable`](crate::error::service_unavailable) — that one says
-/// the server as a whole is at capacity, and applies to every caller at once.
-/// A client that can tell the two apart can back off its own traffic in the
-/// first case and fail over in the second.
+/// Return it when a client went over a limit you set for it, such as a rate
+/// limit or a quota. A 429 means that this client sent too many requests. Use
+/// [`service_unavailable`](crate::error::service_unavailable) instead when the
+/// whole server is busy, no matter who sends the request.
 ///
-/// `Retry-After` is what makes the refusal actionable. Without it a rate
-/// limiter teaches callers nothing except to retry immediately.
+/// The `Retry-After` header tells the client when it may try again.
 ///
 /// # Examples
 ///
@@ -36,10 +32,10 @@ pub fn too_many_requests(retry_after_secs: u64) -> TooManyRequestsError {
     TooManyRequestsError::new(retry_after_secs)
 }
 
-/// A too-many-requests response carried as the `Err` variant of a handler
-/// `Result`.
+/// A `429 Too Many Requests` error.
 ///
-/// Construct one with [`too_many_requests`].
+/// Create one with [`too_many_requests`]. Returned from a handler, it renders
+/// as a `429 Too Many Requests` response with a `Retry-After` header.
 #[derive(Debug, Clone)]
 pub struct TooManyRequestsError {
     retry_after_secs: u64,
@@ -50,7 +46,7 @@ impl TooManyRequestsError {
         Self { retry_after_secs }
     }
 
-    /// The `Retry-After` value this response carries, in seconds.
+    /// Returns the `Retry-After` value of the response, in seconds.
     #[must_use]
     pub fn retry_after_secs(&self) -> u64 {
         self.retry_after_secs

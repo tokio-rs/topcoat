@@ -9,21 +9,16 @@ use topcoat_core::context::{Cx, request_context};
 
 use crate::Cookies;
 
-/// The root cookie jar for a request.
+/// The root cookie jar of a request.
 ///
-/// `CookieJar` wraps the [`cookie`] crate's [`CookieJar`](RawCookieJar) behind a
-/// [`Mutex`], giving the whole [`Cookies`] adapter stack interior mutability and
-/// thread safety. It is created lazily by [`cookies`](crate::cookies), which
-/// parses the incoming `Cookie` header on first access and memoizes the jar for
-/// the rest of the request.
+/// Get it with [`cookies`](crate::cookies) and use it through the [`Cookies`]
+/// trait, which `&CookieJar` implements. It holds the cookies the request
+/// carried and the changes made during the request. The changes are sent as
+/// `Set-Cookie` response headers when the handler returns. All adapters built
+/// on top of it read from and write to this jar.
 ///
-/// Every adapter ([`SignedJar`](crate::SignedJar), [`PrivateJar`](crate::PrivateJar),
-/// [`Prefixed`](crate::Prefixed), [`Map`](crate::Map)) ultimately reads from and
-/// writes to this jar, so the pending changes it accumulates are what gets
-/// serialized into `Set-Cookie` response headers.
-///
-/// Once those headers are written the jar is sealed: reads keep working, but
-/// adding or removing a cookie panics instead of being silently dropped.
+/// After the response headers are written, reads keep working, but adding or
+/// removing a cookie panics, because the change could never reach the client.
 #[derive(Debug)]
 pub struct CookieJar {
     jar: Mutex<RawCookieJar>,
@@ -31,11 +26,8 @@ pub struct CookieJar {
 }
 
 impl CookieJar {
-    /// Builds a jar from the request's `Cookie` header(s), seeding each parsed
-    /// cookie as an original (so it does not count towards the response delta).
-    ///
-    /// Reads the request headers from the [`Parts`] registered in request
-    /// context by the router.
+    /// Builds a jar from the request's `Cookie` headers. The parsed cookies are
+    /// originals, so they are not sent back in the response.
     pub(crate) fn from_request(cx: &Cx) -> Self {
         let mut jar = RawCookieJar::new();
         let parts = request_context::<Parts>(cx);

@@ -5,7 +5,7 @@ use topcoat::{
 
 /// The size of an [`avatar`].
 ///
-/// [`Default`] is `AvatarSize::Md`, used when no size is given.
+/// The default is `AvatarSize::Md`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum AvatarSize {
@@ -21,8 +21,8 @@ pub enum AvatarSize {
 impl AvatarSize {
     /// The Tailwind classes for this size.
     ///
-    /// Each size sets a text size along with the dimensions, which is what
-    /// scales the initials in an [`avatar_fallback`].
+    /// Each size also sets a text size, which scales the initials in an
+    /// [`avatar_fallback`].
     fn classes(self) -> StaticClass {
         match self {
             Self::Sm => class!("size-8 text-xs"),
@@ -34,18 +34,17 @@ impl AvatarSize {
 
 /// The classes shared by every avatar, regardless of size.
 ///
-/// The circle clips whatever is inside it, and is positioned so that an
+/// The circle clips its content. It is positioned so that an
 /// [`avatar_image`] can cover the [`avatar_fallback`] behind it.
 const AVATAR: StaticClass = class!("relative flex shrink-0 overflow-hidden rounded-full");
 
-/// An avatar component: a circular portrait of a person or an organization.
+/// A circular picture of a person or an organization.
 ///
 /// An avatar holds an [`avatar_image`], an [`avatar_fallback`], or both. With
-/// both, the fallback shows until the image has loaded, and keeps showing if
-/// the image never arrives. The `size` parameter selects the dimensions,
-/// defaulting to `Md`. The `attrs` (such as `class` or `title`) are forwarded
-/// to the underlying `<span>`; a `class` among them is appended to the
-/// computed classes.
+/// both, the fallback shows until the image has loaded, and stays visible if
+/// the image fails to load. `size` sets the dimensions and defaults to `Md`.
+/// The `attrs` (such as `class` or `title`) are forwarded to the `<span>`. A
+/// `class` among them is appended to the component's classes.
 ///
 /// ```ignore
 /// view! {
@@ -74,20 +73,20 @@ pub async fn avatar(
     })
 }
 
-/// The portrait of an [`avatar`], covering the fallback behind it.
+/// The image of an [`avatar`], shown on top of the fallback.
 ///
-/// The image fills the circle and is cropped to it rather than squashed, so
-/// portraits of any aspect ratio stay undistorted. Pass the `src` among the
-/// `attrs`.
+/// The image fills the circle and is cropped, not stretched, so images of
+/// any aspect ratio keep their proportions. Pass the `src` in `attrs`. The
+/// `attrs` are forwarded to the `<img>`, and a `class` among them is appended
+/// to the component's classes.
 #[component]
 pub async fn avatar_image(
     /// The image's alternative text.
     ///
-    /// It is empty by default, which suits the usual case: an avatar beside
-    /// the name it belongs to says nothing the name does not, and empty
-    /// alternative text is also what leaves the [`avatar_fallback`] visible
-    /// when the image fails to load, where a caption would be painted over it
-    /// instead.
+    /// It is empty by default. This fits the usual case of an avatar next to
+    /// the name it belongs to, where the image adds nothing to the name. Empty
+    /// alternative text also keeps the [`avatar_fallback`] visible when the
+    /// image fails to load. Otherwise the browser would draw the text over it.
     #[into]
     #[default]
     alt: String,
@@ -107,12 +106,14 @@ pub async fn avatar_image(
     })
 }
 
-/// What an [`avatar`] shows in place of its image: initials, or any small
-/// view such as an icon.
+/// What an [`avatar`] shows instead of its image, such as initials or an
+/// icon.
 ///
-/// It fills the circle and centers its content on a tinted background, and is
-/// laid out behind the [`avatar_image`], so it stands in while the image
-/// loads and whenever there is none.
+/// It fills the circle and centers its content on a tinted background. It
+/// sits behind the [`avatar_image`], so it is visible while the image loads
+/// and when there is no image. Child nodes become its content. The `attrs`
+/// are forwarded to the `<span>`, and a `class` among them is appended to the
+/// component's classes.
 #[component]
 pub async fn avatar_fallback(
     #[default] mut attrs: Attributes,

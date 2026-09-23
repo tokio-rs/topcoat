@@ -4,17 +4,23 @@ import { PageUnit } from "./render/page";
 import type { Scope } from "./scope";
 import { type SignalId, SignalRegistry } from "./signal-registry";
 
+/**
+ * The browser runtime: the signal registry, the context compiled expressions
+ * run with, and the page unit that owns the document's content.
+ */
 export class Runtime {
 	readonly registry = new SignalRegistry();
 	readonly context: Context = new Context(this.registry);
 	/** The page: the outermost unit, owning every signal in the document. */
 	readonly page: PageUnit = new PageUnit(this);
 
+	/** Hydrates the markup under `root` and starts watching the page's inputs. */
 	start(root: ParentNode): void {
 		this.hydrate(root, null, null, this.page.contentScope);
 		this.page.startWatching();
 	}
 
+	/** Logs an error that has no caller to propagate to. */
 	reportError(error: unknown): void {
 		console.error("[topcoat]", error);
 	}

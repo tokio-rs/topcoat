@@ -1,7 +1,6 @@
 use syn::parse::{Parse, ParseStream};
 
-/// Arguments passed to the `#[shard]` attribute itself. Currently reserved:
-/// the macro accepts no arguments today.
+/// The arguments of the `#[shard]` attribute, which takes none.
 pub struct ShardAttr {}
 
 impl Parse for ShardAttr {

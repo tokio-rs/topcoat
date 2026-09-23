@@ -3,9 +3,9 @@
 //! Six pieces cooperate, tied together by the event loop in
 //! [`DevCommand::run`]:
 //!
-//! - [`broadcast_server`]: a long-lived local WebSocket server that browsers connect to; it
+//! - [`broadcast_server`]: a long-lived local WebSocket server that browsers connect to. It
 //!   broadcasts a reload message whenever a freshly started application reports ready.
-//! - [`watch`]: watches every local package -- workspace members and path dependencies alike -- and
+//! - [`watch`]: watches every local package, both workspace members and path dependencies, and
 //!   coalesces bursts of filesystem events into single change notifications.
 //! - [`keyboard`]: reports the `r` keypress that triggers a manual rebuild.
 //! - [`build`]: compiles the application and bundles its assets in a cancellable background task.
@@ -39,6 +39,7 @@ use watch::{Change, SourceWatcher};
 
 use crate::common::cargo::{BuildFlags, BuildOpts, BuildStamp};
 
+/// The arguments of `topcoat dev`.
 #[derive(Args)]
 pub struct DevCommand {
     #[command(flatten)]
@@ -46,6 +47,7 @@ pub struct DevCommand {
 }
 
 impl DevCommand {
+    /// Runs the development server until the user presses Ctrl-C.
     pub async fn run(self) {
         let opts: BuildOpts = self.build.into();
 

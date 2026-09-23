@@ -16,6 +16,8 @@ use super::{
     method::Methods,
 };
 
+/// The arguments of `#[page(...)]`: optional HTTP methods followed by an
+/// optional path.
 pub struct PageAttr {
     /// The declared HTTP methods; the page serves `GET` when omitted.
     methods: Option<Methods>,
@@ -72,9 +74,11 @@ impl Parse for PageItem {
     }
 }
 
+/// A parsed `#[page]` declaration, which expands to the generated code.
 pub struct Page(PageAttr, PageItem);
 
 impl Page {
+    /// Combines a parsed attribute and item.
     #[must_use]
     pub fn new(attr: PageAttr, item: PageItem) -> Self {
         Self(attr, item)

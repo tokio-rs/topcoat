@@ -17,17 +17,21 @@ pin_project! {
     /// one type.
     #[project = EitherViewProj]
     pub enum EitherView<A, B> {
+        /// The first branch.
         Left { #[pin] view: A },
+        /// The second branch, or the nested remaining arms of a `match`.
         Right { #[pin] view: B },
     }
 }
 
 impl<A, B> EitherView<A, B> {
+    /// Wraps the view of the first branch.
     #[must_use]
     pub fn left(view: A) -> Self {
         Self::Left { view }
     }
 
+    /// Wraps the view of the second branch.
     #[must_use]
     pub fn right(view: B) -> Self {
         Self::Right { view }

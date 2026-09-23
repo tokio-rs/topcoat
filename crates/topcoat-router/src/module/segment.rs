@@ -1,48 +1,35 @@
 use std::{borrow::Cow, collections::HashMap};
 
-/// The kind of a module-router path segment, set via the `segment!` macro.
+/// The kind of path segment a module adds under `module_router!`.
 ///
-/// When using the module router, each module maps to a URL segment. By default,
-/// regular modules are `Static` and `_`-prefixed modules are `Group`. Use
-/// `segment!(...)` in a module to override the default.
-///
-/// The `segment!` macro accepts comma-separated `key = value` attributes:
-///
-/// | Attribute        | Description                                                    |
-/// |------------------|----------------------------------------------------------------|
-/// | `kind = <Kind>`  | Overrides the segment kind (`Static`, `Group`, `Param`, `CatchAll`). |
-/// | `rename = "..."` | Overrides the URL name (defaults to the module name).          |
+/// By default, a module adds a `Static` segment, and a module whose name
+/// starts with `_` adds a `Group`. Call the `segment!` macro in a module to
+/// choose another kind.
 ///
 /// # Examples
 ///
 /// ```rust
-/// // In a module-router module (e.g. src/app/users/id.rs):
+/// // In src/app/users/id.rs: pages in this module serve `/users/{id}`.
 /// topcoat::router::segment!(kind = Param);
-/// // This module now maps to /users/{id}
-///
-/// // Rename the URL segment:
-/// topcoat::router::segment!(rename = "user-id");
-///
-/// // Combine attributes:
-/// topcoat::router::segment!(kind = CatchAll, rename = "path");
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SegmentKind {
-    /// A literal URL segment (e.g. `/users`). Default for regular modules.
+    /// A literal URL segment, like `/users`. The default for regular modules.
     Static,
-    /// A layout-only grouping that doesn't appear in the URL. Default for `_`-prefixed modules.
+    /// A group that adds no URL segment but can hold layouts and layers. The
+    /// default for `_`-prefixed modules.
     Group,
-    /// A dynamic path parameter (e.g. `/{id}`).
+    /// A path parameter that matches one segment, like `/{id}`.
     Param,
-    /// A wildcard tail that matches all remaining path segments (e.g. `/{*path}`).
+    /// A catch-all that matches all remaining segments, like `/{*path}`.
     CatchAll,
 }
 
-/// A module-router segment declaration, produced by the `segment!` macro.
+/// A segment override for one module, created by the `segment!` macro.
 #[doc(hidden)]
 #[derive(Debug, Clone)]
 pub struct Segment {
-    /// Module path (set automatically by the `segment!` macro via `module_path!()`).
+    /// The module path, set by the `segment!` macro with `module_path!()`.
     module_path: &'static str,
     /// Overridden segment kind, or `None` to use the default (static / group).
     kind: Option<SegmentKind>,
@@ -51,7 +38,7 @@ pub struct Segment {
 }
 
 impl Segment {
-    /// Creates a new segment. Called by the expanded `segment!` macro.
+    /// Creates a segment override. The `segment!` macro calls this.
     #[must_use]
     pub const fn new(
         module_path: &'static str,
@@ -87,11 +74,8 @@ impl Segment {
 #[cfg(feature = "discover")]
 inventory::collect!(Segment);
 
-/// Registry of [`Segment`] declarations, keyed by module path.
-///
-/// The module router builds a `Segments` map from all `segment!` invocations,
-/// then consults it while walking the module tree to determine each module's
-/// URL contribution.
+/// The [`Segment`] overrides registered on a module router, keyed by module
+/// path.
 #[doc(hidden)]
 #[derive(Debug, Default, Clone)]
 pub(crate) struct Segments {
@@ -104,7 +88,11 @@ impl Segments {
         Segments::default()
     }
 
-    /// Registers a segment for a module path. Panics on duplicates.
+    /// Registers the override for the module at `path`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the module already has an override.
     #[track_caller]
     pub fn register(&mut self, path: &'static str, segment: Segment) {
         if let Some(existing) = self.segments.insert(path, segment) {
@@ -115,7 +103,7 @@ impl Segments {
         }
     }
 
-    /// Looks up the segment declaration for a module path.
+    /// Returns the override for the module at `path`, if any.
     pub fn get(&self, path: &str) -> Option<&Segment> {
         self.segments.get(path)
     }

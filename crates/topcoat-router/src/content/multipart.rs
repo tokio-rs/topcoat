@@ -22,20 +22,22 @@ use crate::{
 
 /// `multipart/form-data` request extractor, commonly used for file uploads.
 ///
-/// Iterate the request's parts with
-/// [`next_field`](Multipart::next_field); each [`Field`] exposes its metadata
-/// ([`name`](Field::name), [`file_name`](Field::file_name),
-/// [`content_type`](Field::content_type), [`headers`](Field::headers)) and its
-/// data ([`bytes`](Field::bytes), [`text`](Field::text),
-/// [`chunk`](Field::chunk)). A [`Field`] also implements [`Stream`], so its
-/// chunks can be consumed with the usual stream combinators.
+/// Read the fields of the request one by one with
+/// [`next_field`](Multipart::next_field). Each [`Field`] has metadata, such as
+/// its [`name`](Field::name) and [`file_name`](Field::file_name), and its data
+/// can be read in full with [`bytes`](Field::bytes) or [`text`](Field::text),
+/// or piece by piece with [`chunk`](Field::chunk). A [`Field`] is also a
+/// [`Stream`] of chunks.
 ///
-/// Wrap it in [`Option`] to make the body optional: the extractor yields
-/// [`None`] when the request carries no `multipart/form-data` body.
+/// The request must carry a `Content-Type: multipart/form-data` header with a
+/// `boundary` parameter. Wrap the extractor in [`Option`] to make the body
+/// optional. It then yields [`None`] when the request has no `Content-Type`
+/// header or a content type other than `multipart/form-data`.
 ///
-/// The stream reads at most the request's body limit across all fields;
-/// register a [`BodyLimit`](crate::BodyLimit) layer to raise it for an
-/// upload route.
+/// All fields together can be at most the request's
+/// [`body_limit`] long. Register a
+/// [`BodyLimit`](crate::BodyLimit) layer to raise the limit for an upload
+/// route.
 ///
 /// # Examples
 ///
@@ -93,14 +95,17 @@ impl OptionalFromRequest for Multipart {
 }
 
 impl Multipart {
-    /// Yields the next [`Field`] if available.
+    /// Returns the next [`Field`], or [`None`] when there are no more fields.
+    ///
+    /// Only one field can be alive at a time. Drop the current field before
+    /// asking for the next one.
     ///
     /// # Errors
     ///
-    /// Returns an error if reading the next field from the multipart stream
-    /// fails; a body over the request's body limit is classified as
-    /// `413 Content Too Large`, malformed requests as `400 Bad Request`, and
-    /// other failures as `500 Internal Server Error`.
+    /// Returns an error if reading the next field fails. A body over the
+    /// request's body limit is a `413 Content Too Large` error, a malformed
+    /// body is a `400 Bad Request` error, and any other failure is a
+    /// `500 Internal Server Error`.
     pub async fn next_field(&mut self) -> Result<Option<Field<'_>>> {
         let field = self.inner.next_field().await.map_err(multipart_error)?;
 
@@ -111,7 +116,10 @@ impl Multipart {
     }
 }
 
-/// A single field in a multipart stream.
+/// A single field of a [`Multipart`] request.
+///
+/// A field borrows the [`Multipart`] it came from, so only one field can be
+/// read at a time.
 #[derive(Debug)]
 #[must_use]
 pub struct Field<'a> {
@@ -122,61 +130,66 @@ pub struct Field<'a> {
 }
 
 impl Field<'_> {
-    /// The field name found in the `Content-Disposition` header.
+    /// Returns the field name from the `Content-Disposition` header.
     #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.inner.name()
     }
 
-    /// The file name found in the `Content-Disposition` header.
+    /// Returns the file name from the `Content-Disposition` header, if the
+    /// field is a file upload.
     #[must_use]
     pub fn file_name(&self) -> Option<&str> {
         self.inner.file_name()
     }
 
-    /// The `Content-Type` of the field, if present.
+    /// Returns the `Content-Type` header of the field, if present.
     #[must_use]
     pub fn content_type(&self) -> Option<&str> {
         self.inner.content_type().map(std::convert::AsRef::as_ref)
     }
 
-    /// The headers of the field as a [`HeaderMap`].
+    /// Returns all headers of the field.
     #[must_use]
     pub fn headers(&self) -> &HeaderMap {
         self.inner.headers()
     }
 
-    /// Reads the full data of the field into [`Bytes`].
+    /// Reads the rest of the field data into [`Bytes`].
     ///
     /// # Errors
     ///
-    /// Returns an error if reading the field data fails; a body over the request's body
-    /// limit is classified as `413 Content Too Large`, malformed requests as
-    /// `400 Bad Request`, and other failures as `500 Internal Server Error`.
+    /// Returns an error if reading the field data fails. A body over the request's body
+    /// limit is a `413 Content Too Large` error, a malformed body is a
+    /// `400 Bad Request` error, and any other failure is a
+    /// `500 Internal Server Error`.
     pub async fn bytes(self) -> Result<Bytes> {
         self.inner.bytes().await.map_err(multipart_error)
     }
 
-    /// Reads the full data of the field as text.
+    /// Reads the rest of the field data as text.
     ///
     /// # Errors
     ///
-    /// Returns an error if reading the field text fails; a body over the request's body
-    /// limit is classified as `413 Content Too Large`, malformed requests as
-    /// `400 Bad Request`, and other failures as `500 Internal Server Error`.
+    /// Returns an error if reading the field text fails. A body over the request's body
+    /// limit is a `413 Content Too Large` error, a malformed body is a
+    /// `400 Bad Request` error, and any other failure is a
+    /// `500 Internal Server Error`.
     pub async fn text(self) -> Result<String> {
         self.inner.text().await.map_err(multipart_error)
     }
 
-    /// Streams a chunk of the field data, returning [`None`] once exhausted.
+    /// Reads the next chunk of the field data, or returns [`None`] when the
+    /// field has no more data.
     ///
-    /// This does the same thing as the [`Stream`] implementation.
+    /// This is the same as polling the field as a [`Stream`].
     ///
     /// # Errors
     ///
-    /// Returns an error if reading the next chunk fails; a body over the request's body
-    /// limit is classified as `413 Content Too Large`, malformed requests as
-    /// `400 Bad Request`, and other failures as `500 Internal Server Error`.
+    /// Returns an error if reading the next chunk fails. A body over the request's body
+    /// limit is a `413 Content Too Large` error, a malformed body is a
+    /// `400 Bad Request` error, and any other failure is a
+    /// `500 Internal Server Error`.
     pub async fn chunk(&mut self) -> Result<Option<Bytes>> {
         self.inner.chunk().await.map_err(multipart_error)
     }

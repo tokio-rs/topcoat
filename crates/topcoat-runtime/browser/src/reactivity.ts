@@ -3,6 +3,10 @@ const pending = new Set<Effect>();
 let scheduled = false;
 let flushing = false;
 
+/**
+ * A reactive value. Calling it reads the value, and `set` replaces it with a
+ * new value or with the result of a function of the previous one.
+ */
 export interface WriteSignal<T> {
 	(): T;
 	set(value: T | ((previous: T) => T)): T;
@@ -53,15 +57,17 @@ export class Effect {
 
 	constructor(private readonly callback: () => void) {}
 
+	/** Subscribes this effect to a signal's subscriber set. */
 	track(subscribers: Set<Effect>): void {
 		if (this.disposed) return;
 		subscribers.add(this);
 		this.dependencies.add(subscribers);
 	}
 
+	/** Queues this effect to run in a microtask. */
 	schedule(): void {
-		// Like the previous engine, writes during an effect do not schedule
-		// that same effect again. They still notify its other subscribers.
+		// Writes during an effect do not schedule that same effect again. They
+		// still notify its other subscribers.
 		if (this.disposed || this.running) return;
 		pending.add(this);
 		if (!scheduled && !flushing) {
@@ -73,6 +79,7 @@ export class Effect {
 		}
 	}
 
+	/** Runs the callback now, tracking the signals it reads. */
 	run(): void {
 		if (this.disposed || this.running) return;
 		pending.delete(this);
@@ -88,6 +95,7 @@ export class Effect {
 		}
 	}
 
+	/** Stops this effect and drops its subscriptions. */
 	dispose(): void {
 		this.disposed = true;
 		pending.delete(this);

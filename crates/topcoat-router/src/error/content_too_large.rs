@@ -3,11 +3,12 @@ use topcoat_core::{context::Cx, error::Result};
 
 use crate::response::{IntoResponse, Response};
 
-/// Builds a content-too-large (HTTP 413) response.
+/// Creates a `413 Content Too Large` error.
 ///
-/// The router raises this itself when a request body exceeds the request's
-/// body limit; see [`BodyLimit`](crate::BodyLimit) for changing that limit.
-/// Return it yourself when input is too large by a measure of your own.
+/// The built-in extractors return this error when a request body is longer
+/// than the request's body limit. See [`BodyLimit`](crate::BodyLimit) to
+/// change that limit. Return it yourself when the input is too large by some
+/// other measure.
 ///
 /// # Examples
 ///
@@ -29,10 +30,10 @@ pub fn content_too_large() -> ContentTooLargeError {
     ContentTooLargeError::new()
 }
 
-/// A content-too-large response carried as the `Err` variant of a handler
-/// `Result`.
+/// A `413 Content Too Large` error.
 ///
-/// Construct one with [`content_too_large`].
+/// Create one with [`content_too_large`]. Returned from a handler, it renders
+/// as a `413 Content Too Large` response.
 #[derive(Debug, Clone)]
 pub struct ContentTooLargeError {
     _priv: (),

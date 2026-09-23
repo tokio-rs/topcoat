@@ -8,14 +8,14 @@ use topcoat_core_grammar::paths::{topcoat_error, topcoat_router, topcoat_router_
 
 /// The `not_found!` macro input: an optional URL path prefix.
 pub struct NotFound {
-    /// The prefix the catch-all page covers; derived from the enclosing module
-    /// when absent.
+    /// The path prefix the catch-all page covers. When absent, the prefix is
+    /// the path of the enclosing module.
     pub path: Option<LitStr>,
 }
 
 impl NotFound {
-    /// The served path: the prefix with a `{*rest}` catch-all segment
-    /// appended. `None` when the path is module-derived.
+    /// The served path, which is the prefix followed by a `{*rest}` catch-all
+    /// segment. Returns `None` when the path comes from the module.
     #[must_use]
     pub fn catch_all_path(&self) -> Option<LitStr> {
         self.path.as_ref().map(|path| {

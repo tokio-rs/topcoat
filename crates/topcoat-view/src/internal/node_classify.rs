@@ -6,11 +6,11 @@ use crate::{
 /// Splits a node position's value into the parts the template's burst
 /// pushes and the view the template's join drives.
 ///
-/// A value implementing [`NodeViewParts`] is all parts: it is pushed into
-/// the template's block where the position sits, and the join drives the
-/// unit view `()`, which resolves at once to empty content. A view is all
-/// unit: nothing is pushed for it, and the join drives it in place and
-/// splices the content it resolves at the position.
+/// A value implementing [`NodeViewParts`] becomes parts only. It is pushed
+/// into the template's block at the position, and the join drives the empty
+/// view `()`, which resolves at once. A view becomes a unit only. Nothing is
+/// pushed for it, and the join drives it and splices the content it resolves
+/// at the position.
 pub trait NodeClassify {
     /// The parts the burst pushes at the position.
     type Parts: NodeViewParts;

@@ -32,21 +32,31 @@ use crate::{
     view::hir::{ExprKind, LowerView, ViewBuilder},
 };
 
-/// The full list of attributes attached to a single tag.
+/// A list of attributes: the body of an `attributes!` invocation, or the
+/// attributes in an element's opening tag.
+///
+/// Parsing rejects a literal attribute name that appears twice in the same
+/// list. As the body of `attributes!`, the list expands to a block that builds
+/// a [`topcoat_view::Attributes`] collection.
+///
+/// In an opening tag, a list whose names are all literal and that has no
+/// `if`, `for`, `match`, or inserted collection renders without a runtime
+/// collection. Any other
+/// list is collected into a [`topcoat_view::Attributes`] at render time, so a
+/// later attribute replaces an earlier one with the same name.
 pub struct Attributes {
-    /// The request context binding supplied by a leading `cx =>` argument to
-    /// the `attributes!` macro.
+    /// The context named by a leading `cx =>` argument to `attributes!`.
     ///
     /// Inside a `#[component]`, `#[page]`, or `#[layout]`, the context is
-    /// available implicitly, so this is [`None`]. Anywhere else the caller names
-    /// it explicitly as `attributes! { cx => ... }`, mirroring `view! { cx => ... }`.
-    /// Attributes parsed as part of an element tag never carry one.
+    /// available implicitly, so this is [`None`]. Anywhere else the caller
+    /// names it as `attributes! { cx => ... }`, like `view! { cx => ... }`.
     pub cx: Option<LeadingCx>,
+    /// The attributes and control flow in the list, in source order.
     pub items: Vec<AttributeNode>,
 }
 
 impl Attributes {
-    /// Returns `true` if `self` has no attributes.
+    /// Returns `true` if the list has no items.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.items.is_empty()

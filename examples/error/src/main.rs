@@ -68,7 +68,8 @@ async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
 
 path_param!(post_id: u64, error = bad_request);
 
-// ok_or_not_found turns the None into a 404, which the error handler catches above.
+// `ok_or_not_found` turns `None` into a not-found error, which the error
+// boundary in the layout above catches.
 #[page("/posts/{post_id}")]
 async fn post(cx: &Cx) -> Result<impl View> {
     let title = match *path_param::<PostId>(cx)? {
@@ -81,7 +82,8 @@ async fn post(cx: &Cx) -> Result<impl View> {
     Ok(view! { <h1>(title)</h1> })
 }
 
-// An error constructor converts into the handler's error type.
+// An error constructor such as `forbidden` converts into the handler's error
+// type with `into`.
 #[page("/admin")]
 async fn admin() -> Result<()> {
     Err(forbidden().into())
@@ -98,7 +100,8 @@ async fn rewritten() -> Result<impl View> {
     Ok(view! { <h1>"The rewrite target"</h1> })
 }
 
-// A URL matching no route is normally answered with a bare 404 that skips the
-// layouts. This catch-all page resolves such URLs to a NotFoundError instead,
-// so the layout brands them like any other handler error.
+// The router answers a URL that matches no route with a bare 404 that skips
+// the layouts. This catch-all page turns such URLs into a `NotFoundError`
+// instead, so the layout renders the same error page as for any other
+// handler error.
 not_found!("/");

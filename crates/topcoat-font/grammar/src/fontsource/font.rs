@@ -31,11 +31,17 @@ use crate::fontsource::font_face::{Display, FamilyName, Host};
 /// cross product is emitted as `fontsource_font_face!` calls, each of which
 /// verifies its own combination against the catalog.
 pub struct FontsourceFont {
+    /// The family, as the name of its `families` constant.
     pub family: FamilyName,
+    /// The `weight` argument, if written.
     pub weight: Option<Weight>,
+    /// The `style` argument, if written.
     pub style: Option<Style>,
+    /// The `subset` argument, if written.
     pub subset: Option<Subset>,
+    /// The `display` argument, if written.
     pub display: Option<Display>,
+    /// The `host` argument, if written.
     pub host: Option<Host>,
 }
 

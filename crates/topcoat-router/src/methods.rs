@@ -5,30 +5,28 @@ use http::Method;
 /// The HTTP methods a [`Route`](crate::Route) responds to, as returned by
 /// [`Route::methods`](crate::Route::methods).
 ///
-/// Most routes respond to a fixed set of methods, usually a single one.
-/// [`Methods::Any`] marks a route that accepts every method at its path, like
-/// an adapter forwarding requests to an external service. A route registered
-/// for a specific method takes precedence over an any-method route at the
-/// same path.
+/// Most routes respond to a fixed list of methods, usually just one.
+/// [`Methods::Any`] is for a route that accepts every method, like one that
+/// forwards requests to another service. A route registered for a specific
+/// method wins over an any-method route at the same path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Methods<'a> {
     /// The route accepts every HTTP method.
     Any,
-    /// The route accepts exactly the listed methods.
+    /// The route accepts only the listed methods.
     Only(&'a [Method]),
 }
 
-/// An owned counterpart to [`Methods`], stored by routes like
+/// An owned version of [`Methods`], stored by routes like
 /// [`RouteFn`](crate::RouteFn).
 ///
-/// Rarely constructed directly: [`RouteFn::new`](crate::RouteFn::new) accepts
-/// anything convertible into it, like a [`Method`], a `&'static [Method]`, a
-/// `Vec<Method>`, or a [`Methods`] value (so [`Methods::Any`] expresses an
-/// any-method route). The common single-method case is stored without
-/// allocating.
+/// You rarely create one directly. Functions like
+/// [`RouteFn::new`](crate::RouteFn::new) accept anything that converts into
+/// it: a [`Method`], a `&'static [Method]`, a `Vec<Method>`, or a [`Methods`]
+/// value such as [`Methods::Any`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OwnedMethods {
-    /// Responds to a single method.
+    /// Responds to one method.
     One(Method),
     /// Responds to each method in the set.
     Set(Cow<'static, [Method]>),
@@ -37,8 +35,8 @@ pub enum OwnedMethods {
 }
 
 impl OwnedMethods {
-    /// Borrows this set as a [`Methods`] value, as returned by
-    /// [`Route::methods`](crate::Route::methods).
+    /// Returns these methods as a [`Methods`] value, as
+    /// [`Route::methods`](crate::Route::methods) returns them.
     #[must_use]
     pub fn as_methods(&self) -> Methods<'_> {
         match self {

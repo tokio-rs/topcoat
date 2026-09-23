@@ -2,10 +2,11 @@ use cookie::Cookie;
 
 use crate::Cookies;
 
-/// A [RFC 6265bis] cookie name prefix.
+/// A cookie name prefix from [RFC 6265bis].
 ///
-/// A prefix asks the browser to enforce extra constraints on a cookie based on
-/// its name. Apply one with [`Cookies::override_prefix_host`] and friends.
+/// A browser only accepts a cookie whose name starts with a prefix if the
+/// cookie has the attributes that prefix requires. Apply a prefix with
+/// [`Cookies::override_prefix_host`] or one of the related combinators.
 ///
 /// [RFC 6265bis]: https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis#name-cookie-name-prefixes
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -18,7 +19,8 @@ pub enum Prefix {
 }
 
 impl Prefix {
-    /// The literal prefix string prepended to cookie names.
+    /// Returns the prefix as it appears at the start of a cookie name, such as
+    /// `"__Host-"`.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -79,12 +81,13 @@ pub(crate) enum Conform {
     Override,
 }
 
-/// A [`Cookies`] adapter that scopes cookies to a name [`Prefix`].
+/// A [`Cookies`] adapter that adds a name [`Prefix`] to cookies.
 ///
-/// On write it prepends the prefix and applies the prefix's required
-/// attributes; on read it looks the cookie up under its prefixed name and
-/// strips the prefix from the result. Created by
-/// [`Cookies::override_prefix_host`] and the related combinators.
+/// On write, it prepends the prefix to the cookie name and sets the attributes
+/// the prefix requires. On read, it looks up the prefixed name and returns the
+/// cookie under its bare name, so code keeps using the bare name throughout.
+///
+/// Created by [`Cookies::override_prefix_host`] and the related combinators.
 #[derive(Debug, Clone, Copy)]
 pub struct Prefixed<J> {
     inner: J,

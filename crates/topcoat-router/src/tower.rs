@@ -27,26 +27,26 @@ use crate::{
 
 /// A [`Route`] that forwards its requests to a tower service.
 ///
-/// This adapter mounts a whole tower application (an axum router, a hyper
-/// service, a reverse proxy) as a route in a topcoat router, typically while
-/// migrating an existing application to topcoat one route at a time.
-/// Registered with [`any`](Self::any) at a catch-all path, it hands an entire
-/// URL subtree to the service. The adapter forwards the URI provided by the
-/// surrounding layers. To make paths relative to a mount point, register a
-/// [`StripPrefixLayer`](crate::StripPrefixLayer) for the route. A catch-all
-/// segment does not match the bare prefix itself, so register a second
+/// Use it to mount a whole tower application, such as an axum router or a
+/// reverse proxy, as a route in a Topcoat router. This helps when you move an
+/// existing application to Topcoat one route at a time. Register it with
+/// [`RouterBuilder::route`](crate::RouterBuilder::route).
+///
+/// Created with [`any`](Self::any) at a catch-all path, the route hands a
+/// whole URL subtree to the service. The service receives the URI as the
+/// surrounding layers left it. To make paths relative to the mount point,
+/// register a [`StripPrefixLayer`](crate::StripPrefixLayer) for the route. A
+/// catch-all segment does not match the bare prefix, so register a second
 /// `TowerRoute` for the prefix if the service also serves that URL.
 ///
-/// The service must be `Clone`, `Send`, and `Sync`; wrap a service that is
-/// not `Sync` in `tower::buffer`. Its per-request clones share cross-request
-/// state through the service's internal handles.
+/// The service must be `Clone`, `Send`, and `Sync`. Wrap a service that is
+/// not `Sync` in `tower::buffer`. The route clones the service for every
+/// request.
 ///
-/// An error the mounted service returns surfaces as an [`Error`] wrapping a
-/// [`TowerServiceError`]; unmapped, the router renders it as a 500. Layers
-/// wrapping the route's path apply as they would to any other route.
-///
-/// Register the adapter with
-/// [`RouterBuilder::route`](crate::RouterBuilder::route).
+/// An error returned by the service becomes an [`Error`] that wraps a
+/// [`TowerServiceError`]. Unless a layer handles it, the router renders it as
+/// a `500 Internal Server Error`. Layers that wrap the route's path apply as
+/// they do to any other route.
 ///
 /// # Examples
 ///
@@ -77,13 +77,13 @@ pub struct TowerRoute<S> {
 }
 
 impl<S> TowerRoute<S> {
-    /// Mounts `service` at `path`, responding to `methods`.
+    /// Mounts `service` at `path` for the given `methods`.
     ///
-    /// The methods are anything convertible into [`OwnedMethods`]: a single
-    /// [`Method`](crate::Method), a `&'static [Method]`, a `Vec<Method>`, or
-    /// [`Methods::Any`] to respond to every method (see also
-    /// [`any`](Self::any)). A route registered for a specific method takes
-    /// precedence over an any-method route at the same path.
+    /// `methods` is anything convertible into [`OwnedMethods`], such as a
+    /// single [`Method`](crate::Method), a list of methods, or
+    /// [`Methods::Any`] for every method (see also [`any`](Self::any)). A route
+    /// registered for a specific method wins over an any-method route at the
+    /// same path.
     ///
     /// # Panics
     ///
@@ -99,10 +99,10 @@ impl<S> TowerRoute<S> {
         }
     }
 
-    /// Mounts `service` at `path`, responding to every HTTP method.
+    /// Mounts `service` at `path` for every HTTP method.
     ///
     /// This is the usual way to hand a URL subtree to a mounted application,
-    /// which dispatches on the method itself. A shorthand for
+    /// which then handles the method itself. It is a shorthand for
     /// [`new`](Self::new) with [`Methods::Any`].
     ///
     /// # Panics
@@ -150,29 +150,25 @@ where
     }
 }
 
-/// A [`Layer`] that wraps request handling in a [`tower::Layer`]'s
-/// middleware.
+/// A [`Layer`] that runs the middleware of a [`tower::Layer`].
 ///
-/// This adapter runs middleware from the tower ecosystem (a timeout, a rate
-/// limit, CORS, compression) inside a topcoat router. The middleware behaves
-/// as it would in a plain tower stack: its state (a concurrency-limit
-/// semaphore, a rate-limit window) is shared across requests, and changes it
-/// makes to the request are seen by the layers and route it wraps.
+/// Use it to run tower middleware, such as a timeout, a rate limit, or CORS,
+/// inside a Topcoat router. Register it with
+/// [`RouterBuilder::layer`](crate::RouterBuilder::layer). The middleware
+/// behaves as it does in a plain tower stack. Its state, such as a
+/// concurrency limit, is shared across requests, and the layers and route it
+/// wraps see the changes it makes to the request.
 ///
-/// The middleware's service must be `Clone`, `Send`, and `Sync`; wrap a
-/// service that is not `Sync` in `tower::buffer`. To run several tower
-/// layers, compose them first (for example with [`tower::ServiceBuilder`])
-/// and wrap the result in a single `TowerLayer`. Middleware that calls its
-/// inner service more than once per request (like `tower::retry`) is not
-/// supported.
+/// The middleware service must be `Clone`, `Send`, and `Sync`. Wrap a service
+/// that is not `Sync` in `tower::buffer`. To run several tower layers, combine
+/// them first, for example with [`tower::ServiceBuilder`], and wrap the result
+/// in a single `TowerLayer`. Middleware that calls its inner service more than
+/// once per request, like `tower::retry`, is not supported.
 ///
-/// An error produced by the wrapped routes (a 404, a handler error) leaves
-/// the layer as the original [`Error`] value, while an error produced by the
-/// middleware itself (a timeout elapsing, a load-shed rejection) surfaces as
-/// an `Err` wrapping a [`TowerServiceError`].
-///
-/// Register the adapter with
-/// [`RouterBuilder::layer`](crate::RouterBuilder::layer).
+/// An error from the wrapped routes, such as a `404 Not Found` or a handler
+/// error, leaves the layer as the original [`Error`]. An error that the
+/// middleware produces itself, such as an elapsed timeout, becomes an
+/// [`Error`] that wraps a [`TowerServiceError`].
 ///
 /// # Examples
 ///
@@ -195,13 +191,15 @@ pub struct TowerLayer<S> {
 }
 
 impl<S> TowerLayer<S> {
-    /// Wraps every request in the middleware `layer` builds, including one
-    /// that matches no route, so middleware answering requests on its own
-    /// (like a CORS preflight) sees them all. Scope the layer to a path
-    /// prefix with [`at`](Self::at).
+    /// Creates a layer that runs the middleware built by `layer` for every
+    /// request.
     ///
-    /// The middleware is built immediately and shared by every request
-    /// passing through this layer.
+    /// This includes requests that match no route, so middleware that answers
+    /// some requests on its own, like a CORS preflight, sees them all. Scope
+    /// the layer to a path prefix with [`at`](Self::at).
+    ///
+    /// The middleware is built once, here, and shared by every request that
+    /// passes through this layer.
     #[must_use]
     pub fn new<L>(layer: L) -> Self
     where
@@ -213,7 +211,9 @@ impl<S> TowerLayer<S> {
         }
     }
 
-    /// Scopes the layer to the matched routes under `path`.
+    /// Scopes the layer to the routes under `path`.
+    ///
+    /// A scoped layer only runs for requests that match a route.
     ///
     /// # Panics
     ///
@@ -292,12 +292,12 @@ where
     }
 }
 
-/// The inner service a [`TowerLayer`]'s middleware wraps.
+/// The inner service that the middleware of a [`TowerLayer`] wraps.
 ///
-/// [`TowerLayer::new`] hands this service to the given [`tower::Layer`].
-/// Calling it forwards the request to the layers and route the `TowerLayer`
-/// wraps and resolves with their response. It can be called at most once per
-/// request; a repeated call (like a retry's) resolves to a
+/// [`TowerLayer::new`] passes this service to the given [`tower::Layer`].
+/// Calling it sends the request on to the layers and route that the
+/// `TowerLayer` wraps, and returns their response. It can be called at most
+/// once per request. A second call, such as a retry, fails with a
 /// [`TowerNextError`].
 #[derive(Clone, Debug)]
 pub struct TowerNext {
@@ -339,13 +339,13 @@ impl tower::Service<Request> for TowerNext {
     }
 }
 
-/// The error type [`TowerNext`] returns.
+/// The error type of [`TowerNext`].
 ///
-/// Middleware should let this error pass through unchanged: the enclosing
-/// [`TowerLayer`] restores an error produced by the wrapped routes to the
-/// original [`Error`] value. The other cases are misuse (calling the service
-/// a second time, or from a request that lost the original request's
-/// extensions) and the request being cancelled.
+/// Middleware should pass this error through unchanged. The [`TowerLayer`]
+/// then turns an error from the wrapped routes back into the original
+/// [`Error`]. The error also reports misuse, such as calling [`TowerNext`] a
+/// second time or with a request that lost the extensions of the original
+/// request, and a request that was cancelled.
 #[derive(Debug)]
 pub struct TowerNextError {
     repr: Repr,
@@ -412,14 +412,14 @@ impl Display for TowerNextError {
 
 impl std::error::Error for TowerNextError {}
 
-/// An error a tower service produced itself, as opposed to one that passed
-/// through it from wrapped routes.
+/// An error that a tower service produced itself, as opposed to one from the
+/// routes it wraps.
 ///
-/// Both adapters surface it: a [`TowerLayer`] wraps a failure of its
-/// middleware (a timeout elapsing, a load-shed rejection), and a
-/// [`TowerRoute`] wraps an error returned by its mounted service. An outer
-/// layer can downcast to it to map specific failures onto responses;
-/// unmapped, the router renders it as a 500.
+/// A [`TowerLayer`] returns it when its middleware fails, for example when a
+/// timeout elapses. A [`TowerRoute`] returns it when its service returns an
+/// error. An outer layer can downcast to it to turn specific failures into
+/// responses. Otherwise the router renders it as a
+/// `500 Internal Server Error`.
 #[derive(Debug)]
 pub struct TowerServiceError(BoxError);
 
@@ -430,7 +430,7 @@ impl TowerServiceError {
         &self.0
     }
 
-    /// Consumes the wrapper, returning the underlying error.
+    /// Consumes the wrapper and returns the underlying error.
     #[must_use]
     pub fn into_inner(self) -> BoxError {
         self.0
@@ -496,24 +496,24 @@ fn recover(error: BoxError) -> Error {
     }
 }
 
-/// A tower service dispatching every request to a topcoat [`Router`].
+/// A tower service that handles every request with a Topcoat [`Router`].
 ///
-/// This adapter is the opposite of [`TowerRoute`]: it serves a whole topcoat
-/// router inside a tower application (an axum router, a hyper server, a tower
-/// middleware stack), typically to embed a topcoat application in one that
-/// owns the HTTP server. The service accepts a request with any body yielding
-/// [`Bytes`] and never errors; the router renders every failure, including a
-/// handler panic, as a response.
+/// This is the opposite of [`TowerRoute`]. It serves a whole Topcoat router
+/// inside a tower application, such as an axum router or a hyper server. Use
+/// it to embed a Topcoat application in one that owns the HTTP server. The
+/// service accepts a request with any body that yields [`Bytes`]. It never
+/// fails, because the router renders every failure as a response, including a
+/// handler panic.
 ///
-/// The service is `Clone`, `Send`, `Sync`, and infallible, satisfying the
-/// bounds tower servers commonly require. Clones are cheap and share the
-/// router's routing tables and app context.
+/// The service is `Clone`, `Send`, and `Sync`, as tower servers usually
+/// require. Clones are cheap and share the routing tables and app context of
+/// the router.
 ///
-/// The router matches the URI exactly as the service receives it, and
-/// generates its URLs (hrefs, redirects, asset URLs) from its own absolute
-/// route paths. Mount the service where the surrounding application forwards
-/// full request paths, like a root-level fallback; behind a mount that strips
-/// a path prefix, generated URLs would point outside the mount.
+/// The router matches the URI exactly as the service receives it, and builds
+/// its URLs, such as links, redirects, and asset URLs, from its own absolute
+/// route paths. Mount the service where the surrounding application passes on
+/// the full request path, like a root-level fallback. Behind a mount that
+/// strips a path prefix, the generated URLs would point outside the mount.
 ///
 /// # Examples
 ///
@@ -530,9 +530,9 @@ fn recover(error: BoxError) -> Error {
 /// The surrounding server owns the connections, so the router does not know
 /// the peer address of a request it receives this way. To make
 /// [`remote_addr`](crate::request::remote_addr) and
-/// [`client_ip`](crate::request::client_ip)
-/// work, insert a [`RemoteAddr`](crate::RemoteAddr) into the request's
-/// extensions before it reaches the service.
+/// [`client_ip`](crate::request::client_ip) work, insert a
+/// [`RemoteAddr`](crate::RemoteAddr) into the extensions of the request
+/// before it reaches the service.
 #[derive(Clone)]
 pub struct TowerService {
     /// The served router, shared with every clone of the service.
@@ -540,7 +540,7 @@ pub struct TowerService {
 }
 
 impl TowerService {
-    /// Wraps `router` in a cloneable tower service.
+    /// Wraps `router` in a tower service.
     #[must_use]
     pub fn new(router: Router) -> Self {
         Self {

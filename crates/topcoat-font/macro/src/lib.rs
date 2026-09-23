@@ -1,3 +1,7 @@
+//! Procedural macros for Topcoat web fonts.
+//!
+//! Use these macros through the `topcoat::font` module.
+
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 use proc_macro::TokenStream;

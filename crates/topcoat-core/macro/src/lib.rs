@@ -1,3 +1,7 @@
+//! The `#[memoize]` attribute macro.
+//!
+//! Use it through `topcoat::context::memoize`, which also hosts the guide.
+
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 use proc_macro::TokenStream;

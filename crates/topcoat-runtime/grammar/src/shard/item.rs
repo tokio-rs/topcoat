@@ -4,15 +4,17 @@ use syn::{
     spanned::Spanned,
 };
 
-/// The annotated `async fn` that becomes a shard. Validates the function
-/// signature: shards must be `async`, must declare a return type, must not
-/// take a `self` receiver, and must use identifier patterns for their
-/// arguments.
+/// The annotated `async fn` that becomes a shard.
+///
+/// Parsing checks the signature: a shard must be `async`, must declare a
+/// return type, must not take a `self` receiver, and must use plain
+/// identifiers for its arguments.
 pub struct ShardItem {
     item: ItemFn,
 }
 
 impl ShardItem {
+    /// The function as written.
     pub fn item(&self) -> &ItemFn {
         &self.item
     }

@@ -11,10 +11,10 @@ pub use value::*;
 
 use crate::{HtmlContext, PartsWriter};
 
-/// A single HTML attribute.
+/// A single HTML attribute made of a key and a value.
 ///
-/// The value decides whether the attribute is present. For example, `None`
-/// and `false` values omit the attribute.
+/// The value decides whether the attribute is rendered. For example, a
+/// `None` or `false` value leaves out the attribute.
 #[derive(Debug, Clone)]
 pub struct Attribute<K, V> {
     key: K,
@@ -29,10 +29,10 @@ impl<K, V> Attribute<K, V> {
     }
 }
 
-/// Converts one or more attributes into view parts.
+/// A value that renders as zero or more whole attributes in a template.
 ///
-/// When this trait is implemented on a type, it can be used in the attribute position of an element
-/// in the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
+/// A type that implements this trait can be used in the attribute position
+/// of the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
 ///
 /// ```rust
 /// # use topcoat::view::{Attributes, View, component, view};
@@ -45,10 +45,11 @@ impl<K, V> Attribute<K, V> {
 /// # }
 /// ```
 ///
-/// The emitted view parts must contain a leading space for each attribute to separate them from
-/// the element name or preceding attributes.
+/// An implementation must push a leading space before each attribute, to
+/// separate it from the element name or the previous attribute. Wrapping the
+/// key and value in an [`Attribute`] takes care of this.
 pub trait AttributeViewParts {
-    /// Appends zero or more attributes to the view being built.
+    /// Pushes zero or more attributes into `parts`.
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>);
 }
 

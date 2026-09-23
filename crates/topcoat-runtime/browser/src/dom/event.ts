@@ -6,6 +6,11 @@ const EVENT_HANDLER_PREFIX = "data-topcoat-on:";
 
 type EventHandler = (event: unknown) => void;
 
+/**
+ * Attaches the handler from a `data-topcoat-on:<event>` attribute to its
+ * element. The attribute holds JavaScript that evaluates to the handler
+ * function, which receives the event wrapped in the runtime's `Event`.
+ */
 export function setupEventHandler(el: Element, attr: Attr, scope: Scope): void {
 	if (!attr.name.startsWith(EVENT_HANDLER_PREFIX)) return;
 

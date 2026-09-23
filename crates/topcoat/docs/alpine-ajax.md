@@ -1,6 +1,6 @@
-[Alpine AJAX](https://alpine-ajax.js.org) is an Alpine.js plugin that lets HTML drive its own updates. Attributes like `x-target` make a `<form>` or `<a>` issue a fetch request and merge the returned HTML fragment into one or more target elements, without a full reload and without writing JavaScript. The server just answers with the markup for the piece of the page that changed.
+[Alpine AJAX](https://alpine-ajax.js.org) is an [Alpine.js](https://alpinejs.dev) plugin that lets HTML update itself. Attributes like `x-target` make a `<form>` or `<a>` send a fetch request and merge the returned HTML into one or more target elements. There is no full page reload and no JavaScript to write. The server answers with the markup for the part of the page that changed.
 
-The browser tells the server about the request through two `X-Alpine-*` HTTP headers. Unlike htmx, Alpine AJAX defines no response header convention: there is nothing for the server to set to control navigation, retargeting, or client-side events -- those are all configured directly in markup (`x-merge`, `x-target`) or JavaScript (`ajax:*` events). Topcoat helps you read the request headers.
+Alpine AJAX tells the server about a request through two `X-Alpine-*` HTTP headers. Unlike htmx, it has no response headers. Merging, navigation, and client-side events are all set up in markup (`x-target`, `x-merge`) or in JavaScript (`ajax:*` events). This module gives you functions to read the request headers.
 
 Everything below is re-exported from `topcoat::alpine_ajax` and gated behind the `alpine-ajax` feature.
 
@@ -12,7 +12,7 @@ topcoat = { version = "0.8.1", features = ["alpine-ajax"] }
 
 # Loading the Alpine AJAX script
 
-Alpine AJAX is a plugin for Alpine.js core, so the browser must load both, in order: the plugin script first, then Alpine.js itself. Load both with `defer` so they run after the document has parsed; without it, Alpine can start initializing before `<body>` exists and silently skip binding directives on the page's first render.
+Alpine AJAX is a plugin for Alpine.js, so the browser must load both scripts in this order: first the plugin, then Alpine.js itself. Load both with `defer` so that they run after the document has been parsed. Without `defer`, Alpine can start before `<body>` exists and skip the directives on the first render without any error.
 
 ```rust
 use topcoat::{
@@ -38,7 +38,7 @@ async fn root(slot: Slot<'_>) -> Result<impl View> {
 
 # Reading request headers
 
-When Alpine AJAX makes a request it sends two headers describing itself and what it's targeting.
+Alpine AJAX sends two [request headers](https://alpine-ajax.js.org/reference/): `X-Alpine-Request` marks the request as coming from Alpine AJAX, and `X-Alpine-Target` lists the `id`s of the target elements. Each has a function that reads it from the request context:
 
 ```rust
 use topcoat::{
@@ -53,12 +53,11 @@ use topcoat::{
 async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         if ajax_request(cx) {
-            // Alpine AJAX only merges the requested target elements, so we do
-            // not need to render the full layout shell. Just the page's
-            // content is enough.
+            // Alpine AJAX only merges the target elements, so the layout
+            // shell is not needed. The page content alone is enough.
             (slot)
         } else {
-            // Non-AJAX requests require a full page render including the shell.
+            // A normal browser request needs the full page, shell included.
             <html>
                 <body>
                     <nav> /* persistent navigation */ </nav>
@@ -70,26 +69,28 @@ async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
 }
 ```
 
-- [`ajax_request`]: was this request issued by Alpine AJAX?
-- [`ajax_targets`]: an iterator over the `id`s of the target elements being requested.
-- [`ajax_target`]: is a given `id` among the requested targets?
+- [`ajax_request`]: returns `true` when the request was sent by Alpine AJAX.
+- [`ajax_targets`]: returns an iterator over the `id`s of the target elements.
+- [`ajax_target`]: returns `true` when a given `id` is one of the target elements.
+
+All of these functions panic when called outside a router request.
 
 # Sending alert messages with `x-sync`
 
-A form's `x-target` only merges the elements it names, and by default only for a `2xx` response. Alpine AJAX's `x-sync` attribute is the escape hatch: any element on the page carrying `x-sync` is refreshed whenever a response contains a matching `id`, regardless of whether that `id` was targeted and regardless of status code. That makes it the right tool for a flash message or alert region that lives outside whatever a form explicitly targets:
+A form's `x-target` only merges the elements it names. The `x-sync` attribute covers everything else: an element with `x-sync` is updated whenever a response contains an element with the same `id`, even when that element is not a target. This makes it a good fit for a flash message or alert area that lives outside of what a form targets:
 
 ```html
 <div id="alert" x-sync role="status"></div>
 
 <form x-target="comment_form comments" method="post" action="/comments">
     <textarea name="body"></textarea>
-    <button type="submit">"Post"</button>
+    <button type="submit">Post</button>
 </form>
 ```
 
-Render the `#alert` markup into every response from `/comments` (success or failure) and Alpine AJAX picks it up and replaces it in place, without it ever appearing in that form's `x-target`.
+Include the `#alert` markup in every response from `/comments`, on success and on failure. Alpine AJAX replaces the alert in place, even though it is not in the form's `x-target`.
 
-Pairing this with `x-target`'s status-code modifiers covers form validation end to end. Add a modifier so the target list changes on a non-2xx response -- `x-target.422` merges only on a `422`, `x-target.4xx` on any `4xx`, `x-target.error` on `4xx` or `5xx`:
+Together with the status code modifiers of `x-target`, this covers form validation. By default, `x-target` merges its targets for any response, error responses included. A modifier sets a different target list for some status codes: `x-target.422` applies to a `422` response, `x-target.4xx` to any `4xx` response, and `x-target.error` to any `4xx` or `5xx` response.
 
 ```html
 <form
@@ -103,7 +104,7 @@ Pairing this with `x-target`'s status-code modifiers covers form validation end 
 </form>
 ```
 
-A validation failure can respond `422` with just the `#comment_form` fragment (the textarea and an inline error) -- `comments` is left alone because it isn't in the `.422` target list -- while a success responds `200` and updates both. The Rust attribute name needs the parenthesized-expression form, since `422` on its own is not a valid identifier segment:
+When validation fails, the handler responds with a `422` and only the `#comment_form` fragment, which holds the textarea and an inline error. The `comments` list stays as it is because it is not in the `.422` target list. When the comment is saved, the handler responds with a `200` and both targets are updated.
 
 ```rust
 use topcoat::{
@@ -137,12 +138,12 @@ async fn create_comment(cx: &Cx /* , Form(input): Form<NewComment> */) -> Result
             .into_response(cx);
     }
 
-    // ...save the comment, then respond with the cleared form, the updated
-    // `comments` list, and an `#alert` confirmation, same as above but `200`.
+    // Save the comment, then respond with the cleared form, the updated
+    // `comments` list, and an `#alert` confirmation, like above but with `200`.
     # unreachable!()
 }
 ```
 
 # Header constants
 
-The raw `X-Alpine-*` header names are available as `HeaderName` constants in [`topcoat::alpine_ajax::header`](crate::alpine_ajax::header), for when you want to read a header directly.
+The raw `X-Alpine-*` header names are available as `HeaderName` constants in [`topcoat::alpine_ajax::header`](crate::alpine_ajax::header). Use them when you want to read a header yourself.

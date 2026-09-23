@@ -36,6 +36,8 @@ where
     U: JoinUnits,
     F: FnOnce(&mut Builder<'_, '_, '_>, U::Contents),
 {
+    /// Creates the view from the template's units and the burst that builds
+    /// its block from their contents.
     #[must_use]
     pub fn new(cx: &'cx Cx, units: U, burst: F) -> Self {
         Self {
@@ -173,6 +175,7 @@ where
     V: View,
     Rest: JoinUnits,
 {
+    /// Links the unit driving `view` in front of `rest`.
     #[must_use]
     pub fn new(view: V, rest: Rest) -> Self {
         Self {

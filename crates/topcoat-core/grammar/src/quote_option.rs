@@ -3,20 +3,30 @@ use std::ops::{Deref, DerefMut};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 
-/// A newtype wrapper around `Option<T>` that implements [`ToTokens`] by
-/// preserving the `Option` in the generated token stream.
+/// A wrapper around `Option<T>` that quotes as an `Option` expression.
 ///
-/// The default `ToTokens` impl for `Option<T>` emits nothing for `None` and
-/// emits the inner value directly for `Some`. `QuoteOption` instead quotes
-/// `Some(value)` as `::core::option::Option::Some(value)` and `None` as
-/// `::core::option::Option::None`, so the resulting code still contains an
-/// `Option`.
+/// The [`ToTokens`] impl for `Option<T>` emits nothing for `None` and the
+/// inner value for `Some`. `QuoteOption` instead emits
+/// `::core::option::Option::Some(value)` or `::core::option::Option::None`,
+/// so the generated code still holds an `Option`.
 ///
-/// Implements `Deref`/`DerefMut` to `Option<T>` for ergonomic access.
+/// It dereferences to the inner `Option<T>`.
+///
+/// ```
+/// use quote::quote;
+/// use topcoat_core_grammar::QuoteOption;
+///
+/// let value = QuoteOption::new(None::<u8>);
+/// assert_eq!(
+///     quote! { #value }.to_string(),
+///     ":: core :: option :: Option :: None",
+/// );
+/// ```
 #[allow(unused)]
 pub struct QuoteOption<T>(Option<T>);
 
 impl<T> QuoteOption<T> {
+    /// Wraps `inner`.
     #[inline]
     #[allow(unused)]
     pub fn new(inner: Option<T>) -> Self {

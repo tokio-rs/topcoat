@@ -5,6 +5,7 @@ mod remove;
 
 use clap::{Args, Subcommand};
 
+/// The arguments of `topcoat ui`.
 #[derive(Args)]
 pub struct UiCommand {
     #[command(subcommand)]
@@ -24,6 +25,7 @@ enum UiSubcommand {
 }
 
 impl UiCommand {
+    /// Runs the selected `ui` subcommand.
     pub fn run(self) {
         match self.command {
             UiSubcommand::Init(cmd) => cmd.run(),

@@ -4,10 +4,12 @@ pub use drink::*;
 use toasty::Db;
 use topcoat::context::{Cx, app_context};
 
+/// Returns a handle to the database registered as app context.
 pub(crate) fn db(cx: &Cx) -> Db {
     app_context::<Db>(cx).clone()
 }
 
+/// Fills the database with the drinks on the menu.
 pub async fn seed(db: &mut Db) -> toasty::Result<()> {
     toasty::create!(Drink::[
         {

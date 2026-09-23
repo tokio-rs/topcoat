@@ -6,11 +6,14 @@ use topcoat_view::{NodeViewParts, PartsWriter};
 
 use crate::{Js, Surrogate, Surrogated};
 
-/// A value with a JavaScript expression that can produce it in the browser.
+/// A runtime expression: a value computed on the server, together with the
+/// JavaScript that computes the same value in the browser.
 ///
-/// Expressions whose evaluation reads no signals can render without browser
-/// bindings or marker comments. Their JavaScript is still available for
-/// event handlers and shard arguments.
+/// The `expr!` macro and `$(...)`
+/// in a `view!` body create these. An expression is static if its evaluation
+/// read no signals. A static expression renders as its plain value, without
+/// browser bindings or marker comments. Its JavaScript is still available,
+/// for example for event handlers and shard arguments.
 #[derive(Debug, Clone)]
 pub struct Expr<T> {
     pub(crate) evaluated: T,
@@ -19,10 +22,12 @@ pub struct Expr<T> {
 }
 
 impl<T> Expr<T> {
-    /// Evaluates an expression while observing signal reads.
+    /// Runs `evaluate` and pairs its result with `js`, recording whether the
+    /// evaluation read any signals.
     ///
-    /// The evaluation is synchronous. Its signal reads must represent the
-    /// dependencies of the JavaScript expression as well.
+    /// The evaluation is synchronous. The signals it reads must be the same
+    /// signals the JavaScript depends on, since they decide whether the
+    /// expression is static.
     #[inline]
     pub fn evaluate(evaluate: impl FnOnce() -> T, js: Js) -> Self {
         let _scope = ReadScope::enter();
@@ -34,22 +39,23 @@ impl<T> Expr<T> {
         }
     }
 
-    /// Whether this expression is known not to require reactive evaluation.
-    ///
-    /// Signal reads during [`evaluate`](Self::evaluate) make it dynamic.
+    /// Whether the expression read no signals during
+    /// [`evaluate`](Self::evaluate), so it never needs to run again in the
+    /// browser.
     #[inline]
     #[must_use]
     pub fn is_static(&self) -> bool {
         self.is_static
     }
 
-    /// Returns the value and its JavaScript, including for static expressions.
+    /// Splits the expression into its value and its JavaScript.
     #[inline]
     pub fn into_evaluated_and_js(self) -> (T, Js) {
         (self.evaluated, self.js)
     }
 
-    /// Returns the captured value, carrying its dependencies into evaluation.
+    /// Returns the value for use inside another expression's evaluation,
+    /// marking that evaluation as reading signals if this expression did.
     #[doc(hidden)]
     pub fn into_captured_value(self) -> T::Surrogate
     where

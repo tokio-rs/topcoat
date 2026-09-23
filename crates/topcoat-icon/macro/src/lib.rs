@@ -1,3 +1,7 @@
+//! Procedural macros for Topcoat icons.
+//!
+//! Use these macros through the `topcoat::icon::iconify` module.
+
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[cfg(feature = "iconify")]

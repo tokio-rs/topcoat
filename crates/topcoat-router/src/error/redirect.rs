@@ -9,11 +9,16 @@ use topcoat_core::{
 
 use crate::response::{IntoResponse, Response};
 
-/// Builds a temporary (HTTP 307) redirect to `uri`.
+/// Creates a temporary redirect (`307 Temporary Redirect`) to `uri`.
 ///
-/// Characters a URI cannot carry, like non-ASCII ones, are percent-encoded.
-/// Percent signs already in `uri` are left alone, so an encoded target is not
-/// encoded twice.
+/// The client repeats the request at `uri` with the same method. Return the
+/// redirect as an error, or use
+/// [`RouterErrorExt::ok_or_redirect`](crate::error::RouterErrorExt::ok_or_redirect)
+/// on an `Option` or `Result`.
+///
+/// Control characters and non-ASCII characters in `uri` are percent-encoded.
+/// Percent signs already in `uri` are kept as they are, so an encoded target
+/// is not encoded twice.
 ///
 /// # Examples
 ///
@@ -34,11 +39,12 @@ pub fn redirect(uri: impl AsRef<str>) -> RedirectError {
     RedirectError::new(StatusCode::TEMPORARY_REDIRECT, uri.as_ref())
 }
 
-/// Builds a permanent (HTTP 308) redirect to `uri`.
+/// Creates a permanent redirect (`308 Permanent Redirect`) to `uri`.
 ///
-/// Use this for URLs that have moved for good; clients and search engines
-/// are allowed to cache the new location. The target is percent-encoded like
-/// [`redirect`] does.
+/// Use it for URLs that have moved for good. Clients and search engines may
+/// remember the new location. The client repeats the request at `uri` with
+/// the same method. `uri` is percent-encoded in the same way as for
+/// [`redirect`].
 ///
 /// # Examples
 ///
@@ -60,12 +66,12 @@ pub fn redirect_permanent(uri: impl AsRef<str>) -> RedirectError {
     RedirectError::new(StatusCode::PERMANENT_REDIRECT, uri.as_ref())
 }
 
-/// A redirect response carried as the `Err` variant of a handler `Result`.
+/// A temporary or permanent redirect, returned as the error of a handler.
 ///
-/// Construct one with [`redirect`] or [`redirect_permanent`], or derive one
-/// from an `Option` / `Result` via [`RouterErrorExt`](crate::error::RouterErrorExt).
-/// For the Post/Redirect/Get pattern, which sends the browser on with a
-/// `GET`, reach for [`see_other`] instead.
+/// Create one with [`redirect`] or [`redirect_permanent`], or turn a missing
+/// value into one with [`RouterErrorExt`](crate::error::RouterErrorExt). To
+/// send the browser to a new page with a `GET` after a form submission, use
+/// [`see_other`] instead.
 #[derive(Debug, Clone)]
 pub struct RedirectError {
     status: StatusCode,
@@ -102,16 +108,16 @@ impl IntoResponse for RedirectError {
     }
 }
 
-/// Builds a "see other" (HTTP 303) redirect to `uri`.
+/// Creates a "see other" redirect (`303 See Other`) to `uri`.
 ///
-/// Unlike [`redirect`] and [`redirect_permanent`], which preserve the request
-/// method, a 303 tells the client to follow `uri` with a `GET`. Reply with it
-/// after a successful `POST`, `PUT`, or `DELETE` to land the browser on a page
-/// -- the Post/Redirect/Get pattern that keeps a reload from re-submitting the
-/// mutation. The target is percent-encoded like [`redirect`] does.
+/// [`redirect`] and [`redirect_permanent`] keep the request method. A 303
+/// tells the client to load `uri` with a `GET` instead. Reply with it after a
+/// successful `POST`, `PUT`, or `DELETE` to send the browser to a page. This
+/// is the Post/Redirect/Get pattern, which keeps a reload from submitting the
+/// form again. `uri` is percent-encoded in the same way as for [`redirect`].
 ///
-/// A route returns the redirect as its `Ok` value. A page renders a view, so
-/// it returns the redirect through `Err` instead, like the other redirects.
+/// A route returns the redirect as its `Ok` value. A page returns a view on
+/// success, so it returns the redirect as an error instead.
 ///
 /// # Examples
 ///
@@ -161,15 +167,14 @@ pub fn see_other(uri: impl AsRef<str>) -> SeeOther {
     SeeOther::new(uri.as_ref())
 }
 
-/// A "see other" (HTTP 303) redirect response.
+/// A "see other" redirect (`303 See Other`).
 ///
-/// It is the Post/Redirect/Get reply for a completed `POST`, `PUT`, or
-/// `DELETE`, sending the browser to a new location with a `GET`. Construct one
-/// with [`see_other`].
+/// It sends the browser to a new location with a `GET`, usually after a
+/// completed `POST`, `PUT`, or `DELETE`. Create one with [`see_other`].
 ///
-/// The redirect is both a response and an error, so a handler can return it
-/// either way: a route returns it through `Ok`, and a page, whose `Ok` value
-/// is a view, returns it through `Err`. Both produce the same 303 response.
+/// The redirect is both a response and an error. A route can return it as its
+/// `Ok` value, and a page, which returns a view on success, can return it as
+/// an error. Both produce the same 303 response.
 #[derive(Debug, Clone)]
 pub struct SeeOther {
     location: HeaderValue,

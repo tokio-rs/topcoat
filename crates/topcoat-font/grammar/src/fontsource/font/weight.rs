@@ -12,8 +12,11 @@ use crate::fontsource::{
 /// A `weight:` argument for `fontsource_font!`: one weight or a bracketed list
 /// of weights to cross-product, e.g. `weight: [400, 700]`.
 pub struct Weight {
+    /// The `weight` name.
     pub key: WeightKey,
+    /// The `:` between the name and the value.
     pub colon_token: Token![:],
+    /// The written value or list of values.
     pub value: List<WeightValue>,
 }
 

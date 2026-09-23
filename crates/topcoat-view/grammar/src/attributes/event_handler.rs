@@ -15,11 +15,15 @@ use crate::{
     view::hir::{ExprKind, LowerView, ViewBuilder},
 };
 
-/// The value attached to an [`EventHandler`]. Either a Rust expression
-/// (`(expr)` or `$(expr)`) compiled to a handler, or a string literal holding
-/// raw JavaScript that runs on the event.
+/// The value of an [`EventHandler`].
+///
+/// Either an expression, written `(expr)` or `$(expr)`, whose JavaScript form
+/// becomes the handler, or a string literal holding the handler's JavaScript
+/// directly.
 pub enum EventHandlerValue {
+    /// A handler given as an expression.
     Expr(Box<TemplateOrRuntimeExpr>),
+    /// A handler given as JavaScript source.
     LitStr(LitStr),
 }
 
@@ -55,11 +59,18 @@ impl topcoat_core_grammar::pretty::PrettyPrint for EventHandlerValue {
     }
 }
 
-/// An `@name=(expr)`, `@name=$(expr)`, or `@name="js"` attribute: a DOM event handler.
+/// An `@name=(expr)`, `@name=$(expr)`, or `@name="js"` DOM event handler.
+///
+/// Renders as a `data-topcoat-on:name` attribute holding the handler's
+/// JavaScript.
 pub struct EventHandler {
+    /// The leading `@`.
     pub at: Token![@],
+    /// The event name.
     pub key: AttributeKey,
+    /// The `=` between name and value.
     pub eq: Token![=],
+    /// The handler.
     pub value: EventHandlerValue,
 }
 

@@ -9,6 +9,7 @@ const OUT_SUBDIR: &str = "assets";
 /// The scope of the asset download cache inside the shared Topcoat cache.
 const CACHE_SCOPE: &str = "assets";
 
+/// The arguments of `topcoat asset`.
 #[derive(Args)]
 pub struct AssetCommand {
     #[command(subcommand)]
@@ -26,6 +27,7 @@ enum AssetSubcommand {
 }
 
 impl AssetCommand {
+    /// Runs the selected `asset` subcommand.
     pub async fn run(self) {
         match self.command {
             AssetSubcommand::List(args) => list::run(args).await,

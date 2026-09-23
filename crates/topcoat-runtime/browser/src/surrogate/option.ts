@@ -5,6 +5,7 @@ import { Bool } from "./bool";
 import { Panic } from "./panic";
 import { cloneValue } from "./ref";
 
+/** A Rust `Option`. `None` renders as nothing. */
 export class Option<T> implements AttributeValueViewParts, NodeViewParts {
 	constructor(private readonly value: T | undefined) {}
 

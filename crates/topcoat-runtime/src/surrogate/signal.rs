@@ -8,6 +8,10 @@ use crate::{
     impl_surrogate_ref,
 };
 
+/// A [`Signal`] in a runtime expression.
+///
+/// Reads work on both sides. Writes only work in the browser, so they
+/// belong in event handler closures, whose bodies never run on the server.
 #[derive(Debug, RefCast)]
 #[repr(transparent)]
 pub struct SignalSurrogate<T>(Signal<T>);
@@ -25,9 +29,9 @@ where
 {
     /// Borrows the current value.
     ///
-    /// Reads inside a runtime expression are the client-reactive path and
-    /// do not register a dependency on the server; the server-side
-    /// evaluation only records whether the expression needs a browser binding.
+    /// The expression reading it runs again in the browser when the signal
+    /// changes. Unlike [`Signal::read`], this does not make the enclosing
+    /// page or shard re-run on the server.
     #[must_use]
     pub fn read(&self) -> <&T as Surrogated>::Surrogate {
         self.0.read_untracked().into_surrogate()
@@ -40,8 +44,8 @@ where
 {
     /// Clones the current value.
     ///
-    /// Like [`read`](Self::read), this does not register a dependency on
-    /// the server.
+    /// Like [`read`](Self::read), this does not make the enclosing page or
+    /// shard re-run on the server.
     #[must_use]
     pub fn get(&self) -> <T as Surrogated>::Surrogate {
         self.0.get_untracked().into_surrogate()
@@ -52,11 +56,12 @@ impl<T> SignalSurrogate<T>
 where
     T: Surrogated,
 {
-    /// Writes a new value to the signal.
+    /// Replaces the signal's value.
     ///
     /// # Panics
     ///
-    /// Always panics; signal writes can only occur in client-side expressions.
+    /// Always panics on the server, since signals can only be written in the
+    /// browser.
     #[track_caller]
     pub fn set(&self, _v: T::Surrogate) {
         write_in_browser_only();
@@ -68,7 +73,8 @@ impl SignalSurrogate<bool> {
     ///
     /// # Panics
     ///
-    /// Always panics; signal writes can only occur in client-side expressions.
+    /// Always panics on the server, since signals can only be written in the
+    /// browser.
     #[track_caller]
     pub fn toggle(&self) {
         write_in_browser_only();
@@ -82,7 +88,8 @@ macro_rules! numeric_signal {
             ///
             /// # Panics
             ///
-            /// Always panics on the server. Integer overflow panics in the browser.
+            /// Always panics on the server, since signals can only be written
+            /// in the browser. Integer overflow panics in the browser.
             #[track_caller]
             pub fn increment(&self) {
                 write_in_browser_only();
@@ -92,7 +99,8 @@ macro_rules! numeric_signal {
             ///
             /// # Panics
             ///
-            /// Always panics on the server. Integer overflow panics in the browser.
+            /// Always panics on the server, since signals can only be written
+            /// in the browser. Integer overflow panics in the browser.
             #[track_caller]
             pub fn decrement(&self) {
                 write_in_browser_only();
@@ -108,14 +116,14 @@ numeric_signal!(
 impl SignalSurrogate<String> {
     /// Appends a string to the end of the value.
     ///
-    /// The argument is anything that dereferences to a string, so both a
-    /// borrowed `&str` and an owned `String` work. The owned form is what an
-    /// event field yields: `Event::target.value` is a `String`, so
-    /// `message.push_str(e.target.value)` is the common call.
+    /// Both a borrowed `&str` and an owned `String` work, so an event field
+    /// like `e.target.value` can be passed directly:
+    /// `message.push_str(e.target.value)`.
     ///
     /// # Panics
     ///
-    /// Always panics; signal writes can only occur in client-side expressions.
+    /// Always panics on the server, since signals can only be written in the
+    /// browser.
     #[track_caller]
     pub fn push_str(&self, _s: impl Deref<Target = StrSurrogate>) {
         write_in_browser_only();
@@ -151,12 +159,12 @@ impl<T> Serialize for SignalSurrogate<T> {
     }
 }
 
-/// A signal sent by the client, as an argument to a run: its id next to its
-/// current value.
+/// A signal the browser sends as an argument to a re-run: its id together
+/// with its current value.
 ///
-/// The value is required. A run cannot read a signal it has no value for,
-/// so a client that sends only the id is rejected the same way as one that
-/// sends a value of the wrong shape.
+/// The value is required. A re-run cannot read a signal it has no value for,
+/// so a request that sends only the id is rejected, like one that sends a
+/// value of the wrong type.
 impl<'de, T> Deserialize<'de> for SignalSurrogate<T>
 where
     T: Surrogated,

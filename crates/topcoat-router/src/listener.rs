@@ -7,21 +7,21 @@ use tokio::{
     net::TcpListener,
 };
 
-/// A bound listener the serve functions can accept connections from.
+/// A bound socket that the serve functions accept connections from.
 ///
-/// The serve functions are generic over this trait, so a router can be served
-/// over any connection-oriented transport. Implementations are provided for
-/// [`TcpListener`] and, on Unix, [`UnixListener`].
+/// Implement it to serve a router over another connection-based transport.
+/// Topcoat implements it for [`TcpListener`] and, on Unix, for
+/// [`UnixListener`].
 pub trait Listener: Send + 'static {
-    /// The I/O stream of an accepted connection.
+    /// The stream of an accepted connection.
     type Io: AsyncRead + AsyncWrite + Unpin + Send + 'static;
 
-    /// Accepts the next connection and returns its I/O stream and the remote
-    /// IP address and port, if available.
+    /// Waits for the next connection and returns its stream and the remote IP
+    /// address and port.
     ///
     /// Topcoat stores the address as [`RemoteAddr`](crate::RemoteAddr) in
-    /// every request received over the connection. Return `None` for
-    /// connections without an IP address, such as Unix sockets.
+    /// every request received over the connection. Return `None` as the
+    /// address for connections without an IP address, such as Unix sockets.
     ///
     /// # Errors
     ///
@@ -29,11 +29,12 @@ pub trait Listener: Send + 'static {
     fn accept(&mut self)
     -> impl Future<Output = io::Result<(Self::Io, Option<SocketAddr>)>> + Send;
 
-    /// The local TCP address the listener is bound to, when it has one.
+    /// Returns the local TCP address the listener is bound to, if it has one.
     ///
-    /// The serve functions report this address to the `topcoat dev` server so
-    /// it can proxy to the application. Listeners without a TCP address, like
-    /// Unix domain sockets, return `None`, the default.
+    /// The serve functions tell the `topcoat dev` server this address so it
+    /// can forward requests to the application. The default implementation
+    /// returns `None`, which is right for listeners without a TCP address,
+    /// like Unix sockets.
     fn tcp_addr(&self) -> Option<SocketAddr> {
         None
     }
@@ -52,8 +53,8 @@ impl Listener for TcpListener {
     }
 }
 
-/// Serves over a Unix domain socket, typically behind a reverse proxy that
-/// forwards HTTP to the socket path.
+/// Serves over a Unix socket, usually behind a reverse proxy that forwards
+/// HTTP requests to the socket path.
 ///
 /// Unix socket connections have no IP address, so requests have no
 /// [`RemoteAddr`](crate::RemoteAddr). If a reverse proxy connects through
@@ -61,8 +62,8 @@ impl Listener for TcpListener {
 /// to trust it and read the client's IP address from its headers.
 ///
 /// Binding fails with `AddrInUse` if the socket file already exists, and
-/// dropping the listener does not remove it, so remove any stale file from a
-/// previous run before binding:
+/// dropping the listener does not remove the file. So remove any file left
+/// over from a previous run before binding:
 ///
 /// ```no_run
 /// # #[cfg(unix)]

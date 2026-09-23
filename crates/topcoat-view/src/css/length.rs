@@ -4,7 +4,7 @@ use topcoat_core::context::Cx;
 
 use crate::{AttributeValueViewParts, PartsWriter};
 
-/// A CSS length unit.
+/// A CSS [length unit](https://developer.mozilla.org/en-US/docs/Web/CSS/length).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LengthUnit {
     // Absolute lengths.
@@ -184,12 +184,16 @@ impl Display for LengthUnit {
     }
 }
 
-/// A CSS length: a numeric value paired with a [`LengthUnit`].
+/// A CSS length: a number paired with a [`LengthUnit`].
 ///
-/// Construct one with a per-unit helper like [`Length::px`] or [`Length::rem`],
-/// or from a value and unit with [`Length::new`]. Plain numbers convert to a
-/// pixel length, so a `#[into]` component parameter accepts `size: 24` as a
-/// 24-pixel length.
+/// Create one with a per-unit constructor such as [`Length::px`] or
+/// [`Length::rem`], or from a number and a unit with [`Length::new`]. A `u16`
+/// or `f32` converts into a length in pixels, so a component prop declared
+/// with `#[into]` accepts `size: 24` as a length of 24 pixels.
+///
+/// A length can be used as an attribute value in a template, where it renders
+/// as the number followed by the unit, such as `1.5rem`. It also implements
+/// [`Display`] with the same output.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Length {
     value: f32,
@@ -197,13 +201,13 @@ pub struct Length {
 }
 
 impl Length {
-    /// Creates a length from a numeric value and a unit.
+    /// Creates a length from a number and a unit.
     #[must_use]
     pub const fn new(value: f32, unit: LengthUnit) -> Self {
         Self { value, unit }
     }
 
-    /// Returns the numeric value of this length.
+    /// Returns the number of this length.
     #[must_use]
     pub const fn value(self) -> f32 {
         self.value
@@ -215,295 +219,295 @@ impl Length {
         self.unit
     }
 
-    /// A length in `px` units.
+    /// Creates a length in `px` units.
     #[must_use]
     pub const fn px(value: f32) -> Self {
         Self::new(value, LengthUnit::Px)
     }
 
-    /// A length in `cm` units.
+    /// Creates a length in `cm` units.
     #[must_use]
     pub const fn cm(value: f32) -> Self {
         Self::new(value, LengthUnit::Cm)
     }
 
-    /// A length in `mm` units.
+    /// Creates a length in `mm` units.
     #[must_use]
     pub const fn mm(value: f32) -> Self {
         Self::new(value, LengthUnit::Mm)
     }
 
-    /// A length in `Q` units.
+    /// Creates a length in `Q` units.
     #[must_use]
     pub const fn q(value: f32) -> Self {
         Self::new(value, LengthUnit::Q)
     }
 
-    /// A length in `in` units.
+    /// Creates a length in `in` units.
     #[must_use]
     pub const fn r#in(value: f32) -> Self {
         Self::new(value, LengthUnit::In)
     }
 
-    /// A length in `pc` units.
+    /// Creates a length in `pc` units.
     #[must_use]
     pub const fn pc(value: f32) -> Self {
         Self::new(value, LengthUnit::Pc)
     }
 
-    /// A length in `pt` units.
+    /// Creates a length in `pt` units.
     #[must_use]
     pub const fn pt(value: f32) -> Self {
         Self::new(value, LengthUnit::Pt)
     }
 
-    /// A length in `em` units.
+    /// Creates a length in `em` units.
     #[must_use]
     pub const fn em(value: f32) -> Self {
         Self::new(value, LengthUnit::Em)
     }
 
-    /// A length in `rem` units.
+    /// Creates a length in `rem` units.
     #[must_use]
     pub const fn rem(value: f32) -> Self {
         Self::new(value, LengthUnit::Rem)
     }
 
-    /// A length in `ex` units.
+    /// Creates a length in `ex` units.
     #[must_use]
     pub const fn ex(value: f32) -> Self {
         Self::new(value, LengthUnit::Ex)
     }
 
-    /// A length in `rex` units.
+    /// Creates a length in `rex` units.
     #[must_use]
     pub const fn rex(value: f32) -> Self {
         Self::new(value, LengthUnit::Rex)
     }
 
-    /// A length in `cap` units.
+    /// Creates a length in `cap` units.
     #[must_use]
     pub const fn cap(value: f32) -> Self {
         Self::new(value, LengthUnit::Cap)
     }
 
-    /// A length in `rcap` units.
+    /// Creates a length in `rcap` units.
     #[must_use]
     pub const fn rcap(value: f32) -> Self {
         Self::new(value, LengthUnit::Rcap)
     }
 
-    /// A length in `ch` units.
+    /// Creates a length in `ch` units.
     #[must_use]
     pub const fn ch(value: f32) -> Self {
         Self::new(value, LengthUnit::Ch)
     }
 
-    /// A length in `rch` units.
+    /// Creates a length in `rch` units.
     #[must_use]
     pub const fn rch(value: f32) -> Self {
         Self::new(value, LengthUnit::Rch)
     }
 
-    /// A length in `ic` units.
+    /// Creates a length in `ic` units.
     #[must_use]
     pub const fn ic(value: f32) -> Self {
         Self::new(value, LengthUnit::Ic)
     }
 
-    /// A length in `ric` units.
+    /// Creates a length in `ric` units.
     #[must_use]
     pub const fn ric(value: f32) -> Self {
         Self::new(value, LengthUnit::Ric)
     }
 
-    /// A length in `lh` units.
+    /// Creates a length in `lh` units.
     #[must_use]
     pub const fn lh(value: f32) -> Self {
         Self::new(value, LengthUnit::Lh)
     }
 
-    /// A length in `rlh` units.
+    /// Creates a length in `rlh` units.
     #[must_use]
     pub const fn rlh(value: f32) -> Self {
         Self::new(value, LengthUnit::Rlh)
     }
 
-    /// A length in `vw` units.
+    /// Creates a length in `vw` units.
     #[must_use]
     pub const fn vw(value: f32) -> Self {
         Self::new(value, LengthUnit::Vw)
     }
 
-    /// A length in `vh` units.
+    /// Creates a length in `vh` units.
     #[must_use]
     pub const fn vh(value: f32) -> Self {
         Self::new(value, LengthUnit::Vh)
     }
 
-    /// A length in `vi` units.
+    /// Creates a length in `vi` units.
     #[must_use]
     pub const fn vi(value: f32) -> Self {
         Self::new(value, LengthUnit::Vi)
     }
 
-    /// A length in `vb` units.
+    /// Creates a length in `vb` units.
     #[must_use]
     pub const fn vb(value: f32) -> Self {
         Self::new(value, LengthUnit::Vb)
     }
 
-    /// A length in `vmin` units.
+    /// Creates a length in `vmin` units.
     #[must_use]
     pub const fn vmin(value: f32) -> Self {
         Self::new(value, LengthUnit::Vmin)
     }
 
-    /// A length in `vmax` units.
+    /// Creates a length in `vmax` units.
     #[must_use]
     pub const fn vmax(value: f32) -> Self {
         Self::new(value, LengthUnit::Vmax)
     }
 
-    /// A length in `svw` units.
+    /// Creates a length in `svw` units.
     #[must_use]
     pub const fn svw(value: f32) -> Self {
         Self::new(value, LengthUnit::Svw)
     }
 
-    /// A length in `svh` units.
+    /// Creates a length in `svh` units.
     #[must_use]
     pub const fn svh(value: f32) -> Self {
         Self::new(value, LengthUnit::Svh)
     }
 
-    /// A length in `svi` units.
+    /// Creates a length in `svi` units.
     #[must_use]
     pub const fn svi(value: f32) -> Self {
         Self::new(value, LengthUnit::Svi)
     }
 
-    /// A length in `svb` units.
+    /// Creates a length in `svb` units.
     #[must_use]
     pub const fn svb(value: f32) -> Self {
         Self::new(value, LengthUnit::Svb)
     }
 
-    /// A length in `svmin` units.
+    /// Creates a length in `svmin` units.
     #[must_use]
     pub const fn svmin(value: f32) -> Self {
         Self::new(value, LengthUnit::Svmin)
     }
 
-    /// A length in `svmax` units.
+    /// Creates a length in `svmax` units.
     #[must_use]
     pub const fn svmax(value: f32) -> Self {
         Self::new(value, LengthUnit::Svmax)
     }
 
-    /// A length in `lvw` units.
+    /// Creates a length in `lvw` units.
     #[must_use]
     pub const fn lvw(value: f32) -> Self {
         Self::new(value, LengthUnit::Lvw)
     }
 
-    /// A length in `lvh` units.
+    /// Creates a length in `lvh` units.
     #[must_use]
     pub const fn lvh(value: f32) -> Self {
         Self::new(value, LengthUnit::Lvh)
     }
 
-    /// A length in `lvi` units.
+    /// Creates a length in `lvi` units.
     #[must_use]
     pub const fn lvi(value: f32) -> Self {
         Self::new(value, LengthUnit::Lvi)
     }
 
-    /// A length in `lvb` units.
+    /// Creates a length in `lvb` units.
     #[must_use]
     pub const fn lvb(value: f32) -> Self {
         Self::new(value, LengthUnit::Lvb)
     }
 
-    /// A length in `lvmin` units.
+    /// Creates a length in `lvmin` units.
     #[must_use]
     pub const fn lvmin(value: f32) -> Self {
         Self::new(value, LengthUnit::Lvmin)
     }
 
-    /// A length in `lvmax` units.
+    /// Creates a length in `lvmax` units.
     #[must_use]
     pub const fn lvmax(value: f32) -> Self {
         Self::new(value, LengthUnit::Lvmax)
     }
 
-    /// A length in `dvw` units.
+    /// Creates a length in `dvw` units.
     #[must_use]
     pub const fn dvw(value: f32) -> Self {
         Self::new(value, LengthUnit::Dvw)
     }
 
-    /// A length in `dvh` units.
+    /// Creates a length in `dvh` units.
     #[must_use]
     pub const fn dvh(value: f32) -> Self {
         Self::new(value, LengthUnit::Dvh)
     }
 
-    /// A length in `dvi` units.
+    /// Creates a length in `dvi` units.
     #[must_use]
     pub const fn dvi(value: f32) -> Self {
         Self::new(value, LengthUnit::Dvi)
     }
 
-    /// A length in `dvb` units.
+    /// Creates a length in `dvb` units.
     #[must_use]
     pub const fn dvb(value: f32) -> Self {
         Self::new(value, LengthUnit::Dvb)
     }
 
-    /// A length in `dvmin` units.
+    /// Creates a length in `dvmin` units.
     #[must_use]
     pub const fn dvmin(value: f32) -> Self {
         Self::new(value, LengthUnit::Dvmin)
     }
 
-    /// A length in `dvmax` units.
+    /// Creates a length in `dvmax` units.
     #[must_use]
     pub const fn dvmax(value: f32) -> Self {
         Self::new(value, LengthUnit::Dvmax)
     }
 
-    /// A length in `cqw` units.
+    /// Creates a length in `cqw` units.
     #[must_use]
     pub const fn cqw(value: f32) -> Self {
         Self::new(value, LengthUnit::Cqw)
     }
 
-    /// A length in `cqh` units.
+    /// Creates a length in `cqh` units.
     #[must_use]
     pub const fn cqh(value: f32) -> Self {
         Self::new(value, LengthUnit::Cqh)
     }
 
-    /// A length in `cqi` units.
+    /// Creates a length in `cqi` units.
     #[must_use]
     pub const fn cqi(value: f32) -> Self {
         Self::new(value, LengthUnit::Cqi)
     }
 
-    /// A length in `cqb` units.
+    /// Creates a length in `cqb` units.
     #[must_use]
     pub const fn cqb(value: f32) -> Self {
         Self::new(value, LengthUnit::Cqb)
     }
 
-    /// A length in `cqmin` units.
+    /// Creates a length in `cqmin` units.
     #[must_use]
     pub const fn cqmin(value: f32) -> Self {
         Self::new(value, LengthUnit::Cqmin)
     }
 
-    /// A length in `cqmax` units.
+    /// Creates a length in `cqmax` units.
     #[must_use]
     pub const fn cqmax(value: f32) -> Self {
         Self::new(value, LengthUnit::Cqmax)

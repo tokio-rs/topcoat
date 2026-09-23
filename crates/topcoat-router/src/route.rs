@@ -22,21 +22,22 @@ use crate::{
     response::Response, route, route_endpoint,
 };
 
-/// The future returned by [`Route::handle`]: a boxed, `Send` future borrowing
-/// the route and its request context.
+/// The future returned by [`Route::handle`].
+///
+/// It is boxed and `Send`, and it may borrow the route and the request
+/// context.
 pub type RouteFuture<'cx> = Pin<Box<dyn Future<Output = Result<Response>> + Send + 'cx>>;
 
-/// The identity of a registered handler.
+/// A unique id for a route handler.
 ///
-/// Ids are drawn from a process-wide counter with [`new`](RouteId::new), so
-/// every handler in an application gets a distinct one.
+/// Topcoat uses it to tell routes apart, for example in
+/// [`Route::is_current`]. Each handler creates one id with
+/// [`new`](RouteId::new) and returns it from its `id` method.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RouteId(usize);
 
 impl RouteId {
-    /// Draws the next id from the process-wide counter.
-    ///
-    /// A handler calls this once and keeps the result as its identity.
+    /// Creates an id that differs from every other id in the process.
     #[must_use]
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
@@ -45,28 +46,31 @@ impl RouteId {
     }
 }
 
-/// A single routable endpoint: a set of HTTP methods, a URL path, and a
-/// handler.
+/// A request handler for a URL path and a set of HTTP methods.
 ///
-/// This is the core primitive a [`Router`](crate::Router) dispatches to.
-/// Register any `Route` with [`RouterBuilder::route`](crate::RouterBuilder::route).
+/// Routes are what a [`Router`](crate::Router) runs to answer requests.
+/// Pages, and handlers declared with `#[route]`, become routes. Register a
+/// route with [`RouterBuilder::route`](crate::RouterBuilder::route), or use
+/// [`RouteFn`] to make one from a function.
 pub trait Route: Send + Sync + 'static {
-    /// The identity of this route's handler.
+    /// Returns the id of this route's handler.
+    ///
+    /// Return the same [`RouteId`] on every call.
     fn id(&self) -> RouteId;
 
-    /// The HTTP methods this route responds to.
+    /// Returns the HTTP methods this route responds to.
     fn methods(&self) -> Methods<'_>;
 
-    /// The URL path this route handles.
+    /// Returns the path pattern this route handles.
     fn path(&self) -> &Path;
 
-    /// Handles a request, producing a response.
+    /// Handles a request and produces a response.
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx>;
 
-    /// Returns whether this route handles the current request.
+    /// Returns whether this route is the one handling the current request.
     ///
-    /// Only the handler is compared, so a route is current for every value its
-    /// path parameters take, whatever the request's query or fragment.
+    /// Only the route's [`id`](Self::id) is compared, so the result does not
+    /// depend on the values of path parameters or on the query string.
     ///
     /// # Panics
     ///
@@ -98,13 +102,13 @@ impl<R: Route + ?Sized> Route for &'static R {
 #[cfg(feature = "discover")]
 inventory::collect!(&'static dyn Route);
 
-/// The async handler function backing a [`RouteFn`].
+/// The handler function of a [`RouteFn`].
 pub type RouteHandlerFn = for<'cx> fn(cx: &'cx Cx, body: Body) -> RouteFuture<'cx>;
 
-/// A [`Route`] backed by a plain handler function.
+/// A [`Route`] made from a handler function, a path, and a set of methods.
 ///
-/// Turns a function into a route without implementing [`Route`] on a struct,
-/// pairing it with the methods and path it serves.
+/// Use it to register a route without implementing [`Route`] on a type of
+/// your own.
 #[derive(Debug, Clone)]
 pub struct RouteFn {
     /// The identity of this route's handler.
@@ -118,10 +122,11 @@ pub struct RouteFn {
 }
 
 impl RouteFn {
-    /// Creates a new route with explicit methods, path, and handler function.
+    /// Creates a route that runs `handle` for requests to `path` with one of
+    /// `methods`.
     ///
-    /// The methods are anything convertible into [`OwnedMethods`]: a single
-    /// [`Method`](crate::Method), a `&'static [Method]`, a `Vec<Method>`, or
+    /// `methods` accepts anything that converts into [`OwnedMethods`], like a
+    /// single [`Method`](crate::Method), a slice or `Vec` of methods, or
     /// [`Methods::Any`] to respond to every method.
     ///
     /// ```rust

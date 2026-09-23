@@ -4,28 +4,28 @@ use topcoat_core::{context::Cx, error::Result};
 
 use crate::{Token, config};
 
-/// The future returned by [`TokenStore`] methods: a boxed, `Send` future
-/// borrowing the store and the request context.
+/// The boxed future returned by [`TokenStore`] methods.
 pub type TokenStoreFuture<'a, T> = Pin<Box<dyn Future<Output = Result<T>> + Send + 'a>>;
 
-/// The client-side transport for the session token.
+/// Carries the session [`Token`] between the client and the server.
 ///
-/// A token store moves the raw [`Token`] between the client and the server;
-/// it is not the session database, which the application owns. The default
-/// [`CookieTokenStore`](cookie::CookieTokenStore) carries the token in a
-/// hardened cookie; implement this trait to carry it elsewhere, such as an
-/// `Authorization` header.
+/// A token store is not the session database, which the application owns.
+/// The default [`CookieTokenStore`](cookie::CookieTokenStore) carries the
+/// token in a cookie. Implement this trait to carry it some other way, such
+/// as in an `Authorization` header. Set it with
+/// [`SessionConfigBuilder::token_store`](crate::SessionConfigBuilder::token_store).
 pub trait TokenStore: Send + Sync {
-    /// Reads the token presented by the current request, or `None` when the
-    /// request carries none (or a malformed one).
+    /// Reads the token the current request carries.
+    ///
+    /// Returns `None` when the request carries no token or an invalid one.
     fn read<'a>(&'a self, cx: &'a Cx) -> TokenStoreFuture<'a, Option<Token>>;
 
-    /// Issues `token` to the client with the given time to live, replacing
-    /// any previously issued token.
+    /// Sends `token` to the client, valid for `max_age`, replacing any token
+    /// the client holds.
     fn write<'a>(&'a self, cx: &'a Cx, token: Token, max_age: Duration)
     -> TokenStoreFuture<'a, ()>;
 
-    /// Instructs the client to discard its token.
+    /// Tells the client to discard its token.
     fn delete<'a>(&'a self, cx: &'a Cx) -> TokenStoreFuture<'a, ()>;
 }
 
@@ -33,6 +33,7 @@ pub(crate) fn token_store(cx: &Cx) -> &dyn TokenStore {
     &*config(cx).token_store
 }
 
+/// The default token store, which carries the token in a cookie.
 #[cfg(feature = "cookie")]
 pub mod cookie {
     use std::{borrow::Cow, time::Duration};
@@ -54,23 +55,25 @@ pub mod cookie {
     /// The default name of the session cookie.
     pub const SESSION_COOKIE_NAME: &str = "session";
 
-    /// A [`TokenStore`] carrying the token in a hardened cookie: `__Host-`
+    /// A [`TokenStore`] that carries the token in a cookie that is `__Host-`
     /// prefixed, `Secure`, `HttpOnly`, `SameSite=Lax`, and scoped to `/`.
     ///
-    /// Requires the cookie layer (`RouterBuilder::cookies`) to be registered
-    /// on the router.
+    /// Requires the cookie layer, which is added with `.cookies()` on the
+    /// router builder.
     pub struct CookieTokenStore {
         name: Cow<'static, str>,
     }
 
     impl CookieTokenStore {
-        /// Creates a store using [`SESSION_COOKIE_NAME`].
+        /// Creates a store that uses [`SESSION_COOKIE_NAME`] as the cookie
+        /// name.
         #[must_use]
         pub fn new() -> Self {
             Self::default()
         }
 
-        /// Overrides the name of the session cookie.
+        /// Sets the name of the session cookie, without the `__Host-`
+        /// prefix.
         #[must_use]
         pub fn name(mut self, name: impl Into<Cow<'static, str>>) -> Self {
             self.name = name.into();

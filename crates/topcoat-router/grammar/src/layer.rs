@@ -12,6 +12,7 @@ use topcoat_core_grammar::{
 
 use super::common::HandlerPath;
 
+/// The arguments of `#[layer(...)]`: an optional path.
 pub struct LayerAttr {
     path: Option<HandlerPath>,
 }
@@ -24,6 +25,8 @@ impl Parse for LayerAttr {
     }
 }
 
+/// The annotated function that becomes a layer. It takes `cx`, `body`, and
+/// `next`, in that order.
 pub struct LayerItem {
     item: ItemFn,
 }
@@ -36,9 +39,11 @@ impl Parse for LayerItem {
     }
 }
 
+/// A parsed `#[layer]` declaration, which expands to the generated code.
 pub struct Layer(LayerAttr, LayerItem);
 
 impl Layer {
+    /// Combines a parsed attribute and item.
     #[must_use]
     pub fn new(attr: LayerAttr, item: LayerItem) -> Self {
         Self(attr, item)

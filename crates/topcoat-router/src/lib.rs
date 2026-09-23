@@ -1,3 +1,8 @@
+//! Routing for Topcoat: the [`Router`], its builder, pages, layouts, layers,
+//! and routes, and the request and response types they work with.
+//!
+//! Use this crate through `topcoat::router`, which also re-exports the routing
+//! macros and hosts the guide.
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod body;

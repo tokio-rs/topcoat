@@ -2,32 +2,30 @@ use std::fmt::Write;
 
 use crate::Font;
 
-/// Function that formats the URL at which a [`Font`]'s CSS is hosted by the
-/// router into a `dyn Write`.
+/// A function that writes the URL of a [`Font`]'s stylesheet.
 pub type ResolveFontRouteFn = dyn Fn(Font, &mut dyn Write) -> std::fmt::Result + Send + Sync;
 
-/// Function registered with the app context that resolves a [`Font`] to its
-/// hosted stylesheet URL.
+/// Resolves a [`Font`] to the URL of its stylesheet.
 ///
-/// Registered by [`RouterBuilderFontExt`](crate::RouterBuilderFontExt)
-/// when a font is added to the router, and read when a [`Font`] is used as an
-/// attribute value in the `view!` macro.
+/// A `FontResolver` lives in the app context. A [`Font`] used as an attribute
+/// value in a view reads it to render the stylesheet URL. Registering a font on
+/// the router sets it up, so application code does not need to create one.
 pub struct FontResolver {
     resolve_fn: Box<ResolveFontRouteFn>,
 }
 
 impl FontResolver {
-    /// Builds a resolver from a callback.
+    /// Creates a resolver that calls `resolve_fn`.
     #[must_use]
     pub fn new(resolve_fn: Box<ResolveFontRouteFn>) -> Self {
         Self { resolve_fn }
     }
 
-    /// Invokes the underlying callback.
+    /// Writes the stylesheet URL of `font` to `write`.
     ///
     /// # Errors
     ///
-    /// Propagates errors of the registered [`ResolveFontRouteFn`].
+    /// Returns any error from the resolver function.
     pub fn resolve(&self, font: Font, write: &mut dyn Write) -> std::fmt::Result {
         (self.resolve_fn)(font, write)
     }

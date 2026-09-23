@@ -2,17 +2,15 @@ use cookie::Cookie;
 
 use crate::Cookies;
 
-/// A [`Cookies`] adapter that applies a transform to every cookie written
-/// through it.
+/// A [`Cookies`] adapter that runs a closure on every cookie written through
+/// it.
 ///
-/// `Map` is how the attribute combinators ([`Cookies::default_same_site`],
-/// [`Cookies::override_secure`], ...) and the general [`Cookies::map`] escape
-/// hatch are implemented: the closure runs on `add`, mutating the cookie before
-/// it is forwarded inward.
+/// The closure runs on both `add` and `remove`, so attributes such as `Path`
+/// and `Domain` also reach removal cookies and the browser can match them.
+/// Reads pass through unchanged.
 ///
-/// The transform runs on `add` and `remove` alike, so `Path`/`Domain` defaults
-/// reach the removal cookie and the browser can match it. `get` delegates
-/// unchanged.
+/// Created by [`Cookies::map`] and the attribute combinators, such as
+/// [`Cookies::default_same_site`].
 #[derive(Debug, Clone, Copy)]
 pub struct Map<J, F> {
     inner: J,

@@ -3,7 +3,10 @@ use topcoat_core::{context::Cx, error::Result};
 
 use crate::response::{IntoResponse, Response};
 
-/// Builds a not-found (HTTP 404) response.
+/// Creates a `404 Not Found` error.
+///
+/// Use it when the requested resource does not exist. The router returns this
+/// error on its own when no route matches the request path.
 ///
 /// # Examples
 ///
@@ -24,10 +27,11 @@ pub fn not_found() -> NotFoundError {
     NotFoundError::new()
 }
 
-/// A not-found response carried as the `Err` variant of a handler `Result`.
+/// A `404 Not Found` error.
 ///
-/// Construct one with [`not_found`], or derive one from an `Option` /
-/// `Result` via [`RouterErrorExt`](crate::error::RouterErrorExt).
+/// Create one with [`not_found`], or turn a missing value into one with
+/// [`RouterErrorExt`](crate::error::RouterErrorExt). Returned from a handler,
+/// it renders as a `404 Not Found` response.
 #[derive(Debug, Clone)]
 pub struct NotFoundError {
     _priv: (),

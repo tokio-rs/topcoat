@@ -1,3 +1,8 @@
+//! The procedural macros of the Topcoat router.
+//!
+//! Use these macros through `topcoat::router`, which re-exports them together
+//! with the runtime types they expand to.
+
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 use proc_macro::TokenStream;

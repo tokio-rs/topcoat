@@ -3,6 +3,7 @@ import type { IntegerKind, SerializedInteger } from "../expression/serialized";
 import { Bool } from "./bool";
 import { Panic } from "./panic";
 
+/** A Rust integer type, with its width and range. */
 export interface IntegerType {
 	readonly kind: IntegerKind;
 	readonly bits: number;
@@ -45,6 +46,7 @@ export class Integer implements AttributeValueViewParts, NodeViewParts {
 		}
 	}
 
+	/** Reads an integer the server serialized, rejecting a malformed one. */
 	static hydrate(value: SerializedInteger): Integer {
 		const type = integerType(value.t, value.bits);
 		if (

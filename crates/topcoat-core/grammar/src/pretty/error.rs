@@ -1,7 +1,7 @@
 use proc_macro2::LineColumn;
 
-/// A failure encountered while formatting a macro body, carrying the location of
-/// the error in the coordinates of the original source file.
+/// An error found while formatting a macro body, with its position in the
+/// source file.
 #[derive(Debug, Clone)]
 pub struct FormatError {
     message: String,
@@ -9,13 +9,12 @@ pub struct FormatError {
 }
 
 impl FormatError {
-    /// Builds a [`FormatError`] from a [`syn::Error`] whose span is measured
-    /// relative to a macro body that starts at `base` in the source file.
+    /// Builds a [`FormatError`] from a [`syn::Error`] whose span is relative
+    /// to a macro body that starts at `base` in the source file.
     ///
-    /// A body is parsed as standalone text, so `syn` reports its start as line
-    /// 1, column 0 regardless of where it sits in the file. Shifting the
-    /// reported position by `base` recovers the location in the file the body
-    /// was extracted from.
+    /// A body is parsed on its own, so `syn` reports positions as if the body
+    /// started at line 1, column 0. This shifts the position by `base` to get
+    /// the position in the file.
     #[must_use]
     pub fn new(error: &syn::Error, base: LineColumn) -> Self {
         let local = error.span().start();
@@ -40,7 +39,7 @@ impl FormatError {
         }
     }
 
-    /// The position of the error in the original source file.
+    /// Returns the position of the error in the source file.
     #[must_use]
     pub fn start(&self) -> LineColumn {
         self.start

@@ -1,18 +1,13 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 //! [htmx](https://htmx.org) support for Topcoat.
 //!
-//! This crate provides two halves of htmx integration, both built on Topcoat's
-//! request context and response conventions rather than on extractors and
-//! middleware:
+//! This crate has two parts:
 //!
-//! - **Request accessors** ([`hx_request`], [`hx_boosted`], [`hx_target`], ...)
-//!   read the [htmx request headers](https://htmx.org/reference/#request_headers)
+//! - Functions like [`hx_request`], [`hx_target`], and [`hx_trigger`] read the [htmx request headers](https://htmx.org/reference/#request_headers)
 //!   from a `cx: &Cx`.
-//! - **Responders** ([`HxRedirect`], [`HxRefresh`], [`HxRetarget`],
-//!   [`HxResponseTrigger`], ...) implement
-//!   [`IntoResponseParts`](topcoat_router::response::IntoResponseParts), so they
-//!   can be placed before the body in a handler's response tuple to set the
-//!   corresponding [htmx response headers](https://htmx.org/reference/#response_headers).
+//! - Types like [`HxRedirect`], [`HxRetarget`], and [`HxResponseTrigger`] set the [htmx response headers](https://htmx.org/reference/#response_headers).
+//!   They implement [`IntoResponseParts`](topcoat_router::response::IntoResponseParts), so you
+//!   place them before the body in a handler's response tuple.
 //!
 //! The raw header names are available as constants in the [`header`] module.
 

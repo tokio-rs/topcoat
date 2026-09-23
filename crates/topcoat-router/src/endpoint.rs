@@ -43,16 +43,15 @@ fn standard_slot(method: &Method) -> Option<usize> {
     }
 }
 
-/// The set of routes registered at a single URL path, indexed by HTTP method.
+/// The routes registered at one URL path, looked up by HTTP method.
 ///
-/// The router matches a request URL to one endpoint, then picks the route
-/// registered for the request's method. Read the endpoint a request matched
-/// with [`endpoint`](crate::endpoint).
-///
-/// The standard methods occupy a fixed-size array for O(1), allocation-free
-/// lookup; the rare custom methods spill into a map that is usually empty.
+/// The router matches a request's URL to one endpoint, then picks the route
+/// registered there for the request's method. Read the endpoint a request
+/// matched with [`endpoint`](crate::endpoint).
 #[derive(Debug)]
 pub struct Endpoint {
+    // The standard methods use a fixed-size array for fast lookup without
+    // allocation. Other methods go into a map that is usually empty.
     standard: [Option<RouteIndex>; STANDARD_METHODS.len()],
     other: HashMap<Method, RouteIndex>,
     /// The route handling every method without a registration of its own.
@@ -84,12 +83,11 @@ impl Endpoint {
         }
     }
 
-    /// Returns the URL path this endpoint serves.
+    /// Returns the path pattern this endpoint serves.
     ///
-    /// This is the path pattern the endpoint was registered under rather than
-    /// a requested URL, so parameters keep their `{name}` form. Group
-    /// segments are not part of it: they bind layouts and layers at build
-    /// time and never reach the URL.
+    /// This is a pattern, not a requested URL, so parameters keep their
+    /// `{name}` form. It has no group segments, since those are not part of
+    /// the URL.
     #[must_use]
     pub fn path(&self) -> &Path {
         Path::new_unchecked(&self.path)
@@ -133,8 +131,11 @@ impl Endpoint {
         }
     }
 
-    /// Iterates over the methods with a route registered at this endpoint,
-    /// standard methods first.
+    /// Iterates over the methods that have a route registered at this
+    /// endpoint, standard methods first.
+    ///
+    /// `HEAD` is included when a `GET` route answers it. An any-method route
+    /// adds no methods to the list.
     pub fn methods(&self) -> impl Iterator<Item = &Method> {
         STANDARD_METHODS
             .iter()

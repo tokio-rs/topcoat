@@ -3,44 +3,48 @@ use topcoat_core::context::Cx;
 
 use crate::request::uri;
 
-/// A typed view of the request's query string, as declared by
+/// A struct that the request's query string is parsed into, declared with
 /// [`#[query_params]`](attr.query_params.html).
 ///
-/// This trait is implemented by the macro and is not meant to be implemented by
-/// hand. Read the value with the [`query_params`] free function rather than
-/// calling the trait method directly.
+/// The macro implements this trait. Do not implement it by hand. Read the
+/// value with the [`query_params`] function.
 pub trait QueryParams {
-    /// The value produced for a request bound to lifetime `'cx`.
+    /// The value [`query_params`] returns for this struct.
     ///
-    /// A `Result` of a reference to the parsed struct or the error declared
-    /// by the attribute (a reference to the [`QueryParamsError`] by default).
+    /// It is a `Result` holding a reference to the parsed struct, or the
+    /// error declared by the attribute. The default error is a reference to
+    /// a [`QueryParamsError`].
     type Output<'cx>;
 
     /// Parses the query string of the request `cx` belongs to.
     ///
-    /// Call [`query_params::<T>(cx)`](query_params) instead: this method is
-    /// sealed behind [`QueryParamsSealed`] and cannot be invoked directly.
+    /// This method cannot be called directly. Call
+    /// [`query_params::<T>(cx)`](query_params) instead.
     #[doc(hidden)]
     fn query_params(cx: &Cx, _: QueryParamsSealed) -> Self::Output<'_>;
 }
 
-/// Parses the request's query string into a typed struct.
+/// Parses the current request's query string into `T`.
 ///
-/// See [`#[query_params]`](attr.query_params.html) for details.
+/// `T` is a struct declared with
+/// [`#[query_params]`](attr.query_params.html). See the macro for what this
+/// returns.
 #[inline]
 #[must_use]
 pub fn query_params<T: QueryParams>(cx: &Cx) -> T::Output<'_> {
     T::query_params(cx, QueryParamsSealed::new())
 }
 
-/// The error produced when the request's query string fails to deserialize,
-/// carrying the path of the key that failed.
+/// The error returned when the query string does not match the struct it is
+/// parsed into.
+///
+/// It names the field that failed to parse.
 pub type QueryParamsError = serde_path_to_error::Error<serde::de::value::Error>;
 
-/// Deserializes the query string of the request `cx` belongs to into `T`.
+/// Parses the query string of the request `cx` belongs to into `T`.
 ///
-/// This backs the typed `#[query_params]` accessors and is rarely used
-/// directly.
+/// Unlike [`query_params`], this parses the query string on every call and
+/// works with any [`DeserializeOwned`] type.
 ///
 /// # Errors
 ///
@@ -53,11 +57,8 @@ pub fn parse_query_params<T: DeserializeOwned>(cx: &Cx) -> Result<T, QueryParams
     serde_path_to_error::deserialize(deserializer)
 }
 
-/// A guard that limits [`QueryParams::query_params`] to being called through the
-/// [`query_params`] free function.
-///
-/// It cannot be constructed outside this crate, so the only way to invoke the
-/// trait method is via [`query_params`].
+/// A token that only this crate can create, so that
+/// [`QueryParams::query_params`] can only be called through [`query_params`].
 #[doc(hidden)]
 #[derive(Debug)]
 pub struct QueryParamsSealed(());

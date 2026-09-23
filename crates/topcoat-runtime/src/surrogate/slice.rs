@@ -12,22 +12,27 @@ use crate::{
 pub struct SliceSurrogate<T>([T]);
 
 impl<T> SliceSurrogate<T> {
+    /// Returns the number of elements.
     #[must_use]
     pub fn len(&self) -> UsizeSurrogate {
         UsizeSurrogate::new(self.0.len())
     }
 
+    /// Returns whether the slice has no elements.
     #[must_use]
     pub fn is_empty(&self) -> BoolSurrogate {
         BoolSurrogate::new(self.0.is_empty())
     }
 
+    /// Borrows the element at `index`, or returns `None` if `index` is out
+    /// of bounds.
     #[must_use]
     pub fn get(&self, index: UsizeSurrogate) -> OptionSurrogate<&T> {
         OptionSurrogate::new(self.0.get(index.into_real()))
     }
 
-    /// Borrows the element at `index`.
+    /// Borrows the element at `index`. Indexing with `slice[index]` calls
+    /// this.
     ///
     /// # Panics
     ///
@@ -41,11 +46,13 @@ impl<T> SliceSurrogate<T> {
         (&self.0[index.into_real()]).into_surrogate()
     }
 
+    /// Borrows the first element, or returns `None` if the slice is empty.
     #[must_use]
     pub fn first(&self) -> OptionSurrogate<&T> {
         OptionSurrogate::new(self.0.first())
     }
 
+    /// Borrows the last element, or returns `None` if the slice is empty.
     #[must_use]
     pub fn last(&self) -> OptionSurrogate<&T> {
         OptionSurrogate::new(self.0.last())
@@ -53,11 +60,13 @@ impl<T> SliceSurrogate<T> {
 }
 
 impl<T: Clone> SliceSurrogate<T> {
+    /// Copies the elements into a new vector.
     #[must_use]
     pub fn to_vec(&self) -> VecSurrogate<T> {
         VecSurrogate::new(self.0.to_vec())
     }
 
+    /// Copies the elements into a new vector, like [`to_vec`](Self::to_vec).
     #[must_use]
     pub fn to_owned(&self) -> VecSurrogate<T> {
         self.to_vec()

@@ -8,16 +8,16 @@ use crate::context::{Cx, try_app_context};
 /// The absolute URL an application is publicly reachable at, like
 /// `https://example.com`.
 ///
-/// Relative URLs work anywhere within the site, but rendered content that
-/// leaves it (e.g. links and images in emails, feeds, or sitemaps) needs
-/// the absolute form, resolved against this base. A base URL is an `http` or
-/// `https` URL with a host and an optional path prefix (for applications
-/// mounted under one, like `https://example.com/app`), and no query or
-/// fragment. The string is parsed at construction, so every value of this
-/// type holds a well-formed base.
+/// Relative URLs work anywhere within the site. Content that leaves the site,
+/// such as links and images in emails, feeds, or sitemaps, needs absolute
+/// URLs, which are built by joining a path onto this base. A base URL is an
+/// `http` or `https` URL with a host, an optional path prefix for
+/// applications mounted below the root (like `https://example.com/app`), and
+/// no query or fragment. The string is checked when the value is created, so
+/// every `BaseUrl` is valid.
 ///
 /// Register one on the router builder with `.base_url(...)`, read it back
-/// with [`base_url`] or [`try_base_url`], and resolve paths against it with
+/// with [`base_url`] or [`try_base_url`], and build absolute URLs with
 /// [`join`](BaseUrl::join):
 ///
 /// ```
@@ -40,9 +40,9 @@ pub struct BaseUrl {
 impl BaseUrl {
     /// Parses a base URL.
     ///
-    /// The scheme and any trailing slash are normalized, so
-    /// `https://example.com/app/` and `https://example.com/app` are the
-    /// same base.
+    /// The scheme is lowercased and a trailing slash is removed, so
+    /// `HTTPS://example.com/app/` and `https://example.com/app` are the same
+    /// base.
     ///
     /// # Errors
     ///
@@ -73,22 +73,21 @@ impl BaseUrl {
         })
     }
 
-    /// Resolves a root-relative path into an absolute URL.
+    /// Joins a path onto the base, returning an absolute URL.
     ///
-    /// The path is taken as relative to the application root whether or not
-    /// it starts with a slash: `base.join("/assets/logo.png")` and
-    /// `base.join("assets/logo.png")` produce the same URL. A query string
-    /// on the path is carried through.
+    /// The path is relative to the application root whether or not it starts
+    /// with a slash, so `base.join("/assets/logo.png")` and
+    /// `base.join("assets/logo.png")` return the same URL. A query string on
+    /// the path is kept.
     #[must_use]
     pub fn join(&self, path: &str) -> String {
         format!("{}/{}", self.url, path.trim_start_matches('/'))
     }
 
-    /// The path prefix of an application mounted under one, or the empty
-    /// string for an application mounted at the host root.
+    /// Returns the path prefix the application is mounted under, or the empty
+    /// string for an application mounted at the root.
     ///
-    /// The prefix starts with a slash and never ends with one, matching the
-    /// normalization [`new`](BaseUrl::new) applies.
+    /// A non-empty prefix starts with a slash and never ends with one.
     ///
     /// ```
     /// use topcoat::context::BaseUrl;
@@ -108,7 +107,7 @@ impl BaseUrl {
         }
     }
 
-    /// The base URL as a string, without a trailing slash.
+    /// Returns the base URL as a string, without a trailing slash.
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.url
@@ -207,8 +206,8 @@ pub fn base_url(cx: &Cx) -> &BaseUrl {
     }
 }
 
-/// Returns the [`BaseUrl`] registered on the router, or `None` if none has
-/// been registered.
+/// Returns the [`BaseUrl`] registered on the router, or `None` if none is
+/// registered.
 #[must_use]
 pub fn try_base_url(cx: &Cx) -> Option<&BaseUrl> {
     try_app_context(cx)

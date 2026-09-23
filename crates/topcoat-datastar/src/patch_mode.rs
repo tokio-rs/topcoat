@@ -1,19 +1,21 @@
 use http::HeaderValue;
 
-/// How [`PatchElements`](crate::PatchElements) applies elements to the DOM.
+/// How Datastar patches elements into the DOM.
 ///
-/// Mirrors the modes accepted by the `datastar-patch-elements` event and the
-/// `datastar-mode` response header.
+/// The variants match the modes of the `datastar-patch-elements` event and
+/// the `datastar-mode` response header. The default is
+/// [`Outer`](Self::Outer).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum ElementPatchMode {
-    /// Morph the entire element into the existing element. The default.
+    /// Morph the new element into the existing element, including the element
+    /// itself.
     #[default]
     Outer,
-    /// Morph the inner HTML of the existing element.
+    /// Morph the new element into the inner HTML of the existing element.
     Inner,
     /// Remove the existing element.
     Remove,
-    /// Replace the existing element with the new element.
+    /// Replace the existing element with the new element, without morphing.
     Replace,
     /// Insert the element as the first child of the existing element.
     Prepend,
@@ -26,7 +28,7 @@ pub enum ElementPatchMode {
 }
 
 impl ElementPatchMode {
-    /// Returns the Datastar string for this patch mode (e.g. `"outer"`).
+    /// Returns the Datastar name of this mode, such as `"outer"`.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {

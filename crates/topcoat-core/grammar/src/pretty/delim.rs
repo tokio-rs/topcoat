@@ -2,11 +2,16 @@ use proc_macro2::extra::DelimSpan;
 
 use crate::pretty::{BreakMode, PrettyPrint, Printer};
 
-/// A balanced pair of delimiters (`()`, `[]` or `{}`) that wraps a body of
-/// content. The default `pretty_print` implementation handles the open/close
-/// tokens, indentation and break behavior; the inner body is supplied by the
-/// caller via the `f` closure.
+/// A pair of delimiters (`()`, `[]`, or `{}`) around a body.
+///
+/// The provided [`pretty_print`](Self::pretty_print) method prints the
+/// delimiters, the indentation, and the line breaks, and calls a closure to
+/// print the body.
 pub trait Delim {
+    /// Prints the delimiters with the body printed by `f` between them.
+    ///
+    /// When `break_mode` is set, the delimiters and body form a group with
+    /// that mode. The body is indented one level when the group breaks.
     fn pretty_print(
         &self,
         printer: &mut Printer<'_>,
@@ -48,15 +53,20 @@ pub trait Delim {
         printer.move_cursor(self.span().close().end());
     }
 
+    /// Returns whether a space separates the body from the delimiters when
+    /// they print on one line, as in `{ a }`.
     #[must_use]
     fn space(&self) -> bool;
 
+    /// Returns the opening delimiter, like `(`.
     #[must_use]
     fn open_text(&self) -> &'static str;
 
+    /// Returns the closing delimiter, like `)`.
     #[must_use]
     fn close_text(&self) -> &'static str;
 
+    /// Returns the source span of the delimiters.
     #[must_use]
     fn span(&self) -> DelimSpan;
 }

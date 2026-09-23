@@ -16,13 +16,16 @@ use topcoat_core::error::Result;
 
 use crate::error::{bad_request, content_too_large};
 
-/// A boxed error type used by the response body machinery.
+/// A boxed error that can cross threads. It is the error type of a [`Body`].
 pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
-/// The HTTP body type used for both requests and responses.
+/// The body of an HTTP request or response.
 ///
-/// A panic while producing a frame ends the body with a [`BodyPanicError`]
-/// instead of unwinding into the connection serving it.
+/// Build a body from text or bytes with [`From`], or wrap any other
+/// [`http_body::Body`] with [`Body::new`] to stream it.
+///
+/// If producing a frame panics, the body ends with a [`BodyPanicError`]. The
+/// panic does not reach the connection that serves the body.
 #[must_use]
 pub struct Body(UnsyncBoxBody<Bytes, BoxError>);
 
@@ -33,6 +36,9 @@ impl Body {
     }
 
     /// Wraps any [`http_body::Body`] that yields [`Bytes`].
+    ///
+    /// The body is streamed as it is polled, so it can produce its data
+    /// lazily.
     pub fn new<B>(body: B) -> Self
     where
         B: http_body::Body<Data = Bytes> + Send + 'static,
@@ -138,9 +144,8 @@ impl fmt::Debug for Body {
 
 /// The error a [`Body`] ends with when producing one of its frames panicked.
 ///
-/// The panic is caught at the body, so the connection carrying it stays up
-/// and the stream terminates with this error instead. Carries the panic's
-/// message when it had one.
+/// The body catches the panic, so the connection that carries it stays up.
+/// The error keeps the panic message when there is one.
 #[derive(Debug)]
 pub struct BodyPanicError {
     message: Option<Box<str>>,
@@ -159,7 +164,7 @@ impl BodyPanicError {
         Self { message }
     }
 
-    /// The panic's message, if it carried one.
+    /// Returns the panic message, if the panic carried one.
     #[must_use]
     pub fn message(&self) -> Option<&str> {
         self.message.as_deref()
@@ -177,8 +182,10 @@ impl fmt::Display for BodyPanicError {
 
 impl std::error::Error for BodyPanicError {}
 
-/// A [`Stream`](futures_core::Stream) over the data frames of a [`Body`],
-/// yielding the raw [`Bytes`] of each frame.
+/// A [`Stream`](futures_core::Stream) over the data frames of a [`Body`].
+///
+/// It yields the [`Bytes`] of each data frame and skips other frames, such as
+/// trailers. Create one with [`Body::into_data_stream`].
 #[must_use]
 pub struct BodyDataStream(BodyStream<Body>);
 
@@ -200,20 +207,21 @@ impl futures_core::Stream for BodyDataStream {
     }
 }
 
-/// Collects an entire [`Body`] into [`Bytes`], failing if it exceeds `limit`.
+/// Reads an entire [`Body`] into [`Bytes`], failing if it is longer than
+/// `limit` bytes.
 ///
-/// Pass [`usize::MAX`] to read the body without enforcing a limit. When
-/// reading a request body, pass the request's
-/// [`body_limit`](crate::body_limit) so the configured limit applies.
+/// Pass [`usize::MAX`] to read the body without a limit. When reading a
+/// request body, pass the request's [`body_limit`](crate::body_limit) so the
+/// configured limit applies.
 ///
 /// # Errors
 ///
 /// Returns a [`ContentTooLargeError`](crate::error::ContentTooLargeError) when
-/// the body exceeds `limit` bytes, and a
+/// the body is longer than `limit` bytes, and a
 /// [`BadRequestError`](crate::error::BadRequestError) when reading it fails.
-/// Both render themselves as a response, so a
-/// [`FromRequest`](crate::request::FromRequest) implementation can propagate them with
-/// `?` rather than mapping them by hand.
+/// Both render as an error response, so a
+/// [`FromRequest`](crate::request::FromRequest) implementation can return them
+/// with `?`.
 pub async fn to_bytes(body: Body, limit: usize) -> Result<Bytes> {
     let collected = if limit == usize::MAX {
         body.collect().await

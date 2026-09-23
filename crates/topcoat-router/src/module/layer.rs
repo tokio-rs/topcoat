@@ -8,15 +8,13 @@ use crate::{Body, Layer, LayerFuture, Next, Path, PathBuf};
 /// the URL prefix from the module tree and registers the layer under it.
 #[doc(hidden)]
 pub trait ModuleLayer: Send + Sync + 'static {
-    /// The module path where the layer was declared, used to derive the URL.
+    /// Returns the module path the layer was declared in.
     fn module_path(&self) -> &'static str;
 
-    /// The path below the module path, joined onto it to form the URL prefix,
-    /// as declared with a `./` path. The root path stands for the module path
-    /// with a trailing slash.
+    /// Returns the path below the module path, as declared with a `./` path.
+    /// The root path stands for the module path with a trailing slash.
     ///
-    /// Defaults to `None`, so the handler is served at the module path
-    /// itself.
+    /// Defaults to `None`, which means the module path itself.
     fn relative_path(&self) -> Option<&Path> {
         None
     }

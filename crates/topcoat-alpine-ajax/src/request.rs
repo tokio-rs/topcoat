@@ -6,9 +6,8 @@ use crate::header;
 /// Reads the request header `name` as a string slice, or [`None`] when it is
 /// absent or not valid UTF-8.
 ///
-/// The header map is borrowed straight from the request, so these reads are
-/// cheap pointer lookups: there is nothing worth caching with `#[memoize]`,
-/// and borrowing avoids the allocation a memoized owned value would require.
+/// The value is borrowed from the request, so there is nothing worth caching
+/// with `#[memoize]`.
 #[track_caller]
 fn header<'cx>(cx: &'cx Cx, name: &HeaderName) -> Option<&'cx str> {
     request_context::<Parts>(cx)
@@ -18,8 +17,11 @@ fn header<'cx>(cx: &'cx Cx, name: &HeaderName) -> Option<&'cx str> {
         .ok()
 }
 
-/// Returns `true` when the current request was issued by Alpine AJAX, i.e. it
-/// carries an `X-Alpine-Request: true` header.
+/// Returns `true` when the current request was sent by Alpine AJAX, which
+/// means it carries an `X-Alpine-Request: true` header.
+///
+/// Use it to render only a fragment for Alpine AJAX requests and the full
+/// page for normal browser requests.
 ///
 /// # Panics
 ///
@@ -31,8 +33,10 @@ pub fn ajax_request(cx: &Cx) -> bool {
     header(cx, &header::X_ALPINE_REQUEST) == Some("true")
 }
 
-/// Returns the target element `id`s from the `X-Alpine-Target` header, or an
-/// empty iterator when the header is absent.
+/// Returns an iterator over the `id`s of the target elements, read from the
+/// space-separated `X-Alpine-Target` header.
+///
+/// The iterator is empty when the header is absent.
 ///
 /// # Panics
 ///
@@ -44,8 +48,11 @@ pub fn ajax_targets(cx: &Cx) -> impl Iterator<Item = &str> {
         .split_whitespace()
 }
 
-/// Returns `true` when `id` is among the requested target elements, i.e. it
-/// appears in the `X-Alpine-Target` header.
+/// Returns `true` when `id` is one of the target elements listed in the
+/// `X-Alpine-Target` header.
+///
+/// Use it to skip rendering parts of the page that the client will not
+/// merge.
 ///
 /// # Panics
 ///

@@ -3,18 +3,18 @@ use std::sync::{Mutex, PoisonError};
 use http::{HeaderMap, HeaderName, HeaderValue};
 use topcoat_core::context::{Cx, request_context};
 
-/// Headers the router adds to the response it sends for the current request,
+/// Headers that the router adds to the response for the current request,
 /// whatever that response turns out to be.
 ///
-/// A layer normally sets headers on the [`Response`](super::Response) it gets
-/// back from [`Next::run`](crate::Next). When the chain returns an error
-/// instead, the response is only built once the error leaves the last layer,
-/// so there is nothing to set them on yet. Appending them here defers them
-/// until then: the router applies every pending header after it has built the
-/// response, for a success and an error alike, and leaves the error itself
-/// untouched so outer layers can still inspect it.
+/// A layer usually sets headers on the [`Response`](super::Response) it gets
+/// back from [`Next::run`](crate::Next). When the handler returns an error
+/// instead, there is no response yet, because the router only builds it once
+/// the error has passed through every layer. Headers added here are applied
+/// after the router has built the final response, for a success and an error
+/// alike. The error itself stays unchanged, so outer layers can still inspect
+/// it.
 ///
-/// Get the request's slot with [`response_headers`].
+/// Get the headers of the current request with [`response_headers`].
 ///
 /// # Examples
 ///
@@ -33,8 +33,8 @@ use topcoat_core::context::{Cx, request_context};
 ///
 ///     fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
 ///         Box::pin(async move {
-///             // Lands on the 404 for an unmatched URL as well as on a
-///             // handler's own response.
+///             // Added to the 404 response for an unknown URL as well as to
+///             // the response of a handler.
 ///             response_headers(cx).append(
 ///                 header::HeaderName::from_static("x-request-id"),
 ///                 header::HeaderValue::from_static("42"),
@@ -50,21 +50,23 @@ pub struct ResponseHeaders {
 }
 
 impl ResponseHeaders {
-    /// Creates an empty slot.
+    /// Creates an empty set of pending headers.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Queues `value` to be appended under `name`.
+    /// Adds `value` under `name` to the pending headers.
     ///
-    /// Appending keeps any value the response already carries under `name`,
-    /// so a header that repeats, like `Set-Cookie`, accumulates.
+    /// The value is appended, so values that the response already has under
+    /// `name` are kept. This lets a header that can repeat, like `Set-Cookie`,
+    /// collect several values.
     pub fn append(&self, name: HeaderName, value: HeaderValue) {
         self.lock().append(name, value);
     }
 
-    /// Queues every entry of `headers` to be appended.
+    /// Adds every entry of `headers` to the pending headers, in the same way
+    /// as [`append`](Self::append).
     pub fn extend(&self, headers: HeaderMap) {
         append_all(&mut self.lock(), headers);
     }
@@ -97,11 +99,11 @@ fn append_all(into: &mut HeaderMap, from: HeaderMap) {
     }
 }
 
-/// Returns the [`ResponseHeaders`] slot of the current request.
+/// Returns the [`ResponseHeaders`] of the current request.
 ///
 /// # Panics
 ///
-/// Panics if the request is not being dispatched by the router.
+/// Panics if the router is not handling the current request.
 #[must_use]
 #[track_caller]
 pub fn response_headers(cx: &Cx) -> &ResponseHeaders {

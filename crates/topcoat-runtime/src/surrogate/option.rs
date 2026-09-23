@@ -5,6 +5,9 @@ use crate::{
     impl_surrogate_mut, impl_surrogate_ref, serialize_tagged,
 };
 
+/// An `Option` in a runtime expression.
+///
+/// `None` renders as nothing, and `Some` renders as its value.
 #[derive(Debug, Clone, RefCast)]
 #[repr(transparent)]
 pub struct OptionSurrogate<T>(Option<T>);
@@ -15,16 +18,19 @@ impl<T> OptionSurrogate<T> {
         Self(v)
     }
 
+    /// Creates a `None` value.
     #[inline]
     pub fn none() -> Self {
         Self(None)
     }
 
+    /// Returns whether the option is `Some`.
     #[inline]
     pub fn is_some(&self) -> BoolSurrogate {
         BoolSurrogate::new(self.0.is_some())
     }
 
+    /// Returns whether the option is `None`.
     #[inline]
     pub fn is_none(&self) -> BoolSurrogate {
         BoolSurrogate::new(self.0.is_none())
@@ -35,6 +41,7 @@ impl<T> OptionSurrogate<T>
 where
     T: Surrogated,
 {
+    /// Creates a `Some` value.
     #[inline]
     pub fn some(v: impl Surrogate<Real = T>) -> Self {
         Self(Some(v.into_real()))

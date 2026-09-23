@@ -18,20 +18,24 @@ use crate::{
     },
 };
 
-/// The name appearing in an [`Element`](super::Element)'s tag. May be an HTML
-/// identifier (`div`, `data-foo`, `xmlns:xlink`), a string literal
-/// (`"my-tag"`), or a parenthesized Rust expression that resolves to the tag
-/// name at runtime.
+/// The name in an [`Element`](super::Element)'s tag.
+///
+/// It is an HTML identifier like `div` or `my-widget`, a string literal like
+/// `"my-tag"`, or a parenthesized Rust expression that evaluates to the name
+/// at render time. Identifier names can only contain `-` as a separator.
 #[derive(Debug, PartialEq)]
 pub enum ElementName {
+    /// A name written as an identifier, like `div`.
     Ident(HtmlIdent),
+    /// A name written as a string literal, like `"my-tag"`.
     LitStr(LitStr),
+    /// A name computed by an expression, like `(tag)`.
     Expr(Box<TemplateExpr>),
 }
 
 impl ElementName {
-    /// The tag name as a string when it is statically known. Returns `None` for
-    /// expression-valued names, which can only be resolved at runtime.
+    /// Returns the tag name as a string when it is known at compile time, or
+    /// [`None`] for a name computed by an expression.
     #[must_use]
     pub fn string_name(&self) -> Option<String> {
         match self {
@@ -41,7 +45,7 @@ impl ElementName {
         }
     }
 
-    /// The source span covering the name.
+    /// Returns the source span of the name.
     #[must_use]
     pub fn span(&self) -> Span {
         match self {
@@ -51,9 +55,10 @@ impl ElementName {
         }
     }
 
-    /// Returns `true` if this name is one of the HTML void elements (`br`,
-    /// `img`, `input`, ...): those that take no closing tag and no children.
-    /// Only matches identifier names; string and expression names always
+    /// Returns `true` if this name is one of the HTML void elements, such as
+    /// `br`, `img`, or `input`, which have no closing tag and no children.
+    ///
+    /// Only identifier names can match. String and expression names always
     /// return `false`.
     #[must_use]
     pub fn is_void_element(&self) -> bool {
@@ -71,8 +76,8 @@ impl ElementName {
         }
     }
 
-    /// Returns the underlying expression if this name was written as
-    /// `(expr)`, otherwise `None`.
+    /// Returns the expression if the name was written as `(expr)`, otherwise
+    /// [`None`].
     #[must_use]
     pub fn expr(&self) -> Option<&Expr> {
         match self {

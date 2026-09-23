@@ -1,9 +1,9 @@
-/// Place a Fontsource font should be loaded from.
+/// Where the browser loads a Fontsource font file from.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Host {
-    /// Download the Fontsource font and self-host it as a Topcoat asset.
+    /// Bundle the file as a Topcoat asset and serve it from your own origin.
     #[cfg(feature = "asset")]
     Asset,
-    /// Load the Fontsource font from <https://www.jsdelivr.com/>.
+    /// Load the file from the [jsDelivr](https://www.jsdelivr.com/) CDN.
     JsDelivr,
 }

@@ -6,9 +6,8 @@ use crate::header;
 /// Reads the request header `name` as a string slice, or [`None`] when it is
 /// absent or not valid UTF-8.
 ///
-/// The header map is borrowed straight from the request, so these reads are
-/// cheap pointer lookups: there is nothing worth caching with `#[memoize]`,
-/// and borrowing avoids the allocation a memoized owned value would require.
+/// The value is borrowed from the request, so there is nothing worth caching
+/// with `#[memoize]`.
 #[track_caller]
 fn header<'cx>(cx: &'cx Cx, name: &HeaderName) -> Option<&'cx str> {
     request_context::<Parts>(cx)
@@ -18,8 +17,11 @@ fn header<'cx>(cx: &'cx Cx, name: &HeaderName) -> Option<&'cx str> {
         .ok()
 }
 
-/// Returns `true` when the current request was issued by htmx, i.e. it carries
-/// an `HX-Request: true` header.
+/// Returns `true` when the current request was sent by htmx, which means it
+/// carries an `HX-Request: true` header.
+///
+/// Use it to render only a fragment for htmx requests and the full page for
+/// normal browser requests.
 ///
 /// # Panics
 ///
@@ -31,8 +33,8 @@ pub fn hx_request(cx: &Cx) -> bool {
     header(cx, &header::HX_REQUEST) == Some("true")
 }
 
-/// Returns `true` when the request was made by an element using `hx-boost`,
-/// i.e. it carries `HX-Boosted: true`.
+/// Returns `true` when the request was sent by an element using `hx-boost`,
+/// which means it carries an `HX-Boosted: true` header.
 ///
 /// # Panics
 ///
@@ -45,7 +47,8 @@ pub fn hx_boosted(cx: &Cx) -> bool {
 }
 
 /// Returns `true` when the request restores history after a miss in the local
-/// history cache, i.e. it carries `HX-History-Restore-Request: true`.
+/// history cache, which means it carries an `HX-History-Restore-Request: true`
+/// header.
 ///
 /// # Panics
 ///
@@ -57,8 +60,8 @@ pub fn hx_history_restore_request(cx: &Cx) -> bool {
     header(cx, &header::HX_HISTORY_RESTORE_REQUEST) == Some("true")
 }
 
-/// Returns the current browser URL from the `HX-Current-URL` header, or [`None`]
-/// when it is absent.
+/// Returns the current URL of the browser from the `HX-Current-URL` header, or
+/// [`None`] when the header is absent.
 ///
 /// # Panics
 ///
@@ -84,7 +87,7 @@ pub fn hx_prompt(cx: &Cx) -> Option<&str> {
 }
 
 /// Returns the `id` of the target element from the `HX-Target` header, or
-/// [`None`] when the request has no target.
+/// [`None`] when the target has no `id`.
 ///
 /// # Panics
 ///
@@ -96,8 +99,8 @@ pub fn hx_target(cx: &Cx) -> Option<&str> {
     header(cx, &header::HX_TARGET)
 }
 
-/// Returns the `id` of the triggering element from the `HX-Trigger` header, or
-/// [`None`] when it has none.
+/// Returns the `id` of the element that triggered the request from the
+/// `HX-Trigger` header, or [`None`] when that element has no `id`.
 ///
 /// # Panics
 ///
@@ -109,8 +112,8 @@ pub fn hx_trigger(cx: &Cx) -> Option<&str> {
     header(cx, &header::HX_TRIGGER)
 }
 
-/// Returns the `name` of the triggering element from the `HX-Trigger-Name`
-/// header, or [`None`] when it has none.
+/// Returns the `name` of the element that triggered the request from the
+/// `HX-Trigger-Name` header, or [`None`] when that element has no `name`.
 ///
 /// # Panics
 ///

@@ -1,9 +1,10 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-/// A tuple of call arguments encoded as a JSON array.
+/// A tuple of call arguments, serialized as a JSON array.
 ///
 /// An empty argument list is `[]`, while a single unit argument is `[null]`.
-/// Each argument keeps its own serialization, including surrogate values.
+/// Each argument keeps its own serialization. Tuples of up to twelve
+/// arguments are supported.
 #[derive(Debug)]
 pub struct Arguments<T>(pub T);
 

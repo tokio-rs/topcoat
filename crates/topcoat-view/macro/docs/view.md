@@ -1,12 +1,12 @@
-The [`view!`] macro is Topcoat's HTML templating syntax. It tries to be unsurprising by staying close to real HTML instead of inventing a Rust-shaped HTML dialect. That means:
+The [`view!`] macro is Topcoat's HTML templating syntax. It stays close to real HTML instead of inventing a Rust-shaped dialect:
 
-- HTML elements use their real names.
+- HTML elements use their real names, and custom elements with dashes like `<my-widget>` work too.
 - HTML void elements, such as `<br>`, `<hr>`, and `<img>`, are written without closing tags.
-- Non-void elements need matching closing tags.
-- Attribute names can use HTML separators like `-`, `:`, and `.`: `data-post-id`, `aria-label`, `xmlns:xlink`, `hx-get`, `class.active`.
-- Rust keywords are still valid HTML attribute names, so `type="button"` and `for="email"` work as expected.
+- All other elements need a matching closing tag, unless they are written self-closing like `<path d="..." />`, which renders exactly as written. This is mainly useful for SVG.
+- Attribute names can contain `-`, `:`, and `.`, as in `data-post-id`, `aria-label`, `xmlns:xlink`, `hx-get`, and `class.active`.
+- Rust keywords are valid attribute names, so `type="button"` and `for="email"` work as expected.
 
-Unlike HTML however, text nodes must be quoted.
+The main difference from HTML is that text must be quoted. A Rust macro cannot see the exact source text between tokens, so unquoted text would lose its spacing and punctuation.
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -23,29 +23,20 @@ Ok(view! {
             <label for="email">"Email"</label>
             <input type="email" id="email" aria-label="Email address">
             <hr>
+            <my-widget data-widget-id="profile"></my-widget>
         </body>
     </html>
 })
 # }
 ```
 
-Element names can use dashes, so custom elements fit naturally:
-
-```rust
-# use topcoat::{Result, view::*};
-# #[component]
-# async fn example() -> Result<impl View> {
-Ok(view! {
-    <my-widget data-widget-id="profile"></my-widget>
-})
-# }
-```
+Each attribute name can appear only once per element. Writing the same literal name twice is a compile error.
 
 # Rust Expressions
 
-Use parentheses to interpolate a Rust expression into markup.
+Wrap a Rust expression in parentheses to insert it into the markup.
 
-In child position, the expression becomes a node:
+In child position, the expression becomes a node. Text from an expression is HTML-escaped, and a value that is itself a view, like the result of another `view!`, renders in place:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -53,7 +44,8 @@ In child position, the expression becomes a node:
 # #[component]
 # async fn example() -> Result<impl View> {
 # let user = User { name: "Ada" };
-# let sidebar = view! { <aside></aside> };
+let sidebar = view! { <aside></aside> };
+
 Ok(view! {
     <h1>"Hello, " (user.name) "!"</h1>
     (sidebar)
@@ -75,7 +67,7 @@ Ok(view! {
 # }
 ```
 
-The same parenthesized expression syntax can also be used for dynamic attribute names and dynamic element names:
+The same syntax works for attribute names and element names. For an element name, the closing tag repeats the expression, but it is only evaluated once:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -90,27 +82,13 @@ Ok(view! {
 # }
 ```
 
-Due to a limitation in Rust macros, text nodes must be quoted:
-
-```rust
-# use topcoat::{Result, view::*};
-# #[component]
-# async fn example() -> Result<impl View> {
-# let computed_text = "Computed";
-Ok(view! {
-    <p>"This is text"</p>
-    <p>(computed_text)</p>
-})
-# }
-```
-
 # Control Flow
 
-Control flow in [`view!`] is Rust control flow with markup bodies. The macro lowers these constructs into ordinary Rust statements that append to the view being built.
+[`view!`] supports Rust's `if`, `for`, `match`, and `let` with markup in their bodies. Each works both between child nodes and inside an element's opening tag, where the bodies contain attributes instead of nodes.
 
 ## `if`
 
-Use `if`, `else if`, and `else` to choose which markup is emitted.
+Use `if`, `else if`, and `else` to choose which markup is rendered. `if let` works as well.
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -127,7 +105,7 @@ Ok(view! {
 # }
 ```
 
-In attributes, each branch emits attributes instead of child nodes:
+Inside an opening tag, each branch contains attributes:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -150,7 +128,7 @@ Ok(view! {
 
 ## `for`
 
-Use `for pat in expr { ... }` to render the body once for each item.
+Use `for pat in expr { ... }` to render the body once for each item:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -170,7 +148,7 @@ Ok(view! {
 # }
 ```
 
-In attributes, a loop can emit zero or more attributes. This is useful when you already have attributes represented as data:
+Inside an opening tag, a loop adds zero or more attributes. This is useful when the attributes already exist as data:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -187,9 +165,11 @@ Ok(view! {
 # }
 ```
 
+When a loop renders components or live regions, give it a key. See [Keys](#keys) below.
+
 ## `match`
 
-Use `match` to choose markup from patterns. Match arms can also use guards.
+Use `match` to choose markup by pattern. Arms can have guards.
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -209,7 +189,7 @@ Ok(view! {
 # }
 ```
 
-A match arm body is one view node. If a branch needs multiple sibling nodes, wrap them in a block:
+An arm body is a single node. Wrap several sibling nodes in braces:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -229,7 +209,7 @@ Ok(view! {
 # }
 ```
 
-In attributes, each arm can emit attribute nodes:
+Inside an opening tag, each arm contains an attribute:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -250,7 +230,7 @@ Ok(view! {
 
 ## `let`
 
-Use `let pat = expr;` to bind values for later nodes in the same body.
+Use `let pat = expr;` to bind a value for the nodes that follow it in the same body. `let ... else` is not supported.
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -269,7 +249,7 @@ Ok(view! {
 # }
 ```
 
-The same works in an attribute list. The binding is in scope for attributes that follow it:
+Inside an opening tag, the binding is in scope for the attributes that follow it:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -292,7 +272,7 @@ Ok(view! {
 
 # Components
 
-Components are called inside [`view!`] with a call syntax similar to functions. The macro introduces named parameters with the comma-separated `name: value` syntax to improve readability for components with many (optional) parameters. If the component has a `child` property, you may pass any number of view nodes at the end of parameter list. These do not need to be comma-separated:
+Call a component inside [`view!`] like a function, but with named arguments written as `name: value` and separated by commas. If the component has a `child` parameter, any view nodes after the named arguments become its child content. The child nodes are not separated by commas:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -304,7 +284,7 @@ Components are called inside [`view!`] with a call syntax similar to functions. 
 # async fn example() -> Result<impl View> {
 Ok(view! {
     panel(
-        // Named title parameter:
+        // Named argument:
         title: "Profile",
         // Child nodes:
         <p>"Account details"</p>
@@ -317,7 +297,7 @@ Ok(view! {
 # }
 ```
 
-The child nodes desugar to:
+The child nodes are shorthand for a `child` argument holding a view:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -330,7 +310,6 @@ The child nodes desugar to:
 Ok(view! {
     panel(
         title: "Profile",
-        // Named child parameter:
         child: view! {
             <p>"Account details"</p>
             badge(
@@ -343,11 +322,13 @@ Ok(view! {
 # }
 ```
 
-See how to define components in the [`component`] macro guide.
+Leaving out a required argument is a compile error. See the [`component`] macro guide for how to define components.
 
 ## Keys
 
-Each component invocation receives a context with a stable identity derived from the chain of sites leading down to it in code, the same from one render to the next. The framework attaches per-invocation data such as state to it. A `for` loop repeats its body at the same site. Use `#[key(expr)]` on the loop to give each iteration its own identity, inherited by the components it invokes:
+Each component call gets a context with a stable identity. The identity comes from the chain of call sites leading to it in the code, so it is the same from one render to the next. The framework uses it to attach per-call data, such as state, to the call.
+
+A `for` loop repeats its body at the same call site, so its iterations cannot be told apart by location. Add `#[key(expr)]` to the loop to give each iteration its own identity. The components called inside the iteration inherit it:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -366,17 +347,17 @@ Ok(view! {
 # }
 ```
 
-The key expression is evaluated once per iteration and can use the loop's bindings. Choose a value that identifies the item, such as its database id, so identity follows the item when the list reorders. Any value implementing [`IdentityKey`] works as a key.
+The key expression runs once per iteration and can use the loop's bindings. Pick a value that identifies the item, such as its database id, so the identity follows the item when the list is reordered. Any value implementing [`IdentityKey`] works as a key.
 
-The attribute is optional. An unkeyed loop still renders, but its iteration identity is ambiguous. Consuming that identity through a component's context errors with the location of the loop missing its key. Nested keyed loops inherit ambiguity from an unkeyed outer loop.
+The key is optional. A loop without one still renders, but its iterations share an ambiguous identity. Reading that identity through a component's context fails with a message naming the loop that is missing its key. A keyed loop nested in an unkeyed loop is ambiguous as well.
 
-Ordinary Rust expressions use the context explicitly passed to them. The macro does not rebind context variables inside loops. If a helper needs a distinct identity for each call, pass a context derived with [`Cx::keyed`](../context/struct.Cx.html#method.keyed), such as `helper(&cx.keyed(item.id))`.
+The macro only sets up identities for components and live regions. Ordinary Rust expressions use whatever context you pass them. If a helper function needs a distinct identity for each iteration, pass it a context derived with [`Cx::keyed`](../context/struct.Cx.html#method.keyed), such as `helper(&cx.keyed(item.id))`.
 
 # Views Are Lazy
 
-A [`view!`] expression does not render where it is written. It evaluates to a value implementing [`View`], and the expressions inside run when that view renders: when it becomes a response, or when the view it is interpolated into does. A view that is never rendered never runs them, like a future that is never awaited.
+A [`view!`] expression does not render where it is written. It evaluates to a value implementing [`View`], and the expressions inside it run when that view renders: when it becomes a response, or when the view it is inserted into renders. A view that never renders never runs them, just like a future that is never awaited.
 
-A view value behaves exactly like an `async move` block, which is what the macro expands to. It captures every variable the template mentions by moving it into the view:
+A view behaves like an `async move` block. It moves every variable the template mentions into itself:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -393,23 +374,23 @@ Ok(view! {
 # }
 ```
 
-When a value is needed both inside the view and after it, interpolate a clone instead.
+When you need a value both inside the view and after it, insert a clone instead.
 
-A view that captures a reference borrows whatever it points at, so it cannot outlive that data, exactly like an `async move` block. In practice this rarely gets in the way: component props and anything borrowed from the request context stay alive until the render is over, so they are safe to use in a view even when they are references, like a `&str` prop.
+A view that captures a reference borrows the data behind it, so it cannot outlive that data. In practice this rarely gets in the way. Component props and anything borrowed from the request context live until the render is over, so references like a `&str` prop are safe to use in a view.
 
 # Concurrent Rendering
 
-The components inside a [`view!`] render concurrently. Sibling components, the iterations of a `for` loop, the taken branch of an `if` or `match` all start at the same time. A component waiting on a database query or an HTTP request therefore does not hold up the rest of the view, which avoids request waterfalls.
+The components inside a [`view!`] render concurrently. Sibling components, the iterations of a `for` loop, and the taken branch of an `if` or `match` all start at the same time. A component that waits on a database query or an HTTP request does not hold up the rest of the view, which avoids request waterfalls.
 
-The rendered markup always appears in source order, no matter which component finishes first. The order in which component bodies and template expressions run is unspecified and can change between renders.
+The rendered markup always appears in source order, no matter which component finishes first. The order in which component bodies and template expressions run is not specified and can change between renders.
 
-Treat component bodies and template expressions as computations without side effects. Do not rely on another component or expression in the same view having run first, and do not communicate through shared mutable state. If work needs to happen in a particular order, perform it before constructing the view and interpolate the resulting values.
+So treat component bodies and template expressions as computations without side effects. Do not rely on another component or expression in the same view having run first, and do not communicate through shared mutable state. If work has to happen in a particular order, do it before building the view and insert the results.
 
 # Boolean And Conditional Attributes
 
-[Boolean HTML attributes](https://developer.mozilla.org/en-US/docs/Glossary/Boolean/HTML) such as `disabled`, `required`, and `checked` are true when the attribute is present and false when it is absent. HTML expects a present boolean attribute to have an empty value.
+[Boolean HTML attributes](https://developer.mozilla.org/en-US/docs/Glossary/Boolean/HTML) such as `disabled`, `required`, and `checked` are true when present and false when absent. HTML expects a present boolean attribute to have an empty value.
 
-When the value is known where the view is written, prefer the literal form `disabled=""` over the expression form `disabled=(true)`. Both render as `disabled=""`, but the literal is static markup that the macro folds into the pre-rendered parts of the template, while `(true)` is a Rust expression evaluated on every render.
+When the value is known where you write the view, prefer the literal form `disabled=""` over the expression form `disabled=(true)`. Both render as `disabled=""`, but the literal is part of the static markup that the macro prepares at compile time, while `(true)` is an expression evaluated on every render.
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -421,7 +402,7 @@ Ok(view! {
 # }
 ```
 
-When the value is only known at run time, pass an expression. Expression attributes can remove themselves from the rendered markup: when the value evaluates to [`false`] or [`None`], the whole attribute is omitted, while a [`true`] value renders the attribute with an empty value. A [`bool`] expression therefore gives a boolean attribute exactly the presence behavior HTML expects, and [`Some`]/[`None`] extend the same logic to attributes that carry values:
+When the value is only known at run time, use an expression. An expression value can remove its attribute: when it evaluates to [`false`] or [`None`], the whole attribute is left out, and [`true`] renders the attribute with an empty value. A [`bool`] expression therefore gives a boolean attribute the presence behavior HTML expects, and an [`Option`] does the same for attributes that carry a value:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -443,9 +424,9 @@ Ok(view! {
 # }
 ```
 
-The rendered opening tag includes `aria-current="page"`, but leaves out `disabled` and `title` completely.
+The rendered opening tag includes `aria-current="page"` and leaves out `disabled` and `title` completely.
 
-This omission logic applies to expression attributes. Literal attributes are always present:
+Only expression values can remove an attribute. A literal attribute is always present:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -457,7 +438,7 @@ Ok(view! {
 # }
 ```
 
-Attributes that take the literal strings `"true"` and `"false"` as values, such as `aria-expanded` or `contenteditable`, are enumerated attributes, not boolean attributes. For them, `"false"` means something different than omitting the attribute, so pass strings instead of booleans:
+Some attributes, such as `aria-expanded` and `contenteditable`, take the strings `"true"` and `"false"` as values. These are enumerated attributes, not boolean attributes: `"false"` means something different from leaving the attribute out. Pass them strings instead of booleans:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -472,14 +453,18 @@ Ok(view! {
 
 # Attribute Collections And Class Lists
 
-Two companion macros build attribute values outside a view:
+Two companion macros build attribute values outside of an element:
 
-- [`attributes!`] uses the same attribute syntax as [`view!`] to build a reusable [`topcoat::view::Attributes`] collection that inserts into an element as an attribute fragment.
-- [`class!`] assembles a `class` attribute value from static and conditional entries into a [`topcoat::view::Class`], which joins its entries with single spaces and omits the attribute entirely when no entry is present.
+- [`attributes!`] uses the same attribute syntax as [`view!`] to build an [`Attributes`] collection. Insert it into an element as `<div (attrs)>`, or pass it to a component.
+- [`class!`] builds a [`Class`] list for a `class` attribute from static and conditional entries. It separates the entries with single spaces and leaves out the attribute when no entry is present.
+
+# Client Reactivity
+
+A view can also carry client-side behavior: `$(...)` runtime expressions, `@event` handlers, and `:name` bind attributes. The [runtime guide](../runtime/index.html) explains them.
 
 # Status Codes And Response Headers
 
-A view can declare the status code and headers of the HTTP response it renders into. A [`StatusCode`] in node position sets the response status, and a [`HeaderMap`] or a single `(HeaderName, HeaderValue)` pair adds response headers. None of them render any content.
+A view can set the status code and headers of the HTTP response it renders into. A [`StatusCode`] in node position sets the response status, and a [`HeaderMap`] or a single `(HeaderName, HeaderValue)` pair adds response headers. None of them render any content.
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -494,7 +479,7 @@ Ok(view! {
 # }
 ```
 
-Competing declarations resolve by render order: the first status code rendered wins, and for each header name the first part that mentions it provides all of that name's values. Placement therefore decides precedence between a layout and the pages it wraps. A declaration placed before the layout's slot overrides whatever the page declares; placed after the slot it is a fallback the page can override:
+When several parts of a render declare these, render order decides. The first status code rendered wins. For each header name, the first part that mentions it provides all of that name's values. So in a layout, the placement decides who wins: a declaration placed before the layout's slot overrides whatever the page declares, and one placed after the slot is a fallback that the page can override:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -508,15 +493,15 @@ async fn docs_layout(slot: Slot<'_>) -> Result<impl View> {
 }
 ```
 
-Every page under `/docs` now gets `Cache-Control: max-age=60` unless it declares its own `Cache-Control`.
+Every page under `/docs` now gets `Cache-Control: max-age=60`, unless it declares its own `Cache-Control`.
 
-A status code in node position never renders text. To display one, render one of its accessors instead, such as `(status.as_u16())`.
+A status code in node position never renders as text. To display one, render one of its accessors instead, such as `(status.as_u16())`.
 
-These declarations require the `router` feature (or the `topcoat-view` crate's `http` feature) and take effect when the rendered view becomes a response; rendering a view to a plain string discards them.
+These declarations require the `router` feature (or the `http` feature of the `topcoat-view` crate). They take effect when the rendered view becomes a response. Rendering a view to a plain string ignores them.
 
 # Rendering Outside A Component
 
-Inside a [`component`], `#[page]`, `#[layout]`, or `#[shard]`, the request context is in scope implicitly, so `view!` can render components and reactive markup with no ceremony. In a plain function you pass the context explicitly at the start of the `view!` macro:
+Inside a [`component`], `#[page]`, `#[layout]`, or `#[shard]`, the request context is in scope implicitly, so `view!` can call components and use reactive markup without extra setup. In a plain function, pass the context at the start of the `view!` body:
 
 ```rust
 # use topcoat::{Result, context::Cx, view::*};
@@ -527,21 +512,23 @@ async fn render(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-Whether it names its context or not, a view resolves to self-contained content when it is the outermost view of a render, so it can become a response on its own, and takes part in the enclosing render when it is interpolated into another view.
+With `cx =>`, the view holds its own clone of the context, so it does not borrow `cx`.
+
+A view behaves the same whether or not it names its context. As the outermost view of a render it produces self-contained content that can become a response on its own. Inserted into another view, it renders as part of that view.
 
 # Custom Values In Markup
 
-The macro accepts dynamic Rust values by routing them through small runtime traits. Implement the trait for the position where your type should be accepted:
+[`view!`] accepts Rust values through a small set of traits, one per position. Implement the trait for each position where your type should be accepted:
 
-- [`NodeViewParts`] for values used as child nodes: `(value)`.
-- [`AttributeValueViewParts`] for values used as attribute values: `name=(value)`.
-- [`AttributeKeyViewParts`] for values used as dynamic attribute names: `(name)="value"`.
-- [`AttributeViewParts`] for values that emit one or more full attributes in APIs that accept complete attribute fragments.
-- [`ElementNameViewParts`] for values used as dynamic element names: `<(name)>...</(name)>`.
+- [`NodeViewParts`] for child nodes: `(value)`.
+- [`AttributeValueViewParts`] for attribute values: `name=(value)`.
+- [`AttributeKeyViewParts`] for attribute names: `(name)="value"`.
+- [`AttributeViewParts`] for values that add whole attributes to an element: `<div (value)>`.
+- [`ElementNameViewParts`] for element names: `<(name)>...</(name)>`.
 
-Each trait method receives a [`PartsWriter`] for the position being filled. Everything pushed through its `push_*` methods is escaped or validated for that position when the view renders; the `push_*_unescaped` methods are the only opt-out and must only be given trusted markup.
+Each trait method receives a [`PartsWriter`] for the position being filled. Everything pushed through its `push_*` methods is escaped or validated for that position when the view renders. The `push_*_unescaped` methods are the only way around this, and must only be given trusted markup.
 
-For example, a type can opt into child-node rendering by implementing [`NodeViewParts`]:
+For example, a type can render as a child node by implementing [`NodeViewParts`]:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -563,7 +550,7 @@ Ok(view! {
 # }
 ```
 
-For attribute values, implement [`AttributeValueViewParts`]. Its [`attribute_present`][AttributeValueViewParts::attribute_present] method controls whether the containing attribute is rendered at all.
+For attribute values, implement [`AttributeValueViewParts`]. Its [`attribute_present`][AttributeValueViewParts::attribute_present] method decides whether the attribute is rendered at all:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -595,23 +582,21 @@ Ok(view! {
 [`AttributeValueViewParts`]: trait.AttributeValueViewParts.html
 [AttributeValueViewParts::attribute_present]: trait.AttributeValueViewParts.html#tymethod.attribute_present
 [`AttributeViewParts`]: trait.AttributeViewParts.html
+[`Attributes`]: struct.Attributes.html
+[`Class`]: struct.Class.html
 [`ElementNameViewParts`]: trait.ElementNameViewParts.html
 [`NodeViewParts`]: trait.NodeViewParts.html
 [`PartsWriter`]: struct.PartsWriter.html
-[`component`]: attr.component.html
-[`memoize`]: https://docs.rs/topcoat/latest/topcoat/context/attr.memoize.html
 [`attributes!`]: macro.attributes.html
 [`class!`]: macro.class.html
+[`component`]: attr.component.html
+[`view!`]: macro.view.html
+[`View`]: trait.View.html
+[`IdentityKey`]: ../core/identity/trait.IdentityKey.html
 [`bool`]: https://doc.rust-lang.org/std/primitive.bool.html
 [`false`]: https://doc.rust-lang.org/std/keyword.false.html
 [`true`]: https://doc.rust-lang.org/std/keyword.true.html
 [`None`]: https://doc.rust-lang.org/std/option/enum.Option.html#variant.None
-[`Some`]: https://doc.rust-lang.org/std/option/enum.Option.html#variant.Some
-[`topcoat::view::Attributes`]: struct.Attributes.html
-[`topcoat::view::Class`]: struct.Class.html
-[`view!`]: macro.view.html
-[`View`]: trait.View.html
-[`Identity`]: ../core/identity/struct.Identity.html
-[`IdentityKey`]: ../core/identity/trait.IdentityKey.html
+[`Option`]: https://doc.rust-lang.org/std/option/enum.Option.html
 [`StatusCode`]: https://docs.rs/http/latest/http/status/struct.StatusCode.html
 [`HeaderMap`]: https://docs.rs/http/latest/http/header/struct.HeaderMap.html

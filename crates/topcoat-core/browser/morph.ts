@@ -3,28 +3,36 @@
  * can match so that focus, scroll position, and other state the browser
  * holds on an element survive a replacement.
  *
- * The algorithm is a port of idiomorph's, on a sibling range instead of an
- * element: old and new siblings are paired in order by node type and tag
- * name, an `id` is a hard identity that is never paired with a different
- * one, and an element containing an id that survives the morph is matched
- * to the element that contains the same id in the new content, so a
- * container is found again even when the siblings around it shifted. An
+ * The algorithm is a port of idiomorph
+ * (https://github.com/bigskysoftware/idiomorph) that works on a range of
+ * siblings instead of a single element. Old and new siblings are paired in
+ * order by node type and tag name. An `id` is a hard identity: an element is
+ * never paired with one that has a different id. An element that contains a
+ * surviving id is matched to the new element that contains the same id, so a
+ * container is found again even when the siblings around it changed. An
  * element with a surviving id that ended up somewhere else is moved into
- * place rather than recreated.
+ * place instead of being created again.
  *
  * Attributes and text are synced in place. The value of the focused element
  * is left alone, so a morph never disturbs what the user is typing.
  */
 
+/** Options for {@link morph}. */
 export interface MorphOptions {
-	/** Keeps the live state of matching form controls, including their defaults. */
+	/**
+	 * Keeps the live state of matching form controls, such as the value of an
+	 * input or the selection of a select, instead of resetting it to the new
+	 * content.
+	 */
 	preserveFormState?: boolean;
 }
 
-/** The ids present in both the old and the new content. */
+/** The state of one morph. */
 type Ctx = {
 	options: MorphOptions;
+	/** The select elements whose selection is being preserved. */
 	preservedSelects: WeakSet<HTMLSelectElement>;
+	/** The ids present in both the old and the new content. */
 	persistent: Set<string>;
 	/**
 	 * The persistent ids in each element's subtree, itself included, for the
@@ -65,6 +73,7 @@ export function morph(
 	);
 }
 
+/** The children of `parent` strictly between `start` and `end`. */
 function rangeNodes(
 	parent: ParentNode,
 	start: ChildNode | null,
@@ -79,6 +88,7 @@ function rangeNodes(
 	return nodes;
 }
 
+/** Collects the persistent ids of a morph from its old and new nodes. */
 function createContext(
 	parent: ParentNode,
 	oldNodes: Node[],

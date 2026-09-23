@@ -1,3 +1,4 @@
+/** A status message sent by the dev server over the WebSocket. */
 export type DevEvent =
 	| "reload"
 	| "rebuilding"
@@ -11,7 +12,12 @@ interface Handlers {
 	navigating: () => void;
 }
 
-/** Keeps a dev-server connection alive without interrupting navigation. */
+/**
+ * A WebSocket connection to the dev server that reconnects when it is lost.
+ *
+ * It does not reconnect while the page navigates away, so it never delays or
+ * interrupts navigation.
+ */
 export class DevConnection {
 	private readonly url: string;
 	private readonly lifetime = new AbortController();
@@ -31,10 +37,12 @@ export class DevConnection {
 		this.url = url.href;
 	}
 
+	/** Whether the page is currently navigating away. */
 	get isNavigating(): boolean {
 		return this.navigating;
 	}
 
+	/** Opens the connection and starts tracking navigation. */
 	start(): void {
 		const options = { signal: this.lifetime.signal };
 		const navigating = () => {
@@ -62,6 +70,7 @@ export class DevConnection {
 		this.connect(false);
 	}
 
+	/** Closes the connection for good. */
 	stop(): void {
 		this.lifetime.abort();
 		clearTimeout(this.retry);

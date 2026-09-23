@@ -16,15 +16,17 @@ use crate::{
     view::hir::{ExprKind, LowerView, ViewBuilder},
 };
 
-/// A `name=value` attribute on an element, or an entry in an
-/// [`Attributes`](super::Attributes) list.
+/// A `name=value` attribute in an [`Attributes`](super::Attributes) list.
 ///
-/// The key may be a static [`HtmlIdent`](super::super::view::HtmlIdent) or a
-/// parenthesized Rust expression; the value may be a string literal or a
-/// parenthesized expression.
+/// The name is an [`HtmlIdent`](crate::view::HtmlIdent) or a parenthesized
+/// Rust expression. The value is a string literal or a parenthesized
+/// expression.
 pub struct Attribute {
+    /// The attribute name.
     pub key: AttributeKey,
+    /// The `=` between name and value.
     pub eq: Token![=],
+    /// The attribute value.
     pub value: AttributeValue,
 }
 

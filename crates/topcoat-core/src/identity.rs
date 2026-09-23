@@ -1,4 +1,5 @@
-//! Stable identities derived from parent identities, source locations, and keys.
+//! Stable identities derived from a parent identity, a source location, and
+//! an optional key.
 
 mod key;
 mod site;
@@ -18,9 +19,16 @@ const TAG_KEYED: u8 = 1;
 
 /// A stable identity derived from a chain of source locations and keys.
 ///
-/// Child identities inherit any ambiguity from their parent. Derivation
-/// succeeds even when ambiguous, so callers can defer checking until an
-/// identity is needed.
+/// The same chain always derives the same identity, so an identity stays the
+/// same across requests and renders. An identity can be ambiguous when it was
+/// derived for repeated invocations that could not be told apart. A child
+/// inherits the ambiguity of its parent. Deriving an ambiguous identity still
+/// succeeds, and the error is only reported when the identity is read with
+/// [`identity`](crate::context::identity) or
+/// [`try_identity`](crate::context::try_identity).
+///
+/// An identity displays as 22 characters of URL-safe base64 and parses back
+/// from that form with [`FromStr`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Identity {
     hash: u128,
@@ -35,7 +43,7 @@ impl Identity {
         ambiguity: None,
     };
 
-    /// Checks whether this identity can be consumed.
+    /// Returns this identity, or an error if it is ambiguous.
     pub(crate) fn checked(self) -> Result<Self, AmbiguousIdentityError> {
         match self.ambiguity {
             None => Ok(self),
@@ -43,7 +51,7 @@ impl Identity {
         }
     }
 
-    /// The hash value of this identity.
+    /// Returns the hash value of this identity.
     #[must_use]
     pub const fn hash(self) -> u128 {
         self.hash
@@ -62,12 +70,11 @@ impl Identity {
 
     /// Derives the identity of a keyed child invocation at `site`.
     ///
-    /// The key tells repetitions of one invocation site apart, so an
-    /// invocation in a loop body can give each iteration its own identity.
-    /// The site stays mixed in: the same key at two different sites still
-    /// derives two different identities. An ambiguity on `self` carries over
-    /// to the child; a key resolves repetition at its own site, not on the
-    /// chain above it.
+    /// The key tells repeated invocations at one site apart, so an invocation
+    /// in a loop body can give each iteration its own identity. The same key
+    /// at two different sites still derives two different identities. An
+    /// ambiguity on `self` carries over to the child: a key only tells apart
+    /// repetitions at its own site, not further up the chain.
     #[must_use]
     pub fn keyed_child(self, site: SiteKey, key: impl IdentityKey) -> Self {
         Self {
@@ -81,8 +88,9 @@ impl Identity {
     /// Derives the identity of a child invocation at `site` whose
     /// repetitions cannot be told apart, recording `label` as the ambiguity.
     ///
-    /// Derivation succeeds, but checking this identity or any descendant
-    /// reports the ambiguity. An ambiguity already on the parent wins.
+    /// Derivation succeeds, but reading this identity or any identity derived
+    /// from it reports the ambiguity. If the parent is already ambiguous, its
+    /// label is kept.
     #[must_use]
     pub const fn ambiguous_child(self, site: SiteKey, label: &'static str) -> Self {
         Self {
@@ -121,12 +129,11 @@ impl fmt::Display for Identity {
     }
 }
 
-/// Parses an identity from its hash, as written by `Display`.
+/// Parses an identity from the form `Display` writes.
 ///
-/// The result carries no ambiguity: a hash is only worth carrying forward
-/// once its identity was consumed, which an ambiguous identity refuses.
-/// This is the door for re-entering a subtree in another request at an
-/// identity captured earlier, for example one a client sends back.
+/// Use this to continue at an identity captured in an earlier request, for
+/// example one a client sends back. The result is never ambiguous, because
+/// only an identity that could be read was written out.
 impl FromStr for Identity {
     type Err = ParseIdentityError;
 
@@ -140,8 +147,8 @@ impl FromStr for Identity {
     }
 }
 
-/// Error returned when parsing an identity from a string that is not the
-/// wire form `Display` writes.
+/// The error returned when parsing an [`Identity`] from a string that is not
+/// in the form its `Display` impl writes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ParseIdentityError;
 
@@ -153,14 +160,15 @@ impl fmt::Display for ParseIdentityError {
 
 impl std::error::Error for ParseIdentityError {}
 
-/// Error returned when an identity cannot distinguish repeated scopes.
+/// The error returned when reading an [`Identity`] that cannot tell repeated
+/// scopes apart.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AmbiguousIdentityError {
     label: &'static str,
 }
 
 impl AmbiguousIdentityError {
-    /// Names the scope that introduced ambiguity.
+    /// Returns the name of the scope that introduced the ambiguity.
     #[must_use]
     pub const fn label(&self) -> &'static str {
         self.label

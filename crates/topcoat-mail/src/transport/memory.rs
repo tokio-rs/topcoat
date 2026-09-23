@@ -9,13 +9,13 @@ use crate::{
     mime::{self, BccHeader},
 };
 
-/// A [`Transport`] that captures sent mail in memory instead of delivering
-/// it, for asserting on mail in tests.
+/// A [`Transport`] that keeps sent mail in memory instead of delivering it,
+/// so tests can check it.
 ///
-/// Sending assembles the mail exactly as a delivering transport would, so a
-/// mail that would fail to send (one without recipients, say) fails here
-/// too. Cloning is cheap and every clone shares the same capture, so a test
-/// can keep one clone and hand the other to the code under test:
+/// Sending builds the full message just like a delivering transport, so a
+/// mail that would fail to send, such as one without recipients, fails here
+/// too. Clones are cheap and share the same list of sent mail, so a test can
+/// keep one clone and give another to the code under test:
 ///
 /// ```
 /// # use topcoat_core::context::Cx;
@@ -45,13 +45,13 @@ pub struct MemoryTransport {
 }
 
 impl MemoryTransport {
-    /// Creates a transport with an empty capture.
+    /// Creates a transport with no sent mail.
     #[must_use]
     pub fn new() -> MemoryTransport {
         MemoryTransport::default()
     }
 
-    /// The captured mail, in the order it was sent.
+    /// Returns the sent mail, in the order it was sent.
     #[must_use]
     pub fn sent(&self) -> Vec<Mail> {
         self.sent
@@ -60,7 +60,7 @@ impl MemoryTransport {
             .clone()
     }
 
-    /// Empties the capture.
+    /// Removes all sent mail.
     pub fn clear(&self) {
         self.sent
             .lock()

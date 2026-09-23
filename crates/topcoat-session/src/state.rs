@@ -6,13 +6,15 @@ use topcoat_core::{
 
 use crate::{Token, token_store};
 
-/// The request-scoped session cell, registered on the request context by the
-/// session layer (or manually via `CxTestBuilder` in tests).
+/// Request context slot that holds the session token of the current request.
 ///
-/// The cell caches the token presented by the request so the token store is
-/// read at most once per request, and it is updated by the lifecycle
-/// functions ([`start`](crate::start), [`stop`](crate::stop),
-/// [`rotate`](crate::rotate)) so later reads within the same request observe
+/// The session router layer adds one to the request context of every request.
+/// You only need to create one yourself when you build a
+/// [`Cx`] by hand, for example in tests.
+///
+/// The token is read from the token store at most once per request. The
+/// lifecycle functions, such as [`start`](crate::start) and
+/// [`stop`](crate::stop), update it, so later code in the same request sees
 /// the change.
 #[derive(Debug, Default)]
 pub struct SessionState {
@@ -27,7 +29,7 @@ enum Load {
 }
 
 impl SessionState {
-    /// Creates an empty cell; the token is loaded on first access.
+    /// Creates an empty slot. The token is read on first use.
     #[must_use]
     pub fn new() -> Self {
         Self::default()

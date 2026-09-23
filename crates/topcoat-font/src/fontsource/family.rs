@@ -1,12 +1,11 @@
 use super::{Style, Subset, families};
 use crate::UnicodeRanges;
 
-/// Static metadata describing a single font family in the Fontsource catalog.
+/// Metadata about a font family in the Fontsource catalog.
 ///
-/// One `Family` constant is generated for every family in the vendored
-/// catalog in the [`families`] module, and the full list is available as
-/// [`families::ALL`]. The values mirror the fields of the Fontsource
-/// [`/v1/fonts`](https://api.fontsource.org/v1/fonts) endpoint.
+/// The [`families`] module has one `Family` constant for every family in the
+/// catalog, and [`families::ALL`] lists them all. The fields match those of
+/// the Fontsource [`/v1/fonts`](https://api.fontsource.org/v1/fonts) endpoint.
 #[derive(Debug, Clone, Copy)]
 pub struct Family {
     /// Fontsource id, used to build CDN URLs (e.g. `"roboto"`).
@@ -35,7 +34,7 @@ pub struct Family {
     pub provider: &'static str,
     /// The `unicode-range` each named subset covers, paired with its [`Subset`].
     ///
-    /// Numbered CJK subset blocks are omitted, so this can be shorter than
+    /// The numbered CJK subsets have no entry, so this can be shorter than
     /// [`subsets`](Self::subsets); look a subset up with
     /// [`unicode_range`](Self::unicode_range).
     pub unicode_ranges: &'static [(Subset, UnicodeRanges)],
@@ -44,7 +43,7 @@ pub struct Family {
 impl Family {
     /// Look up a family by its Fontsource [`id`](Family::id), e.g. `"roboto"`.
     ///
-    /// Returns `None` if no such family is in the vendored catalog.
+    /// Returns `None` if the catalog has no such family.
     #[must_use]
     pub fn by_id(id: &str) -> Option<&'static Family> {
         families::ALL
@@ -56,7 +55,7 @@ impl Family {
     /// Look up a family by the name of its [`families`] constant, e.g.
     /// `"ROBOTO"`.
     ///
-    /// Returns `None` if no such family is in the vendored catalog.
+    /// Returns `None` if the catalog has no such family.
     #[must_use]
     pub fn by_ident(ident: &str) -> Option<&'static Family> {
         families::ALL.iter().copied().find(|f| f.ident == ident)
@@ -65,7 +64,7 @@ impl Family {
     /// Look up a family by its human-readable [`name`](Family::name), e.g.
     /// `"Roboto"`.
     ///
-    /// Returns `None` if no such family is in the vendored catalog.
+    /// Returns `None` if the catalog has no such family.
     #[must_use]
     pub fn by_name(name: &str) -> Option<&'static Family> {
         families::ALL.iter().copied().find(|f| f.name == name)
@@ -112,9 +111,8 @@ impl Family {
 
     /// The `unicode-range` this family ships for `subset`, if known.
     ///
-    /// Returns `None` for subsets without vendored ranges (notably the
-    /// numbered CJK blocks), in which case a face for that subset is emitted
-    /// without a `unicode-range` descriptor.
+    /// Returns `None` when the catalog has no range for `subset`, which is
+    /// the case for the numbered CJK subsets.
     #[must_use]
     pub const fn unicode_range(&self, subset: Subset) -> Option<UnicodeRanges> {
         let mut i = 0;

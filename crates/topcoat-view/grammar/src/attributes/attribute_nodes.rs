@@ -10,9 +10,9 @@ use crate::{
     view::hir::{LowerView, ViewBuilder},
 };
 
-/// A sequence of sibling [`AttributeNode`]s: the attribute-position counterpart
-/// of [`Nodes`](crate::view::Nodes). Used as the body of attribute-position template
-/// constructs (`if`/`for`/`match` inside an opening tag's attribute list).
+/// A sequence of sibling [`AttributeNode`]s, the attribute counterpart of
+/// [`Nodes`](crate::view::Nodes). It is the body of an `if`, `for`, or block
+/// among attributes.
 pub struct AttributeNodes(Vec<AttributeNode>);
 
 impl Deref for AttributeNodes {

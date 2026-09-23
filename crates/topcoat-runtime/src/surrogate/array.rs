@@ -16,6 +16,7 @@ impl<T, const N: usize> ArraySurrogate<T, N> {
         Self(value)
     }
 
+    /// Borrows the array as a slice.
     #[must_use]
     pub fn as_slice(&self) -> &SliceSurrogate<T> {
         SliceSurrogate::ref_cast(self.0.as_slice())
@@ -23,6 +24,7 @@ impl<T, const N: usize> ArraySurrogate<T, N> {
 }
 
 impl<T: Clone, const N: usize> ArraySurrogate<T, N> {
+    /// Returns a copy of the array.
     #[must_use]
     pub fn to_owned(&self) -> Self {
         self.clone()

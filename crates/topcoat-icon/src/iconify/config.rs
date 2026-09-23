@@ -8,9 +8,8 @@ use std::{
 
 use crate::iconify::{BuildError, IconSet, Result, set::STAGE_DIR};
 
-/// Builder for staging the Iconify icon sets used by the
-/// `iconify::include!` and `iconify::iconify_icon!` macros. Use from a
-/// build script:
+/// Stages Iconify icon sets for the `iconify::include!` and
+/// `iconify::iconify_icon!` macros. Call it from a build script:
 ///
 /// ```rust,no_run
 /// topcoat::icon::iconify::BuildConfig::new()
@@ -20,16 +19,14 @@ use crate::iconify::{BuildError, IconSet, Result, set::STAGE_DIR};
 ///     .unwrap();
 /// ```
 ///
-/// Each set is staged to `$OUT_DIR/topcoat-icon-iconify/<set>.json` in the
-/// `IconifyJSON` format, downloading the set's `@iconify-json/<set>` package
-/// from jsDelivr into a cache first. Once a set is cached, builds stay
-/// offline.
+/// Each set is downloaded from the `@iconify-json/<set>` package on jsDelivr
+/// into a cache, then written to the build's `OUT_DIR` in the `IconifyJSON`
+/// format, where the macros read it. Once a set is cached, builds do not need
+/// network access.
 ///
-/// The cache lives in `topcoat/cache/iconify` inside the Cargo target
-/// directory by default, shared across the workspace; pass a
+/// By default the cache is `topcoat/cache/iconify` inside the Cargo target
+/// directory, shared by every package in the workspace. Pass
 /// [`cache_dir`](Self::cache_dir) to use a directory of your own instead.
-/// Files you place in the cache yourself are picked up without downloading,
-/// so icon sets that are not on Iconify can be vendored the same way.
 #[derive(Debug, Default)]
 pub struct BuildConfig {
     cache_dir: Option<PathBuf>,
@@ -43,9 +40,12 @@ impl BuildConfig {
         Self::default()
     }
 
-    /// Stages the latest version of `set`, downloading it when it is not
-    /// cached yet. To pick up new releases, delete the cached copy or pin a
-    /// version with [`icon_set_version`](Self::icon_set_version).
+    /// Adds the latest version of `set`, named by its Iconify prefix such as
+    /// `"mdi"`.
+    ///
+    /// The set is downloaded only when it is not cached yet. To pick up a new
+    /// release, delete the cached copy or pin a version with
+    /// [`icon_set_version`](Self::icon_set_version).
     #[must_use]
     pub fn icon_set(mut self, set: impl Into<String>) -> Self {
         self.sets.push(Set {
@@ -55,9 +55,11 @@ impl BuildConfig {
         self
     }
 
-    /// Stages `version` of `set`, downloading it whenever the cached copy
-    /// was cached from a different version. The version a copy was cached
-    /// from is tracked in a `<set>.version` file next to it.
+    /// Adds a pinned `version` of `set`.
+    ///
+    /// The set is downloaded again whenever the cached copy has a different
+    /// version. The cached version is stored in a `<set>.version` file next
+    /// to the cached set.
     #[must_use]
     pub fn icon_set_version(mut self, set: impl Into<String>, version: impl Into<String>) -> Self {
         self.sets.push(Set {
@@ -67,31 +69,32 @@ impl BuildConfig {
         self
     }
 
-    /// Caches downloaded sets in `dir` instead of the shared Topcoat cache
-    /// in the target directory. Relative paths resolve against
-    /// `CARGO_MANIFEST_DIR` (the package root).
+    /// Caches downloaded sets in `dir` instead of the shared Topcoat cache in
+    /// the target directory. A relative path is resolved against the package
+    /// root (`CARGO_MANIFEST_DIR`).
     ///
-    /// Each set is cached at `<dir>/<set>.json` and downloaded only when
-    /// its file is missing or, for an
-    /// [`icon_set_version`](Self::icon_set_version) set, cached from a
-    /// different version. Files you place there yourself are used as-is.
-    /// Commit the directory for offline, reproducible builds, or gitignore
-    /// it to keep a cache that survives `cargo clean`.
+    /// Each set is cached at `<dir>/<set>.json`. It is downloaded only when
+    /// the file is missing or, for a set added with
+    /// [`icon_set_version`](Self::icon_set_version), has a different version.
+    /// Files you place there yourself are used as-is, so an icon set that is
+    /// not on Iconify can be added the same way. Commit the directory for
+    /// offline, reproducible builds, or ignore it in git to keep a cache that
+    /// survives `cargo clean`.
     #[must_use]
     pub fn cache_dir(mut self, dir: impl Into<PathBuf>) -> Self {
         self.cache_dir = Some(dir.into());
         self
     }
 
-    /// Stages every set into `$OUT_DIR/topcoat-icon-iconify`.
+    /// Stages every added set, downloading the ones that are not cached.
     ///
     /// # Errors
     ///
-    /// Returns `Err` if `OUT_DIR` is unset (or `CARGO_MANIFEST_DIR`, with a
-    /// cache directory), a download fails, a file cannot be read or written,
-    /// or a set does not match the `IconifyJSON` schema, declares a prefix
-    /// other than the name it is staged as, or contains an alias that does
-    /// not lead to an icon.
+    /// Returns an error if it is not called from a build script, a download
+    /// fails, a file cannot be read or written, or a set is not valid
+    /// `IconifyJSON`. A set is also rejected when it declares a different
+    /// prefix than the name it was added with, or when one of its aliases
+    /// does not lead to an icon.
     pub fn stage(self) -> Result {
         let out_dir = env::var_os("OUT_DIR").ok_or(BuildError::NoOutDir)?;
         let dir = PathBuf::from(out_dir).join(STAGE_DIR);

@@ -9,19 +9,19 @@ use tokio_tungstenite::tungstenite;
 
 /// A WebSocket message, received from or sent to the client.
 ///
-/// `Text` and `Binary` are the messages an application exchanges. `Ping` and
-/// `Pong` are the protocol's keep-alive probes: an incoming `Ping` is answered
-/// automatically, so most applications only observe them. `Close` starts (or
-/// acknowledges) the closing handshake, optionally carrying a [`CloseFrame`]
-/// with a [code](CloseCode) and a reason.
+/// `Text` and `Binary` carry application data. `Ping` and `Pong` are the
+/// keep-alive probes of the protocol. An incoming `Ping` is answered
+/// automatically, so most applications can ignore them. `Close` starts or
+/// answers the closing handshake, and can carry a [`CloseFrame`] with a
+/// [code](CloseCode) and a reason.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[must_use]
 pub enum Message {
-    /// A text message, guaranteed to be valid UTF-8.
+    /// A text message. Its payload is always valid UTF-8.
     Text(Utf8Bytes),
     /// A binary message.
     Binary(Bytes),
-    /// A ping probe, answered with a `Pong` automatically.
+    /// A ping probe. Incoming pings are answered with a `Pong` automatically.
     Ping(Bytes),
     /// The answer to a ping probe.
     Pong(Bytes),
@@ -30,18 +30,20 @@ pub enum Message {
 }
 
 impl Message {
-    /// Builds a text message.
+    /// Creates a text message.
     pub fn text(text: impl Into<Utf8Bytes>) -> Self {
         Self::Text(text.into())
     }
 
-    /// Builds a binary message.
+    /// Creates a binary message.
     pub fn binary(data: impl Into<Bytes>) -> Self {
         Self::Binary(data.into())
     }
 
-    /// Consumes the message, returning its payload as bytes: the text or
-    /// binary data, a probe's payload, or a close message's reason.
+    /// Consumes the message and returns its payload as bytes.
+    ///
+    /// For a close message, the payload is the reason, or empty bytes when
+    /// there is no close frame.
     #[must_use]
     pub fn into_data(self) -> Bytes {
         match self {
@@ -51,12 +53,12 @@ impl Message {
         }
     }
 
-    /// Consumes the message, returning its payload as UTF-8 text.
+    /// Consumes the message and returns its payload as UTF-8 text.
     ///
     /// # Errors
     ///
-    /// Returns an error if the payload is not valid UTF-8. A `Text` message
-    /// never fails; the other variants carry arbitrary bytes.
+    /// Returns an error if the payload is not valid UTF-8. This never happens
+    /// for a `Text` message, but the other variants can carry any bytes.
     pub fn into_text(self) -> Result<Utf8Bytes, Utf8Error> {
         match self {
             Self::Text(text) => Ok(text),
@@ -124,12 +126,12 @@ impl From<Bytes> for Message {
     }
 }
 
-/// Cheaply cloneable bytes guaranteed to contain valid UTF-8, used as the
-/// payload of a text [`Message`].
+/// Bytes that always hold valid UTF-8, used as the payload of a text
+/// [`Message`]. Cloning is cheap.
 ///
-/// Dereferences to [`str`], so string methods are available directly. Build
+/// It dereferences to [`str`], so string methods work on it directly. Create
 /// one from a string with [`From`], or from bytes with [`TryFrom`], which
-/// validates the encoding.
+/// checks the encoding.
 #[derive(Debug, Clone, Default)]
 pub struct Utf8Bytes(tungstenite::Utf8Bytes);
 
@@ -221,32 +223,30 @@ impl From<Utf8Bytes> for Bytes {
     }
 }
 
-/// The payload of a close [`Message`]: a status code and a human-readable
-/// reason.
+/// The payload of a close [`Message`]: a status code and a reason.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CloseFrame {
-    /// The status code explaining why the connection is closing, typically one
-    /// of the [`close_code`] constants.
+    /// The status code that says why the connection is closing, usually one of
+    /// the [`close_code`] constants.
     pub code: CloseCode,
-    /// A human-readable explanation, which may be empty.
+    /// A human-readable explanation. It can be empty.
     pub reason: Utf8Bytes,
 }
 
 /// The status code of a [`CloseFrame`].
 ///
-/// The registered codes are available as the [`close_code`] constants; ranges
-/// outside them are reserved for applications and extensions by the protocol.
+/// The registered codes are available as the [`close_code`] constants. RFC 6455 leaves the range
+/// 4000 to 4999 for private use by applications.
 pub type CloseCode = u16;
 
-/// The registered [`CloseCode`] values a close message can carry, from RFC
-/// 6455.
+/// The registered [`CloseCode`] values that a close message can carry.
 pub mod close_code {
     use super::CloseCode;
 
     /// The purpose for which the connection was established is fulfilled.
     pub const NORMAL: CloseCode = 1000;
-    /// The endpoint is going away: the server shuts down, or the browser
-    /// leaves the page.
+    /// The endpoint is going away, for example because the server shuts down
+    /// or the browser leaves the page.
     pub const AWAY: CloseCode = 1001;
     /// The endpoint received a message that violates the protocol.
     pub const PROTOCOL: CloseCode = 1002;
@@ -265,9 +265,9 @@ pub mod close_code {
     /// The server encountered an unexpected condition that prevents it from
     /// fulfilling the request.
     pub const ERROR: CloseCode = 1011;
-    /// The server is restarting; the client may reconnect.
+    /// The server is restarting. The client may reconnect.
     pub const RESTART: CloseCode = 1012;
-    /// The server is overloaded; the client should reconnect later or to a
+    /// The server is overloaded. The client should reconnect later or to a
     /// different server.
     pub const AGAIN: CloseCode = 1013;
 }

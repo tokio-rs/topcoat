@@ -11,32 +11,34 @@ use super::{
 };
 use crate::{DEFAULT_REGISTRY, Dependency, Registry, content_hash};
 
-/// What to add and from where.
+/// Options for [`add`].
 pub struct AddOptions {
-    /// Names of the components to add (e.g. `button`). Each is resolved and
-    /// installed along with its transitive dependencies.
+    /// The names of the components to add, such as `button`. Their
+    /// dependencies are added too.
     pub components: Vec<String>,
-    /// Registry crate to add from (defaults to the built-in default registry).
+    /// The registry to add from. When `None`, the built-in registry is
+    /// preferred.
     pub registry: Option<String>,
-    /// Overwrite the component file if it already exists.
+    /// Whether to replace the file of a requested component that already
+    /// exists. Files of dependencies are never replaced.
     pub overwrite: bool,
 }
 
 /// A component written into the package by [`add`].
 pub struct AddedComponent {
-    /// The component's name.
+    /// The name of the component.
     pub name: String,
-    /// The package-relative path of the written file.
+    /// The path of the written file, relative to the package root.
     pub file: PathBuf,
-    /// The registry crate it was added from.
+    /// The name of the registry it was added from.
     pub registry: String,
 }
 
 /// The result of [`add`].
 pub enum AddOutcome {
-    /// Nothing was written; every needed file was already present.
+    /// Nothing was written, because every needed file already existed.
     UpToDate,
-    /// One or more components were written.
+    /// These components were written.
     Added(Vec<AddedComponent>),
 }
 
@@ -68,27 +70,34 @@ struct PlannedRemoval {
     file_name: String,
 }
 
-/// Adds a component (and its transitive dependencies) to the package.
+/// Adds components and their dependencies to the package: implements
+/// `topcoat ui add`.
 ///
-/// The operation is transactional: it walks the requested component and its
-/// dependencies, loading registries and reading sources without touching disk,
-/// and only commits the writes once everything resolves. Interactive decisions
-/// (pulling from a non-default registry, or replacing a file owned by another
-/// registry) are delegated to `confirm`.
+/// For each component, this copies its source into the components directory,
+/// adds a `pub mod` declaration for it to the components module file, and
+/// records it in `components.toml`. The module file is the `<dir>.rs` file
+/// next to the components directory, or `mod.rs` inside it if that file
+/// exists.
+///
+/// Without [`AddOptions::registry`], a component comes from the built-in
+/// registry if it offers it. Otherwise `confirm` is asked whether to use the
+/// one other registry that offers it. `confirm` is also asked before replacing
+/// a file that holds a component from another registry.
+///
+/// Everything is resolved before anything is written, so most errors leave
+/// the package unchanged.
 ///
 /// # Errors
 ///
-/// Returns an error if the install state or workspace cannot be loaded, a
-/// requested component or its registry cannot be resolved, a confirmation
-/// prompt is declined, an existing file would be overwritten without
-/// `overwrite`, or any file write, module declaration, or state save fails.
+/// Returns an error if the package has no `components.toml`, if a component
+/// or registry cannot be found, if `confirm` declines or fails, if a requested
+/// component's file exists and [`AddOptions::overwrite`] is not set, if the
+/// components directory has both a `<dir>.rs` and a `mod.rs` module file, or
+/// if a file cannot be written.
 ///
 /// # Panics
 ///
-/// Panics if a registry found to conflict with a new component is no longer
-/// present in the install state when its old component is removed. This is an
-/// internal invariant: the conflict was discovered by iterating the state, so
-/// the registry must still be tracked.
+/// Panics if an internal invariant of the install state is broken.
 pub fn add(
     package: &Package,
     options: &AddOptions,

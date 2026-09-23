@@ -1,26 +1,25 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
-//! Premade UI components for Topcoat applications.
+//! Component registries and the `topcoat ui` workflow.
 //!
-//! In the spirit of [shadcn/ui](https://ui.shadcn.com), components are not
-//! consumed as an opaque dependency. Instead, `topcoat ui add <name>` copies a
-//! component's source straight into the user's project, where it can be freely
-//! modified.
+//! Like [shadcn/ui](https://ui.shadcn.com), Topcoat UI components are not used
+//! as a library dependency. `topcoat ui add <name>` copies the source of a
+//! component into your project, where you can change it freely.
 //!
-//! This crate models the *registry* that backs that command. A registry is a
-//! cargo crate that carries a `[package.metadata.topcoat-ui]` key pointing at a
-//! directory holding a `registry.toml` manifest alongside the component source
-//! files. A registry is referenced by its crate name and must be a dependency
-//! of the consuming project, so its component source is always present locally
-//! at the matching version. Registries are read at runtime, so the set of
-//! available components can change without rebuilding the CLI.
+//! This crate reads the *registries* that the components come from. A
+//! registry is a Cargo crate with a `[package.metadata.topcoat-ui]` key. The
+//! key points at a directory that holds a hand-written `registry.toml`
+//! manifest next to the component sources. A project refers to a registry by
+//! its crate name and must depend on it, so the component sources are on
+//! disk at the version the project uses. The CLI reads registries when it
+//! runs, so it does not need to be rebuilt when their components change.
 //!
-//! Each component is versioned independently by a hash of its source (see
-//! [`content_hash`]). A `registry.toml` records no hashes: it names each
-//! component and its source file, and the hash is computed from the registry's
-//! current source. The hash is recorded in the project's install state when a
-//! component is added, then recomputed from the registry to surface updates.
+//! The version of each component is a hash of its source, computed with
+//! [`content_hash`]. `registry.toml` records no hashes. When you add a
+//! component, its hash is recorded in the project's install state. Comparing
+//! it with a fresh hash of the registry source shows whether an update is
+//! available.
 //!
-//! A `registry.toml` is written by hand; there is no generator.
+//! The [`manage`] module implements the `topcoat ui` commands.
 
 pub mod manage;
 mod registry;

@@ -7,10 +7,10 @@ use topcoat::{
 /// The classes for the native `<input type="checkbox">` inside the
 /// [`checkbox`] component.
 ///
-/// The native glyph is suppressed with `appearance-none` so the component can
-/// draw its own checkmark, which keeps the control looking the same across
-/// browsers. The unchecked box matches the input control's border;
-/// checking it fills the box with the primary color.
+/// `appearance-none` hides the native checkmark, so the component can draw
+/// its own and look the same in all browsers. The unchecked box has the same
+/// border as the input control. When checked, the box is filled with the
+/// primary color.
 const CHECKBOX: StaticClass = class!(
     "peer size-4 shrink-0 appearance-none rounded-[4px] border border-border \
      bg-background transition-colors outline-none \
@@ -19,13 +19,13 @@ const CHECKBOX: StaticClass = class!(
      focus-visible:ring-offset-background disabled:pointer-events-none",
 );
 
-/// A checkbox component: a themed native `<input type="checkbox">`.
+/// A checkbox, rendered as a styled native `<input type="checkbox">`.
 ///
 /// The `attrs` (such as `name`, `checked`, `disabled`, or event handlers) are
-/// forwarded to the `<input>`; a `class` among them is appended to the
-/// wrapping element's classes. Set the checked state with a plain `checked`
-/// attribute. The indeterminate state is not styled: it is only reachable
-/// through the DOM property, so setting it takes a script to begin with.
+/// forwarded to the `<input>`. A `class` among them is not put on the input
+/// but appended to the classes of the `<span>` that wraps it. Set the checked
+/// state with a `checked` attribute. The indeterminate state has no style of
+/// its own, because it can only be set from a script.
 ///
 /// ```ignore
 /// view! {
@@ -37,9 +37,9 @@ const CHECKBOX: StaticClass = class!(
 /// ```
 #[component]
 pub async fn checkbox(#[default] mut attrs: Attributes) -> Result<impl View> {
-    // The checkmark cannot be drawn by the `<input>` itself, which renders no
-    // children or pseudo-elements: it is a sibling icon overlaid on the
-    // control, revealed by the input's `peer` state while checked.
+    // The `<input>` cannot draw the checkmark, because it renders no children
+    // or pseudo-elements. So the checkmark is a sibling icon placed over the
+    // control, and the input's `peer` state shows it while checked.
     Ok(view! {
         <span
             class=(class!(

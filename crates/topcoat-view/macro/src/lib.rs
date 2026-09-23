@@ -1,3 +1,10 @@
+//! Procedural macros for Topcoat's views: `view!`, `live!`, `emit!`,
+//! `attributes!`, `class!`, `#[component]`, and `#[derive(Props)]`.
+//!
+//! Application code uses these macros through the `topcoat::view` module of
+//! the [`topcoat`](https://docs.rs/topcoat) crate. Their documentation is
+//! written for that module, so its links resolve there.
+
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 use proc_macro::TokenStream;

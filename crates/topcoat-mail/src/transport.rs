@@ -16,39 +16,37 @@ pub use memory::*;
 #[cfg(feature = "smtp")]
 pub use smtp::*;
 
-/// The future returned by [`Transport::send`]: a boxed, `Send` future
-/// borrowing the transport and the request context.
+/// The boxed future returned by [`Transport::send`].
 pub type TransportFuture<'a> = Pin<Box<dyn Future<Output = Result<Receipt>> + Send + 'a>>;
 
 /// Delivers a [`Mail`] to its recipients.
 ///
-/// A transport receives the mail as declared content, assembles its wire
-/// form (rendering the HTML view with the request context), and hands it
-/// to a delivery mechanism. The crate ships three: `SmtpTransport` submits
-/// to an SMTP server (behind the `smtp` feature), [`FileTransport`] writes
-/// `.eml` files during development, and [`MemoryTransport`] captures mail in
+/// A transport turns the mail into a message, rendering the HTML body with
+/// the request context, and delivers it. Topcoat includes transports for
+/// SMTP, for writing files during development, and for capturing mail in
 /// tests.
 ///
-/// Implement this trait to deliver through anything else, such as a mail
-/// provider's HTTP API. [`Mail::formatted`] produces the RFC 5322 wire form
-/// for APIs that accept raw messages.
+/// Implement this trait to deliver mail some other way, such as through the
+/// HTTP API of a mail provider. [`Mail::formatted`] renders a complete RFC
+/// 5322 message for APIs that accept raw messages.
 pub trait Transport: Send + Sync {
-    /// Sends the mail, returning a [`Receipt`] once the delivery mechanism
-    /// accepts it.
+    /// Sends the mail and returns a [`Receipt`] once it is accepted for
+    /// delivery.
     ///
-    /// Acceptance is not receipt: a transport reports that the mail was
-    /// handed off successfully, not that it reached an inbox.
+    /// A receipt means that the mail was handed off, not that it reached an
+    /// inbox.
     fn send<'a>(&'a self, cx: &'a Cx, mail: Mail) -> TransportFuture<'a>;
 }
 
-/// Proof that a transport accepted a mail, carrying its `Message-ID`.
+/// Confirmation that a transport accepted a mail, with the mail's
+/// `Message-ID`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Receipt {
     message_id: String,
 }
 
 impl Receipt {
-    /// A receipt for the mail with the given `Message-ID`. Called by
+    /// Creates a receipt for the mail with the given `Message-ID`, for use in
     /// [`Transport`] implementations.
     #[must_use]
     pub fn new(message_id: impl Into<String>) -> Receipt {
@@ -57,10 +55,10 @@ impl Receipt {
         }
     }
 
-    /// The `Message-ID` of the sent mail, as it appears in the header.
-    /// It is generated at send time unless the mail declared one.
+    /// The `Message-ID` header of the sent mail. It is generated when the
+    /// mail is sent, unless the mail set one.
     ///
-    /// Store it to thread a later mail onto this one with
+    /// Save it to send a later mail in the same thread with
     /// [`in_reply_to`](crate::MailBuilder::in_reply_to).
     #[must_use]
     pub fn message_id(&self) -> &str {
@@ -68,53 +66,52 @@ impl Receipt {
     }
 }
 
-/// The reason a mail could not be sent.
+/// The error returned when a mail cannot be sent.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum SendError {
-    /// The mail declares no `From` address.
+    /// The mail has no `From` address.
     #[error("mail has no `From` address")]
     MissingFrom,
 
-    /// The mail declares no `To`, `Cc`, or `Bcc` recipient.
+    /// The mail has no `To`, `Cc`, or `Bcc` recipient.
     #[error("mail has no recipients")]
     MissingRecipients,
 
-    /// The mail declares neither an HTML nor a plain-text body.
+    /// The mail has neither an HTML nor a plain-text body.
     #[error("mail has no body")]
     MissingBody,
 
-    /// The mail carries an inline attachment but no HTML body that could
-    /// reference it.
+    /// The mail has an inline attachment but no HTML body to show it in.
     #[error("mail has an inline attachment but no HTML body to reference it")]
     InlineWithoutHtml,
 
-    /// An attachment declares a content type that is not a valid MIME type.
+    /// An attachment has a content type that is not a valid MIME type.
     #[error("invalid attachment content type {content_type:?}")]
     InvalidContentType {
         /// The rejected content type.
         content_type: String,
     },
 
-    /// A custom header declares an invalid header name.
+    /// A custom header has an invalid name.
     #[error("invalid header name {name:?}")]
     InvalidHeaderName {
         /// The rejected header name.
         name: String,
     },
 
-    /// The mail could not be assembled into its wire form.
+    /// The mail could not be turned into a message.
     #[error("could not assemble the mail")]
     Assembly(#[source] Box<dyn std::error::Error + Send + Sync>),
 
-    /// The delivery mechanism failed to accept the mail.
+    /// The transport failed to deliver the mail.
     #[error("could not deliver the mail")]
     Delivery(#[source] Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl SendError {
-    /// Wraps a delivery failure. Called by [`Transport`] implementations
-    /// to report errors from the underlying delivery mechanism.
+    /// Creates a [`Delivery`](Self::Delivery) error from `error`, for use in
+    /// [`Transport`] implementations.
     #[must_use]
     pub fn delivery(error: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> SendError {
         SendError::Delivery(error.into())

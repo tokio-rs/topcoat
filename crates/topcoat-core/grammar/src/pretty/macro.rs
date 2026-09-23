@@ -5,24 +5,35 @@ use syn::{
 
 use crate::pretty::{BreakMode, Delim, PrettyPrint, Printer, Unspaced};
 
-/// A wrapper type that parses and pretty-prints content with any of the three delimiter types.
+/// A macro body of type `T` together with the delimiters around it.
 ///
-/// - **Parentheses `()`**: No extra spacing around content
-/// - **Braces `{}`**: Adds spaces around content (e.g., `{ foo }`), except when the body is empty,
-///   which prints as `{}`
-/// - **Brackets `[]`**: No extra spacing around content
+/// Parses and prints a body in any of the three delimiters:
+///
+/// - Parentheses `()` and brackets `[]` print with no space around the body.
+/// - Braces `{}` print with a space around the body, as in `{ foo }`, except when the body is
+///   empty, which prints as `{}`.
 pub enum Macro<T> {
+    /// A body in parentheses.
     Parenthesized {
+        /// The parentheses.
         paren: syn::token::Paren,
+        /// The body.
         inner: T,
     },
+    /// A body in braces.
     Braced {
+        /// The braces.
         brace: syn::token::Brace,
+        /// Whether only whitespace sits between the braces in the source.
         empty: bool,
+        /// The body.
         inner: T,
     },
+    /// A body in brackets.
     Bracketed {
+        /// The brackets.
         bracket: syn::token::Bracket,
+        /// The body.
         inner: T,
     },
 }

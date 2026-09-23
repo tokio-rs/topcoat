@@ -13,11 +13,11 @@ use crate::{
     mime::{self, BccHeader},
 };
 
-/// A [`Transport`] that submits mail to an SMTP server.
+/// A [`Transport`] that sends mail to an SMTP server.
 ///
-/// This is the production transport: point it at a mail provider's
-/// submission endpoint or your own mail server. Connections are pooled and
-/// reused across sends.
+/// Use it in production with the submission server of a mail provider or with
+/// your own mail server. It keeps a pool of connections and reuses them
+/// across sends.
 ///
 /// ```no_run
 /// use topcoat_mail::SmtpTransport;
@@ -34,36 +34,36 @@ pub struct SmtpTransport {
 }
 
 impl SmtpTransport {
-    /// Connects to `host` over implicit TLS on port 465, the modern
-    /// submission setup most mail providers offer.
+    /// Configures a connection to `host` over TLS on port 465, which most
+    /// mail providers offer.
     ///
     /// # Errors
     ///
-    /// Returns [`SmtpError`] if the TLS parameters for `host` cannot be
-    /// established.
+    /// Returns [`SmtpError`] if the TLS settings for `host` cannot be
+    /// created.
     pub fn relay(host: &str) -> Result<SmtpTransportBuilder, SmtpError> {
         Ok(SmtpTransportBuilder {
             inner: AsyncSmtpTransport::<Tokio1Executor>::relay(host).map_err(SmtpError)?,
         })
     }
 
-    /// Connects to `host` on port 587, upgrading the connection with
-    /// STARTTLS, for providers that only offer the older submission setup.
+    /// Configures a connection to `host` on port 587 that is upgraded to TLS
+    /// with STARTTLS, for providers that do not offer port 465.
     ///
     /// # Errors
     ///
-    /// Returns [`SmtpError`] if the TLS parameters for `host` cannot be
-    /// established.
+    /// Returns [`SmtpError`] if the TLS settings for `host` cannot be
+    /// created.
     pub fn starttls(host: &str) -> Result<SmtpTransportBuilder, SmtpError> {
         Ok(SmtpTransportBuilder {
             inner: AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(host).map_err(SmtpError)?,
         })
     }
 
-    /// Connects to `host` on port 25 without encryption.
+    /// Configures a connection to `host` on port 25 without encryption.
     ///
-    /// Credentials and mail travel in clear text, so this belongs only in
-    /// development, against a local catch-all server like Mailpit:
+    /// Credentials and mail are sent as plain text, so only use this in
+    /// development, with a local test server such as Mailpit:
     ///
     /// ```no_run
     /// use topcoat_mail::SmtpTransport;
@@ -77,10 +77,10 @@ impl SmtpTransport {
         }
     }
 
-    /// Connects according to a connection URL, the form that fits a single
+    /// Configures a connection from a URL, which fits well into a single
     /// environment variable:
     ///
-    /// - `smtps://user:pass@smtp.example.com:465` for implicit TLS.
+    /// - `smtps://user:pass@smtp.example.com:465` for TLS.
     /// - `smtp://user:pass@smtp.example.com:587?tls=required` for STARTTLS.
     /// - `smtp://localhost:1025` for an unencrypted development server.
     ///
@@ -110,13 +110,14 @@ impl Transport for SmtpTransport {
     }
 }
 
-/// Assembles an [`SmtpTransport`], created by its connection constructors.
+/// Builder for an [`SmtpTransport`], created by [`SmtpTransport::relay`] and
+/// the other constructors.
 pub struct SmtpTransportBuilder {
     inner: AsyncSmtpTransportBuilder,
 }
 
 impl SmtpTransportBuilder {
-    /// Overrides the port the connection constructor chose.
+    /// Sets the port, replacing the one the constructor chose.
     #[must_use]
     pub fn port(mut self, port: u16) -> SmtpTransportBuilder {
         self.inner = self.inner.port(port);
@@ -143,7 +144,7 @@ impl SmtpTransportBuilder {
         self
     }
 
-    /// Finishes the builder into an [`SmtpTransport`].
+    /// Returns the finished [`SmtpTransport`].
     #[must_use]
     pub fn build(self) -> SmtpTransport {
         SmtpTransport {
@@ -152,7 +153,7 @@ impl SmtpTransportBuilder {
     }
 }
 
-/// The reason an SMTP connection could not be configured.
+/// The error returned when an SMTP connection cannot be configured.
 #[derive(Debug, thiserror::Error)]
 #[error("invalid SMTP configuration: {0}")]
 pub struct SmtpError(lettre::transport::smtp::Error);

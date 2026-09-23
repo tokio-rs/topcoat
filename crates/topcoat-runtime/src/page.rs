@@ -21,23 +21,24 @@ struct PageRerunRequest {
     signals: SignalValues,
 }
 
-/// A [`Route`] that re-runs a page with the signal values a client sends.
+/// A [`Route`] that re-runs a page with the signal values the browser sends.
 ///
-/// The browser runtime posts to the route with the page's path and query
-/// appended, and the route rewrites the request into a plain `GET` for the
-/// page with the signal values on its request context, so the page runs
-/// through its layouts and guards as if the client had requested it, and
+/// The browser runtime posts to this route with the page's path and query
+/// appended. The route rewrites the request into a plain `GET` for the page
+/// and puts the signal values on its request context. The page then runs
+/// through its layouts and guards as if the browser had requested it, and
 /// [`signal`](crate::signal) resumes from the values sent.
 ///
-/// A page path is matched by a catch-all segment, which needs at least one
-/// segment, so the root page has a route of its own at the bare prefix.
+/// The route for nested pages matches the path with a catch-all segment,
+/// which needs at least one segment, so the root page has a route of its
+/// own. `RouterBuilderRuntimeExt::runtime` registers both.
 pub struct PageRerunRoute {
     id: RouteId,
     path: PathBuf,
 }
 
 impl PageRerunRoute {
-    /// The route re-running the root page.
+    /// Creates the route that re-runs the root page.
     #[must_use]
     pub fn root() -> Self {
         Self {
@@ -46,7 +47,7 @@ impl PageRerunRoute {
         }
     }
 
-    /// The route re-running every page below the root.
+    /// Creates the route that re-runs every page below the root.
     #[must_use]
     pub fn nested() -> Self {
         Self {

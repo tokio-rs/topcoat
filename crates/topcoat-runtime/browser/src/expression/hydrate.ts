@@ -10,6 +10,10 @@ import { String as RuntimeString, Str } from "../surrogate/string";
 import type { Context } from "./context";
 import type { DehydratedSurrogate } from "./serialized";
 
+/**
+ * Converts a value serialized by the server into its runtime object. Throws
+ * on a value of an unknown type.
+ */
 export function hydrate(value: DehydratedSurrogate, cx: Context): unknown {
 	if (value === null) return undefined;
 

@@ -1,21 +1,26 @@
 import { signal, type WriteSignal } from "./reactivity";
 
+/** A signal's id, as the server renders it: 32 hex digits. */
 export type SignalId = string;
 
+/** Every signal the document holds, keyed by id. */
 export class SignalRegistry {
 	private readonly signals = new Map<SignalId, WriteSignal<unknown>>();
 
+	/** Whether a signal with this id exists. */
 	has(id: SignalId): boolean {
 		return this.signals.has(id);
 	}
 
+	/** Returns the signal with this id, if any. */
 	get(id: SignalId): WriteSignal<unknown> | undefined {
 		return this.signals.get(id);
 	}
 
 	/**
-	 * Inserts a signal with the given id. If one already exists, the call is a
-	 * no-op (existing signal wins). Returns `true` iff a new signal was created.
+	 * Inserts a signal with the given id and initial value. If one already
+	 * exists, the existing signal is kept and nothing changes. Returns whether
+	 * a new signal was created.
 	 */
 	insert(id: SignalId, value: unknown): boolean {
 		if (this.signals.has(id)) return false;
@@ -23,6 +28,7 @@ export class SignalRegistry {
 		return true;
 	}
 
+	/** Removes the signal with this id. */
 	delete(id: SignalId): void {
 		this.signals.delete(id);
 	}

@@ -3,6 +3,11 @@ use topcoat_view::{NodeViewParts, PartsWriter, ViewHandle};
 
 use crate::{Js, ShardId};
 
+/// The rendered form of a shard invocation: its content wrapped in the
+/// marker comments the browser runtime uses to find the shard, its
+/// arguments, and its identity.
+///
+/// `#[shard]` generates the code that creates it.
 pub struct ShardScope {
     /// The identity of the shard invocation, which names the scope in its
     /// markers and which the browser sends back with a re-render request so
@@ -14,6 +19,9 @@ pub struct ShardScope {
 }
 
 impl ShardScope {
+    /// Creates a scope for the invocation with `identity` of the shard
+    /// `shard_id`, with the JavaScript of each argument and the content
+    /// rendered on the server.
     #[inline]
     #[must_use]
     pub fn new(

@@ -11,32 +11,38 @@ use crate::{
     response::Response,
 };
 
-/// The future returned by [`Layer::handle`] and [`Next::run`]: a boxed, `Send`
-/// future borrowing the chain and the request context.
+/// The future returned by [`Layer::handle`] and [`Next::run`].
+///
+/// It is boxed and `Send`, and it may borrow the layer chain and the request
+/// context.
 pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send + 'a>>;
 
-/// A request-processing layer that wraps the routes nested under its path,
-/// similar to a tower middleware.
+/// Code that runs around the routes under a path, similar to a tower
+/// middleware.
 ///
-/// A layer with a path wraps every matched route whose path begins with it
-/// (the same prefix rule as layouts), so a layer at `/admin` wraps only routes
-/// under `/admin`, and one at `/` wraps every matched route. A layer without a
-/// path wraps every request, including one that matches no route: the chain
-/// then resolves to the not-found or method-not-allowed error, which the layer
-/// receives as the `Err` returned by [`Next::run`]. Each layer receives the
-/// [`Cx`] and the request [`Body`], plus a [`Next`] representing the rest of
-/// the chain. A layer typically derives a child context carrying
-/// request-scoped values with [`Cx::with`], passes it to [`Next::run`] to
-/// invoke the inner layers and ultimately the route, then inspects or modifies
-/// the [`Response`]. Headers meant for the response of an error coming back
-/// up the chain go through [`response_headers`](crate::response::response_headers),
-/// since that response is only built once the error leaves the chain.
+/// A layer receives the request context, the request [`Body`], and a
+/// [`Next`] that stands for the rest of the chain. It calls [`Next::run`] to
+/// run the inner layers and then the route, and can inspect or change the
+/// [`Response`] that comes back. To pass request-scoped values inward, run
+/// `next` with a child context made by [`Cx::with`].
 ///
-/// When several layers match a route they nest from least-specific (outermost)
-/// to most-specific (innermost), like layouts; a layer without a path runs
-/// outside every layer with one.
+/// A layer with a path wraps every route whose path starts with it, the same
+/// rule layouts follow. A layer at `/admin` wraps only the routes under
+/// `/admin`, and a layer at `/` wraps every route. A layer without a path
+/// wraps every request, including one that matches no route. For such a
+/// request, [`Next::run`] returns the not-found or method-not-allowed error.
 ///
-/// Register layers with [`RouterBuilder::layer`](crate::RouterBuilder::layer).
+/// An error returned from [`Next::run`] only becomes a response after it
+/// leaves the whole chain. To add headers to that response, use
+/// [`response_headers`](crate::response::response_headers) instead of
+/// changing a response.
+///
+/// When several layers wrap a route, the one with the shorter path runs
+/// outside the one with the longer path, and layers without a path run
+/// outside all of them.
+///
+/// Register layers with [`RouterBuilder::layer`](crate::RouterBuilder::layer),
+/// or use [`LayerFn`] to make one from a function.
 ///
 /// # Examples
 ///
@@ -66,8 +72,8 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 /// }
 /// ```
 pub trait Layer: Send + Sync + 'static {
-    /// The URL path prefix whose matched routes this layer wraps, or `None`
-    /// to wrap every request.
+    /// Returns the path whose routes this layer wraps, or `None` to wrap every
+    /// request.
     fn path(&self) -> Option<&Path>;
 
     /// Handles a request, calling `next` to continue down the chain.
@@ -87,13 +93,13 @@ impl<L: Layer + ?Sized> Layer for &'static L {
 #[cfg(feature = "discover")]
 inventory::collect!(&'static dyn Layer);
 
-/// The handler function backing a [`LayerFn`].
+/// The handler function of a [`LayerFn`].
 pub type LayerHandlerFn = for<'a> fn(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a>;
 
-/// A [`Layer`] backed by a plain handler function.
+/// A [`Layer`] made from a handler function and an optional path.
 ///
-/// Turns a function into a layer without implementing [`Layer`] on a struct,
-/// pairing it with the path prefix it applies to.
+/// Use it to register a layer without implementing [`Layer`] on a type of
+/// your own.
 #[derive(Debug, Clone)]
 pub struct LayerFn {
     /// The URL path prefix whose matched routes this layer wraps, or `None`
@@ -104,8 +110,10 @@ pub struct LayerFn {
 }
 
 impl LayerFn {
-    /// Creates a new layer from a handler function: pass a path prefix to
-    /// wrap the matched routes under it, or `None` to wrap every request.
+    /// Creates a layer that runs `handle`.
+    ///
+    /// Pass a path to wrap the routes under it, or `None` to wrap every
+    /// request.
     ///
     /// # Panics
     ///
@@ -164,11 +172,10 @@ pub(crate) enum Terminal<'a> {
     NotFound,
 }
 
-/// The continuation of a [`Layer`] chain: the remaining layers followed by the
-/// chain's terminal handler.
+/// The rest of a [`Layer`] chain: the remaining layers, then the route.
 ///
-/// Passed as the `next` argument to [`Layer::handle`]. Call [`run`](Self::run)
-/// to invoke the next layer, or the terminal once the layers are exhausted.
+/// A layer receives it as the `next` argument of [`Layer::handle`]. Call
+/// [`run`](Self::run) to continue the chain.
 pub struct Next<'a> {
     /// The layers wrapping this request, ordered from least- to most-specific
     /// so the outermost layer runs first.
@@ -186,8 +193,10 @@ impl<'a> Next<'a> {
         Self { layers, terminal }
     }
 
-    /// Runs the next layer in the chain, or the terminal handler once no layers
-    /// remain.
+    /// Runs the next layer in the chain, or the route once no layers remain.
+    ///
+    /// When the request matched no route, the chain ends in a not-found or
+    /// method-not-allowed error instead of a route.
     #[must_use]
     pub fn run(self, cx: &'a Cx, body: Body) -> LayerFuture<'a> {
         match self.layers.split_first() {

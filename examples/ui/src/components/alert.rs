@@ -5,24 +5,24 @@ use topcoat::{
 
 /// The visual style of an [`alert`].
 ///
-/// [`Default`] is `AlertVariant::Neutral`, used when no variant is given.
+/// The default is `AlertVariant::Neutral`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum AlertVariant {
-    /// A plain alert for informational notices.
+    /// A plain alert, for information.
     #[default]
     Neutral,
-    /// A destructive-colored alert for errors and failures.
+    /// An alert in the destructive color, for errors and failures.
     Destructive,
 }
 
 impl AlertVariant {
     /// The Tailwind classes for this variant.
     ///
-    /// A variant colors the border and the text, which the icon and the
-    /// [`alert_title`] inherit; the fill stays the page background so the
-    /// alert reads as a notice rather than as a banner. The
-    /// [`alert_description`] sets its own muted color and so keeps it.
+    /// A variant sets the color of the border and the text. The icon and the
+    /// [`alert_title`] inherit the text color. The background stays the page
+    /// background. The [`alert_description`] sets its own muted color, so the
+    /// variant does not change it.
     fn classes(self) -> StaticClass {
         match self {
             Self::Neutral => class!("border-border text-foreground"),
@@ -33,23 +33,25 @@ impl AlertVariant {
 
 /// The classes shared by every alert, regardless of variant.
 ///
-/// The alert is a two-column grid: an optional leading icon, then the title
-/// and the description. Without an icon the first column collapses to nothing
-/// and the gap along with it, so the text starts at the padding either way.
+/// The alert is a grid with two columns: an optional icon, then the title and
+/// the description. Without an icon, the first column and its gap have zero
+/// width, so the text starts right at the padding.
 const BASE: StaticClass = class!(
     "grid w-full grid-cols-[0_1fr] items-start gap-y-1 rounded-lg border \
      bg-background px-4 py-3 text-sm has-[>svg]:grid-cols-[1rem_1fr] has-[>svg]:gap-x-3 \
      [&>svg]:size-4 [&>svg]:translate-y-0.5",
 );
 
-/// An alert component: a notice calling out something about the page it sits
-/// on.
+/// A box that draws attention to a message on the page.
 ///
-/// The `variant` parameter selects the styling, defaulting to `Neutral`. Child
-/// nodes are the alert's content: an optional icon first, then an
-/// [`alert_title`] and an [`alert_description`]. The `attrs` (such as `class`)
-/// are forwarded to the underlying `<div>`; a `class` among them is appended
-/// to the computed classes.
+/// `variant` sets the style and defaults to `Neutral`. Child nodes become the
+/// alert's content: an optional icon first, then an [`alert_title`] and an
+/// [`alert_description`]. The `attrs` (such as `class`) are forwarded to the
+/// `<div>`. A `class` among them is appended to the component's classes.
+///
+/// The alert has no `role="alert"`, because that role makes screen readers
+/// announce the element as soon as it appears. For a message that appears
+/// while the user is on the page, pass `role="alert"` in `attrs`.
 ///
 /// ```ignore
 /// view! {
@@ -84,7 +86,7 @@ pub async fn alert(
     })
 }
 
-/// The heading of an [`alert`], one line saying what happened.
+/// The heading of an [`alert`], usually one line that says what happened.
 #[component]
 pub async fn alert_title(
     #[default] mut attrs: Attributes,
@@ -103,8 +105,7 @@ pub async fn alert_title(
     })
 }
 
-/// The supporting text under an [`alert_title`], with the detail and what to
-/// do about it.
+/// Muted text under an [`alert_title`], with the details.
 #[component]
 pub async fn alert_description(
     #[default] mut attrs: Attributes,

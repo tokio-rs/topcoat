@@ -16,8 +16,11 @@ mod kw {
 /// A `weight:` argument carrying the single weight one face ships, e.g.
 /// `weight: 400`.
 pub struct Weight {
+    /// The `weight` name.
     pub key: WeightKey,
+    /// The `:` between the name and the value.
     pub colon_token: Token![:],
+    /// The written value.
     pub value: WeightValue,
 }
 
@@ -47,7 +50,9 @@ impl topcoat_core_grammar::pretty::PrettyPrint for Weight {
     }
 }
 
+/// The `weight` argument name.
 pub struct WeightKey {
+    /// The `weight` keyword.
     pub weight_kw: kw::weight,
 }
 

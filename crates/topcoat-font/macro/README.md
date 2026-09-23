@@ -1,1 +1,1 @@
-This crate is part of [`topcoat`](https://github.com/tokio-rs/topcoat).
+This crate is part of [`topcoat`](https://github.com/tokio-rs/topcoat). It provides the `font!`, `font_face!`, `fontsource_font!`, and `fontsource_font_face!` macros. Use them through the `topcoat::font` module.

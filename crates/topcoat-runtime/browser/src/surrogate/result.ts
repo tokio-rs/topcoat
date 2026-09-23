@@ -7,6 +7,7 @@ import { cloneValue } from "./ref";
 
 type ResultKind = "ok" | "err";
 
+/** A Rust `Result`. */
 export class Result<T, E> {
 	constructor(
 		private readonly kind: ResultKind,

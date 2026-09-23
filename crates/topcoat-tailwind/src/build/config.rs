@@ -2,15 +2,17 @@ use std::{env, fs, path::PathBuf};
 
 use crate::build::{BuildError, Command, ExecutableSource, Result};
 
-/// File name of the default [`output`](BuildConfig::output) inside `OUT_DIR`.
+/// The filename of the default [`output`](BuildConfig::output) inside
+/// `OUT_DIR`.
 pub const DEFAULT_OUTPUT_NAME: &str = "tailwind.css";
 const DEFAULT_INPUT_CSS: &str = "@import \"tailwindcss\";\n";
 
-/// Builder for a Tailwind CLI run from a Cargo build script.
+/// Runs the Tailwind CLI from a Cargo build script.
 ///
-/// The default configuration downloads the standalone Tailwind CLI, scans the
-/// package for class names, and writes the generated stylesheet to
-/// `$OUT_DIR/tailwind.css`:
+/// Create a config with [`BuildConfig::new`], change settings with the
+/// builder methods, and run it with [`render`](Self::render). The default
+/// config downloads the standalone Tailwind CLI, scans the package for class
+/// names, and writes the generated stylesheet to `$OUT_DIR/tailwind.css`:
 ///
 /// ```rust,no_run
 /// topcoat::tailwind::BuildConfig::new().render().unwrap();
@@ -38,27 +40,28 @@ impl Default for BuildConfig {
 }
 
 impl BuildConfig {
-    /// The default configuration, ready to be customized with the builder
-    /// methods and executed with [`render`](Self::render).
+    /// Creates a config with every setting at its default.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Where the Tailwind CLI executable comes from. Defaults to downloading
-    /// [`DEFAULT_VERSION`](crate::build::DEFAULT_VERSION) from GitHub.
+    /// Sets where the Tailwind CLI executable comes from. Defaults to
+    /// downloading [`DEFAULT_VERSION`](crate::DEFAULT_VERSION) from GitHub.
     ///
     /// [`version`](Self::version), [`version_checksum`](Self::version_checksum),
     /// [`executable`](Self::executable), and
     /// [`executable_env`](Self::executable_env) are shorthands for the
-    /// individual variants; the most recent call wins.
+    /// variants of [`ExecutableSource`]. If you call several of them, the last
+    /// call wins.
     #[must_use]
     pub fn executable_source(mut self, executable_source: ExecutableSource) -> Self {
         self.executable_source = executable_source;
         self
     }
 
-    /// Pin the Tailwind CLI release to download (without the leading `v`).
+    /// Sets the Tailwind CLI release to download, without the leading `v`,
+    /// for example `"4.3.2"`.
     ///
     /// Shorthand for [`ExecutableSource::Github`] without a checksum.
     #[must_use]
@@ -69,10 +72,12 @@ impl BuildConfig {
         })
     }
 
-    /// Pin the Tailwind CLI release to download (without the leading `v`)
-    /// along with the expected hash of the downloaded binary as an
-    /// `algorithm:hex` string. Only `sha256` is currently supported, e.g.
-    /// `"sha256:b800b065..."`.
+    /// Sets the Tailwind CLI release to download, together with the expected
+    /// hash of the downloaded executable.
+    ///
+    /// The version has no leading `v`. The checksum has the form
+    /// `algorithm:hex`, and the only supported algorithm is `sha256`, for
+    /// example `"sha256:b800b065..."`.
     ///
     /// Shorthand for [`ExecutableSource::Github`] with a checksum.
     #[must_use]
@@ -83,12 +88,11 @@ impl BuildConfig {
         })
     }
 
-    /// Use an existing Tailwind CLI executable instead of downloading one.
+    /// Uses an installed Tailwind CLI instead of downloading one.
     ///
-    /// A bare command name like `"tailwindcss"` is resolved through `PATH`;
-    /// anything containing a path separator is used as a file path, with
-    /// relative paths resolved against the package root (the directory the
-    /// build script runs in).
+    /// A plain command name like `"tailwindcss"` is looked up in `PATH`. A
+    /// value that contains a path separator is a file path. Relative paths
+    /// are relative to the package root, where the build script runs.
     ///
     /// Shorthand for [`ExecutableSource::Path`].
     #[must_use]
@@ -96,10 +100,13 @@ impl BuildConfig {
         self.executable_source(ExecutableSource::Path(path.into()))
     }
 
-    /// Read the Tailwind CLI executable from an environment variable at build
-    /// time. The variable's value is interpreted like
-    /// [`executable`](Self::executable). Print `cargo:rerun-if-env-changed`
-    /// yourself if changing the variable should rerun the build script.
+    /// Reads the path of the Tailwind CLI from the environment variable `name`
+    /// when the build script runs.
+    ///
+    /// The value is interpreted like the argument of
+    /// [`executable`](Self::executable). If a change to the variable should
+    /// rerun the build script, print `cargo:rerun-if-env-changed=<name>`
+    /// yourself.
     ///
     /// Shorthand for [`ExecutableSource::Env`].
     #[must_use]
@@ -107,76 +114,79 @@ impl BuildConfig {
         self.executable_source(ExecutableSource::Env(name.into()))
     }
 
-    /// Input CSS file. Defaults to a generated `input.css` in `OUT_DIR` that
-    /// just contains `@import "tailwindcss";`.
+    /// Sets the input CSS file.
     ///
-    /// The Tailwind CLI resolves a relative path against [`cwd`](Self::cwd),
-    /// which defaults to the package root.
+    /// Defaults to a generated `tailwind-input.css` in `OUT_DIR` that only
+    /// contains `@import "tailwindcss";`. The Tailwind CLI resolves a relative
+    /// path against [`cwd`](Self::cwd), which defaults to the package root.
     #[must_use]
     pub fn input(mut self, path: impl Into<PathBuf>) -> Self {
         self.input = Some(path.into());
         self
     }
 
-    /// Output CSS file. Defaults to `$OUT_DIR/tailwind.css`, which can be
-    /// loaded from source via `asset!(concat!(env!("OUT_DIR"), "/tailwind.css"))`.
+    /// Sets the output CSS file.
     ///
-    /// The Tailwind CLI resolves a relative path against [`cwd`](Self::cwd),
-    /// which defaults to the package root.
+    /// Defaults to `$OUT_DIR/tailwind.css`, the file that
+    /// [`stylesheet!`](crate::stylesheet) declares as an asset. The Tailwind
+    /// CLI resolves a relative path against [`cwd`](Self::cwd), which defaults
+    /// to the package root.
     #[must_use]
     pub fn output(mut self, path: impl Into<PathBuf>) -> Self {
         self.output = Some(path.into());
         self
     }
 
-    /// Pass `--cwd` to the Tailwind CLI: the directory Tailwind scans for
-    /// class names, and the base for relative [`input`](Self::input) and
-    /// [`output`](Self::output) paths. Defaults to `$CARGO_MANIFEST_DIR`
-    /// (the package root).
+    /// Sets the directory passed to the Tailwind CLI with `--cwd`.
     ///
-    /// Tailwind's automatic source detection walks every file under this
-    /// directory that is not matched by `.gitignore`. That makes the ignore
-    /// file load-bearing: Cargo's generated `.gitignore` excludes `target/`,
-    /// but in a checkout without one the walk descends into build artifacts,
-    /// which is slow and resurrects class names from previous builds. If the
-    /// build environment cannot guarantee an ignore file, scope the scan
-    /// down (e.g. `.cwd("src")`), or disable directory scanning entirely
-    /// with a custom [`input`](Self::input) that uses
-    /// `@import "tailwindcss" source(none)` and explicit `@source` globs.
+    /// Tailwind scans this directory for class names, and resolves relative
+    /// [`input`](Self::input) and [`output`](Self::output) paths against it.
+    /// Defaults to `$CARGO_MANIFEST_DIR`, the package root.
+    ///
+    /// Tailwind scans every file in this directory that `.gitignore` does not
+    /// exclude. The `.gitignore` that Cargo generates excludes `target/`.
+    /// Without it, Tailwind also scans build output, which is slow and can
+    /// bring back class names from earlier builds. If you cannot rely on a
+    /// `.gitignore`, scan a smaller directory, for example `.cwd("src")`. Or
+    /// turn off directory scanning with a custom [`input`](Self::input) that
+    /// uses `@import "tailwindcss" source(none)` and explicit `@source` globs.
     #[must_use]
     pub fn cwd(mut self, cwd: impl Into<PathBuf>) -> Self {
         self.cwd = Some(cwd.into());
         self
     }
 
-    /// Pass `--optimize` to the Tailwind CLI. Defaults to `false`.
+    /// Sets whether to pass `--optimize` to the Tailwind CLI. Defaults to
+    /// `false`.
     #[must_use]
     pub fn optimize(mut self, optimize: bool) -> Self {
         self.optimize = optimize;
         self
     }
 
-    /// Pass `--minify` to the Tailwind CLI. Defaults to `true`.
+    /// Sets whether to pass `--minify` to the Tailwind CLI. Defaults to
+    /// `true`.
     #[must_use]
     pub fn minify(mut self, minify: bool) -> Self {
         self.minify = minify;
         self
     }
 
-    /// Resolve the Tailwind CLI executable from the configured
-    /// [`ExecutableSource`] and run it. Returns the path to the generated CSS
-    /// file.
+    /// Gets the Tailwind CLI from the configured [`ExecutableSource`] and runs
+    /// it. Returns the path of the generated CSS file.
     ///
-    /// `OUT_DIR` is only required when something depends on it: the CLI is
-    /// downloaded, or `input`/`output` is left at its default.
+    /// Call this from a build script. It needs `OUT_DIR` when the CLI is
+    /// downloaded or when [`input`](Self::input) or [`output`](Self::output)
+    /// is not set, and `CARGO_MANIFEST_DIR` when [`cwd`](Self::cwd) is not
+    /// set. Cargo sets both for build scripts.
     ///
     /// # Errors
     ///
-    /// Returns `Err` if the CLI cannot be downloaded, fails checksum
-    /// verification, or cannot be executed, if an [`ExecutableSource::Env`]
-    /// variable is unset, if the Tailwind CLI exits with a non-zero status, or
-    /// if `OUT_DIR` or `CARGO_MANIFEST_DIR` is unset while a default depends
-    /// on it.
+    /// Returns an error if the CLI cannot be downloaded, does not match its
+    /// checksum, or cannot be run, if the variable of an
+    /// [`ExecutableSource::Env`] is not set, if the Tailwind CLI exits with a
+    /// non-zero status, or if `OUT_DIR` or `CARGO_MANIFEST_DIR` is needed but
+    /// not set.
     pub fn render(self) -> Result<PathBuf> {
         let executable = self.executable_source.resolve()?;
 

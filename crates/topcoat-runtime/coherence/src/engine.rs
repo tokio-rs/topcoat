@@ -6,13 +6,16 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 
-/// A JavaScript engine that gives each evaluation a fresh global context.
+/// A V8 JavaScript engine that gives each evaluation a fresh global context.
 pub struct Engine {
     isolate: v8::OwnedIsolate,
     timeout: Duration,
 }
 
 impl Engine {
+    /// Creates an engine whose evaluations fail after `timeout`.
+    ///
+    /// The first call also initializes V8 for the process.
     #[must_use]
     pub fn new(timeout: Duration) -> Self {
         static INITIALIZE: Once = Once::new();

@@ -7,46 +7,69 @@ use super::{
 };
 use crate::Registry;
 
-/// One registry's listing: its crate name, and either the status of its
-/// components or the error encountered loading it.
+/// The listing of one registry, returned by [`list`].
 pub struct RegistryListing {
+    /// The name of the registry.
     pub name: String,
+    /// The status of each component, or the error from loading the registry.
     pub outcome: Result<Vec<ComponentStatus>, String>,
 }
 
-/// A component's name and its install status within a registry.
+/// The install status of one component in a [`RegistryListing`].
 pub struct ComponentStatus {
+    /// The name of the component.
     pub name: String,
+    /// Whether and at which version the component is installed.
     pub status: InstallStatus,
 }
 
-/// How a component relates to what the package has installed from its registry.
+/// Whether a component is installed, compared with what its registry offers.
+///
+/// The hashes are [`content_hash`](crate::content_hash) values.
 pub enum InstallStatus {
-    /// Offered by the registry but not installed; carries the latest hash.
-    Available { hash: String },
-    /// Installed at the hash the registry currently offers.
-    UpToDate { hash: String },
-    /// Installed at a different hash than the registry now offers.
-    Update { installed: String, latest: String },
-    /// Tracked as installed under this registry, which no longer offers it.
-    Orphaned { installed: String },
+    /// The registry offers the component, but it is not installed.
+    Available {
+        /// The hash of the registry's source.
+        hash: String,
+    },
+    /// The component is installed with the registry's current source.
+    UpToDate {
+        /// The hash of the installed and the registry's source.
+        hash: String,
+    },
+    /// The component is installed, but the registry's source has changed
+    /// since.
+    Update {
+        /// The hash recorded when the component was installed.
+        installed: String,
+        /// The hash of the registry's current source.
+        latest: String,
+    },
+    /// The component is installed from this registry, but the registry no
+    /// longer offers it or can no longer be loaded.
+    Orphaned {
+        /// The hash recorded when the component was installed.
+        installed: String,
+    },
 }
 
-/// Lists registries and the install status of their components.
+/// Lists registries and the install status of their components: implements
+/// `topcoat ui list`.
 ///
-/// The registries listed are those the package can add from (the default plus
-/// any dependency registry), together with any registry still tracked in the
-/// install state (so components from a since-removed dependency are not hidden).
-/// A component counts as installed only when it is tracked under *that* registry.
-/// With `selected`, only that registry is listed. Failures to load an individual
-/// registry are reported per registry (in `outcome`) rather than failing the
-/// whole listing.
+/// This lists every registry the package can add from, plus every registry
+/// that `components.toml` still records components from, sorted by name. A
+/// component counts as installed only if it was installed from that same
+/// registry. With `selected`, only that registry is listed. An error while
+/// loading one registry is reported in its [`RegistryListing::outcome`] and
+/// does not fail the whole listing.
+///
+/// The hashes compare the registry's source only. Local edits to an installed
+/// file do not change its status.
 ///
 /// # Errors
 ///
-/// Returns an error if the install state or workspace cannot be loaded, or if
-/// `selected` names a registry that is neither a dependency nor tracked in the
-/// install state.
+/// Returns an error if the package has no `components.toml`, if
+/// `cargo metadata` fails, or if `selected` names an unknown registry.
 pub fn list(package: &Package, selected: Option<&str>) -> Result<Vec<RegistryListing>, String> {
     let state = InstallState::load(package)?;
     let workspace = Workspace::load(package)?;

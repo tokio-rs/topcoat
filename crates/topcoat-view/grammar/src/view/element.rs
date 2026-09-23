@@ -16,28 +16,37 @@ use crate::{
     },
 };
 
-/// An HTML element. `SelfClosing` covers elements written with a trailing
-/// slash (`<path/>`), which take no children and render exactly as written.
-/// `Void` covers the HTML void elements (`<br>`, `<img>`, ...) which take no
-/// closing tag and no children.
+/// An HTML element.
+///
+/// Parsing checks that the closing tag matches the opening tag.
 // Optimize for the common case (normal elements).
 #[allow(clippy::large_enum_variant)]
 pub enum Element {
+    /// An element with an opening tag, children, and a closing tag.
     Normal {
+        /// The opening tag.
         opening_tag: OpeningTag,
+        /// The child nodes.
         children: Nodes,
+        /// The closing tag.
         closing_tag: ClosingTag,
     },
+    /// An element written with a trailing slash, like `<path />`. It has no
+    /// children and renders as written.
     SelfClosing {
+        /// The self-closing tag.
         tag: SelfClosingTag,
     },
+    /// An HTML void element, like `<br>` or `<img>`. It has no closing tag and
+    /// no children.
     Void {
+        /// The opening tag.
         tag: OpeningTag,
     },
 }
 
 impl Element {
-    /// The element's tag name.
+    /// Returns the element's tag name.
     #[must_use]
     pub fn name(&self) -> &ElementName {
         match self {
@@ -47,7 +56,7 @@ impl Element {
         }
     }
 
-    /// The attributes on the opening tag.
+    /// Returns the attributes of the opening tag.
     #[must_use]
     pub fn attributes(&self) -> &Attributes {
         match self {
@@ -57,8 +66,8 @@ impl Element {
         }
     }
 
-    /// The element's children. Always empty for self-closing and void
-    /// elements.
+    /// Returns the element's children. Self-closing and void elements have
+    /// none.
     #[must_use]
     pub fn children(&self) -> &[Node] {
         match self {
@@ -179,7 +188,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for Element {
             } => {
                 opening_tag.pretty_print(printer);
                 // Break the content onto its own lines when there is something
-                // to show -- child nodes or an interior comment. A completely
+                // to show: child nodes or an interior comment. A completely
                 // empty element instead keeps `</tag>` right after the opening
                 // tag's `>`, so wrapping the opening tag's attributes never
                 // leaves a blank line between them.

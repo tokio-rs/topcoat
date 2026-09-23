@@ -1,15 +1,15 @@
 use std::net::SocketAddr;
 
-/// The IP address and port of the direct connection, stored in the request
-/// [`extensions`](crate::request::extensions).
+/// The IP address and port of the other end of the connection, stored in the
+/// request [`extensions`](crate::request::extensions).
 ///
 /// Topcoat adds this to every request received over TCP. Read it with
-/// [`remote_addr`](crate::request::remote_addr). Behind a reverse proxy,
-/// this is the proxy's address.
+/// [`remote_addr`](crate::request::remote_addr). Behind a reverse proxy, this
+/// is the proxy's address.
 ///
-/// Unix socket connections have no IP address, so Topcoat does not add this
-/// value for them. If you serve the router through a tower service or pass
-/// requests to it yourself, insert this value into each request's extensions
+/// Unix socket connections have no IP address, so their requests do not
+/// have this value. If you pass requests to the router yourself, for example
+/// through a tower service, insert this value into each request's extensions
 /// to make the connection's address available.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RemoteAddr(pub SocketAddr);

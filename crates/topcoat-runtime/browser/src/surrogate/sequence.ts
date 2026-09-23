@@ -5,7 +5,7 @@ import { Integer, type IntegerType } from "./integer";
 import { Option } from "./option";
 import { cloneValue, Ref } from "./ref";
 
-/** A shared view of a sequence's elements. */
+/** A Rust slice: a shared view of a sequence's elements. */
 export class Slice<T> {
 	constructor(
 		protected readonly items: readonly T[],
@@ -69,7 +69,9 @@ export class Slice<T> {
 	}
 }
 
-/** An owned sequence. Cloning duplicates its owned elements recursively. */
+/**
+ * A Rust `Vec`. Cloning duplicates its owned elements recursively.
+ */
 export class Vec<T> extends Slice<T> {
 	constructor(items: readonly T[], usizeType: IntegerType) {
 		super(items, usizeType);
@@ -97,7 +99,7 @@ export class Vec<T> extends Slice<T> {
 	}
 }
 
-/** A fixed-size owned sequence with the same read methods as a slice. */
+/** A Rust array: a fixed-size owned sequence with the methods of a slice. */
 export class FixedArray<T> extends Slice<T> {
 	constructor(items: readonly T[], usizeType: IntegerType) {
 		super(items, usizeType);

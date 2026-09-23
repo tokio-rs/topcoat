@@ -1,4 +1,4 @@
-Topcoat assets are declared from Rust code with [`asset!`](asset). The macro returns a small [`Asset`] handle and embeds the declaration into the compiled binary. After building your application, Topcoat can scan the binary, copy or download every declared file into an asset bundle directory, and serve those bundled files from the router.
+Assets are static files, like images, scripts, and stylesheets, that your pages link to. You declare them in Rust code with [`asset!`](asset), which returns a small [`Asset`] handle. After you build your application, the `topcoat` CLI scans the binary for these declarations and copies or downloads every declared file into an asset bundle directory. The router then serves the bundled files, and each [`Asset`] renders as the URL of its file.
 
 # Declaring assets
 
@@ -37,19 +37,19 @@ Ok(view! {
 # }
 ```
 
-When an [`Asset`] appears inside [`view!`](crate::view::view), Topcoat renders it as the URL of the bundled file. For example, an image might render as:
+When you use an [`Asset`] inside [`view!`](crate::view::view), it renders as the URL of the bundled file. For example, the image above might render as:
 
 ```html
 <img src="/_topcoat/assets/ferris-1a2b3c4d5e6f7a8b.png">
 ```
 
-The hash in the filename is based on the file contents, so URLs are safe to cache aggressively.
+The filename contains a hash of the file contents. When the contents change, the URL changes too, so browsers and proxies can cache these files forever.
 
-The bundler finds declarations by scanning the compiled binary. The embedded declaration is kept in the binary through the returned [`Asset`] handle, so an asset only ends up in the bundle while some code path uses its handle: a declaration whose handle is never used can be optimized out of the binary, and the bundler then skips it.
+The CLI finds declarations by scanning the compiled binary. The returned [`Asset`] handle is what keeps a declaration in the binary. If no code uses the handle, the compiler may remove the declaration, and the file is not bundled.
 
 # Loading the bundle
 
-Load the generated asset bundle while building the router, before `.build()`. Use [`AssetBundle::load`] for the default bundle location:
+Load the asset bundle while you build the router, before `.build()`. [`AssetBundle::load`] loads the bundle from its default location:
 
 ```rust,no_run
 use topcoat::{
@@ -65,15 +65,15 @@ pub fn router() -> Router {
 }
 ```
 
-Use [`AssetBundle::load_dir`] when you write the bundle to a custom location.
+Use [`AssetBundle::load_dir`] when you write the bundle to a different location.
 
-[`RouterBuilderAssetExt::assets`] serves every bundled file under `/_topcoat/assets` and makes an [`Asset`] in a view render as the URL of its bundled file, as shown above.
+[`RouterBuilderAssetExt::assets`] serves every bundled file under `/_topcoat/assets`, and makes each [`Asset`] in a view render as the URL of its file, as shown above.
 
-If a page renders an [`Asset`] that is not present in the loaded bundle, rendering panics. Treat that as a build/deploy mismatch: the binary and asset bundle must come from the same build.
+Rendering an [`Asset`] that is not in the loaded bundle panics. This means the binary and the bundle do not match: they must come from the same build.
 
 # Bundling
 
-During development, `topcoat dev` builds the app and bundles assets after each successful build:
+During development, `topcoat dev` builds the app and bundles its assets after every successful build:
 
 ```sh
 topcoat dev
@@ -81,19 +81,19 @@ topcoat dev
 cargo topcoat dev
 ```
 
-By default, the bundle is written to an `assets` directory next to the executable it was scanned from:
+By default, the bundle is written to an `assets` directory next to the executable that was scanned:
 
 ```text
 <cargo-target>/<profile>/assets
 ```
 
-The download/cache directory for remote assets is:
+Remote assets are downloaded into a cache directory, and later builds reuse the cached files:
 
 ```text
 <cargo-target>/topcoat/cache/assets
 ```
 
-For a manual build, use the asset subcommands:
+To bundle without the dev server, use the asset subcommands:
 
 ```sh
 topcoat asset list
@@ -101,23 +101,23 @@ topcoat asset bundle
 topcoat asset clean
 ```
 
-If Cargo would build more than one executable, choose the target:
+`list` prints the declared assets, `bundle` writes the bundle, and `clean` deletes the bundles and the download cache. If Cargo would build more than one executable, choose one:
 
 ```sh
 topcoat asset bundle --bin my-app
 topcoat asset bundle --package my-package
 ```
 
-The subcommands build the application to scan it, and they accept the same profile flags as `cargo build`. Bundle with the profile you are going to run, since each profile keeps its own bundle:
+The subcommands build the application in order to scan it, and they accept the same profile flags as `cargo build`. Each profile has its own bundle, so bundle with the profile you are going to run:
 
 ```sh
 topcoat asset bundle --release
 topcoat asset bundle --profile my-profile
 ```
 
-The profile matters beyond the output path. An asset's ID is derived from the path it was declared with, and a build script writes into `OUT_DIR`, whose path covers the target directory, the profile, and a per-build hash. `tailwind::stylesheet!()` is one such asset. So a `dev` bundle does not describe a `--release` binary even though the file on disk is identical, and a bundle built in one checkout does not describe a binary built in another. Bundle and binary have to come from the same build.
+The profile matters for more than the output path. An asset's ID depends on the path it was declared with. A build script writes its output into `OUT_DIR`, and that path contains the target directory, the profile, and a hash. The Tailwind stylesheet from `tailwind::stylesheet!()` is such an asset. So a bundle from a `dev` build does not match a `--release` binary, even when the files are identical. In the same way, a bundle built in one checkout does not match a binary built in another. The bundle and the binary must come from the same build.
 
-To write the bundle somewhere else, pass `--out` and load the same directory at runtime:
+To write the bundle somewhere else, pass `--out`, and load the same directory at runtime:
 
 ```sh
 topcoat asset bundle --out dist/assets
@@ -131,25 +131,25 @@ let router = Router::builder()
     .build();
 ```
 
-[`AssetBundle::load`] only looks next to the executable, so any `--out` outside that location has to be loaded with [`AssetBundle::load_dir`].
+[`AssetBundle::load`] only looks in the `assets` directory next to the executable. Load any other `--out` directory with [`AssetBundle::load_dir`].
 
 # Path resolution
 
-The first argument to [`asset!`](asset) is a string literal path or an `http(s)` URL. Local paths are resolved by the bundler:
+The first argument of [`asset!`](asset) is a string literal: a file path or an `http` or `https` URL. The CLI resolves local paths when it bundles:
 
 | Asset path | Resolution |
 |---|---|
 | `asset!("./ferris.png")` | relative to the source file that calls `asset!` |
 | `asset!("../shared/logo.png")` | relative to the source file that calls `asset!` |
 | `asset!("assets/logo.png")` | relative to the declaring crate's `CARGO_MANIFEST_DIR` |
-| `asset!("/opt/app/logo.png")` | absolute path, used as-is |
-| `asset!("https://example.com/logo.png")` | downloaded and cached by the bundler |
+| `asset!("/opt/app/logo.png")` | absolute path, used as it is |
+| `asset!("https://example.com/logo.png")` | downloaded and cached |
 
-Use `./` or `../` when the asset should move with the module. Use a bare relative path when the asset is part of a crate-level assets directory.
+Use `./` or `../` for files that live next to the module that uses them. Use a path without a prefix for files in a crate-level assets directory.
 
 # Output options
 
-[`asset!`](asset) accepts optional named arguments that affect the bundled filename:
+[`asset!`](asset) accepts optional named arguments after the path:
 
 ```rust
 use topcoat::asset::{Asset, asset};
@@ -161,20 +161,20 @@ const RUST_LOGO: Asset = asset!(
 );
 ```
 
-Each named argument sets a field on [`AssetOptions`], which documents them all. The common ones:
+Each argument sets a field of [`AssetOptions`], which documents them in detail:
 
 | Option | Meaning |
 |---|---|
-| `rename: "name"` | replaces the output file stem |
-| `extension: "ext"` | overrides the output extension, without the leading dot |
-| `checksum: "sha256:<hex>"` | requires the raw source file to match the hash |
-| `content_type: "text/css"` | sets the `Content-Type` the asset is served with, instead of guessing it from the extension |
+| `rename: "name"` | replaces the stem of the bundled filename |
+| `extension: "ext"` | replaces the extension of the bundled filename, without the leading dot |
+| `checksum: "sha256:<hex>"` | fails the bundling if the source file has a different hash |
+| `content_type: "text/css"` | sets the `Content-Type` the file is served with, instead of guessing it from the extension |
 
-Use `checksum` for remote assets when you want deployments to fail if the remote file changes unexpectedly.
+Use `checksum` on remote assets if you want bundling to fail when the remote file changes.
 
 # Hosting assets externally
 
-The application does not have to serve the bundled files itself. Any static file host works in its place: a CDN, an object store, or the reverse proxy in front of the app. Point Topcoat at it by registering the bundle through [`AssetConfig::hosted_at`]:
+The application does not have to serve the bundled files itself. Any static file host can serve them instead, such as a CDN, an object store, or the reverse proxy in front of the app. To use one, register the bundle with [`AssetConfig::hosted_at`]:
 
 ```rust,no_run
 # use topcoat::{asset::{AssetBundle, AssetConfig, RouterBuilderAssetExt}, router::{Router, RouterBuilderDiscoverExt}};
@@ -187,14 +187,17 @@ let router = Router::builder()
     .build();
 ```
 
-Registered this way, the router adds no asset routes, and an [`Asset`] in a view renders as the file's URL on the external host, `{base_url}/{bundled-filename}`. The image from earlier becomes `https://cdn.example.com/assets/ferris-1a2b3c4d5e6f7a8b.png`.
+With this configuration, the router adds no asset routes, and each [`Asset`] renders as `{base_url}/{bundled-filename}`. The image from earlier becomes `https://cdn.example.com/assets/ferris-1a2b3c4d5e6f7a8b.png`.
 
-Actually putting the files there is your deployment's job: write the bundle with `topcoat asset bundle --out dist/assets` and upload that directory whenever you deploy the binary it was built from. The filenames contain a content hash, so the host can serve them with long-lived, immutable caching.
+Uploading the files is up to your deployment. Write the bundle with `topcoat asset bundle --out dist/assets`, and upload that directory every time you deploy the binary it was built from. The filenames contain a content hash, so the host can cache them forever.
 
-To resolve these URLs, the application only needs the mapping from asset IDs to bundled filenames, not the files themselves. That mapping is the bundle's [`AssetCatalog`], and it lives in the bundle's `manifest.toml`. On targets without filesystem access, such as WebAssembly, there is no bundle directory to load at runtime; embed the manifest into the binary instead and pass it in place of the bundle:
+To build these URLs, the application only needs to know the bundled filename of each asset ID, not the files themselves. This mapping is the [`AssetCatalog`], and it is stored in the bundle's `manifest.toml`. On targets without filesystem access, such as WebAssembly, there is no bundle directory to load at runtime. Instead, embed the manifest into the binary with `include_str!`, parse it with [`Manifest::parse`], and pass it in place of the bundle:
 
-```rust,ignore
-let manifest = Manifest::parse(include_str!("../dist/assets/manifest.toml"))?;
+```rust
+# use topcoat::{asset::{AssetConfig, Manifest, RouterBuilderAssetExt}, router::Router};
+# const MANIFEST: &str = "version = 1\nassets = []";
+// `MANIFEST` is `include_str!("../dist/assets/manifest.toml")`.
+let manifest = Manifest::parse(MANIFEST).unwrap();
 let router = Router::builder()
     .assets(AssetConfig::hosted_at("https://static.example.com/assets", manifest))
     .build();

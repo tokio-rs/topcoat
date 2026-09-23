@@ -15,9 +15,13 @@ mod kw {
     custom_keyword!(U);
 }
 
+/// A `unicode-range: ...` descriptor in a `font_face!` body.
 pub struct UnicodeRanges {
+    /// The `unicode-range` name.
     pub key: UnicodeRangesKey,
+    /// The `:` between the name and the value.
     pub colon_token: Token![:],
+    /// The descriptor's value.
     pub value: UnicodeRangesValue,
 }
 
@@ -53,9 +57,13 @@ impl topcoat_core_grammar::pretty::PrettyPrint for UnicodeRanges {
     }
 }
 
+/// The `unicode-range` descriptor name.
 pub struct UnicodeRangesKey {
+    /// The `unicode` keyword.
     pub unicode_kw: kw::unicode,
+    /// The `-` between the keywords.
     pub dash_token: Token![-],
+    /// The `range` keyword.
     pub range_kw: kw::range,
 }
 
@@ -85,8 +93,11 @@ impl topcoat_core_grammar::pretty::PrettyPrint for UnicodeRangesKey {
     }
 }
 
+/// The value of a `unicode-range` descriptor: CSS syntax or a Rust expression.
 pub enum UnicodeRangesValue {
+    /// A Rust expression that evaluates to `UnicodeRanges`.
     Expr(Box<Expr>),
+    /// A comma-separated list of CSS ranges such as `U+0000-00FF, U+0131`.
     Css(Punctuated<UnicodeRange, Token![,]>),
 }
 
@@ -133,9 +144,13 @@ impl topcoat_core_grammar::pretty::PrettyPrint for UnicodeRangesValue {
 /// A single `U+...` interval, either one code point (`U+0041`) or an inclusive
 /// range (`U+0041-005A`).
 pub struct UnicodeRange {
+    /// The `U`.
     pub u_token: kw::U,
+    /// The `+`.
     pub plus_token: Token![+],
+    /// The first code point.
     pub start: UnicodeCodePoint,
+    /// The last code point, if the range spans more than one.
     pub end: Option<UnicodeRangeEnd>,
 }
 
@@ -181,7 +196,9 @@ impl topcoat_core_grammar::pretty::PrettyPrint for UnicodeRange {
 
 /// The `-005A` tail of a [`UnicodeRange`] that spans more than one code point.
 pub struct UnicodeRangeEnd {
+    /// The `-` before the last code point.
     pub dash_token: Token![-],
+    /// The last code point.
     pub code_point: UnicodeCodePoint,
 }
 
@@ -217,7 +234,9 @@ impl topcoat_core_grammar::pretty::PrettyPrint for UnicodeRangeEnd {
 /// A single Unicode code point written as bare hexadecimal (the `0041` in
 /// `U+0041`), validated to be in `U+0000..=U+10FFFF`.
 pub struct UnicodeCodePoint {
+    /// The numeric code point.
     pub value: u32,
+    /// The span of the written hex digits.
     pub span: Span,
 }
 
@@ -226,8 +245,8 @@ impl Parse for UnicodeCodePoint {
         // After `U+`, a code point lexes as:
         //   - an integer literal (starts with a digit, e.g. `0041`),
         //   - a Rust hex literal with `0x` prefix, needed when the bare hex would be rejected by
-        //     Rust's tokenizer (e.g. `0x000E` — bare `000E` looks like a float exponent to the
-        //     tokenizer), or
+        //     Rust's tokenizer (e.g. `0x000E`, because bare `000E` looks like a float exponent to
+        //     the tokenizer), or
         //   - an identifier (starts with a hex letter, e.g. `D800`).
         //
         // Reconstruct the original text, strip any supported prefix, and

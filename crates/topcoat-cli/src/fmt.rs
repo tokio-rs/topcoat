@@ -10,6 +10,7 @@ use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
 
 use crate::fmt::error::Error;
 
+/// The arguments of `topcoat fmt`.
 #[derive(Args)]
 #[command(version, about = "Format the content of view macro invocations in Rust source files.", long_about = None)]
 pub struct FmtCommand {
@@ -28,6 +29,7 @@ pub struct FmtCommand {
 }
 
 impl FmtCommand {
+    /// Formats the selected files, or standard input with `--stdin`.
     pub async fn run(&self) {
         let registry = {
             // The full set of macros `topcoat fmt` knows how to format.

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{OptionSurrogate, Surrogate, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref};
 
+/// A `bool` in a runtime expression.
 #[derive(Debug, RefCast, Clone, Copy, Serialize, Deserialize)]
 #[repr(transparent)]
 #[serde(transparent)]
@@ -31,6 +32,7 @@ impl core::ops::Not for BoolSurrogate {
 macro_rules! impl_cmp_op {
     ($method:ident, $op:tt) => {
         impl BoolSurrogate {
+            #[doc = concat!("Compares two values with `", stringify!($op), "`.")]
             #[inline]
             #[must_use]
             pub fn $method(&self, rhs: &BoolSurrogate) -> BoolSurrogate {
@@ -44,6 +46,8 @@ impl_cmp_op!(eq, ==);
 impl_cmp_op!(ne, !=);
 
 impl BoolSurrogate {
+    /// Returns `Some` with the result of `f` if the value is `true`, and
+    /// `None` otherwise, like [`bool::then`].
     #[inline]
     pub fn then<F, S>(self, f: F) -> OptionSurrogate<S::Real>
     where
@@ -53,6 +57,8 @@ impl BoolSurrogate {
         OptionSurrogate::new(self.0.then(|| f().into_real()))
     }
 
+    /// Returns `Some(t)` if the value is `true`, and `None` otherwise, like
+    /// [`bool::then_some`].
     #[inline]
     pub fn then_some<S>(self, t: S) -> OptionSurrogate<S::Real>
     where

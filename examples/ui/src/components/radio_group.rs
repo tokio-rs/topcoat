@@ -3,14 +3,13 @@ use topcoat::{
     view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
-/// A radio group component: a set of options of which one can be picked.
+/// A set of options from which the user can pick one.
 ///
-/// The group is a container; what ties its options together is the `name`
-/// they share, which is how the browser knows to let go of one when another
-/// is picked. Give every [`radio_group_item`] in the group the same `name`,
-/// and the one that starts out picked a `checked` attribute. The `attrs`
-/// (such as `class`) are forwarded to the underlying `<div>`; a `class` among
-/// them is appended to the computed classes.
+/// The group is a `<div>` with `role="radiogroup"`. The browser groups the
+/// options by their shared `name`, so give every [`radio_group_item`] in the
+/// group the same `name`. Give the option that starts selected a `checked`
+/// attribute. The `attrs` (such as `class`) are forwarded to the `<div>`. A
+/// `class` among them is appended to the component's classes.
 ///
 /// ```ignore
 /// view! {
@@ -45,11 +44,10 @@ pub async fn radio_group(
 /// The classes for the native `<input type="radio">` inside a
 /// [`radio_group_item`].
 ///
-/// The native glyph is suppressed with `appearance-none` so the component can
-/// draw its own dot, which keeps the control looking the same across
-/// browsers. The circle matches the input control's border, and
-/// picking it recolors the ring rather than filling it, which leaves room for
-/// the dot inside.
+/// `appearance-none` hides the native dot, so the component can draw its own
+/// and look the same in all browsers. The circle has the same border as the
+/// input control. When selected, only the border changes color, which leaves
+/// room for the dot inside.
 const RADIO: StaticClass = class!(
     "peer size-4 shrink-0 appearance-none rounded-full border border-border \
      bg-background transition-colors outline-none checked:border-primary \
@@ -57,22 +55,24 @@ const RADIO: StaticClass = class!(
      focus-visible:ring-offset-background disabled:pointer-events-none",
 );
 
-/// The classes for the dot marking the picked option.
+/// The classes for the dot that marks the selected option.
 const DOT: StaticClass = class!(
     "pointer-events-none absolute inset-0 m-auto size-2 rounded-full bg-primary \
      opacity-0 transition-opacity peer-checked:opacity-100",
 );
 
-/// One option of a [`radio_group`]: a themed native `<input type="radio">`.
+/// One option of a [`radio_group`], rendered as a styled native
+/// `<input type="radio">`.
 ///
 /// The `attrs` (such as `name`, `value`, `checked`, or `disabled`) are
-/// forwarded to the `<input>`; a `class` among them is appended to the
-/// wrapping element's classes. Pair it with a `label` naming the option.
+/// forwarded to the `<input>`. A `class` among them is not put on the input
+/// but appended to the classes of the `<span>` that wraps it. Add a `label`
+/// that names the option.
 #[component]
 pub async fn radio_group_item(#[default] mut attrs: Attributes) -> Result<impl View> {
-    // The dot cannot be drawn by the `<input>` itself, which renders no
-    // children or pseudo-elements: it is a sibling overlaid on the control,
-    // revealed by the input's `peer` state while picked.
+    // The `<input>` cannot draw the dot, because it renders no children or
+    // pseudo-elements. So the dot is a sibling placed over the control, and
+    // the input's `peer` state shows it while selected.
     Ok(view! {
         <span
             class=(class!(

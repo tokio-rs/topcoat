@@ -10,11 +10,16 @@ export class RenderRequest {
 		lifetime.addEventListener("abort", () => this.cancel(), { once: true });
 	}
 
+	/** Aborts the request in flight, if any. */
 	cancel(): void {
 		this.controller?.abort();
 		this.controller = null;
 	}
 
+	/**
+	 * Runs `task` in a microtask, aborting any request in flight. Calls made
+	 * before the microtask runs are merged into one.
+	 */
 	schedule(task: () => Promise<void>): void {
 		if (this.pending || this.lifetime.aborted) return;
 		this.cancel();
@@ -26,6 +31,11 @@ export class RenderRequest {
 		});
 	}
 
+	/**
+	 * Performs a request and hands the response HTML to `replace`, unless a
+	 * newer request or the owner's release made it stale. A redirect
+	 * navigates the page instead.
+	 */
 	async run(
 		request: (signal: AbortSignal) => Promise<Response>,
 		replace: (html: string) => void,

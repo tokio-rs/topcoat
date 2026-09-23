@@ -34,11 +34,17 @@ pub use weight::*;
 /// on the written tokens; combinations the catalog does not ship additionally
 /// emit a `compile_error!` alongside the construction.
 pub struct FontsourceFontFace {
+    /// The family, as the name of its `families` constant.
     pub family: FamilyName,
+    /// The `weight` argument.
     pub weight: Weight,
+    /// The `style` argument.
     pub style: Style,
+    /// The `subset` argument, if written.
     pub subset: Option<Subset>,
+    /// The `display` argument, if written.
     pub display: Option<Display>,
+    /// The `host` argument, if written.
     pub host: Option<Host>,
 }
 

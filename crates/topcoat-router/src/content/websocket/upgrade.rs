@@ -23,16 +23,15 @@ use crate::{
     response::Response,
 };
 
-/// WebSocket handshake extractor: validates the upgrade request and hands the
-/// connection to a callback.
+/// WebSocket handshake extractor.
 ///
-/// A route handler takes a `WebSocketUpgrade` parameter to become a WebSocket
-/// endpoint. The extractor validates the handshake (a `GET` request with the
-/// `Upgrade: websocket` headers of [RFC 6455]); the handler then calls
-/// [`on_upgrade`](Self::on_upgrade) with the callback that speaks to the
-/// client, and returns the response that completes the handshake. Before
-/// upgrading, the builder methods can negotiate a subprotocol and bound
-/// message sizes.
+/// A route handler becomes a WebSocket endpoint by taking a `WebSocketUpgrade`
+/// parameter. The extractor checks that the request is a valid [RFC 6455]
+/// handshake: a `GET` request with the `Upgrade: websocket` headers, sent over
+/// an HTTP/1.1 connection. The handler then calls
+/// [`on_upgrade`](Self::on_upgrade) with a callback that talks to the client,
+/// and returns the response it gets back. Before that, the builder methods can
+/// set up subprotocol negotiation and limit message sizes.
 ///
 /// [RFC 6455]: https://datatracker.ietf.org/doc/html/rfc6455
 ///
@@ -63,8 +62,8 @@ use crate::{
 /// ```
 ///
 /// The callback outlives the handler, so it cannot borrow the request context.
-/// Clone the [`Cx`] and move the owned handle in to read the context from the
-/// socket task:
+/// To read the context from the callback, clone the [`Cx`] and move the clone
+/// in:
 ///
 /// ```rust
 /// use topcoat::{
@@ -101,43 +100,51 @@ pub struct WebSocketUpgrade {
 }
 
 impl WebSocketUpgrade {
-    /// Sets the read buffer capacity. Defaults to 128 KiB.
+    /// Sets the capacity of the read buffer. Defaults to 128 KiB.
     pub fn read_buffer_size(mut self, size: usize) -> Self {
         self.config.read_buffer_size = size;
         self
     }
 
     /// Sets the target size of the write buffer, which batches writes to the
-    /// client. Defaults to 128 KiB; `0` writes every message eagerly.
+    /// client. Defaults to 128 KiB.
+    ///
+    /// Set it to `0` to write every message right away.
     pub fn write_buffer_size(mut self, size: usize) -> Self {
         self.config.write_buffer_size = size;
         self
     }
 
-    /// Caps the write buffer, so writes error instead of buffering without
-    /// bound when the client stops reading. Unlimited by default.
+    /// Sets the maximum size of the write buffer. Unlimited by default.
+    ///
+    /// Once the buffer is full, sending fails instead of buffering more data
+    /// for a client that stopped reading.
     pub fn max_write_buffer_size(mut self, max: usize) -> Self {
         self.config.max_write_buffer_size = max;
         self
     }
 
-    /// Caps the size of a received message, closing the connection when a
-    /// client exceeds it. Defaults to 64 MiB.
+    /// Sets the maximum size of a received message. Defaults to 64 MiB.
+    ///
+    /// A larger message makes receiving fail.
     pub fn max_message_size(mut self, max: usize) -> Self {
         self.config.max_message_size = Some(max);
         self
     }
 
-    /// Caps the size of a received frame, closing the connection when a client
-    /// exceeds it. Defaults to 16 MiB.
+    /// Sets the maximum size of a received frame. Defaults to 16 MiB.
+    ///
+    /// A larger frame makes receiving fail.
     pub fn max_frame_size(mut self, max: usize) -> Self {
         self.config.max_frame_size = Some(max);
         self
     }
 
-    /// Accepts frames a client failed to mask, instead of closing the
-    /// connection as RFC 6455 mandates. Off by default; only enable it to
-    /// tolerate known non-conforming clients.
+    /// Sets whether to accept frames that the client did not mask. Off by
+    /// default.
+    ///
+    /// RFC 6455 requires clients to mask their frames. Only turn this on to
+    /// support known clients that break this rule.
     pub fn accept_unmasked_frames(mut self, accept: bool) -> Self {
         self.config.accept_unmasked_frames = accept;
         self
@@ -145,10 +152,11 @@ impl WebSocketUpgrade {
 
     /// Declares the subprotocols the endpoint speaks, in order of preference.
     ///
-    /// The first declared protocol that the client also requested (via the
-    /// `Sec-WebSocket-Protocol` header) is selected, echoed in the handshake
-    /// response, and reported by
+    /// The first protocol in this list that the client also requested in its
+    /// `Sec-WebSocket-Protocol` header is selected. It is sent back in the
+    /// handshake response and returned by
     /// [`WebSocket::protocol`](crate::content::websocket::WebSocket::protocol).
+    /// When there is no match, no protocol is selected.
     pub fn protocols<I>(mut self, protocols: I) -> Self
     where
         I: IntoIterator,
@@ -158,24 +166,25 @@ impl WebSocketUpgrade {
         self
     }
 
-    /// Registers a callback for when the upgrade fails after the handshake
-    /// response was already sent, for example because the client vanished.
-    /// The default callback discards the error.
+    /// Sets a callback that runs when the upgrade fails after the handshake
+    /// response was sent, for example because the client went away.
+    ///
+    /// By default the error is discarded.
     pub fn on_failed_upgrade(mut self, callback: impl FnOnce(Error) + Send + 'static) -> Self {
         self.on_failed_upgrade = Box::new(callback);
         self
     }
 
-    /// Completes the handshake, calling `callback` with the [`WebSocket`] once
-    /// the client connection has switched protocols.
+    /// Completes the handshake and calls `callback` with the [`WebSocket`]
+    /// once the connection has switched protocols.
     ///
-    /// The returned response must be the handler's return value; sending it
-    /// performs the protocol switch. The callback runs on its own task, which
-    /// owns the connection for as long as it runs.
+    /// Return the response from the handler. Sending it to the client switches
+    /// the connection to the WebSocket protocol. The callback then runs on its
+    /// own task and owns the connection until it returns.
     ///
     /// # Errors
     ///
-    /// Returns an error if the handshake response cannot be assembled.
+    /// Returns an error if the handshake response cannot be built.
     pub fn on_upgrade<C, F>(self, callback: C) -> Result<Response>
     where
         C: FnOnce(WebSocket) -> F + Send + 'static,
@@ -231,9 +240,11 @@ impl fmt::Debug for WebSocketUpgrade {
     }
 }
 
-/// Validates the handshake described by RFC 6455 section 4.2.1, rejecting a
-/// request that is not a conforming WebSocket upgrade with a `400 Bad Request`
-/// (or `405 Method Not Allowed` for a non-`GET` method).
+/// Checks the handshake described by RFC 6455 section 4.2.1.
+///
+/// A request with a method other than `GET` is rejected with
+/// `405 Method Not Allowed`. Any other invalid handshake, or a connection that
+/// cannot be upgraded, is rejected with `400 Bad Request`.
 impl FromRequest for WebSocketUpgrade {
     #[allow(clippy::unused_async_trait_impl)]
     async fn from_request(cx: &Cx, _body: Body) -> Result<Self> {

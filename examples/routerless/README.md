@@ -7,4 +7,3 @@ Run it with:
 ```sh
 cargo run -p routerless
 ```
-

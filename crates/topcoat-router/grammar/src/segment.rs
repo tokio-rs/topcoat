@@ -12,6 +12,8 @@ use topcoat_core_grammar::{
     paths::{topcoat_inventory, topcoat_router},
 };
 
+/// The input to `segment!`: comma-separated `kind = ...` and `rename = ...`
+/// attributes, each given at most once.
 pub struct Segment {
     attrs: Punctuated<SegmentAttr, Token![,]>,
 }
@@ -82,12 +84,15 @@ mod kw {
     dead_code,
     reason = "parsed for syntax validation; not yet consumed by code generation"
 )]
+/// One `key = value` attribute of `segment!`.
 pub enum SegmentAttr {
+    /// `kind = Static`, `Group`, `Param`, or `CatchAll`.
     Kind {
         kind_kw: kw::kind,
         eq_token: Token![=],
         value: Ident,
     },
+    /// `rename = "..."`, the name used for the segment.
     Rename {
         rename_kw: kw::rename,
         eq_token: Token![=],

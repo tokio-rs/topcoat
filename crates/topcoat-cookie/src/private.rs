@@ -2,18 +2,19 @@ use cookie::{Cookie, CookieJar as RawCookieJar, Key};
 
 use crate::Cookies;
 
-/// A [`Cookies`] adapter that encrypts cookies written through it and decrypts
-/// cookies read through it, using a [`Key`].
+/// A [`Cookies`] adapter that encrypts cookies on write and decrypts them on
+/// read, using a [`Key`].
 ///
-/// Encryption (AES-256-GCM) makes a cookie's value both tamper-proof and
-/// unreadable by the client. Created by [`Cookies::private`] or
-/// [`private_cookies`](crate::private_cookies).
+/// Encryption with AES-256-GCM makes a cookie's value both tamper-proof and
+/// unreadable by the client. Reads return `None` when the cookie is missing or
+/// fails to decrypt.
 ///
-/// The cookie's **name is bound into the ciphertext as associated data**, so
-/// the name seen at this layer must match on write and read. Because `get`
-/// mirrors `add` through the same adapter stack, that holds automatically
-/// regardless of how this layer is composed with prefixing. Reads return `None`
-/// when a cookie is missing or fails to decrypt.
+/// The encryption also covers the cookie's name, so a value cannot be moved to
+/// a cookie with a different name. This works with any combination of adapters,
+/// as long as the cookie is read through the same adapters it was written
+/// through.
+///
+/// Created by [`Cookies::private`] or [`private_cookies`](crate::private_cookies).
 #[derive(Debug, Clone, Copy)]
 pub struct PrivateJar<'key, J> {
     inner: J,

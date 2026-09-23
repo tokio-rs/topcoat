@@ -5,28 +5,28 @@ use topcoat::{
 
 /// The visual style of a [`badge`].
 ///
-/// [`Default`] is `BadgeVariant::Primary`, used when no variant is given.
+/// The default is `BadgeVariant::Primary`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum BadgeVariant {
-    /// The primary-filled badge for highlighted statuses.
+    /// Filled with the primary color, for highlighted statuses.
     #[default]
     Primary,
-    /// A muted, tinted fill for neutral statuses.
+    /// A muted tinted fill, for neutral statuses.
     Secondary,
-    /// A hairline-bordered badge on the page background.
+    /// A thin border and no fill.
     Outline,
-    /// A destructive-filled badge for errors and warnings.
+    /// Filled with the destructive color, for errors and warnings.
     Destructive,
 }
 
 impl BadgeVariant {
     /// The Tailwind classes for this variant.
     ///
-    /// Each variant sets its own border color rather than inheriting a
-    /// transparent one from [`BASE`]: with two border-color classes on the
-    /// same element, stylesheet order (not class order) would decide the
-    /// winner.
+    /// Each variant sets its own border color instead of getting a
+    /// transparent one from [`BASE`]. With two border color classes on one
+    /// element, the order in the stylesheet would decide which one wins, not
+    /// the order of the classes.
     fn classes(self) -> StaticClass {
         match self {
             Self::Primary => class!("border-transparent bg-primary text-primary-foreground"),
@@ -41,16 +41,16 @@ impl BadgeVariant {
 
 /// The classes shared by every badge, regardless of variant.
 ///
-/// Every badge carries a border (colored per variant) so that the `Outline`
-/// variant, which only recolors it, does not change the badge's dimensions.
+/// Every badge has a border, colored by its variant. So the `Outline`
+/// variant, which only shows the border, has the same size as the others.
 const BASE: StaticClass = class!(
     "inline-flex w-fit shrink-0 items-center justify-center gap-1 rounded-md \
      border px-2 py-0.5 text-xs font-medium whitespace-nowrap",
 );
 
-/// Builds the full class list for a badge of the given `variant`.
+/// Returns the full class list of a badge with the given `variant`.
 ///
-/// Use it to give badge styling to another element, such as a link:
+/// Use it to style another element, such as a link, like a badge:
 ///
 /// ```ignore
 /// view! {
@@ -62,12 +62,12 @@ pub fn badge_variants(variant: BadgeVariant) -> Class<(StaticClass, StaticClass)
     class!(BASE, variant.classes())
 }
 
-/// A badge component: a small inline pill for statuses, counts, and tags.
+/// A small inline label for statuses, counts, and tags.
 ///
-/// The `variant` parameter selects the styling, defaulting to `Primary`. The
-/// `attrs` (such as `class` or `title`) are forwarded to the underlying
-/// `<span>`; a `class` among them is appended to the computed classes. Child
-/// nodes become the badge's content.
+/// `variant` sets the style and defaults to `Primary`. The `attrs` (such as
+/// `class` or `title`) are forwarded to the `<span>`. A `class` among them is
+/// appended to the component's classes. Child nodes become the badge's
+/// content.
 ///
 /// ```ignore
 /// view! {

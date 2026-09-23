@@ -1,9 +1,10 @@
-/// The borrowed return type of a `#[memoize(as_ref)]` function.
+/// Borrows the contents of a value returned by a `#[memoize(as_ref)]`
+/// function.
 ///
 /// `#[memoize]` stores the function's return value in the request cache and
-/// hands out `&T`. With `as_ref`, the macro instead borrows the cached
-/// value's contents through this trait, so an `Option<T>` or `Result<T, E>`
-/// return value comes back as `Option<&T>` or `Result<&T, &E>`.
+/// returns `&T`. With `as_ref`, the macro instead borrows the cached value's
+/// contents through this trait, so an `Option<T>` comes back as `Option<&T>`
+/// and a `Result<T, E>` as `Result<&T, &E>`.
 ///
 /// Implement this trait for your own return type to use it with
 /// `#[memoize(as_ref)]`:
@@ -32,7 +33,7 @@
 /// }
 /// ```
 pub trait MemoizeAsRef {
-    /// The return type produced by borrowing the cached value's contents.
+    /// The type returned when borrowing the cached value's contents.
     type AsRef<'a>
     where
         Self: 'a;

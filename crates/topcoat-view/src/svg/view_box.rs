@@ -4,19 +4,27 @@ use topcoat_core::context::Cx;
 
 use crate::{AttributeValueViewParts, PartsWriter};
 
-/// The [`viewBox`] of an SVG element: `min-x`, `min-y`, `width`, and `height`.
+/// The [`viewBox`] attribute of an SVG element.
+///
+/// A view box can be used as an attribute value in a template, where it
+/// renders as its four numbers separated by spaces, such as `0 0 24 24`. It
+/// also implements [`Display`] with the same output.
 ///
 /// [`viewBox`]: https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/viewBox
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ViewBox {
+    /// The x coordinate of the top left corner.
     pub min_x: f32,
+    /// The y coordinate of the top left corner.
     pub min_y: f32,
+    /// The width of the visible area.
     pub width: f32,
+    /// The height of the visible area.
     pub height: f32,
 }
 
 impl ViewBox {
-    /// Creates a view box from its components.
+    /// Creates a view box from its four components, in attribute order.
     #[must_use]
     pub const fn new(min_x: f32, min_y: f32, width: f32, height: f32) -> Self {
         Self {

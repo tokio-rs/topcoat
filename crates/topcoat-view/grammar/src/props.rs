@@ -7,20 +7,17 @@ use syn::{
 };
 use topcoat_core_grammar::paths::topcoat_view;
 
-/// A parsed `#[derive(Props)]` struct. Expands into a typestate builder where
-/// every field without `#[default]` must be set before `build()` becomes
-/// available, plus implementations of [`topcoat::view::Props`] and an inherent
-/// `builder()` function on the props struct.
+/// A parsed `#[derive(Props)]` struct.
 ///
-/// Each required field is tracked by a generic argument of the builder. It
-/// starts out as a generated marker type named after the field and flips to
-/// [`topcoat::view::Set`] when the field's setter is called. `build()` bounds
-/// every marker by [`topcoat::view::IsSet`], so forgetting a field produces a
-/// "missing required property" error naming the field.
+/// Expands into a builder that only offers `build()` once every field without
+/// `#[default]` has been set, an inherent `builder()` function on the struct,
+/// and an implementation of [`topcoat_view::Props`].
 ///
-/// [`topcoat::view::IsSet`]: trait.IsSet.html
-/// [`topcoat::view::Props`]: trait.Props.html
-/// [`topcoat::view::Set`]: struct.Set.html
+/// The builder tracks each required field with a generic parameter. It starts
+/// as a hidden marker type named after the field and becomes
+/// [`topcoat_view::Set`] when the field's setter is called. `build()` requires
+/// every parameter to implement [`topcoat_view::IsSet`], so a missing field
+/// produces a compile error that names it.
 pub struct Props {
     vis: Visibility,
     ident: Ident,

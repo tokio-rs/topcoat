@@ -9,9 +9,12 @@ use crate::{
     view::hir::{LowerView, ViewBuilder},
 };
 
-/// A `let pat = expr;` binding in view-body position. The binding is in scope
-/// for all sibling nodes that follow it.
+/// A `let pat = expr;` binding in a view or among attributes. The binding is
+/// in scope for the sibling nodes that follow it.
+///
+/// Parsing requires an initializer and rejects `let ... else`.
 pub struct TemplateLocal {
+    /// The parsed `let` statement.
     pub local: Local,
 }
 

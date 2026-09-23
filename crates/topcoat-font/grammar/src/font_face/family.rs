@@ -13,9 +13,13 @@ mod kw {
     custom_keyword!(family);
 }
 
+/// A `font-family: ...` descriptor in a `font_face!` body.
 pub struct FontFamily {
+    /// The `font-family` name.
     pub key: FontFamilyKey,
+    /// The `:` between the name and the value.
     pub colon_token: Token![:],
+    /// The descriptor's value.
     pub value: FontFamilyValue,
 }
 
@@ -51,9 +55,13 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontFamily {
     }
 }
 
+/// The `font-family` descriptor name.
 pub struct FontFamilyKey {
+    /// The `font` keyword.
     pub font_kw: kw::font,
+    /// The `-` between the keywords.
     pub dash_token: Token![-],
+    /// The `family` keyword.
     pub family_kw: kw::family,
 }
 
@@ -83,6 +91,8 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontFamilyKey {
     }
 }
 
+/// The value of a `font-family` descriptor: a string literal or any expression
+/// convertible into a `String`.
 pub struct FontFamilyValue(pub Expr);
 
 impl Parse for FontFamilyValue {

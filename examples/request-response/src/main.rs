@@ -90,8 +90,8 @@ async fn files(mut multipart: Multipart) -> Result<String> {
 
 // --- Optional request bodies ------------------------------------------------
 
-// Option<Json<T>> is None when the request carries no JSON body, and still
-// errors when a malformed body is present.
+// Option<Json<T>> is None when the request has no Content-Type header. A
+// request that has one still errors when its body is not valid JSON.
 #[route(POST "/api/maybe-user")]
 async fn maybe_user(user: Option<Json<User>>) -> Result<String> {
     match user {

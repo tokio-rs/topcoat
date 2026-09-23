@@ -18,12 +18,15 @@ use crate::{
 ///
 /// As a [`FromRequest`] extractor, `Json<T>` reads the request body and
 /// deserializes it into `T`. The request must carry a
-/// `Content-Type: application/json` header, or any `application/*+json` media
-/// type. As an [`IntoResponse`] wrapper, it serializes `T` to JSON and sets the
-/// response `Content-Type` to `application/json`.
+/// `Content-Type: application/json` header or another `application/*+json`
+/// media type. A malformed body is a bad request error that names the path to
+/// the offending field.
 ///
-/// Wrap it in [`Option`] to make the body optional: the extractor yields
-/// [`None`] when the request has no `Content-Type` header, and still reports an
+/// As an [`IntoResponse`] wrapper, `Json<T>` serializes `T` to JSON and
+/// replies with `Content-Type: application/json`.
+///
+/// Wrap it in [`Option`] to make the body optional. The extractor then yields
+/// [`None`] when the request has no `Content-Type` header, and still returns an
 /// error when a body is present but malformed.
 ///
 /// # Examples
@@ -113,12 +116,12 @@ where
 {
     /// Deserializes JSON bytes into `Json<T>`.
     ///
-    /// Unlike the [`FromRequest`] extractor, this does not inspect any
-    /// `Content-Type`; it parses `bytes` directly.
+    /// Unlike the [`FromRequest`] extractor, this does not check any
+    /// `Content-Type` header. It parses `bytes` directly.
     ///
     /// # Errors
     ///
-    /// Returns a bad-request error when `bytes` are not valid JSON or do not
+    /// Returns a bad request error when `bytes` are not valid JSON or do not
     /// match `T`, or when trailing data follows the JSON value.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         let mut deserializer = serde_json::Deserializer::from_slice(bytes);

@@ -1,3 +1,7 @@
+//! Declaring and sending email for Topcoat.
+//!
+//! Use this crate through `topcoat::mail`, which also hosts the guide.
+
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod attachment;

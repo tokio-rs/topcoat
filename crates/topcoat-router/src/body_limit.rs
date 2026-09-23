@@ -8,25 +8,26 @@ use crate::{Body, IntoPath, Layer, LayerFuture, Next, Path};
 /// request.
 pub(crate) const DEFAULT_BODY_LIMIT: usize = 2 * 1024 * 1024;
 
-/// A router layer that overrides the request body size limit for the routes
-/// under its path.
+/// A router layer that sets the request body size limit for the routes under
+/// its path.
 ///
-/// Extractors that buffer the request body ([`Bytes`](crate::request::Bytes),
-/// [`Json`](crate::content::Json), [`Form`](crate::content::Form), and the
-/// other built-ins) read at most the request's body limit and reject a larger
-/// body with `413 Content Too Large`, so a client cannot exhaust the server's
-/// memory. The limit defaults to 2 MiB and applies without any configuration;
-/// register this layer to change it.
+/// The built-in extractors that buffer the request body, such as
+/// [`Bytes`](crate::request::Bytes), [`Json`](crate::content::Json), and
+/// [`Form`](crate::content::Form), read at most the request's body limit. They
+/// reject a larger body with `413 Content Too Large`, so a client cannot
+/// exhaust the server's memory. The limit is 2 MiB by default. Register this
+/// layer to change it.
 ///
 /// Create the layer with [`max`](Self::max) or [`disable`](Self::disable) and
 /// register it with [`RouterBuilder::layer`](crate::RouterBuilder::layer). It
-/// covers the whole application by default; scope it to a path prefix with
-/// [`at`](Self::at). Layers nest from least- to most-specific path, so a
-/// scoped layer overrides a broader one for the routes it wraps.
+/// covers the whole application unless you scope it to a path prefix with
+/// [`at`](Self::at). Layers nest from the least specific path to the most
+/// specific one, so a scoped layer overrides a broader one for the routes it
+/// wraps.
 ///
-/// The limit only applies where a buffering extractor enforces it: a handler
-/// that takes the raw [`Body`] streams the request instead and reads it on
-/// its own terms.
+/// Only extractors that buffer the body enforce the limit. A handler that
+/// takes the raw [`Body`] reads the stream itself and can pass
+/// [`body_limit`] to [`to_bytes`](crate::to_bytes).
 ///
 /// # Examples
 ///
@@ -97,16 +98,17 @@ enum BodyLimitKind {
     Limit(usize),
 }
 
-/// Returns the request's effective body size limit in bytes.
+/// Returns the request's body size limit in bytes.
 ///
-/// This is the limit registered by the innermost [`BodyLimit`] layer wrapping
-/// the matched route, the 2 MiB default when no layer matches, or
+/// This is the limit set by the innermost [`BodyLimit`] layer that wraps the
+/// matched route, or the 2 MiB default when no layer matches. It is
 /// [`usize::MAX`] when the limit is disabled.
 ///
-/// The built-in buffering extractors enforce this limit already. In a custom
-/// [`FromRequest`](crate::request::FromRequest) implementation, prefer delegating the
-/// buffering to [`Bytes`](crate::request::Bytes), which enforces it too; pass this
-/// value to [`to_bytes`](crate::to_bytes) when reading the body by hand.
+/// The built-in buffering extractors already enforce this limit. In a custom
+/// [`FromRequest`](crate::request::FromRequest) implementation, the simplest
+/// option is to read the body through [`Bytes`](crate::request::Bytes), which
+/// enforces it too. When reading the body by hand, pass this value to
+/// [`to_bytes`](crate::to_bytes).
 ///
 /// # Examples
 ///

@@ -2,22 +2,22 @@ use std::panic::Location;
 
 use crate::fnv1a::Fnv1a;
 
-/// A key for one source location that derives an identity.
+/// A hash of one source location, used to derive an
+/// [`Identity`](crate::identity::Identity).
 ///
-/// Generated code can combine `file!()`, `line!()`, and `column!()` with an
-/// ordinal to distinguish multiple sites within one macro invocation.
-///
-/// A function that derives an identity for its caller builds one from the
-/// caller's [`Location`] with [`from_location`](Self::from_location)
-/// instead.
+/// Generated code builds one with [`new`](Self::new) from `file!()`,
+/// `line!()`, and `column!()`, plus an ordinal to tell apart several sites
+/// within one macro invocation. A `#[track_caller]` function that derives an
+/// identity for its caller builds one from the caller's [`Location`] with
+/// [`from_location`](Self::from_location).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SiteKey(pub(super) u64);
 
 impl SiteKey {
     /// Creates a site key from a source location and an ordinal.
     ///
-    /// `const`, so the hashing happens at compile time when the inputs are
-    /// literals from `file!`, `line!`, and `column!`.
+    /// This is a `const fn`, so the hashing happens at compile time when the
+    /// inputs come from `file!`, `line!`, and `column!`.
     #[must_use]
     pub const fn new(file: &str, line: u32, column: u32, ordinal: u32) -> Self {
         Self(
@@ -32,9 +32,9 @@ impl SiteKey {
     }
 
     /// Creates a site key from a runtime source location, such as the one
-    /// `Location::caller` reports inside a `#[track_caller]` function.
+    /// [`Location::caller`] returns inside a `#[track_caller]` function.
     ///
-    /// The ordinal is zero: a call expression has one position in source.
+    /// The ordinal is zero.
     #[must_use]
     pub const fn from_location(location: &Location<'_>) -> Self {
         Self::new(location.file(), location.line(), location.column(), 0)

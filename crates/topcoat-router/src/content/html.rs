@@ -10,13 +10,28 @@ use crate::{
 
 /// HTML request extractor and response wrapper.
 ///
-/// As a response, wrap any value convertible into a [`Body`] (such as a
-/// `String`) to reply with `Content-Type: text/html`. Rendered pages are
-/// wrapped in `Html` automatically; use it directly from a
-/// [`route`](../topcoat_router_macro/attr.route.html) that returns markup by hand.
+/// As a response, `Html<T>` wraps any value convertible into a [`Body`], such
+/// as a `String`, and replies with `Content-Type: text/html; charset=utf-8`.
+/// Pages and views already respond with HTML, so use `Html` from a `#[route]`
+/// that builds its markup by hand.
 ///
 /// As a request extractor, `Html<String>` requires a `Content-Type: text/html`
-/// header and yields the body as text.
+/// header and reads the body as UTF-8 text. Wrap it in [`Option`] to accept
+/// requests without a `Content-Type` header.
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::{
+///     Result,
+///     router::{content::Html, route},
+/// };
+///
+/// #[route(GET "/hello")]
+/// async fn hello() -> Result<Html<&'static str>> {
+///     Ok(Html("<h1>Hello</h1>"))
+/// }
+/// ```
 #[derive(Debug, Clone, Copy, Default)]
 #[must_use]
 pub struct Html<T>(pub T);

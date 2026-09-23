@@ -1,3 +1,7 @@
+//! Request-scoped cookies for Topcoat.
+//!
+//! Use this crate through `topcoat::cookie`, which also hosts the guide.
+
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod jar;
@@ -27,21 +31,41 @@ pub use signed::*;
 pub use store::*;
 use topcoat_core::context::{Cx, app_context, request_context};
 
-/// A request-scoped cookie jar.
+/// A cookie jar that can read, add, and remove cookies for the current request.
 ///
-/// `Cookies` is implemented by the root [`CookieJar`] and by every adapter
-/// ([`SignedJar`], [`PrivateJar`], [`Prefixed`], [`Map`]). The three core
-/// methods read and write cookies; the combinators wrap the jar in further
-/// adapters, in the style of [`Iterator`].
+/// The root jar returned by [`cookies`] implements this trait, and so does
+/// every adapter built on top of it. [`get`](Self::get), [`add`](Self::add),
+/// and [`remove`](Self::remove) read and write cookies. The other methods are
+/// combinators: like [`Iterator`] adapters, each one wraps the jar in a new
+/// jar that signs, encrypts, prefixes, or sets attributes on the cookies that
+/// pass through it.
 ///
-/// Bring this trait into scope to use the combinators.
+/// Bring this trait into scope to call any of its methods.
+///
+/// ```rust
+/// use topcoat::{
+///     context::Cx,
+///     cookie::{Cookies, SameSite, cookies},
+/// };
+///
+/// fn remember_theme(cx: &Cx) {
+///     let jar = cookies(cx)
+///         .default_same_site(SameSite::Lax)
+///         .default_path("/");
+///     jar.add(("theme", "dark"));
+/// }
+/// ```
 pub trait Cookies {
-    /// Returns the cookie named `name`, or `None` if it is absent (or, for
-    /// signed/encrypted jars, fails to verify).
+    /// Returns the cookie named `name`.
+    ///
+    /// Returns `None` if the cookie is absent. Signed and private jars also
+    /// return `None` when the cookie fails to verify or decrypt.
     fn get(&self, name: &str) -> Option<Cookie<'static>>;
 
-    /// Adds `cookie`. It is serialized into a `Set-Cookie` response header once
-    /// the cookie router layer handles the response.
+    /// Adds `cookie`, replacing any cookie with the same name.
+    ///
+    /// The cookie is sent as a `Set-Cookie` response header when the handler
+    /// returns.
     ///
     /// # Panics
     ///
@@ -50,9 +74,14 @@ pub trait Cookies {
     /// WebSocket task.
     fn add<C: Into<Cookie<'static>>>(&self, cookie: C);
 
-    /// Removes `cookie`. If the request carried an original cookie with the
-    /// same name, an expiring removal cookie is sent. Pass the same `Path`/
-    /// `Domain` the cookie was set with.
+    /// Removes the cookie with the name of `cookie`.
+    ///
+    /// If the request carried a cookie with that name, an expired removal
+    /// cookie is sent so the browser deletes it. Otherwise, this only cancels a
+    /// cookie added earlier in the same request. The browser only matches the
+    /// removal if its `Path` and `Domain` are the same as those of the stored
+    /// cookie, so pass the ones the cookie was set with. The value of `cookie`
+    /// is ignored.
     ///
     /// # Panics
     ///
@@ -61,7 +90,8 @@ pub trait Cookies {
     /// WebSocket task.
     fn remove<C: Into<Cookie<'static>>>(&self, cookie: C);
 
-    /// Wraps this jar so signed cookies are written and verified with `key`.
+    /// Wraps this jar so cookies are signed with `key` on write and verified on
+    /// read. See [`SignedJar`].
     fn signed(self, key: &Key) -> SignedJar<'_, Self>
     where
         Self: Sized,
@@ -69,7 +99,8 @@ pub trait Cookies {
         SignedJar::new(self, key)
     }
 
-    /// Wraps this jar so cookies are encrypted and decrypted with `key`.
+    /// Wraps this jar so cookies are encrypted with `key` on write and
+    /// decrypted on read. See [`PrivateJar`].
     fn private(self, key: &Key) -> PrivateJar<'_, Self>
     where
         Self: Sized,
@@ -77,8 +108,17 @@ pub trait Cookies {
         PrivateJar::new(self, key)
     }
 
-    /// Wraps this jar so every added cookie is passed through `f` before being
-    /// stored. The general escape hatch behind the attribute combinators.
+    /// Wraps this jar so `f` runs on every cookie before it is added or
+    /// removed.
+    ///
+    /// Use this for changes that the attribute combinators do not cover.
+    ///
+    /// ```rust
+    /// # use topcoat::cookie::{Cookies, cookies};
+    /// # fn example(cx: &topcoat::context::Cx) {
+    /// let jar = cookies(cx).map(|cookie| cookie.set_partitioned(true));
+    /// # }
+    /// ```
     fn map<F>(self, f: F) -> Map<Self, F>
     where
         Self: Sized,
@@ -87,8 +127,11 @@ pub trait Cookies {
         Map::new(self, f)
     }
 
-    /// Forces the `__Host-` prefix and its required attributes (`Secure`,
-    /// `Path=/`, no `Domain`) on every added cookie.
+    /// Wraps this jar so cookies use the `__Host-` name prefix, and forces the
+    /// attributes the prefix requires: `Secure`, `Path=/`, and no `Domain`.
+    ///
+    /// Reads look up the prefixed name and return the cookie under its bare
+    /// name. See [`Prefixed`].
     fn override_prefix_host(self) -> Prefixed<Self>
     where
         Self: Sized,
@@ -96,8 +139,12 @@ pub trait Cookies {
         Prefixed::new(self, Prefix::Host, Conform::Override)
     }
 
-    /// Applies the `__Host-` prefix, filling its required attributes only when
-    /// the cookie does not already set them.
+    /// Wraps this jar so cookies use the `__Host-` name prefix, and sets
+    /// `Secure` and `Path=/` only on cookies that do not set them already.
+    ///
+    /// Unlike [`override_prefix_host`](Self::override_prefix_host), this does
+    /// not clear `Domain` on added cookies. Removals always force the required
+    /// attributes.
     fn default_prefix_host(self) -> Prefixed<Self>
     where
         Self: Sized,
@@ -105,8 +152,11 @@ pub trait Cookies {
         Prefixed::new(self, Prefix::Host, Conform::Default)
     }
 
-    /// Forces the `__Secure-` prefix and its required `Secure` attribute on
-    /// every added cookie.
+    /// Wraps this jar so cookies use the `__Secure-` name prefix, and forces
+    /// the `Secure` attribute the prefix requires.
+    ///
+    /// Reads look up the prefixed name and return the cookie under its bare
+    /// name. See [`Prefixed`].
     fn override_prefix_secure(self) -> Prefixed<Self>
     where
         Self: Sized,
@@ -114,8 +164,8 @@ pub trait Cookies {
         Prefixed::new(self, Prefix::Secure, Conform::Override)
     }
 
-    /// Applies the `__Secure-` prefix, setting `Secure` only when the cookie
-    /// does not already set it.
+    /// Wraps this jar so cookies use the `__Secure-` name prefix, and sets
+    /// `Secure` only on cookies that do not set it already.
     fn default_prefix_secure(self) -> Prefixed<Self>
     where
         Self: Sized,
@@ -123,7 +173,8 @@ pub trait Cookies {
         Prefixed::new(self, Prefix::Secure, Conform::Default)
     }
 
-    /// Sets `Secure` on every added cookie, overriding any existing value.
+    /// Wraps this jar so `Secure` is set to `value` on every cookie, replacing
+    /// any value the cookie sets.
     fn override_secure(self, value: bool) -> Map<Self, impl Fn(&mut Cookie<'static>)>
     where
         Self: Sized,
@@ -131,7 +182,8 @@ pub trait Cookies {
         self.map(move |cookie| cookie.set_secure(value))
     }
 
-    /// Sets `Secure` on added cookies that do not already specify it.
+    /// Wraps this jar so `Secure` is set to `value` on cookies that do not set
+    /// it already.
     fn default_secure(self, value: bool) -> Map<Self, impl Fn(&mut Cookie<'static>)>
     where
         Self: Sized,
@@ -143,7 +195,8 @@ pub trait Cookies {
         })
     }
 
-    /// Sets `HttpOnly` on every added cookie, overriding any existing value.
+    /// Wraps this jar so `HttpOnly` is set to `value` on every cookie,
+    /// replacing any value the cookie sets.
     fn override_http_only(self, value: bool) -> Map<Self, impl Fn(&mut Cookie<'static>)>
     where
         Self: Sized,
@@ -151,7 +204,8 @@ pub trait Cookies {
         self.map(move |cookie| cookie.set_http_only(value))
     }
 
-    /// Sets `HttpOnly` on added cookies that do not already specify it.
+    /// Wraps this jar so `HttpOnly` is set to `value` on cookies that do not
+    /// set it already.
     fn default_http_only(self, value: bool) -> Map<Self, impl Fn(&mut Cookie<'static>)>
     where
         Self: Sized,
@@ -163,7 +217,8 @@ pub trait Cookies {
         })
     }
 
-    /// Sets `SameSite` on every added cookie, overriding any existing value.
+    /// Wraps this jar so `SameSite` is set to `value` on every cookie,
+    /// replacing any value the cookie sets.
     fn override_same_site(self, value: SameSite) -> Map<Self, impl Fn(&mut Cookie<'static>)>
     where
         Self: Sized,
@@ -171,7 +226,8 @@ pub trait Cookies {
         self.map(move |cookie| cookie.set_same_site(value))
     }
 
-    /// Sets `SameSite` on added cookies that do not already specify it.
+    /// Wraps this jar so `SameSite` is set to `value` on cookies that do not
+    /// set it already.
     fn default_same_site(self, value: SameSite) -> Map<Self, impl Fn(&mut Cookie<'static>)>
     where
         Self: Sized,
@@ -183,7 +239,8 @@ pub trait Cookies {
         })
     }
 
-    /// Sets `Path` on every added cookie, overriding any existing value.
+    /// Wraps this jar so `Path` is set to `value` on every cookie, replacing
+    /// any value the cookie sets.
     fn override_path(self, value: impl Into<String>) -> Map<Self, impl Fn(&mut Cookie<'static>)>
     where
         Self: Sized,
@@ -192,7 +249,8 @@ pub trait Cookies {
         self.map(move |cookie| cookie.set_path(value.clone()))
     }
 
-    /// Sets `Path` on added cookies that do not already specify it.
+    /// Wraps this jar so `Path` is set to `value` on cookies that do not set it
+    /// already.
     fn default_path(self, value: impl Into<String>) -> Map<Self, impl Fn(&mut Cookie<'static>)>
     where
         Self: Sized,
@@ -205,7 +263,8 @@ pub trait Cookies {
         })
     }
 
-    /// Sets `Domain` on every added cookie, overriding any existing value.
+    /// Wraps this jar so `Domain` is set to `value` on every cookie, replacing
+    /// any value the cookie sets.
     fn override_domain(self, value: impl Into<String>) -> Map<Self, impl Fn(&mut Cookie<'static>)>
     where
         Self: Sized,
@@ -214,7 +273,8 @@ pub trait Cookies {
         self.map(move |cookie| cookie.set_domain(value.clone()))
     }
 
-    /// Sets `Domain` on added cookies that do not already specify it.
+    /// Wraps this jar so `Domain` is set to `value` on cookies that do not set
+    /// it already.
     fn default_domain(self, value: impl Into<String>) -> Map<Self, impl Fn(&mut Cookie<'static>)>
     where
         Self: Sized,
@@ -227,7 +287,10 @@ pub trait Cookies {
         })
     }
 
-    /// Sets `Max-Age` on every added cookie, overriding any existing value.
+    /// Wraps this jar so `Max-Age` is set to `value` on every added cookie,
+    /// replacing any value the cookie sets.
+    ///
+    /// Removal cookies still expire immediately.
     fn override_max_age(self, value: time::Duration) -> Map<Self, impl Fn(&mut Cookie<'static>)>
     where
         Self: Sized,
@@ -235,7 +298,10 @@ pub trait Cookies {
         self.map(move |cookie| cookie.set_max_age(value))
     }
 
-    /// Sets `Max-Age` on added cookies that do not already specify it.
+    /// Wraps this jar so `Max-Age` is set to `value` on added cookies that do
+    /// not set it already.
+    ///
+    /// Removal cookies still expire immediately.
     fn default_max_age(self, value: time::Duration) -> Map<Self, impl Fn(&mut Cookie<'static>)>
     where
         Self: Sized,
@@ -248,16 +314,14 @@ pub trait Cookies {
     }
 }
 
-/// Request-context storage for the lazily built cookie jar.
+/// Request context slot that holds the request's [`CookieJar`].
 ///
-/// The cookie router layer inserts one cell per request. The first call to
-/// [`cookies`] parses the incoming `Cookie` headers into a [`CookieJar`] and
-/// stores it here; response finalization reads the same cell to emit pending
-/// `Set-Cookie` headers only if the jar was actually touched.
+/// The cookie router layer adds one to the request context of every request.
+/// [`cookies`] builds the jar in it on first use. You only need to create one
+/// yourself when you build a [`Cx`] by hand, for example in tests.
 ///
-/// Finalization also seals the cell, so a jar handed out afterwards, whether it
-/// was built during the request or on first access from a task that outlives
-/// the handler, rejects writes.
+/// Once the response headers are written, the slot is sealed. Any jar it hands
+/// out after that, even one built for the first time, panics on writes.
 #[derive(Debug, Default)]
 pub struct CookieJarCell {
     jar: OnceLock<CookieJar>,
@@ -265,6 +329,7 @@ pub struct CookieJarCell {
 }
 
 impl CookieJarCell {
+    /// Creates an empty slot.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
@@ -294,39 +359,42 @@ impl CookieJarCell {
     }
 }
 
-/// Returns the request's root [`CookieJar`], parsing the incoming `Cookie`
-/// header on first access and memoizing it for the rest of the request.
+/// Returns the request's root [`CookieJar`].
 ///
-/// Use the [`Cookies`] combinators to layer signing, encryption, prefixes, or
-/// default attributes on top.
+/// The first call parses the request's `Cookie` headers. Later calls in the
+/// same request return the same jar. Use the [`Cookies`] combinators to add
+/// signing, encryption, name prefixes, or default attributes.
 ///
 /// # Panics
 ///
-/// Panics if the cookie router layer has not been installed for this request.
+/// Panics if the cookie router layer is not installed. Add it with
+/// `.cookies()` on the router builder.
 #[must_use]
 #[track_caller]
 pub fn cookies(cx: &Cx) -> &CookieJar {
     request_context::<CookieJarCell>(cx).get_or_init(cx)
 }
 
-/// Returns the root jar wrapped in a [`SignedJar`], using the [`Key`]
-/// registered as app context.
+/// Returns the request's root jar wrapped in a [`SignedJar`] that uses the
+/// [`Key`] registered as app context.
 ///
 /// # Panics
 ///
-/// Panics if no [`Key`] was registered with `Router::app_context`.
+/// Panics if no [`Key`] is registered as app context, or if the cookie router
+/// layer is not installed.
 #[must_use]
 #[track_caller]
 pub fn signed_cookies(cx: &Cx) -> SignedJar<'_, &CookieJar> {
     cookies(cx).signed(app_context::<Key>(cx))
 }
 
-/// Returns the root jar wrapped in a [`PrivateJar`], using the [`Key`]
-/// registered as app context.
+/// Returns the request's root jar wrapped in a [`PrivateJar`] that uses the
+/// [`Key`] registered as app context.
 ///
 /// # Panics
 ///
-/// Panics if no [`Key`] was registered with `Router::app_context`.
+/// Panics if no [`Key`] is registered as app context, or if the cookie router
+/// layer is not installed.
 #[must_use]
 #[track_caller]
 pub fn private_cookies(cx: &Cx) -> PrivateJar<'_, &CookieJar> {
@@ -334,14 +402,9 @@ pub fn private_cookies(cx: &Cx) -> PrivateJar<'_, &CookieJar> {
 }
 
 /// Appends the request's pending cookie changes to `headers` as `Set-Cookie`
-/// entries.
+/// headers, then seals the jar so later writes panic.
 ///
-/// Called by the router after each handler runs. If no cookie helper was used
-/// during the request, the jar was never built, so we skip without parsing the
-/// incoming `Cookie` header at all.
-///
-/// The jar is sealed either way: from here on the response is out of the
-/// framework's hands, so a write would go nowhere and panics instead.
+/// Does nothing but seal if the jar was never built during the request.
 #[doc(hidden)]
 pub fn write_cookies(cx: &Cx, headers: &mut http::HeaderMap) {
     let cell = request_context::<CookieJarCell>(cx);

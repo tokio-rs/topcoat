@@ -16,10 +16,13 @@ mod kw {
 /// a [`FontDisplay`] variant name, e.g. `display: Swap`. Defaults to `Swap` when
 /// omitted.
 ///
-/// [`FontDisplay`]: ../../../font/enum.FontDisplay.html
+/// [`FontDisplay`]: topcoat_font::FontDisplay
 pub struct Display {
+    /// The `display` name.
     pub key: DisplayKey,
+    /// The `:` between the name and the value.
     pub colon_token: Token![:],
+    /// The written value.
     pub value: DisplayValue,
 }
 
@@ -49,7 +52,9 @@ impl topcoat_core_grammar::pretty::PrettyPrint for Display {
     }
 }
 
+/// The `display` argument name.
 pub struct DisplayKey {
+    /// The `display` keyword.
     pub display_kw: kw::display,
 }
 
@@ -83,7 +88,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for DisplayKey {
 /// so the compiler reports unknown strategies on it and editors autocomplete
 /// them.
 ///
-/// [`FontDisplay`]: ../../../font/enum.FontDisplay.html
+/// [`FontDisplay`]: topcoat_font::FontDisplay
 pub struct DisplayValue(Ident);
 
 impl DisplayValue {

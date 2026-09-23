@@ -8,10 +8,12 @@ use crate::view::{
     hir::{LowerView, ViewBuilder},
 };
 
-/// A sequence of sibling [`Node`]s: the shared building block used by both a
-/// top-level [`View`](super::View), a [`Component`](super::Component)'s
-/// children, and any view-position template body. Owns the node list and the
-/// formatting rules for laying out siblings.
+/// A sequence of sibling [`Node`]s.
+///
+/// It holds the top-level nodes of a [`View`](crate::view::View), the children
+/// of an element or [`Component`](super::Component) call, and the body of an
+/// `if`, `for`, or block in a view. Parsing stops at the end of the input or
+/// at a closing tag.
 pub struct Nodes(Vec<Node>);
 
 impl Deref for Nodes {

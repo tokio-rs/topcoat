@@ -11,11 +11,15 @@ use crate::{
     view::hir::{ExprKind, LowerView, ViewBuilder},
 };
 
-/// The value part of an [`Attribute`](super::Attribute). Either a string
-/// literal (`"foo"`) or a parenthesized Rust expression (`(expr)`) that is
-/// evaluated at render time.
+/// The value of an [`Attribute`](super::Attribute).
+///
+/// Either a string literal like `"foo"`, or a parenthesized Rust expression
+/// like `(expr)` that is evaluated at render time.
 pub enum AttributeValue {
+    /// A value computed by an expression. It can leave out the attribute,
+    /// for example when it evaluates to `false` or `None`.
     Expr(Box<TemplateExpr>),
+    /// A literal value. The attribute is always rendered.
     LitStr(LitStr),
 }
 

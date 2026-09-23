@@ -18,12 +18,14 @@ use crate::{
     },
 };
 
-/// The name part of a single `name=value` attribute on an
-/// [`Element`](crate::view::Element) or [`Component`](crate::view::Component). Either an
-/// HTML identifier (`data-foo`, `aria-label`) or a parenthesized Rust
-/// expression that resolves to the attribute name at runtime.
+/// The name of an attribute, bind attribute, or event handler.
+///
+/// Either an HTML identifier like `data-foo` or `aria-label`, or a
+/// parenthesized Rust expression that evaluates to the name at render time.
 pub enum AttributeKey {
+    /// A name written literally, like `data-foo`.
     Ident(HtmlIdent),
+    /// A name computed by an expression, like `(name)`.
     Expr(Box<TemplateExpr>),
 }
 
@@ -36,6 +38,9 @@ impl AttributeKey {
         matches!(self, Self::Ident(..))
     }
 
+    /// Returns the identifier if the attribute key is [`Ident`].
+    ///
+    /// [`Ident`]: AttributeKey::Ident
     #[must_use]
     pub fn as_ident(&self) -> Option<&HtmlIdent> {
         if let Self::Ident(v) = self {
@@ -53,6 +58,9 @@ impl AttributeKey {
         matches!(self, Self::Expr(..))
     }
 
+    /// Returns the expression if the attribute key is [`Expr`].
+    ///
+    /// [`Expr`]: AttributeKey::Expr
     #[must_use]
     pub fn as_expr(&self) -> Option<&TemplateExpr> {
         if let Self::Expr(v) = self {

@@ -1,5 +1,5 @@
-//! Type-keyed values registered for a single request and dropped when it
-//! ends.
+//! Values registered for a single request, looked up by type and dropped when
+//! the request ends.
 
 use std::{
     any::{Any, TypeId, type_name},
@@ -11,13 +11,15 @@ use std::{
 
 use crate::context::{BindingId, ContextRead, Cx};
 
-/// Returns a reference to the request context value of type `T` registered on
-/// the current request's [`Cx`], or `None` if no such value has been registered.
+/// Returns the request context value of type `T` visible from `cx`, or `None`
+/// if no such value is registered.
 ///
-/// The lookup is keyed by `T`'s [`TypeId`], so each type may have at most one
-/// registered value per request. Request context lives only for the duration
-/// of the request that owns it; once the request completes, every value is
-/// dropped.
+/// Values are looked up by type, so a scope holds at most one value per type.
+/// A child scope made with [`Cx::with`] can shadow a value with another one of
+/// the same type. Request context values are dropped when the request ends.
+///
+/// Inside a `#[memoize]` function, the lookup is recorded as a dependency of
+/// the cached result, even when no value is found.
 ///
 /// # Examples
 ///
@@ -42,17 +44,13 @@ where
     binding.map(|(_, value)| value)
 }
 
-/// Returns a reference to the request context value of type `T` registered on
-/// the current request's [`Cx`].
+/// Returns the request context value of type `T` visible from `cx`.
 ///
-/// The lookup is keyed by `T`'s [`TypeId`], so each type may have at most one
-/// registered value per request. Request context lives only for the duration
-/// of the request that owns it; once the request completes, every value is
-/// dropped.
+/// This is [`try_request_context`] for values that must be present.
 ///
 /// # Panics
 ///
-/// Panics if no value of type `T` has been registered on this request's `Cx`.
+/// Panics if no value of type `T` is registered.
 ///
 /// # Examples
 ///
@@ -61,7 +59,7 @@ where
 ///
 /// struct RequestId(String);
 ///
-/// async fn current_request_id(cx: &Cx) -> &str {
+/// fn current_request_id(cx: &Cx) -> &str {
 ///     let id: &RequestId = request_context(cx);
 ///     &id.0
 /// }
@@ -81,14 +79,16 @@ where
     }
 }
 
-/// The type-keyed values registered for one scope of a request.
+/// The values registered for one scope of a request, looked up by type.
 ///
-/// Each value is stored under its [`TypeId`], so a given type can hold one
-/// value per scope, and is tagged with the [`BindingId`] issued when it was
-/// registered, giving every binding a distinct identity. Cloning a
-/// `RequestContext` shares the values, which is how a child scope inherits
-/// them. Within a request, values are retrieved with [`request_context`] or
-/// [`try_request_context`].
+/// A `RequestContext` holds at most one value per type. Each value is tagged
+/// with the [`BindingId`] issued when it was registered. Cloning a
+/// `RequestContext` is cheap, because the clone shares the values instead of
+/// copying them.
+///
+/// Within a request, read values with [`request_context`] or
+/// [`try_request_context`], and add values for a child scope with
+/// [`Cx::with`] or [`Cx::with_many`].
 #[derive(Default, Debug, Clone)]
 pub struct RequestContext {
     entries: HashMap<TypeId, Binding, BuildHasherDefault<TypeIdHasher>>,
@@ -101,11 +101,10 @@ impl RequestContext {
         Self::default()
     }
 
-    /// Registers `value` under its concrete type `T` with a fresh
-    /// [`BindingId`].
+    /// Registers `value` under its type `T` with a fresh [`BindingId`].
     ///
-    /// A type can hold only one value at a time, so registering a type that is
-    /// already present replaces the previous value.
+    /// Registering a type that is already present replaces the previous
+    /// value.
     pub fn insert<T>(&mut self, value: T)
     where
         T: Any + Send + Sync,
@@ -120,8 +119,8 @@ impl RequestContext {
     /// Returns a reference to the registered value of type `T`, or `None` if
     /// no such value has been registered.
     ///
-    /// Within a request, prefer the [`request_context`] and
-    /// [`try_request_context`] free functions over reaching for this directly.
+    /// Within a request, use [`request_context`] or [`try_request_context`]
+    /// instead, so that `#[memoize]` sees the read.
     #[must_use]
     pub fn get<T>(&self) -> Option<&T>
     where
@@ -153,11 +152,10 @@ impl RequestContext {
     }
 }
 
-/// Values that [`Cx::with_many`](crate::context::Cx::with_many) registers on a
-/// request context in one step.
+/// A set of values that [`Cx::with_many`] registers on a request context in
+/// one step.
 ///
-/// Implemented for tuples of context values and [`RequestContext`], so
-/// several types can be registered without deriving a scope per value.
+/// Implemented for [`RequestContext`] and for tuples of up to eight values.
 pub trait ContextValues {
     /// Registers every value on `context`.
     fn install(self, context: &mut RequestContext);

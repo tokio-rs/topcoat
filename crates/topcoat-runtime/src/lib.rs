@@ -1,3 +1,10 @@
+//! Runtime types for Topcoat's client-side interactivity: [`Signal`]s,
+//! runtime expressions ([`Expr`] and [`Js`]), event handler and bind
+//! attributes, procedures, shards, and the values runtime expressions work
+//! with.
+//!
+//! Use this crate through the `topcoat` facade, which re-exports it as
+//! `topcoat::runtime` together with the runtime guide.
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod arguments;
@@ -35,4 +42,7 @@ pub use signal::*;
 pub use surrogate::*;
 use topcoat_asset::{Asset, asset};
 
+/// The browser runtime script, served as an asset.
+///
+/// Pages load it through a `<script type="module">` tag.
 pub const SCRIPT: Asset = asset!("browser/dist/index.js", rename: "topcoat");

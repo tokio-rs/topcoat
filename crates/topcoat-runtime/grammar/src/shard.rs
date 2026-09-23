@@ -13,13 +13,15 @@ use uuid::Uuid;
 
 use crate::shard::{ShardAttr, ShardItem};
 
-/// A parsed `#[shard] async fn ...`.
+/// A parsed `#[shard] async fn ...`, which expands to a component named
+/// after the function that also implements the runtime's `Shard` trait.
 pub struct Shard {
     _attr: ShardAttr,
     item: ShardItem,
 }
 
 impl Shard {
+    /// Combines a parsed attribute and function.
     #[must_use]
     pub fn new(attr: ShardAttr, item: ShardItem) -> Self {
         Self { _attr: attr, item }

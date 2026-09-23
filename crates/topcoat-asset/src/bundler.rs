@@ -22,13 +22,16 @@ use crate::{
     AssetError, AssetId, MANIFEST_NAME, MANIFEST_VERSION, Manifest, ManifestEntry, RawAsset, Source,
 };
 
-/// Scans a built binary for [`asset!`](crate::asset) declarations and
-/// writes the referenced files into a bundle directory.
+/// Builds an asset bundle from the [`asset!`](crate::asset) declarations in
+/// a compiled binary.
 ///
-/// Local paths are copied; remote URLs are downloaded into `cache_dir`
-/// (and reused on subsequent runs). Output filenames include a short
-/// content hash, and the resulting directory is described by a
-/// [`Manifest`].
+/// The bundler copies local files and downloads remote URLs into a cache
+/// directory, where later runs reuse them. It writes each file into the
+/// bundle directory under a name that contains a short content hash, and
+/// describes the result in a [`Manifest`].
+///
+/// Most applications do not use the bundler directly. The `topcoat` CLI
+/// runs it as part of `topcoat dev` and `topcoat asset bundle`.
 pub struct Bundler {
     cache: Cache,
     parallelism: usize,
@@ -36,7 +39,7 @@ pub struct Bundler {
 }
 
 impl Bundler {
-    /// Create a bundler from a [`BundlerConfig`].
+    /// Creates a bundler from a [`BundlerConfig`].
     #[must_use]
     pub fn new(config: &BundlerConfig) -> Self {
         Self {
@@ -46,32 +49,29 @@ impl Bundler {
         }
     }
 
-    /// Scan `binary` for embedded assets and sync them into `out_dir`.
+    /// Scans `binary` for asset declarations and writes the bundle into
+    /// `out_dir`.
     ///
-    /// If `out_dir` already contains a `manifest.toml`, it is loaded and used
-    /// to skip copying files whose content hash hasn't changed. Files that
-    /// were present in the old manifest but are no longer referenced by the
-    /// new one are removed. Remote (http/https) assets are downloaded into
-    /// the bundler's cache directory and then treated like local files.
+    /// When `out_dir` already holds a bundle, files whose contents did not
+    /// change are not written again, and files that are no longer declared
+    /// are deleted. The manifest is written last, so a failed run leaves the
+    /// previous manifest in place.
     ///
     /// Up to [`BundlerConfig::parallelism`] assets are processed at once.
-    /// The manifest lists them in declaration order regardless.
+    /// The manifest still lists them in declaration order.
     ///
-    /// This blocks on filesystem and network I/O; call it from a blocking
-    /// context (e.g. [`tokio::task::spawn_blocking`]) when running inside an
-    /// async runtime.
+    /// This function blocks on filesystem and network I/O. Inside an async
+    /// runtime, call it from a blocking context such as
+    /// [`tokio::task::spawn_blocking`].
     ///
     /// # Errors
     ///
-    /// Returns a [`BundleError`] for any I/O failure while creating or
-    /// reading `out_dir` and its manifest, downloading a remote asset, or
-    /// reading/writing a bundled file; and for a checksum mismatch between a
-    /// declared asset and its configured `checksum`. When several assets
-    /// fail, the one declared earliest is reported.
+    /// Returns a [`BundleError`] if reading or writing a file fails, if a
+    /// download fails, or if an asset does not match its `checksum`. When
+    /// several assets fail, the error of the one declared first is returned.
     ///
-    /// Assets that resolve to the same output filename share one bundled
-    /// file and one route, so they must agree on how that file is served:
-    /// two of them declaring different content types is rejected with
+    /// Assets with the same bundled filename share one file, so they must
+    /// have the same content type. Otherwise this returns
     /// [`BundleError::ConflictingContentTypes`].
     pub fn bundle(&self, binary: &[u8], out_dir: impl AsRef<Path>) -> BundleResult {
         let out_dir = out_dir.as_ref();
@@ -163,7 +163,7 @@ impl Bundler {
         Ok(())
     }
 
-    /// Run [`Bundler::prepare`] over every asset, returning the results in
+    /// Runs [`Bundler::prepare`] on every asset and returns the results in
     /// declaration order.
     ///
     /// Workers pull the next asset off a shared cursor as they go free, so a
@@ -211,7 +211,7 @@ impl Bundler {
         results.into_iter().map(|(_, result)| result).collect()
     }
 
-    /// Resolve one asset to its manifest entry, writing it into `out_dir`
+    /// Resolves one asset to its manifest entry, and writes it into `out_dir`
     /// unless an identical copy is already there.
     fn prepare(
         &self,

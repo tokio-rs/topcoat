@@ -32,6 +32,7 @@ macro_rules! integer_op {
 macro_rules! integer_cmp {
     ($surrogate:ident, $method:ident, $op:tt) => {
         impl $surrogate {
+            #[doc = concat!("Compares two values with `", stringify!($op), "`.")]
             #[inline]
             pub fn $method(&self, rhs: &Self) -> BoolSurrogate {
                 BoolSurrogate::new(self.0 $op rhs.0)
@@ -44,7 +45,9 @@ macro_rules! integer_surrogate {
     ($real:ident, $surrogate:ident) => {
         #[doc = concat!("A `", stringify!($real), "` in a runtime expression.")]
         ///
-        /// Arithmetic panics on overflow or division by zero in every build profile.
+        /// Arithmetic panics on overflow or division by zero in every build
+        /// profile, both on the server and in the browser. The value keeps its
+        /// full precision in the browser.
         #[derive(Debug, Clone, Copy, RefCast)]
         #[repr(transparent)]
         pub struct $surrogate($real);

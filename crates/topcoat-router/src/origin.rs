@@ -7,21 +7,24 @@ use crate::{
     request::{headers, method, uri},
 };
 
-/// The cross-origin request policy the router applies to every request.
+/// Decides which cross-origin requests the router accepts.
 ///
-/// Browsers attach cookies to cross-origin requests, and an intranet or
-/// localhost server is reachable by any page open in the browser, so a
-/// malicious page can send requests the application cannot tell apart from
-/// its own. By default the router rejects state-changing cross-origin browser
-/// requests (cross-site request forgery) and cross-origin WebSocket
-/// handshakes (cross-site WebSocket hijacking) unless the application
-/// explicitly trusts the origin.
+/// Browsers send cookies with cross-origin requests, and any page open in a
+/// browser can reach an intranet or localhost server. So a malicious page can
+/// send requests that look like the application's own. To prevent this, the
+/// router rejects state-changing cross-origin requests from browsers
+/// ([cross-site request forgery](https://owasp.org/www-community/attacks/csrf))
+/// and cross-origin WebSocket handshakes with `403 Forbidden`, unless the
+/// origin is trusted.
 ///
-/// Same-origin requests, direct navigations, and requests from non-browser
-/// clients (which carry no ambient credentials) always pass. Register a
-/// policy with [`RouterBuilder::origin_policy`](crate::RouterBuilder::origin_policy)
-/// to trust cross-origin peers, to exempt individual routes, or to opt out of
-/// verification.
+/// `GET`, `HEAD`, and `OPTIONS` requests that are not WebSocket handshakes
+/// always pass, as do same-origin requests, direct navigations, and requests
+/// from clients other than browsers. The policy uses the `Sec-Fetch-Site`
+/// header, or compares the `Origin` and `Host` headers in older browsers.
+///
+/// Set a policy with
+/// [`RouterBuilder::origin_policy`](crate::RouterBuilder::origin_policy) to
+/// trust other origins, exempt some routes, or turn the check off.
 ///
 /// # Examples
 ///
@@ -50,8 +53,8 @@ enum Inner {
 }
 
 impl OriginPolicy {
-    /// Creates the default policy: every request is verified, with no trusted
-    /// cross-origin peers and no exempt paths.
+    /// Creates the default policy, which checks every request and trusts no
+    /// other origins.
     ///
     /// Loosen it with [`trust_origins`](Self::trust_origins) and
     /// [`exempt_paths`](Self::exempt_paths).
@@ -68,10 +71,10 @@ impl OriginPolicy {
     /// Trusts `origins` to send state-changing cross-origin requests and to
     /// open cross-origin WebSockets.
     ///
-    /// Each value is compared against the request's `Origin` header, so pass
-    /// the full serialized origin: scheme, host, and any non-default port
-    /// (`"https://accounts.example.com"`), with no trailing slash. The
-    /// comparison is ASCII case-insensitive.
+    /// Each value is compared with the request's `Origin` header, so pass the
+    /// full origin: the scheme, the host, and the port if it is not the
+    /// default, like `"https://accounts.example.com"`, with no trailing slash.
+    /// The comparison ignores ASCII case.
     #[must_use]
     pub fn trust_origins<I>(mut self, origins: I) -> Self
     where
@@ -87,13 +90,13 @@ impl OriginPolicy {
         self
     }
 
-    /// Exempts the routes at `paths` from origin verification.
+    /// Skips the origin check for requests to `paths`.
     ///
-    /// A request whose URL matches one of the paths passes unchecked, no
-    /// matter where it comes from. Use this for a route that must accept
-    /// cross-origin requests from anywhere and handles its own protection,
-    /// like a WebSocket endpoint open to other sites. Paths use the route
-    /// path syntax, so `{param}` and `{*rest}` segments match like a route.
+    /// A request whose URL matches one of the paths passes, no matter where
+    /// it comes from. Use this for a route that must accept cross-origin
+    /// requests from any site and protects itself, like a public WebSocket
+    /// endpoint. Paths use the route path syntax, so `{param}` and `{*rest}`
+    /// segments match like they do in a route.
     ///
     /// # Examples
     ///
@@ -114,11 +117,11 @@ impl OriginPolicy {
         self
     }
 
-    /// Turns origin verification off entirely.
+    /// Creates a policy that accepts every request.
     ///
-    /// Without it, nothing rejects state-changing cross-origin requests or
-    /// cross-origin WebSocket handshakes; only use this if the application
-    /// enforces its own defense against cross-site request forgery.
+    /// Nothing then rejects state-changing cross-origin requests or
+    /// cross-origin WebSocket handshakes. Only use this if the application
+    /// protects itself against cross-site request forgery in another way.
     #[must_use]
     pub fn dangerous_disable() -> Self {
         Self {
@@ -191,7 +194,7 @@ impl OriginPolicy {
                     };
                 }
 
-                // Ther request had neither an "origin" nor a "sec-fetch-site" header.
+                // The request had neither an "origin" nor a "sec-fetch-site" header.
                 // We assume it comes from a non-browser client and allow the request.
                 OriginVerdict::Allow
             }
@@ -199,7 +202,7 @@ impl OriginPolicy {
     }
 }
 
-/// Verifies with no trusted cross-origin peers and no exempt paths.
+/// Returns [`OriginPolicy::new`].
 impl Default for OriginPolicy {
     fn default() -> Self {
         Self::new()
@@ -215,20 +218,19 @@ enum OriginVerdict {
     Deny,
 }
 
-/// A [`Layer`] enforcing an [`OriginPolicy`].
+/// A [`Layer`] that applies an [`OriginPolicy`].
 ///
-/// The router wraps one around every request as its outermost step, built
-/// from the policy registered with
-/// [`RouterBuilder::origin_policy`](crate::RouterBuilder::origin_policy). A
-/// request the policy denies is rejected with `403 Forbidden` before any
-/// inner layer or route runs.
+/// A request the policy rejects gets `403 Forbidden` before any inner layer
+/// or route runs. The router already runs one of these around every request,
+/// using the policy set with
+/// [`RouterBuilder::origin_policy`](crate::RouterBuilder::origin_policy).
 #[derive(Debug)]
 pub struct OriginLayer {
     policy: OriginPolicy,
 }
 
 impl OriginLayer {
-    /// Creates a layer enforcing `policy`.
+    /// Creates a layer that applies `policy`.
     #[must_use]
     pub fn new(policy: OriginPolicy) -> Self {
         Self { policy }

@@ -4,16 +4,25 @@ use topcoat_router::response::IntoResponseParts;
 
 use crate::{SwapOption, header};
 
-/// Pushes a new URL onto the browser history stack via the `HX-Push-Url`
-/// header.
+/// Pushes a new URL onto the browser history stack by setting the
+/// `HX-Push-Url` response header.
 ///
-/// Construct it from a URL string. Use [`HxPushUrl::prevent`] to send
-/// `HX-Push-Url: false`, which stops htmx from updating history.
+/// Create it from a URL string with [`From`]. Use [`HxPushUrl::prevent`] to
+/// stop htmx from updating the history.
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::htmx::HxPushUrl;
+///
+/// let push = HxPushUrl::from("/items/42");
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HxPushUrl(pub String);
 
 impl HxPushUrl {
-    /// Sends `HX-Push-Url: false`, preventing htmx from updating the history.
+    /// Creates a value that sends `HX-Push-Url: false`, which stops htmx from
+    /// updating the history.
     #[must_use]
     pub fn prevent() -> Self {
         Self("false".to_owned())
@@ -35,16 +44,18 @@ impl IntoResponseParts for HxPushUrl {
     }
 }
 
-/// Replaces the current URL in the location bar via the `HX-Replace-Url`
-/// header.
+/// Replaces the current URL in the location bar by setting the
+/// `HX-Replace-Url` response header.
 ///
-/// Use [`HxReplaceUrl::prevent`] to send `HX-Replace-Url: false`, which stops
-/// htmx from updating the location bar.
+/// Create it from a URL string with [`From`]. Unlike [`HxPushUrl`], it does
+/// not add an entry to the history. Use [`HxReplaceUrl::prevent`] to stop htmx
+/// from updating the location bar.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HxReplaceUrl(pub String);
 
 impl HxReplaceUrl {
-    /// Sends `HX-Replace-Url: false`, preventing htmx from updating the URL.
+    /// Creates a value that sends `HX-Replace-Url: false`, which stops htmx
+    /// from updating the location bar.
     #[must_use]
     pub fn prevent() -> Self {
         Self("false".to_owned())
@@ -66,8 +77,11 @@ impl IntoResponseParts for HxReplaceUrl {
     }
 }
 
-/// Performs a client-side redirect to a new location via the `HX-Redirect`
-/// header.
+/// Redirects the browser to a new location by setting the `HX-Redirect`
+/// response header.
+///
+/// htmx loads the new location with a full page load. Use
+/// [`HxLocation`](crate::HxLocation) to redirect without one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HxRedirect(pub String);
 
@@ -86,8 +100,10 @@ impl IntoResponseParts for HxRedirect {
     }
 }
 
-/// Triggers a full client-side page refresh via the `HX-Refresh` header when
-/// `true`.
+/// Sets the `HX-Refresh` response header.
+///
+/// When the value is `true`, the browser does a full page refresh. When it is
+/// `false`, the header is sent as `false` and has no effect.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HxRefresh(pub bool);
 
@@ -107,8 +123,10 @@ impl IntoResponseParts for HxRefresh {
     }
 }
 
-/// Overrides how the response is swapped in via the `HX-Reswap` header. See
-/// [`SwapOption`].
+/// Changes how the response is swapped in by setting the `HX-Reswap` response
+/// header.
+///
+/// It overrides the `hx-swap` attribute of the element that sent the request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HxReswap(pub SwapOption);
 
@@ -125,8 +143,10 @@ impl IntoResponseParts for HxReswap {
     }
 }
 
-/// Retargets the content update to a different element via the `HX-Retarget`
-/// header. The value is a CSS selector.
+/// Changes which element the response is swapped into by setting the
+/// `HX-Retarget` response header.
+///
+/// The value is a CSS selector. Create it from a string with [`From`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HxRetarget(pub String);
 
@@ -145,8 +165,11 @@ impl IntoResponseParts for HxRetarget {
     }
 }
 
-/// Chooses which part of the response is swapped in via the `HX-Reselect`
-/// header, overriding an existing `hx-select`. The value is a CSS selector.
+/// Chooses which part of the response is swapped in by setting the
+/// `HX-Reselect` response header.
+///
+/// The value is a CSS selector. It overrides the `hx-select` attribute of the
+/// element that sent the request. Create it from a string with [`From`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HxReselect(pub String);
 

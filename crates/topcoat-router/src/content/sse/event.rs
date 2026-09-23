@@ -9,10 +9,15 @@ use topcoat_core::{
 
 use crate::request::headers;
 
-/// A server-sent event, assembled field by field.
+/// A server-sent event.
 ///
-/// Every builder method replaces the field it sets. An event without any
-/// fields serializes to a blank line, which a client ignores.
+/// Create an event with [`Event::new`] and set its fields with the builder
+/// methods. Each method replaces the field it sets. An event without any
+/// fields is sent as a blank line, which the client ignores.
+///
+/// A field value that the wire format cannot represent, such as an event type
+/// with a line break, makes the stream fail with an [`InvalidEventError`] when
+/// the event is sent.
 ///
 /// # Examples
 ///
@@ -44,8 +49,8 @@ impl Event {
 
     /// Sets the data of the event.
     ///
-    /// Multi-line data is sent as one `data:` line per line, which the client
-    /// reassembles into the original value.
+    /// Data with several lines is sent as one `data:` line per line. The
+    /// client joins them back into the original value.
     pub fn data(mut self, data: impl Into<String>) -> Self {
         self.data = Some(data.into());
         self
@@ -63,30 +68,36 @@ impl Event {
         Ok(self.data(serde_json::to_string(value).map_err(Error::from)?))
     }
 
-    /// Sets the event type, dispatched by an `EventSource` to the listener
-    /// registered for it. Clients treat an event without a type as `message`.
+    /// Sets the event type.
+    ///
+    /// An `EventSource` passes the event to the listener registered for its
+    /// type. Clients treat an event without a type as `message`.
     pub fn event(mut self, event: impl Into<String>) -> Self {
         self.kind = Some(event.into());
         self
     }
 
-    /// Sets the event id, which the client echoes in the `Last-Event-ID`
-    /// header when it reconnects. Read it with [`last_event_id`] to resume
-    /// the stream.
+    /// Sets the event id.
+    ///
+    /// The client sends the id of the last event it received in the
+    /// `Last-Event-ID` header when it reconnects. Read it with
+    /// [`last_event_id`] to resume the stream.
     pub fn id(mut self, id: impl Into<String>) -> Self {
         self.id = Some(id.into());
         self
     }
 
-    /// Sets the reconnection delay a client waits before it reconnects after
-    /// losing the connection.
+    /// Sets how long the client waits before it reconnects after losing the
+    /// connection.
     pub fn retry(mut self, retry: Duration) -> Self {
         self.retry = Some(retry);
         self
     }
 
-    /// Sets a comment, which a client ignores. Keep-alive events are
-    /// comments, as are markers meant only for reading the raw stream.
+    /// Sets a comment.
+    ///
+    /// Clients ignore comments. They are useful as keep-alive events or as
+    /// notes for someone reading the raw stream.
     pub fn comment(mut self, comment: impl Into<String>) -> Self {
         self.comment = Some(comment.into());
         self
@@ -133,7 +144,7 @@ impl Event {
     }
 }
 
-/// The error produced when an [`Event`] field cannot be represented in the
+/// The error returned when an [`Event`] field cannot be represented in the
 /// `text/event-stream` wire format.
 #[derive(Debug)]
 pub struct InvalidEventError {
@@ -163,9 +174,9 @@ impl std::error::Error for InvalidEventError {}
 /// Returns the `Last-Event-ID` header of the current request, or [`None`]
 /// when it is absent or not valid UTF-8.
 ///
-/// An `EventSource` sends this header when it reconnects to an event stream,
-/// carrying the [`id`](Event::id) of the last event it received. Use it to
-/// resume the stream instead of replaying it from the start.
+/// An `EventSource` sends this header when it reconnects to an event stream.
+/// It holds the [`id`](Event::id) of the last event the client received. Use
+/// it to resume the stream instead of starting over.
 ///
 /// # Examples
 ///

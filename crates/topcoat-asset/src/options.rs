@@ -4,39 +4,38 @@ use topcoat_core::fnv1a::Fnv1a;
 
 use crate::{ConstReader, ConstWriter};
 
-/// Options that control how an asset is bundled.
+/// Options that control how an asset is bundled and served.
 ///
-/// Usually set via the [`asset!`](crate::asset) or
-/// [`asset_options!`](crate::asset_options) macros rather than
-/// constructed directly. See the [`asset!`](crate::asset) docs for what
-/// each field does.
+/// Set them through the named arguments of [`asset!`](crate::asset), or
+/// build a value with [`asset_options!`](crate::asset_options). Every field
+/// is optional and defaults to `None`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AssetOptions {
-    /// Replace the file stem (everything before the final `.`) in the
-    /// bundled output. The extension and content-hash suffix are kept.
-    /// An empty string drops the stem entirely, leaving just the hash
-    /// (and extension, if any) as the filename.
+    /// Replaces the file stem (everything before the last `.`) of the
+    /// bundled file. The hash and the extension are kept. An empty string
+    /// removes the stem, so the filename is just the hash and the extension.
     pub rename: Option<Cow<'static, str>>,
-    /// Override the output extension (without the leading dot). Useful
-    /// when the source has no extension or the wrong one. An empty
-    /// string drops the extension entirely.
+    /// Replaces the extension of the bundled file, without the leading dot.
+    /// Useful when the source has no extension or the wrong one. An empty
+    /// string removes the extension.
     pub extension: Option<Cow<'static, str>>,
-    /// Expected hash of the raw, unbundled source file, as an
-    /// `algorithm:hex` string. Only `sha256` is currently supported, e.g.
-    /// `"sha256:e3b0c442..."`. The bundler fails with
-    /// [`AssetError::ChecksumMismatch`](crate::AssetError) if the source's
-    /// actual hash differs, or
-    /// [`AssetError::UnsupportedChecksum`](crate::AssetError) if the
-    /// algorithm prefix is missing or unsupported. Recommended for remote
-    /// assets.
+    /// The expected hash of the source file, as `algorithm:hex`. The only
+    /// supported algorithm is `sha256`, for example `"sha256:e3b0c442..."`.
+    ///
+    /// The bundler fails with
+    /// [`AssetError::ChecksumMismatch`](crate::AssetError::ChecksumMismatch)
+    /// if the file has a different hash, and with
+    /// [`AssetError::UnsupportedChecksum`](crate::AssetError::UnsupportedChecksum)
+    /// if the value does not start with `sha256:`. Recommended for remote
+    /// assets, so that a changed remote file fails the build.
     pub checksum: Option<Cow<'static, str>>,
-    /// Override the `Content-Type` the asset is served with. When unset, the
-    /// bundler guesses it from the bundled file's extension.
+    /// The `Content-Type` the asset is served with. When unset, the bundler
+    /// guesses it from the extension of the bundled file.
     pub content_type: Option<Cow<'static, str>>,
 }
 
 impl AssetOptions {
-    /// All options unset.
+    /// Options with every field set to `None`.
     pub const NONE: Self = Self {
         rename: None,
         extension: None,
@@ -44,25 +43,25 @@ impl AssetOptions {
         content_type: None,
     };
 
-    /// Returns the configured [`rename`](Self::rename) value, if any.
+    /// Returns the [`rename`](Self::rename) option, if set.
     #[must_use]
     pub fn rename(&self) -> Option<&str> {
         self.rename.as_deref()
     }
 
-    /// Returns the configured [`extension`](Self::extension) value, if any.
+    /// Returns the [`extension`](Self::extension) option, if set.
     #[must_use]
     pub fn extension(&self) -> Option<&str> {
         self.extension.as_deref()
     }
 
-    /// Returns the configured [`checksum`](Self::checksum) value, if any.
+    /// Returns the [`checksum`](Self::checksum) option, if set.
     #[must_use]
     pub fn checksum(&self) -> Option<&str> {
         self.checksum.as_deref()
     }
 
-    /// Returns the configured [`content_type`](Self::content_type) value, if any.
+    /// Returns the [`content_type`](Self::content_type) option, if set.
     #[must_use]
     pub fn content_type(&self) -> Option<&str> {
         self.content_type.as_deref()
@@ -108,11 +107,11 @@ const fn hash_opt_str(h: Fnv1a<u64>, s: Option<&str>) -> Fnv1a<u64> {
     }
 }
 
-/// Build an [`AssetOptions`] from a comma-separated list of fields.
+/// Builds an [`AssetOptions`] from a comma-separated list of fields.
 ///
-/// Each field is either `name: "literal"` to set that option, or a bare
-/// `name` (which expects a const string in scope of the same name).
-/// Omitted fields stay `None`.
+/// Write each field as `name: value`, where the value is a `&'static str`,
+/// usually a string literal. Fields you leave out stay `None`. The macro can
+/// be used to initialize a `const`.
 ///
 /// ```rust
 /// use topcoat_asset::{AssetOptions, asset_options};

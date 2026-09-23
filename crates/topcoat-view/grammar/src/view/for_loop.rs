@@ -12,18 +12,23 @@ use crate::{
     },
 };
 
-/// A view loop with an optional `#[key(expr)]` iteration key.
+/// A `for` loop in a view, with an optional `#[key(expr)]` attribute that
+/// gives each iteration its own identity.
+///
+/// Parsing rejects any other attribute on the loop, and more than one key.
 pub struct ForLoop {
+    /// The loop itself.
     pub template: TemplateForLoop<Nodes>,
 }
 
 impl ForLoop {
-    /// Returns the expression identifying each iteration.
+    /// Returns the key expression from the loop's `#[key(expr)]` attribute,
+    /// or [`None`] for an unkeyed loop.
     ///
     /// # Panics
     ///
-    /// Panics if the attributes were modified to contain an invalid key
-    /// after parsing.
+    /// Panics if the attributes were changed after parsing and the first one
+    /// no longer holds an expression.
     #[must_use]
     pub fn key(&self) -> Option<Expr> {
         self.template

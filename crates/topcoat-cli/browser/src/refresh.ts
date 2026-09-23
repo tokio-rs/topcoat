@@ -4,7 +4,13 @@ import {
 } from "../../../topcoat-core/browser/dev";
 import { canMorph, morphDocument } from "./document";
 
-/** Refreshes the page after a build, accepting only the latest response. */
+/**
+ * Refreshes the page after a build by fetching it again and morphing the
+ * new document into the current one.
+ *
+ * Only the latest refresh is applied. It falls back to a full reload when the
+ * new document cannot be morphed in.
+ */
 export class PageRefresh {
 	private controller: AbortController | null = null;
 
@@ -14,11 +20,13 @@ export class PageRefresh {
 		private readonly reportError: (error: unknown) => void,
 	) {}
 
+	/** Cancels the refresh in flight, if any. */
 	cancel(): void {
 		this.controller?.abort();
 		this.controller = null;
 	}
 
+	/** Starts a refresh, cancelling any refresh that is still in flight. */
 	async refresh(): Promise<void> {
 		this.cancel();
 		if (this.navigating()) return;

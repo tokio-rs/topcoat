@@ -1,3 +1,7 @@
+/**
+ * A Rust reference. Reads go through to the current value, and a proxy
+ * forwards the value's methods, so a reference can be used like the value.
+ */
 export class Ref<T> {
 	constructor(
 		private readonly read: () => T,
@@ -31,6 +35,7 @@ export class Ref<T> {
 		return new Ref(read) as Ref<T> & T;
 	}
 
+	/** Returns the value the reference points to. */
 	deref(): T {
 		return this.read();
 	}

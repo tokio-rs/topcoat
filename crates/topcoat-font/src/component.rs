@@ -4,11 +4,16 @@ use topcoat_view_macro::{component, view};
 
 use crate::{Font, FontFormat, FontSource};
 
-/// Loads a [`Font`] into the page.
+/// Loads a [`Font`] into the page. Place it in the page's `<head>`.
 ///
-/// Renders the stylesheet `<link>` that pulls in the font's `@font-face` rules,
-/// and, by default, a `rel="preload"` `<link>` for the first source of each
-/// face so the browser can start fetching the files before the CSS is parsed.
+/// Renders a stylesheet `<link>` for the font's `@font-face` rules. By default
+/// it also renders a `rel="preload"` `<link>` for the first source of each
+/// face, so the browser starts downloading the font files before it parses the
+/// stylesheet. The browser downloads every preloaded file, even for faces the
+/// page does not use, so pass `preload: false` for fonts with many faces.
+///
+/// The font must be registered on the router, either through discovery or
+/// with [`RouterBuilderFontExt::font`](crate::RouterBuilderFontExt::font).
 ///
 /// ```rust
 /// # use topcoat::{font::{Font, fontsource::fontsource_font}, view::{View, view}};
@@ -24,8 +29,7 @@ use crate::{Font, FontFormat, FontSource};
 pub async fn link(
     /// The font to load.
     font: Font,
-    /// Whether to emit `rel="preload"` links for the font's sources ahead of
-    /// the stylesheet.
+    /// Whether to render `rel="preload"` links for the font files.
     #[default(true)]
     preload: bool,
 ) -> Result<impl View> {
@@ -41,11 +45,11 @@ pub async fn link(
     })
 }
 
-/// Renders a `rel="preload"` `<link>` for a single font [`FontSource`].
+/// Renders a `rel="preload"` `<link>` for a single [`FontSource`].
 ///
-/// Emits nothing for sources that are not URL-backed (such as local fonts). The
-/// `type` attribute is set from the source's format when known and omitted
-/// otherwise.
+/// Renders nothing for a [`Local`](FontSource::Local) source. The `type`
+/// attribute is set from the source's format, and left out when the source has
+/// no format.
 #[component]
 pub async fn preload_link(
     /// The font source to preload.

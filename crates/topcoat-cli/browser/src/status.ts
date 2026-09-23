@@ -1,4 +1,9 @@
-/** The floating build status, isolated from page styles in a shadow tree. */
+/**
+ * A floating pill that shows the build status in the corner of the page.
+ *
+ * It lives in a shadow tree, so page styles do not affect it. When `enabled`
+ * is false, it never shows anything.
+ */
 export class StatusIndicator {
 	private pill: {
 		host: HTMLElement;
@@ -24,12 +29,14 @@ export class StatusIndicator {
 		}
 	}
 
+	/** Shows `label` in the pill, styled as an error when `isError` is set. */
 	show(label: string, isError = false): void {
 		if (!this.enabled) return;
 		this.current = { label, isError };
 		this.render();
 	}
 
+	/** Removes the pill from the page until the next `show`. */
 	hide(): void {
 		this.current = null;
 		this.pill?.host.remove();
