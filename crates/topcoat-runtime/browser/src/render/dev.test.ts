@@ -24,6 +24,7 @@ it("a dev refresh keeps page and shard signals while replacing bindings and head
 	vi.spyOn(window, "scrollTo").mockImplementation(() => {});
 	vi.stubGlobal("location", {
 		href: "http://localhost/search?q=x",
+		origin: "http://localhost",
 		pathname: "/search",
 		search: "?q=x",
 		reload: vi.fn(),
@@ -58,7 +59,7 @@ it("a dev refresh keeps page and shard signals while replacing bindings and head
 		);
 		const task = refresh.refresh();
 		await Promise.resolve();
-		expect(fetch.mock.calls[0]?.[0]).toBe("/search?q=x");
+		expect(fetch.mock.calls[0]?.[0]).toBe("http://localhost/search?q=x");
 		expect(JSON.parse(fetch.mock.calls[0]?.[1].body)).toEqual({
 			signals: { a: 5, b: 3, removed: 1 },
 		});

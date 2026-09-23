@@ -48,7 +48,8 @@ export class PageUnit extends RenderUnit {
 		const signals = untrack(() => this.contentScope.collectSignalValues());
 		// The runtime header asks the server to rerun this URL as a GET
 		// with the supplied signal values.
-		return fetch(`${location.pathname}${location.search}`, {
+		const url = `${location.origin}${location.pathname}${location.search}`;
+		return fetch(url, {
 			method: "POST",
 			cache: "no-store",
 			headers: {
