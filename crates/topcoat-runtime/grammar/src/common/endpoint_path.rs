@@ -28,6 +28,14 @@ impl EndpointPath {
             |path| path.lit.clone(),
         )
     }
+
+    /// The literal of the URL the browser requests for an endpoint served at
+    /// `path`: the path without its group segments, which the router strips
+    /// before matching.
+    #[must_use]
+    pub fn url(path: &LitStr) -> LitStr {
+        LitStr::new(&Path::new(&path.value()).to_matchit_path(), path.span())
+    }
 }
 
 impl Parse for EndpointPath {
@@ -108,5 +116,14 @@ mod tests {
         let path = EndpointPath::resolve(None, "/prefix").value();
         let rest = path.strip_prefix("/prefix/").expect(&path);
         assert_eq!(rest.len(), 32, "{path}");
+    }
+
+    #[test]
+    fn the_url_strips_group_segments_and_keeps_the_root_addressable() {
+        let url = |path: &str| EndpointPath::url(&LitStr::new(path, Span::call_site())).value();
+        assert_eq!(url("/search"), "/search");
+        assert_eq!(url("/(api)/search"), "/search");
+        assert_eq!(url("/(api)"), "/");
+        assert_eq!(url("/"), "/");
     }
 }

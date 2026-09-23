@@ -1,5 +1,4 @@
 use topcoat_core::{context::Cx, identity::Identity};
-use topcoat_router::Path;
 use topcoat_view::{NodeViewParts, PartsWriter, ViewHandle};
 
 use crate::Js;
@@ -9,9 +8,9 @@ pub struct ShardScope {
     /// markers and which the browser sends back with a re-render request so
     /// the shard body derives the same identities as the inline render.
     identity: Identity,
-    /// The path of the shard's endpoint, where the browser posts re-render
+    /// The URL of the shard's endpoint, where the browser posts re-render
     /// requests.
-    path: &'static Path,
+    url: &'static str,
     exprs: Vec<Js>,
     placeholder: ViewHandle,
 }
@@ -21,13 +20,13 @@ impl ShardScope {
     #[must_use]
     pub fn new(
         identity: Identity,
-        path: &'static Path,
+        url: &'static str,
         exprs: Vec<Js>,
         placeholder: ViewHandle,
     ) -> Self {
         Self {
             identity,
-            path,
+            url,
             exprs,
             placeholder,
         }
@@ -38,9 +37,9 @@ impl NodeViewParts for ShardScope {
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
         let identity = serde_json::to_string(&self.identity.to_string()).unwrap();
 
-        // <!-- ::topcoat::shard::start("<path>", "<identity>", ["<js>", ...]) -->
+        // <!-- ::topcoat::shard::start("<url>", "<identity>", ["<js>", ...]) -->
         //
-        // The browser runtime posts re-render requests to the path. The
+        // The browser runtime posts re-render requests to the URL. The
         // identity is stable across renders, so a re-render of the enclosing
         // content produces the same markers and the browser can keep them.
         // Each parameter's JavaScript source is wrapped in a quoted string.
@@ -50,7 +49,7 @@ impl NodeViewParts for ShardScope {
         parts.push_comment(|comment| {
             comment
                 .push_promoted_str_unescaped(&"::topcoat::shard::start(")
-                .push_string_unescaped(serde_json::to_string(self.path.as_str()).unwrap())
+                .push_string_unescaped(serde_json::to_string(self.url).unwrap())
                 .push_promoted_str_unescaped(&", ")
                 .push_string_unescaped(identity.clone())
                 .push_promoted_str_unescaped(&", [");

@@ -19,15 +19,19 @@ pub trait TypedProcedure: Route {
 
 /// The surrogate a procedure value turns into inside a runtime expression.
 ///
-/// Serializes as the path of the procedure's endpoint and exposes a typed
+/// Serializes as the URL of the procedure's endpoint and exposes a typed
 /// [`call`](Self::call) for browser expressions. A static reference lets
 /// closures capture it without borrowing a local variable.
-pub struct ProcedureSurrogate<P>(P);
+pub struct ProcedureSurrogate<P> {
+    procedure: P,
+    /// The URL of the procedure's endpoint, where the browser posts calls.
+    url: &'static str,
+}
 
 impl<P: TypedProcedure> ProcedureSurrogate<P> {
     #[must_use]
-    pub const fn new(procedure: P) -> Self {
-        Self(procedure)
+    pub const fn new(procedure: P, url: &'static str) -> Self {
+        Self { procedure, url }
     }
 
     /// Invokes the procedure from the client side.
@@ -51,7 +55,7 @@ where
     type Real = P;
 
     fn into_real(self) -> Self::Real {
-        self.0
+        self.procedure
     }
 }
 
@@ -61,14 +65,14 @@ impl<P: TypedProcedure> Serialize for ProcedureSurrogate<P> {
         S: serde::Serializer,
     {
         #[derive(Serialize)]
-        struct TaggedProcedure<'a> {
+        struct TaggedProcedure {
             t: &'static str,
-            path: &'a str,
+            path: &'static str,
         }
 
         TaggedProcedure {
             t: "Procedure",
-            path: self.0.path().as_str(),
+            path: self.url,
         }
         .serialize(serializer)
     }

@@ -72,6 +72,11 @@ async fn at_path(query: String) -> Result<impl View> {
     Ok(view! { <p>(query)</p> })
 }
 
+#[shard("/(api)/grouped")]
+async fn grouped(query: String) -> Result<impl View> {
+    Ok(view! { <p>(query)</p> })
+}
+
 #[shard]
 async fn region_probe() -> Result<impl View> {
     // Shards require settled views. Capture the region's first content to
@@ -107,11 +112,12 @@ fn last_signal_id(html: &str) -> &str {
     &html[start..end]
 }
 
-/// Sends a JSON request through the router, which installs its identity.
+/// Sends a JSON request to the URL the browser would use through the router,
+/// which installs its identity.
 async fn endpoint(shard: &'static impl Route, identity: &str, body: Body) -> Response {
     let request = http::Request::builder()
         .method("POST")
-        .uri(shard.path().as_str())
+        .uri(shard.path().to_matchit_path().as_ref())
         .header("content-type", "application/json")
         .header(IDENTITY_HEADER, identity)
         .body(body)
@@ -324,6 +330,23 @@ async fn a_shard_with_a_path_is_served_there_and_names_it_in_its_marker() {
     assert_eq!(shard, "/search/results", "{inline}");
 
     let rerendered = rerender_with(&at_path, identity, r#"["boots"]"#, "{}").await;
+    assert!(rerendered.contains("<p>boots</p>"), "{rerendered}");
+}
+
+#[tokio::test]
+async fn a_grouped_path_names_the_served_url_in_its_marker() {
+    let cx = &Cx::default();
+    let inline = view! { cx => grouped(query: String::from("shoes")) }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+    let (shard, identity) = scope_marker(&inline);
+    // The router strips the group from the URL it serves, so the browser
+    // must request the stripped form.
+    assert_eq!(shard, "/grouped", "{inline}");
+
+    let rerendered = rerender_with(&grouped, identity, r#"["boots"]"#, "{}").await;
     assert!(rerendered.contains("<p>boots</p>"), "{rerendered}");
 }
 

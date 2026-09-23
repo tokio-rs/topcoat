@@ -14,6 +14,11 @@ async fn at_path(value: f64) -> Result<f64> {
     Ok(value * 2.0)
 }
 
+#[procedure("/(api)/grouped")]
+async fn grouped(value: f64) -> Result<f64> {
+    Ok(value)
+}
+
 #[procedure]
 async fn with_unit(_value: ()) -> Result<bool> {
     Ok(true)
@@ -24,10 +29,11 @@ async fn with_arguments(enabled: bool, label: String) -> Result<String> {
     Ok(if enabled { label } else { String::new() })
 }
 
+/// Posts `body` to the URL the browser would use for `procedure`.
 async fn call(procedure: &'static dyn Route, body: &'static str) -> Response {
     let request = http::Request::builder()
         .method("POST")
-        .uri(procedure.path().as_str())
+        .uri(procedure.path().to_matchit_path().as_ref())
         .header("content-type", "application/json")
         .body(Body::from(body))
         .unwrap();
@@ -61,6 +67,17 @@ async fn a_procedure_with_a_path_is_served_there_and_its_surrogate_names_it() {
     let surrogate = serde_json::to_value(Surrogated::into_surrogate(at_path)).unwrap();
     assert_eq!(surrogate["t"], "Procedure");
     assert_eq!(surrogate["path"], "/api/double");
+}
+
+#[tokio::test]
+async fn a_grouped_path_serializes_as_the_served_url() {
+    // The router strips the group from the URL it serves, so the browser
+    // must post to the stripped form.
+    let surrogate = serde_json::to_value(Surrogated::into_surrogate(grouped)).unwrap();
+    assert_eq!(surrogate["path"], "/grouped");
+
+    let response = call(&grouped, "[1.5]").await;
+    assert_eq!(response.status(), http::StatusCode::OK);
 }
 
 #[tokio::test]

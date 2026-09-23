@@ -111,19 +111,19 @@ impl ToTokens for Shard {
         // parts hoisted while the shard body runs land inside the scope
         // markers, where the browser attributes them to the shard.
         //
-        // The scope marker carries the endpoint's path, where the browser
+        // The scope marker carries the endpoint's URL, where the browser
         // posts re-render requests. The invocation's identity travels on the
         // same marker and comes back in the identity header of every
         // re-render request, where the router installs it on the context, so
         // identities derived inside the shard body match between the inline
         // render and a re-render.
         let path = EndpointPath::resolve(self.attr.path.as_ref(), SHARD_ROUTE_PREFIX);
+        let url = EndpointPath::url(&path);
         let docs = item.attrs.iter().filter(|attr| attr.path().is_ident("doc"));
         let marker = quote! {
             #(#docs)*
             #[#topcoat_view_macro::component]
             #vis async fn #ident(#component_params) -> #topcoat_error::Result<impl #topcoat_view::View> {
-                const PATH: &#topcoat_router::Path = #topcoat_router::Path::new(#path);
                 let __identity = #topcoat_context::identity(__cx);
                 #(
                     let (#value_idents, #js_idents) = #value_idents.into_evaluated_and_js();
@@ -136,7 +136,7 @@ impl ToTokens for Shard {
                 .await?;
                 let __scope = #topcoat_runtime::ShardScope::new(
                     __identity,
-                    PATH,
+                    #url,
                     ::std::vec![#(#js_idents),*],
                     __placeholder,
                 );
@@ -285,5 +285,19 @@ mod tests {
         .unwrap();
         let out = shard.to_token_stream().to_string();
         assert!(out.contains(SHARD_ROUTE_PREFIX), "{out}");
+    }
+
+    #[test]
+    fn the_scope_marker_carries_the_url_without_group_segments() {
+        let shard = Shard::parse(
+            quote! { "/(api)/search" },
+            quote! {
+                async fn counter(count: i64) -> Result<impl View> { todo!() }
+            },
+        )
+        .unwrap();
+        let out = shard.to_token_stream().to_string();
+        assert!(out.contains(r#""/search""#), "{out}");
+        assert!(out.contains(r#""/(api)/search""#), "{out}");
     }
 }

@@ -169,6 +169,7 @@ impl ToTokens for Procedure {
         // The route serving calls at the endpoint's path, dispatching them to
         // the bridge.
         let path = EndpointPath::resolve(self.0.path.as_ref(), PROCEDURE_ROUTE_PREFIX);
+        let url = EndpointPath::url(&path);
         let route = quote! {
             impl #topcoat_router::Route for #ident {
                 fn id(&self) -> #topcoat_router::RouteId {
@@ -198,7 +199,8 @@ impl ToTokens for Procedure {
 
         // Runtime expressions capture the marker as a typed surrogate, so
         // calls in `expr!` bodies check their arguments against the declared
-        // parameter types.
+        // parameter types. The surrogate carries the endpoint's URL, where
+        // the browser posts calls.
         let ReturnType::Type(_, return_ty) = &item.sig.output else {
             unreachable!("validated by ProcedureItem")
         };
@@ -214,7 +216,7 @@ impl ToTokens for Procedure {
 
                 fn into_surrogate(self) -> Self::Surrogate {
                     static SURROGATE: #topcoat_runtime::ProcedureSurrogate<#ident> =
-                        #topcoat_runtime::ProcedureSurrogate::new(#ident);
+                        #topcoat_runtime::ProcedureSurrogate::new(#ident, #url);
                     &SURROGATE
                 }
             }
@@ -311,5 +313,17 @@ mod tests {
         .unwrap();
         let out = procedure.to_token_stream().to_string();
         assert!(out.contains(PROCEDURE_ROUTE_PREFIX), "{out}");
+    }
+
+    #[test]
+    fn the_surrogate_carries_the_url_without_group_segments() {
+        let procedure = Procedure::parse(
+            quote! { "/(api)/double" },
+            quote! { async fn double(value: f64) -> Result<f64> { todo!() } },
+        )
+        .unwrap();
+        let out = procedure.to_token_stream().to_string();
+        assert!(out.contains(r#""/double""#), "{out}");
+        assert!(out.contains(r#""/(api)/double""#), "{out}");
     }
 }
