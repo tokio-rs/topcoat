@@ -51,4 +51,4 @@ When a module's submodules are peers that make up a whole (the CLI commands `fmt
 * Every test must protect a specific behavior or catch a plausible bug. Before writing it, identify what incorrect behavior would make it fail.
 * Derive expected results from the intended behavior. Do not calculate them by repeating the implementation or calling the same code being tested.
 * Keep tests sensitive to broken behavior and tolerant of implementation changes that preserve correct behavior.
-* If a test is useless, delete it unapologetically.
+* If a test is useless, delete it.

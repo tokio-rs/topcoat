@@ -16,6 +16,10 @@ pin_project! {
     /// fallback renders inside a live region and the child's content swaps
     /// into it once it resolves.
     ///
+    /// With `wait` enabled, the boundary waits for the child's first content
+    /// and renders it in place. It never polls the fallback or creates a
+    /// region of its own.
+    ///
     /// The fallback can stream updates while the child is pending. Once the
     /// child resolves, only its updates pass through. Errors from either view
     /// propagate to the caller.
@@ -25,6 +29,7 @@ pin_project! {
         #[pin]
         child: ScopeView<C>,
         region: RegionId,
+        wait: bool,
         state: State,
     }
 }
@@ -45,14 +50,18 @@ enum State {
 
 impl<F, C> SuspenseView<F, C> {
     /// Creates a boundary whose fallback is replaced at `region` when needed.
+    ///
+    /// Set `wait` to delay the boundary's first content until the child is
+    /// ready, without showing the fallback.
     #[doc(hidden)]
-    pub fn new(region: RegionId, fallback: F, child: C) -> Self {
+    pub fn new(region: RegionId, fallback: F, child: C, wait: bool) -> Self {
         Self {
             fallback,
             // The child can finish after the surrounding first content
             // has gone out, so it must keep its own rendering buffer.
             child: ScopeView::self_contained(|| child),
             region,
+            wait,
             state: State::Start,
         }
     }
@@ -80,6 +89,7 @@ where
                 return Poll::Ready(Ok(first));
             }
             Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+            Poll::Pending if *this.wait => return Poll::Pending,
             Poll::Pending => {}
         }
 
