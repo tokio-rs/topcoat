@@ -46,8 +46,8 @@ export class PageUnit extends RenderUnit {
 	protected request(signal: AbortSignal): Promise<Response> {
 		// Include descendant signals so the server can restore the whole page.
 		const signals = untrack(() => this.contentScope.collectSignalValues());
-		// The page's own URL; the header tells the server to run the page as
-		// a `GET` with these signal values rather than as a form submission.
+		// The runtime header asks the server to rerun this URL as a GET
+		// with the supplied signal values.
 		return fetch(`${location.pathname}${location.search}`, {
 			method: "POST",
 			cache: "no-store",

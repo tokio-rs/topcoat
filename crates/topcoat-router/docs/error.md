@@ -109,7 +109,9 @@ async fn dashboard(cx: &Cx) -> Result<impl View> {
 
 The rewritten request keeps the method and headers, uses the supplied body, and may include a new query string. It gets a fresh request context and memoization cache. Pending response changes from the abandoned dispatch are discarded. All matching layers run again, including pathless layers.
 
-The returned [`RewriteError`] has more configuration options. [`method`](RewriteError::method) dispatches the rewritten request with a different HTTP method than the one it arrived with. [`with`](RewriteError::with) carries a value into the next dispatch and every later dispatch in the same chain, where it is available through [`request_context`](topcoat_core::context::request_context). Each dispatch still gets a fresh context and memoization cache. Calling `with` again, or on a later rewrite, replaces a carried value of the same type while keeping the other carried values. A form handler can combine both options to render its page as a `GET` with a value telling the page what happened:
+Use [`method`](RewriteError::method) to change the HTTP method and [`headers`](RewriteError::headers) to replace the request headers. To change only a few headers, clone the current [`headers`](crate::request::headers) and edit that copy. For example, a rewrite with an empty body can remove the headers that described the original body.
+
+Use [`with`](RewriteError::with) to carry a value into the next dispatch and every later dispatch in the chain. Read it through [`request_context`](topcoat_core::context::request_context). Calling `with` again with the same type replaces that value while keeping the other carried values. A form handler can use `method` and `with` to render its page as a `GET` with a value telling the page what happened:
 
 ```rust
 use topcoat::{Result, context::{Cx, try_request_context}, router::{Body, Method, error::rewrite, page, route}, view::{View, view}};
@@ -138,7 +140,7 @@ async fn settings(cx: &Cx) -> Result<impl View> {
 
 A handler reached through a rewrite sees the rewritten request in [`parts`](crate::request::parts) and its field accessors. To read the request as the client actually sent it, for example the URL a form should post back to, use [`original_parts`](crate::request::original_parts) or a field accessor like [`original_uri`](crate::request::original_uri) and [`original_method`](crate::request::original_method).
 
-The router refuses a rewrite to a path the request was already dispatched under and stops any chain after 8 rewrites; both respond 500 without leaking the chain to the client.
+The router detects a cycle when a rewrite repeats a combination of method, path, and query already handled in the chain. Changing the method from `POST` to `GET` at the same URL is allowed. A cycle or a chain exceeding 8 rewrites produces a 500 response without exposing the dispatch history to the client.
 
 # Unexpected errors
 

@@ -85,8 +85,8 @@ impl Router {
     /// Handles one request inside the panic isolation boundary.
     async fn handle_inner(&self, request: Request) -> Response {
         let inner = &*self.inner;
-        // The client's address comes from the headers the request arrived
-        // with, which no rewrite changes, so it is resolved once.
+        // Resolve the client's address once from the original request,
+        // before any rewrite can replace its headers.
         let client_ip = ClientIp(inner.trusted_proxies.resolve(&request));
         let (mut parts, mut body) = request.into_parts();
         let original = OriginalParts(Arc::new(parts.clone()));
@@ -750,18 +750,17 @@ mod tests {
         Box::pin(async move { format!("{} {}", method(cx), original_method(cx)).into_response(cx) })
     }
 
-    /// Rewrites `POST /same` as `GET /same`.
+    /// Changes the request method to `GET` while keeping the `/same` path.
     fn rewrite_to_same_as_get(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move { Err(rewrite("/same", Body::empty()).method(Method::GET).into()) })
     }
 
-    /// Rewrites `GET /same` as `GET /same`, a cycle of one.
+    /// Repeats `GET /same` to create a rewrite cycle.
     fn rewrite_to_same(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move { Err(rewrite("/same", Body::empty()).into()) })
     }
 
-    /// Rewrites to `/echo-headers` with the `x-dropped` header removed and an
-    /// `x-added` header set.
+    /// Removes `x-dropped` and sets `x-added` before rewriting to `/echo-headers`.
     fn rewrite_with_headers(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move {
             let mut headers = crate::request::headers(cx).clone();
@@ -773,7 +772,7 @@ mod tests {
         })
     }
 
-    /// Echoes the request's `x-` headers as `name=value` pairs joined by `&`.
+    /// Returns the `x-` request headers as `name=value` pairs separated by `&`.
     fn echo_headers(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move {
             crate::request::headers(cx)

@@ -10,37 +10,39 @@ use topcoat_router::{
 
 use crate::SignalValues;
 
-/// The header marking a request as sent by the browser runtime.
+/// The header used to request a page rerun.
+///
+/// A `POST` with `X-Topcoat-Runtime: true` is handled by [`RuntimeLayer`].
 pub static RUNTIME_HEADER: HeaderName = HeaderName::from_static("x-topcoat-runtime");
 
-/// The value of [`RUNTIME_HEADER`] on a page re-run.
+/// The header value that identifies a page rerun.
 static RERUN: HeaderValue = HeaderValue::from_static("true");
 
-/// The body of a request re-running a page: the current values of the
-/// signals in the document.
+/// The document's current signal values, sent as the JSON body of a page rerun.
 #[derive(Debug, Deserialize)]
 struct PageRerunRequest {
     #[serde(default)]
     signals: SignalValues,
 }
 
-/// The [`Layer`] serving the browser runtime's requests at a page's own URL.
+/// A [`Layer`] that reruns pages with signal values from the browser.
 ///
-/// A page re-run is a `POST` to the page URL that carries
-/// [`RUNTIME_HEADER`] and the document's signal values as JSON. The layer
-/// rewrites it as a `GET` for the same path and query, with the signal
-/// values in the request context and the headers describing the consumed
-/// body removed. The page then runs through its layouts and guards like any
-/// other request, and its signals resume from the supplied values. The
-/// original method stays readable through
+/// The browser sends a `POST` to the page's URL with
+/// `X-Topcoat-Runtime: true` and a JSON body containing the document's
+/// signal values. This layer rewrites the request to a `GET` at the same
+/// path and query. The page runs through its layouts and guards, and its
+/// signals resume from the supplied values.
+///
+/// The rewritten request has an empty body. Its [`RUNTIME_HEADER`],
+/// `Content-Type`, and `Content-Length` headers are removed. Read the
+/// client's original method with
 /// [`original_method`](topcoat_router::request::original_method).
-///
-/// A request without the header passes through untouched, so a `POST`
-/// from a form still reaches its handler.
+/// Requests with another method or without `X-Topcoat-Runtime: true`
+/// pass through unchanged, including ordinary form submissions.
 ///
 /// [`RouterBuilderRuntimeExt::runtime`](crate::RouterBuilderRuntimeExt::runtime)
-/// registers this layer. It wraps every layer registered before it, so
-/// those layers only ever see the rewritten `GET`.
+/// registers this layer. Call it after registering your application's
+/// pathless layers so those layers receive the rewritten `GET`.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RuntimeLayer;
 
@@ -57,8 +59,8 @@ impl Layer for RuntimeLayer {
         Box::pin(async move {
             let Json(request) = Json::<PageRerunRequest>::from_request(cx, body).await?;
 
-            // The next dispatch gets an empty body, so nothing may describe
-            // the envelope this one consumed.
+            // Remove the rerun marker and body headers before dispatching
+            // the GET with an empty body.
             let mut headers = headers(cx).clone();
             headers.remove(&RUNTIME_HEADER);
             headers.remove(header::CONTENT_TYPE);

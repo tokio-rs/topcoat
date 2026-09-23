@@ -21,7 +21,7 @@ Ok(view! {
 # }
 ```
 
-Call [`runtime()`](RouterBuilderRuntimeExt::runtime) to register the runtime's routes. Load the [asset bundle](../asset/index.html) to serve the browser script:
+Call [`runtime()`](RouterBuilderRuntimeExt::runtime) to enable page reruns, and load the [asset bundle](../asset/index.html) to serve the browser script. Register your application layers before calling `.runtime()`:
 
 ```rust,no_run
 use topcoat::{
@@ -39,7 +39,9 @@ pub fn router() -> Router {
 }
 ```
 
-Register your [procedures](#procedures) and [shards](#shards) separately. The example uses `.discover()` to find them. Call `.runtime()` after registering your own layers: it adds a layer that turns the runtime's requests into ordinary page requests, and the layers registered before it only ever see those.
+The runtime reruns a page by sending its current signal values to the page's URL. The [`RuntimeLayer`] added by `.runtime()` converts this request into a `GET`, so the page and its layouts can render with those values. Registering your layers first lets them handle the rerun as a `GET`. See [`RuntimeLayer`] for the request format and rewrite behavior.
+
+Register your [procedures](#procedures) and [shards](#shards) separately. The example uses `.discover()` to find them.
 
 # Runtime expressions
 

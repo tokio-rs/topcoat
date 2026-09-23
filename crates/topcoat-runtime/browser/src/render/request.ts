@@ -1,4 +1,4 @@
-/** The header marking a request as sent by the runtime. */
+/** Identifies a page rerun when set to "true" on a POST request. */
 export const RUNTIME_HEADER = "X-Topcoat-Runtime";
 
 /** Batches re-renders and accepts responses only while their owner is live. */

@@ -1,6 +1,7 @@
-//! A page re-run through the runtime layer: a marked `POST` to the page's
-//! own URL is rewritten into a plain `GET` for the page, and the page's
-//! signals resume from the values the client sent.
+//! Page reruns through the runtime layer.
+//!
+//! A `POST` with `X-Topcoat-Runtime: true` becomes a `GET` at the same URL.
+//! The page's signals resume from the values supplied by the client.
 
 use std::sync::{Arc, Mutex};
 
@@ -66,17 +67,16 @@ async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     })
 }
 
-/// A form handler at the page's URL, which an unmarked `POST` must reach.
+/// Handles ordinary form submissions at the same URL as the search page.
 #[route(POST "/search")]
 async fn submit() -> Result<&'static str> {
     Ok("submitted")
 }
 
-/// The methods a pathless application layer saw, in order.
+/// Request methods recorded in the order they were received.
 type Seen = Mutex<Vec<String>>;
 
-/// A pathless application layer recording the method of every request it
-/// sees.
+/// A pathless layer that records each request's method.
 struct Recorder;
 
 impl Layer for Recorder {
@@ -126,7 +126,7 @@ async fn send(
     (status, String::from_utf8(bytes.to_vec()).unwrap())
 }
 
-/// Sends a marked page re-run with `body` as its JSON envelope.
+/// Sends a page rerun with the runtime header and supplied JSON body.
 async fn rerun(router: &Router, path: &str, body: &str) -> (u16, String) {
     let headers = [
         ("content-type", "application/json"),

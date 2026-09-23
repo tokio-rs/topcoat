@@ -11,15 +11,15 @@ pub struct RuntimeSetup;
 /// Sets up the browser runtime on a [`RouterBuilder`].
 #[cfg(feature = "router")]
 pub trait RouterBuilderRuntimeExt {
-    /// Registers the [`RuntimeLayer`] serving the browser runtime's
-    /// requests.
+    /// Enables page reruns by registering a [`RuntimeLayer`].
     ///
-    /// Call this once when building a router that serves interactive pages,
-    /// after the pathless layers the application registers itself. The
-    /// runtime layer wraps the layers registered before it, so they see a
-    /// page re-run as the plain `GET` it is rewritten into rather than the
-    /// runtime's `POST` envelope. Register application procedures and shards
-    /// separately, through discovery or explicit registration.
+    /// Call this once when building a router that serves interactive pages.
+    /// Register your application's pathless layers first so the runtime
+    /// layer can rewrite page reruns to `GET` before those layers run.
+    /// See [`RuntimeLayer`] for the request format and rewrite behavior.
+    ///
+    /// Register procedures and shards separately through discovery or
+    /// explicit registration.
     #[must_use]
     fn runtime(self) -> Self;
 }
