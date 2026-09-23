@@ -7,9 +7,7 @@ use super::js::Js;
 use crate::expr::{Expr, contains_await::ContainsAwait, name_resolver::NameResolver};
 
 impl Expr {
-    /// Lowers `if cond { ... } else { ... }`. The JavaScript side is wrapped
-    /// in an IIFE so the same shape works in both expression and statement
-    /// position. This expression can also hold async expressions.
+    /// Lowers an `if` expression, including branches that await a value.
     pub(super) fn expr_if(
         if_expr: &ExprIf,
         rust: &mut TokenStream,

@@ -25,9 +25,7 @@ impl BuildOpts {
     /// output, reporting cargo's `current/total` build progress to
     /// `on_progress` along the way.
     ///
-    /// The bundler scans any linked binary for embedded asset declarations,
-    /// so an executable and a cdylib/dylib (e.g. a `wasm32` build, which
-    /// produces no executable) are equally valid outputs.
+    /// Accepts executable and dynamic-library outputs.
     pub async fn build(
         &self,
         mut on_progress: impl FnMut(u64, u64) + Send + 'static,
@@ -138,9 +136,7 @@ impl BuildOpts {
 
 /// Command-line flags selecting which target to build and with which profile.
 ///
-/// Shared by every command that compiles the application, flattened into their
-/// argument structs with `#[command(flatten)]` and converted into [`BuildOpts`]
-/// with [`From::from`].
+/// Flatten into a command's arguments and convert to [`BuildOpts`] to build.
 #[derive(Args)]
 pub struct BuildFlags {
     /// Build the named binary target

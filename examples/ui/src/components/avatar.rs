@@ -20,9 +20,6 @@ pub enum AvatarSize {
 
 impl AvatarSize {
     /// The Tailwind classes for this size.
-    ///
-    /// Each size sets a text size along with the dimensions, which is what
-    /// scales the initials in an [`avatar_fallback`].
     fn classes(self) -> StaticClass {
         match self {
             Self::Sm => class!("size-8 text-xs"),
@@ -33,19 +30,13 @@ impl AvatarSize {
 }
 
 /// The classes shared by every avatar, regardless of size.
-///
-/// The circle clips whatever is inside it, and is positioned so that an
-/// [`avatar_image`] can cover the [`avatar_fallback`] behind it.
 const AVATAR: StaticClass = class!("relative flex shrink-0 overflow-hidden rounded-full");
 
-/// An avatar component: a circular portrait of a person or an organization.
+/// A circular portrait with an optional fallback.
 ///
-/// An avatar holds an [`avatar_image`], an [`avatar_fallback`], or both. With
-/// both, the fallback shows until the image has loaded, and keeps showing if
-/// the image never arrives. The `size` parameter selects the dimensions,
-/// defaulting to `Md`. The `attrs` (such as `class` or `title`) are forwarded
-/// to the underlying `<span>`; a `class` among them is appended to the
-/// computed classes.
+/// Place an image over fallback content to show the fallback while the image
+/// loads or if loading fails. `size` defaults to `Md`. Attributes are forwarded
+/// to the `<span>`, and classes are appended.
 ///
 /// ```ignore
 /// view! {
@@ -74,11 +65,9 @@ pub async fn avatar(
     })
 }
 
-/// The portrait of an [`avatar`], covering the fallback behind it.
+/// An avatar image that fills the circle without stretching.
 ///
-/// The image fills the circle and is cropped to it rather than squashed, so
-/// portraits of any aspect ratio stay undistorted. Pass the `src` among the
-/// `attrs`.
+/// Pass its `src` through `attrs`.
 #[component]
 pub async fn avatar_image(
     /// The image's alternative text.
@@ -107,12 +96,9 @@ pub async fn avatar_image(
     })
 }
 
-/// What an [`avatar`] shows in place of its image: initials, or any small
-/// view such as an icon.
+/// Fallback content shown while the avatar image is unavailable.
 ///
-/// It fills the circle and centers its content on a tinted background, and is
-/// laid out behind the [`avatar_image`], so it stands in while the image
-/// loads and whenever there is none.
+/// Use initials or an icon. The content is centered behind the image.
 #[component]
 pub async fn avatar_fallback(
     #[default] mut attrs: Attributes,

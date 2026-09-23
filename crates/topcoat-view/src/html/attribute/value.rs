@@ -295,13 +295,8 @@ impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
 
 /// An attribute value captured from any [`AttributeValueViewParts`] value.
 ///
-/// Produced by the [`Attributes`](crate::Attributes) collection. A value
-/// that pushes a single string is kept as that string, so it costs nothing
-/// beyond the string itself; anything else is rendered into a `String` when
-/// it is captured. A string variant carries the context it was pushed with,
-/// so escaping happens when the value is finally written into a view. Using
-/// a captured value as an attribute value or a class list entry writes it
-/// back exactly as it was captured.
+/// Reusing the value as an attribute value or class list entry preserves
+/// its original escaping context.
 #[non_exhaustive]
 #[derive(Debug, Default, Clone)]
 pub enum AttributeValue {

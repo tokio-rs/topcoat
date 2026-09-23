@@ -6,11 +6,13 @@ This module is available with the `tower` feature. Use [`TowerRoute`] to mount a
 
 [`TowerRoute`] forwards matching requests to a tower service, such as an existing axum application. Register it with [`any`](TowerRoute::any) to forward every HTTP method. A catch-all path lets the service handle everything below a URL prefix, which is useful when moving an application to Topcoat one route at a time.
 
-```rust,ignore
-use topcoat::router::{Router, tower::TowerRoute};
+```rust
+use std::convert::Infallible;
+use topcoat::router::{Body, Router, request::Request, response::Response, tower::TowerRoute};
 
-// The pre-migration application, still serving everything under `/legacy`.
-let legacy: axum::Router = legacy_app();
+let legacy = tower::service_fn(|_request: Request| async {
+    Ok::<_, Infallible>(Response::new(Body::from("legacy")))
+});
 
 let router = Router::builder()
     .route(TowerRoute::any("/legacy/{*rest}", legacy))
@@ -38,20 +40,16 @@ let router = Router::builder()
 
 # Serving a Topcoat router in another application
 
-[`TowerService`] wraps a Topcoat [`Router`](crate::Router) in a tower service. Use it when another application owns the HTTP server. For example, an axum application can forward requests it does not handle to Topcoat:
+[`TowerService`] wraps a Topcoat [`Router`](crate::Router) in a tower service. Pass it to the application that owns your HTTP server:
 
-```rust,ignore
-use topcoat::router::{Router, RouterBuilderDiscoverExt, tower::TowerService};
+```rust
+use topcoat::router::{Router, tower::TowerService};
 
-let topcoat = Router::builder().discover().build();
-
-// Serve every request the surrounding axum application does not handle.
-let app = axum::Router::new()
-    .route("/api/health", axum::routing::get(|| async { "ok" }))
-    .fallback_service(TowerService::new(topcoat));
+let router = Router::builder().build();
+let service = TowerService::new(router);
 ```
 
-Forward the full request path to Topcoat, as the root-level fallback above does. Topcoat matches that path against its routes and generates URLs from its own route paths. Mounting it behind a service that strips a prefix can make generated links point outside the mount.
+Forward the full request path to Topcoat. Topcoat matches that path against its routes and generates URLs from its own route paths. Mounting it behind a service that strips a prefix can make generated links point outside the mount.
 
 The service accepts request bodies that yield bytes and satisfy its trait bounds. It returns routing errors and handler panics as HTTP responses, so callers do not need to handle a service error.
 
@@ -59,24 +57,16 @@ The service accepts request bodies that yield bytes and satisfy its trait bounds
 
 When another server accepts the connections, it must pass the peer address to Topcoat. Insert a [`RemoteAddr`](crate::RemoteAddr) into each request's extensions before passing it to [`TowerService`]. Use the address reported by the transport. Behind a reverse proxy, this is the proxy's address.
 
-In axum, middleware can copy the address from the request's `ConnectInfo<SocketAddr>` extension:
+Insert the address before forwarding each request:
 
-```rust,ignore
+```rust
 use std::net::SocketAddr;
+use topcoat::router::{RemoteAddr, request::Request};
 
-use axum::extract::{ConnectInfo, Request};
-use topcoat::router::RemoteAddr;
-
-let app = app.layer(axum::middleware::map_request(|mut request: Request| async {
-    if let Some(ConnectInfo(addr)) = request.extensions().get::<ConnectInfo<SocketAddr>>() {
-        let addr = *addr;
-        request.extensions_mut().insert(RemoteAddr(addr));
-    }
-    request
-}));
+fn set_peer(request: &mut Request, peer: SocketAddr) {
+    request.extensions_mut().insert(RemoteAddr(peer));
+}
 ```
-
-Serve the axum application with `app.into_make_service_with_connect_info::<SocketAddr>()` to populate that extension. See axum's [`ConnectInfo` documentation](https://docs.rs/axum/latest/axum/extract/struct.ConnectInfo.html) for the server setup.
 
 Topcoat's [`remote_addr`](crate::request::remote_addr) then returns the connection address, and [`client_ip`](crate::request::client_ip) uses its IP by default. If the server receives requests through a reverse proxy, configure [`TrustedProxies`](crate::TrustedProxies) on the Topcoat router to read the client's IP from the proxy's header.
 

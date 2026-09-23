@@ -19,11 +19,7 @@ impl Artifact {
     /// of a bin target, or the uplifted library outputs of a `cdylib` or
     /// `dylib` target.
     ///
-    /// Cargo emits an artifact message for every crate it compiles, but marks
-    /// the final outputs itself: `executable` is only set for the requested
-    /// bin targets, and only the requested packages' library outputs are
-    /// uplifted out of `deps/` into the profile directory. Everything still
-    /// in `deps/` is an intermediate dependency and is skipped.
+    /// Excludes intermediate dependencies and build-script outputs.
     pub(super) fn final_outputs(&self) -> Vec<PathBuf> {
         if let Some(executable) = &self.executable {
             return vec![executable.clone()];

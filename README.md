@@ -30,11 +30,11 @@
 [discord-badge]: https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=flat-square
 [discord-url]: https://discord.gg/tokio
 
-Topcoat is a modular, batteries-included Rust framework for building full-stack apps. It prioritizes simplicity and productivity. See [Learn Topcoat](#learn-topcoat) to get started, or the [Roadmap](#roadmap) for what's coming next.
+Topcoat is a Rust framework for building web apps. Render HTML on the server, compose pages from async components, and add browser interactivity from Rust.
 
 **Early-stage and experimental. Expect breaking changes.**
 
-```rust,ignore
+```rust,no_run
 use topcoat::{
     Result,
     router::{Router, RouterBuilderDiscoverExt, page},
@@ -66,205 +66,34 @@ async fn hello(name: &str) -> Result<impl View> {
 
 ## What makes Topcoat different
 
-### Client reactivity without the boilerplate
+### HTML templates with Rust
 
-Topcoat renders all markup on the server: components can be async and query the database directly, eliminating all the traditional boilerplate needed for a separate API layer. Interactivity does not have to cost a round-trip, though. A `$(...)` expression is ordinary type-checked Rust that Topcoat evaluates on the server for the initial render and also translates to JavaScript, so it re-runs instantly in the browser. No wasm bundle, no client build step:
+Write HTML with `view!` and use Rust expressions and control flow inside it. Async components can load the data they need before rendering. Use `topcoat fmt` to format the templates alongside your Rust code.
 
-```rust,ignore
-#[component]
-async fn faq(cx: &Cx) -> Result<impl View> {
-    let open = signal(cx, || false);
+### Interactivity from Rust
 
-    Ok(view! {
-        // Runs entirely in the browser; no server round-trip.
-        <button @click=$(|_e| open.set(!open.get()))>"What is Topcoat?"</button>
-        <p :hidden=$(!open.get())>"A full-stack Rust framework."</p>
-    })
-}
-```
+The runtime checks expressions as Rust and translates them to JavaScript. Signals hold state in the browser, and views update when that state changes. When an update needs server data, a shard can render fresh HTML on the server. See the [runtime guide](https://docs.rs/topcoat/latest/topcoat/runtime/index.html).
 
-When an update does need the server, like fresh search results, mark the component as a `#[shard]`. Topcoat re-renders it on the server whenever one of its `$(...)` arguments changes and swaps the new HTML in place:
+### Routing that fits your app
 
-```rust,ignore
-#[component]
-async fn search(cx: &Cx) -> Result<impl View> {
-    let query = signal(cx, String::new);
+Register routes explicitly or discover annotated handlers. You can also derive paths from your module tree. Layouts wrap pages with shared content. See the [routing guide](https://docs.rs/topcoat/latest/topcoat/router/index.html).
 
-    Ok(view! {
-        <input @input=$(|e: Event| query.set(e.target.value))>
+### Components you can edit
 
-        // Updates as the user types.
-        search_results(query: $(query.get()))
-    })
-}
+[Topcoat UI](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/ui.md) copies component source into your project. You can change its design and behavior directly.
 
-#[shard]
-async fn search_results(cx: &Cx, query: String) -> Result<impl View> {
-    Ok(view! {
-        <ul>
-            // Your own server-side code, like a database query:
-            for product in search_products(cx, &query).await? {
-                <li>(product.name)</li>
-            }
-        </ul>
-    })
-}
-```
+### Assets declared in Rust
 
-### Powerful, unsurprising HTML templates
-
-The `view!` macro stays true to HTML and Rust. Use familiar Rust control flow as part of your templates:
-
-```rust,ignore
-view! {
-    <nav>
-        for item in nav_items {
-            <a
-                href=(item.url)
-                if item.url == current_path {
-                    aria-current="page"
-                    class="active"
-                }
-            >
-                (item.label)
-            </a>
-        }
-    </nav>
-}
-```
-
-Use the `topcoat fmt` CLI command to automatically format `view!` snippets (and other macros) across your codebase.
-
-### Module-based routing
-
-Topcoat can optionally infer your route tree from your app's module structure (without a build step):
-
-```text
-src/
-|-- app.rs              -> /            (and the root <html> layout)
-`-- app/
-    |-- about.rs        -> /about
-    |-- _marketing.rs                  (layout, no URL segment)
-    |-- _marketing/
-    |   `-- pricing.rs  -> /pricing
-    |-- posts.rs        -> /posts
-    |-- posts/
-    |   `-- id.rs       -> /posts/{post_id}
-    `-- api/
-        `-- health.rs   -> GET /api/health
-```
-
-### Premade components you can edit
-
-Topcoat UI is a component library based on [Tailwind](https://tailwindcss.com/) inspired by [shadcn/ui](https://ui.shadcn.com/). Components are copied into your project via the `topcoat ui` CLI command, meaning you can freely change their design and functionality to fit your use case:
-
-```rust,ignore
-#[component]
-async fn delete_card() -> Result<impl View> {
-    Ok(view! {
-        card(
-            card_header(
-                card_title("Delete workspace")
-                card_description(
-                    "This permanently removes the workspace and all of its data."
-                )
-            )
-            card_footer(
-                attrs: attributes! { class="justify-end" },
-                button(variant: ButtonVariant::Ghost, "Cancel")
-                button(variant: ButtonVariant::Destructive, "Delete workspace")
-            )
-        )
-    })
-}
-```
-
-### Asset bundling
-
-The bundler scans your compiled binary for `asset!` calls, copies (or even downloads) every file into a local asset directory, and allows Topcoat to serve them efficiently with aggressive browser caching.
-
-```rust,ignore
-const FERRIS: Asset = asset!("./ferris.png");
-
-view! { <img src=(FERRIS)> }
-```
-
-Topcoat also ships with utilities for web fonts and icons, as well as easy integrations for [Fontsource](https://fontsource.org/) (Google Fonts) and [Iconify](https://icon-sets.iconify.design/).
-
-
-### Built-in Tailwind support
-
-Enable the `tailwind` feature to integrate [Tailwind](https://tailwindcss.com/) into your project:
-
-```rust,ignore
-view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
-```
+Declare a file with `asset!` and use its handle in a view. Topcoat bundles the file and gives it a URL based on its contents, so browsers can cache it until it changes. See the [asset guide](https://docs.rs/topcoat/latest/topcoat/asset/index.html).
 
 ## Learn Topcoat
 
-**Start here**
-- [Getting started](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/getting_started.md): create a new project, install the CLI, run the dev server.
-- [Source code formatting](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-cli/docs/fmt.md): `topcoat fmt` for macro bodies.
+Start with [Getting started](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/getting_started.md) to create an app and run the dev server.
 
-**Rendering**
-- [The `view!` macro](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html): templating syntax, control flow, conditional attributes.
-- [The `#[component]` macro](https://docs.rs/topcoat/latest/topcoat/view/attr.component.html): async functions as components, with child content.
-- [The `attributes!` macro](https://docs.rs/topcoat/latest/topcoat/view/macro.attributes.html): reusable runtime attribute fragments.
-- [The `class!` macro](https://docs.rs/topcoat/latest/topcoat/view/macro.class.html): space-separated class lists from static and conditional entries.
-- [The `live!` and `emit!` macros](https://docs.rs/topcoat/latest/topcoat/view/macro.live.html): stream slow parts of a page in after the rest, with the `suspense` and `error_boundary` components built on them.
+The [API documentation](https://docs.rs/topcoat/latest/topcoat/) includes guides in each module. For working applications, browse the [examples](https://github.com/tokio-rs/topcoat/tree/main/examples) and [demos](https://github.com/tokio-rs/topcoat/tree/main/demos).
 
-**Routing**
-- [Router](https://docs.rs/topcoat/latest/topcoat/router/index.html): pages, layouts, and API routes; manual and auto-discovered.
-- [Module-based routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html): derive the route table from your module tree.
-
-**Working with requests**
-- [Request context (`Cx`)](https://docs.rs/topcoat/latest/topcoat/context/index.html): the value pages, layouts, and components read from.
-- [App context](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/app_context.md): share long-lived values across requests, keyed by type.
-- [Memoization](https://docs.rs/topcoat/latest/topcoat/context/attr.memoize.html): `#[memoize]` for per-request caching and fan-out dedup.
-- [Functions, not middlewares](https://docs.rs/topcoat/latest/topcoat/context/index.html#functions-not-middlewares): the recommended way to model auth and other request-scoped concerns.
-- [Cookies](https://docs.rs/topcoat/latest/topcoat/cookie/index.html): read and write the request cookie jar, with signed, encrypted, and prefixed cookies.
-- [Sessions](https://docs.rs/topcoat/latest/topcoat/session/index.html): bring-your-own-storage session authentication: login/logout lifecycle, sliding expiration, and token rotation.
-
-**Asset system**
-- [Assets](https://docs.rs/topcoat/latest/topcoat/asset/index.html): declare assets in Rust, serve them with content-hashed URLs.
-- [Fonts](https://docs.rs/topcoat/latest/topcoat/font/index.html): bundle and serve web fonts.
-- [Icons](https://docs.rs/topcoat/latest/topcoat/icon/index.html): download Iconify icon sets or declare your own.
-
-**Client reactivity**
-- [The runtime](https://docs.rs/topcoat/latest/topcoat/runtime/index.html): signals, `$(...)` expressions, `@` event handlers, and `:` bind attributes.
-- [Expressions](https://docs.rs/topcoat/latest/topcoat/runtime/macro.expr.html): the dual Rust/JavaScript expression language and its vocabulary.
-- [Procedures](https://docs.rs/topcoat/latest/topcoat/runtime/attr.procedure.html): async server functions callable from the browser.
-- [Shards](https://docs.rs/topcoat/latest/topcoat/runtime/attr.shard.html): components that re-render on the server when their arguments change.
-
-**Miscellaneous**
-- [Topcoat UI](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/ui.md): premade components vendored into your project for you to edit.
-- [Mail](https://docs.rs/topcoat/latest/topcoat/mail/index.html): declare mail with the `mail!` macro, deliver through SMTP, file, or in-memory transports.
-
-**Third-party integrations**
-- [Tailwind](https://docs.rs/topcoat/latest/topcoat/tailwind/index.html): Tailwind CSS without Node, wired into the asset pipeline.
-- [htmx](https://docs.rs/topcoat/latest/topcoat/htmx/index.html): drive partial HTML swaps from the server with request/response header helpers.
-- [Alpine AJAX](https://docs.rs/topcoat/latest/topcoat/alpine_ajax/index.html): drive partial HTML swaps from the server with Alpine AJAX's request-header conventions.
-- [Datastar](https://docs.rs/topcoat/latest/topcoat/datastar/index.html): patch elements and signals into the page over server-sent events.
+To help with the project, read the [contributing guide](https://github.com/tokio-rs/topcoat/blob/main/CONTRIBUTING.md). Questions and feature discussions are welcome in the [Tokio Discord](https://discord.gg/tokio).
 
 ## Roadmap
 
-Planned features we'd like to bring to Topcoat. Have an idea? [Open an issue](https://github.com/tokio-rs/topcoat/issues).
-
-- [ ] `topcoat new` CLI command to bootstrap pre-configured projects
-- [ ] Static export
-- [ ] (More) reactivity (`topcoat-runtime`)
-- [ ] More Topcoat UI components, full "blocks" e.g. sign-in form
-- [ ] Better [Toasty](https://github.com/tokio-rs/toasty) integration (safely create/update records from forms without listing out all the fields)
-- [ ] Validations
-- [ ] Localization support
-- [ ] `OpenAPI` endpoints
-- [ ] Docs for how to deploy Topcoat
-- [ ] Pre-rendering for static pages
-- [ ] Client-side navigation + prefetching
-- [ ] `WebTransport`
-- [ ] Image optimization / resizing
-- [ ] Markdown support
-- [ ] Easier-to-use middlewares like rate-limiting, compression, etc.
-- [ ] Authentication
-- [ ] Background jobs
-- [ ] Islands
+Follow [project issues](https://github.com/tokio-rs/topcoat/issues) for proposed features and ongoing work.

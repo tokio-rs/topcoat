@@ -1,6 +1,6 @@
 # Context
 
-Reading the current request through `Cx`: the requested path and a request header, used while rendering the page.
+Read the request path and headers through `Cx` while rendering a page.
 
 Run it with:
 

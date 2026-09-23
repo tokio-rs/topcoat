@@ -1,6 +1,6 @@
 Declares a [`Mail`] as a list of `name: value` fields.
 
-Each field lowers to the [`MailBuilder`] method of the same name, with conversions layered on top: addresses can be written as strings or `(name, address)` pairs, and the `html` field takes an inline [`view!`] body. The macro is an expression producing `Result<Mail>`, so a field value that fails, such as an invalid address string, surfaces as an error at the invocation.
+Use strings or `(name, address)` pairs for addresses, and a [`view!`] body for HTML. The macro returns `Result<Mail>` and reports invalid field values as errors.
 
 ```rust
 # use topcoat::{Result, context::Cx};
@@ -20,7 +20,7 @@ let mail = mail! {
 # }
 ```
 
-A mail declares its content only. The MIME structure, encodings, and the envelope are assembled when the mail is passed to [`send`], which delivers it through the [`Transport`] registered in the app's [`MailConfig`].
+Call [`send`] to deliver the message through the configured transport.
 
 # Fields
 
@@ -54,9 +54,9 @@ let mail = mail! {
 # }
 ```
 
-# The HTML Body
+# HTML body
 
-A braced `html` value is a [`view!`] body. Mail clients understand far less CSS than browsers do, so mail markup stays plain and carries its styles inline. When the body renders components or other markup that needs the request context, name it with a leading `cx =>`, just as in a plain-function `view!` call:
+A braced `html` value is a [`view!`] body. Add `cx =>` when the view needs a request context:
 
 ```rust
 # use topcoat::{Result, context::Cx};
@@ -79,9 +79,9 @@ async fn welcome(cx: &Cx, name: &str) -> Result<Mail> {
 
 An unbraced `html` value is an expression, so a prebuilt [`View`] can be passed as-is.
 
-# The Plain-Text Body
+# Plain-text body
 
-Mail without a plain-text alternative scores worse with spam filters, so by default the text body is derived from the HTML body when the mail is assembled. Declare `text` to send your own wording instead, or pass [`TextBody::None`] to send the HTML alone:
+Plain text is derived from the HTML by default. Set `text` to supply your own wording, or use [`TextBody::None`] to omit the plain-text body:
 
 ```rust
 # use topcoat::{Result, context::Cx};
@@ -98,7 +98,7 @@ assert_eq!(html_alone.text(), &TextBody::None);
 # }
 ```
 
-# Attachments And Headers
+# Attachments and headers
 
 `attachments` takes a single [`Attachment`] or a collection. A downloadable attachment is presented to the recipient as a file; an [inline attachment](struct.Attachment.html#method.inline) is displayed where the HTML body references its content id through a `cid:` URL. `headers` adds custom `(name, value)` pairs to the message:
 
@@ -123,9 +123,9 @@ let mail = mail! {
 # }
 ```
 
-# Fallible And Async Values
+# Fallible and async values
 
-The macro expands to an awaited async block, so it must be used inside an async function. In exchange, field values can use `.await` and `?` directly, and their errors surface as the macro's own `Err`:
+Use the macro inside an async function. Field values can use `.await` and `?`; their errors become the macro's `Err`:
 
 ```rust
 # use topcoat::Result;

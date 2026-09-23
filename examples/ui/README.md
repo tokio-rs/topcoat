@@ -1,6 +1,6 @@
 # UI
 
-A showcase of the components from `topcoat ui`, vendored into `src/components/` where they can be restyled and extended like any other source file.
+A showcase of `topcoat ui` components. Edit their source in `src/components/` to change their appearance and behavior.
 
 Run it with:
 

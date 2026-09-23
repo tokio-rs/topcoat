@@ -4,9 +4,7 @@ use topcoat_view::{NodeViewParts, PartsWriter, ViewHandle};
 use crate::{Js, ShardId};
 
 pub struct ShardScope {
-    /// The identity of the shard invocation, which names the scope in its
-    /// markers and which the browser sends back with a re-render request so
-    /// the shard body derives the same identities as the inline render.
+    /// Identifies this invocation across initial renders and later requests.
     identity: Identity,
     shard_id: ShardId,
     exprs: Vec<Js>,

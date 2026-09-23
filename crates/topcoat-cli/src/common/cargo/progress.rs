@@ -9,11 +9,8 @@ const TAIL_LIMIT: usize = 512;
 
 /// Incremental scanner for cargo's build progress.
 ///
-/// Cargo's progress bar renders contain a `current/total` unit count
-/// (`Building [===>  ] 12/34: app`). The scanner is fed the raw stderr
-/// stream chunk by chunk and reports the newest count each time it changes,
-/// keeping a small tail of the stream so a count split across two chunks is
-/// still seen whole.
+/// Feed stderr chunks to read updated `current/total` counts. Counts can
+/// span chunk boundaries.
 #[derive(Default)]
 pub(super) struct ProgressScanner {
     tail: Vec<u8>,

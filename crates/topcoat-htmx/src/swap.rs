@@ -3,9 +3,7 @@ use serde::Serialize;
 
 /// How htmx swaps a response into the DOM.
 ///
-/// Mirrors the values accepted by the `hx-swap` attribute. Used by
-/// [`HxReswap`](crate::HxReswap) and as the `swap` field of an
-/// [`HxLocation`](crate::HxLocation).
+/// Matches the values accepted by the `hx-swap` attribute.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum SwapOption {
     /// Replace the inner HTML of the target element.

@@ -4,14 +4,11 @@ use topcoat::{
     view::{Attributes, Child, View, attributes, class, component, view},
 };
 
-/// A breadcrumb component: the trail from the site's root to the current
-/// page.
+/// Navigation showing the path to the current page.
 ///
-/// The trail is a `<nav>` labelled as a breadcrumb, holding a
-/// [`breadcrumb_list`] of [`breadcrumb_item`]s. Each item is a
-/// [`breadcrumb_link`], except the last, which is the current page and is a
-/// [`breadcrumb_page`] instead. The `attrs` (such as `class`) are forwarded to
-/// the `<nav>`; a `class` among them is appended to the computed classes.
+/// Place items inside a `breadcrumb_list`. Use links for earlier pages and a
+/// `breadcrumb_page` for the current one. Attributes are forwarded to the
+/// `<nav>`, and classes are appended.
 ///
 /// ```ignore
 /// view! {
@@ -75,11 +72,9 @@ pub async fn breadcrumb_item(
     })
 }
 
-/// A step of the trail that leads somewhere: an `<a>` to an ancestor of the
-/// current page.
+/// A link to an ancestor of the current page.
 ///
-/// It takes the list's muted color at rest and the full foreground color on
-/// hover. Pass the `href` among the `attrs`.
+/// Pass its destination through the `href` attribute.
 #[component]
 pub async fn breadcrumb_link(
     #[default] mut attrs: Attributes,
@@ -98,10 +93,7 @@ pub async fn breadcrumb_link(
     })
 }
 
-/// The last step of the trail: the current page, which is not a link.
-///
-/// It carries `aria-current="page"`, so assistive technology announces it as
-/// where the reader is.
+/// The current page, marked with `aria-current="page"`.
 #[component]
 pub async fn breadcrumb_page(
     #[default] mut attrs: Attributes,
@@ -118,10 +110,7 @@ pub async fn breadcrumb_page(
     })
 }
 
-/// The divider between two steps of a [`breadcrumb_list`].
-///
-/// It is a chevron pointing along the trail, hidden from assistive
-/// technology, which reads the steps as a list without it.
+/// A decorative chevron between breadcrumb items.
 #[component]
 pub async fn breadcrumb_separator(#[default] mut attrs: Attributes) -> Result<impl View> {
     Ok(view! {
@@ -134,11 +123,9 @@ pub async fn breadcrumb_separator(#[default] mut attrs: Attributes) -> Result<im
     })
 }
 
-/// A stand-in for the steps left out of a long trail.
+/// An ellipsis representing omitted breadcrumb items.
 ///
-/// It shows an ellipsis in place of the collapsed steps. The glyph itself
-/// says nothing to assistive technology, so a word standing in for it is read
-/// out instead.
+/// Includes a text label for assistive technology.
 #[component]
 pub async fn breadcrumb_ellipsis(#[default] mut attrs: Attributes) -> Result<impl View> {
     Ok(view! {

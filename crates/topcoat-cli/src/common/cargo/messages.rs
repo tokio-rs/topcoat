@@ -22,13 +22,8 @@ impl Messages {
 
     /// The error output to show for a build cargo reported as failed.
     ///
-    /// rustc reports its diagnostics as JSON on stdout, but cargo's own
-    /// failures never reach it: a build script that exits non-zero, an
-    /// unresolvable dependency, a malformed manifest, or a `--bin` that names
-    /// no target are only ever written to stderr as text, leaving stdout
-    /// without a single error-level diagnostic (and often empty altogether).
-    /// Which stream holds the failure is therefore decided by whether rustc
-    /// reported an error at all, rather than by how the build was invoked.
+    /// Uses compiler diagnostics when present. Otherwise uses Cargo's
+    /// stderr report, which can describe failures before compilation starts.
     pub(super) fn failure_diagnostics(&self, stderr: &StderrTail) -> String {
         let diagnostics = if self.has_compiler_error() {
             self.rendered_diagnostics()

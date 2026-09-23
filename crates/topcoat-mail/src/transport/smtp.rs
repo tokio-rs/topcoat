@@ -34,8 +34,7 @@ pub struct SmtpTransport {
 }
 
 impl SmtpTransport {
-    /// Connects to `host` over implicit TLS on port 465, the modern
-    /// submission setup most mail providers offer.
+    /// Connects to `host` over implicit TLS on port 465.
     ///
     /// # Errors
     ///
@@ -47,8 +46,7 @@ impl SmtpTransport {
         })
     }
 
-    /// Connects to `host` on port 587, upgrading the connection with
-    /// STARTTLS, for providers that only offer the older submission setup.
+    /// Connects to `host` on port 587 and requires a STARTTLS upgrade.
     ///
     /// # Errors
     ///

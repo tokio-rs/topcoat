@@ -3,18 +3,11 @@ use topcoat::{
     view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
-/// A hover card component: a card of detail about its trigger, shown while
-/// the trigger is hovered or focused.
+/// Additional content shown when its trigger is hovered or focused.
 ///
-/// Where a tooltip carries a few words, a hover card carries a view: the
-/// person behind a mention, the project behind a link. Child nodes are the
-/// trigger and the [`hover_card_content`] holding that view.
-///
-/// The card waits before it appears, so that passing the cursor over the
-/// trigger on the way somewhere else does not summon it, and waits again
-/// before it goes, so that the way to it is not a race. What is in it is
-/// detail, not the only copy of anything: a reader who never hovers, and one
-/// on a touch screen, will not see it.
+/// Provide a trigger followed by `hover_card_content`. Appearance and dismissal
+/// are delayed to reduce flickering. Keep essential information available
+/// outside the hover card for users who cannot hover.
 ///
 /// ```ignore
 /// view! {
@@ -43,17 +36,6 @@ pub async fn hover_card(
 }
 
 /// The classes for the [`hover_card_content`] panel.
-///
-/// The panel is a raised surface like the card's, dropped below the trigger
-/// and aligned to its left edge. It sets its own background and text color,
-/// so it reads the same over anything it covers, and it takes pointer events,
-/// unlike a tooltip's bubble: a hover card can hold a link worth following.
-///
-/// The delay before it fades in and out is what keeps it from flickering as
-/// the cursor passes by. The visibility that keeps it out of the way in
-/// between is named in the transition with `allow-discrete`, since it has no
-/// in-between values; naming both properties one by one is what makes that
-/// work, as `all` does not carry the visibility along.
 const PANEL: StaticClass = class!(
     "invisible absolute top-full left-0 z-50 mt-2 w-64 rounded-lg border \
      border-border bg-popover p-4 text-popover-foreground opacity-0 shadow-sm \

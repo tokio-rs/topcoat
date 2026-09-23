@@ -14,9 +14,8 @@ use crate::{ElementPatchMode, common};
 /// `id` attribute. A [`selector`](Self::selector) targets other elements, and
 /// a [`mode`](Self::mode) changes how they are applied.
 ///
-/// The event converts [`Into<Event>`](Event) for sending over an
-/// [`Sse`](topcoat_router::content::sse::Sse) stream. Returned from a handler
-/// on its own, it responds as a stream that sends this one event and ends.
+/// Return it from a handler for one update, or convert it to an [`Event`]
+/// to send it in an [`Sse`](topcoat_router::content::sse::Sse) stream.
 ///
 /// # Examples
 ///

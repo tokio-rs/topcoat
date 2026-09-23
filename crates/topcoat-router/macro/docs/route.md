@@ -16,7 +16,7 @@ The function is `async` and returns `Result<T>` where `T` implements [`AsyncInto
 
 # Response conversion
 
-The macro converts the success value via [`AsyncIntoResponse::async_into_response`](response/trait.AsyncIntoResponse.html#tymethod.async_into_response). Strings, status codes, byte buffers, `(headers, body)` tuples, and [`Json<T>`](content/struct.Json.html) all work. A success value is not serialized as JSON automatically; wrap it in [`Json<T>`](content/struct.Json.html) to opt in.
+The return type determines the response format. For a JSON response, return [`Json<T>`](content/struct.Json.html). See [`content`](content/index.html) for request and response types.
 
 # Examples
 

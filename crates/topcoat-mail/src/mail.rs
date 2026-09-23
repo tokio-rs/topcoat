@@ -320,10 +320,9 @@ where
 
 /// The plain-text body of a mail: derived, declared, or absent.
 ///
-/// Mail without a plain-text alternative scores worse with spam filters, so
-/// the default, [`FromHtml`](TextBody::FromHtml), derives one from the
-/// rendered HTML body when the mail is assembled. Declare the text yourself
-/// or opt out through the builder's [`text`](MailBuilder::text) setter:
+/// The default, [`FromHtml`](TextBody::FromHtml), derives plain text from the
+/// rendered HTML. Use [`text`](MailBuilder::text) to supply text yourself or
+/// disable the plain-text body:
 ///
 /// ```
 /// use topcoat_mail::{Mail, TextBody};

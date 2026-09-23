@@ -1,8 +1,8 @@
-[Alpine AJAX](https://alpine-ajax.js.org) is an Alpine.js plugin that lets HTML drive its own updates. Attributes like `x-target` make a `<form>` or `<a>` issue a fetch request and merge the returned HTML fragment into one or more target elements, without a full reload and without writing JavaScript. The server just answers with the markup for the piece of the page that changed.
+[Alpine AJAX](https://alpine-ajax.js.org) is an Alpine.js plugin that updates parts of a page with HTML from the server. Add `x-target` to a form or link to name the elements its response should update.
 
-The browser tells the server about the request through two `X-Alpine-*` HTTP headers. Unlike htmx, Alpine AJAX defines no response header convention: there is nothing for the server to set to control navigation, retargeting, or client-side events -- those are all configured directly in markup (`x-merge`, `x-target`) or JavaScript (`ajax:*` events). Topcoat helps you read the request headers.
+Topcoat provides helpers to identify Alpine AJAX requests and read their target element IDs.
 
-Everything below is re-exported from `topcoat::alpine_ajax` and gated behind the `alpine-ajax` feature.
+Enable the `alpine-ajax` feature to use `topcoat::alpine_ajax`:
 
 ```toml
 # Cargo.toml
@@ -12,7 +12,7 @@ topcoat = { version = "0.8.1", features = ["alpine-ajax"] }
 
 # Loading the Alpine AJAX script
 
-Alpine AJAX is a plugin for Alpine.js core, so the browser must load both, in order: the plugin script first, then Alpine.js itself. Load both with `defer` so they run after the document has parsed; without it, Alpine can start initializing before `<body>` exists and silently skip binding directives on the page's first render.
+Load Alpine AJAX before Alpine.js. Use `defer` on both scripts so they run after the document has parsed:
 
 ```rust
 use topcoat::{
@@ -38,7 +38,7 @@ async fn root(slot: Slot<'_>) -> Result<impl View> {
 
 # Reading request headers
 
-When Alpine AJAX makes a request it sends two headers describing itself and what it's targeting.
+Use [`ajax_request`] to return partial content for an Alpine AJAX request:
 
 ```rust
 use topcoat::{
@@ -53,12 +53,10 @@ use topcoat::{
 async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         if ajax_request(cx) {
-            // Alpine AJAX only merges the requested target elements, so we do
-            // not need to render the full layout shell. Just the page's
-            // content is enough.
+            // Return the content containing the requested targets.
             (slot)
         } else {
-            // Non-AJAX requests require a full page render including the shell.
+            // Render the layout for a full page request.
             <html>
                 <body>
                     <nav> /* persistent navigation */ </nav>
@@ -70,26 +68,24 @@ async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
 }
 ```
 
-- [`ajax_request`]: was this request issued by Alpine AJAX?
-- [`ajax_targets`]: an iterator over the `id`s of the target elements being requested.
-- [`ajax_target`]: is a given `id` among the requested targets?
+Use [`ajax_targets`] to iterate over requested element IDs, or [`ajax_target`] to check for one ID.
 
 # Sending alert messages with `x-sync`
 
-A form's `x-target` only merges the elements it names, and by default only for a `2xx` response. Alpine AJAX's `x-sync` attribute is the escape hatch: any element on the page carrying `x-sync` is refreshed whenever a response contains a matching `id`, regardless of whether that `id` was targeted and regardless of status code. That makes it the right tool for a flash message or alert region that lives outside whatever a form explicitly targets:
+Add `x-sync` to an alert region to update it whenever a response contains the same `id`. This works even when the element is outside the form's targets or the response has an error status:
 
 ```html
 <div id="alert" x-sync role="status"></div>
 
 <form x-target="comment_form comments" method="post" action="/comments">
     <textarea name="body"></textarea>
-    <button type="submit">"Post"</button>
+    <button type="submit">Post</button>
 </form>
 ```
 
-Render the `#alert` markup into every response from `/comments` (success or failure) and Alpine AJAX picks it up and replaces it in place, without it ever appearing in that form's `x-target`.
+Include `#alert` in the response from `/comments` to update the message.
 
-Pairing this with `x-target`'s status-code modifiers covers form validation end to end. Add a modifier so the target list changes on a non-2xx response -- `x-target.422` merges only on a `422`, `x-target.4xx` on any `4xx`, `x-target.error` on `4xx` or `5xx`:
+By default, `x-target` updates its targets only for successful responses. Add a status modifier to handle validation errors:
 
 ```html
 <form
@@ -103,7 +99,7 @@ Pairing this with `x-target`'s status-code modifiers covers form validation end 
 </form>
 ```
 
-A validation failure can respond `422` with just the `#comment_form` fragment (the textarea and an inline error) -- `comments` is left alone because it isn't in the `.422` target list -- while a success responds `200` and updates both. The Rust attribute name needs the parenthesized-expression form, since `422` on its own is not a valid identifier segment:
+A `422` response updates only `comment_form`, while a successful response updates both targets. Include the form and its error message in the validation response:
 
 ```rust
 use topcoat::{
@@ -137,12 +133,11 @@ async fn create_comment(cx: &Cx /* , Form(input): Form<NewComment> */) -> Result
             .into_response(cx);
     }
 
-    // ...save the comment, then respond with the cleared form, the updated
-    // `comments` list, and an `#alert` confirmation, same as above but `200`.
+    // Save the comment and return updated targets with a success status.
     # unreachable!()
 }
 ```
 
 # Header constants
 
-The raw `X-Alpine-*` header names are available as `HeaderName` constants in [`topcoat::alpine_ajax::header`](crate::alpine_ajax::header), for when you want to read a header directly.
+Use the constants in [`header`](crate::alpine_ajax::header) to read raw headers.

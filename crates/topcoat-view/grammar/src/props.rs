@@ -7,20 +7,10 @@ use syn::{
 };
 use topcoat_core_grammar::paths::topcoat_view;
 
-/// A parsed `#[derive(Props)]` struct. Expands into a typestate builder where
-/// every field without `#[default]` must be set before `build()` becomes
-/// available, plus implementations of [`topcoat::view::Props`] and an inherent
-/// `builder()` function on the props struct.
+/// A parsed `#[derive(Props)]` struct, ready to generate a builder.
 ///
-/// Each required field is tracked by a generic argument of the builder. It
-/// starts out as a generated marker type named after the field and flips to
-/// [`topcoat::view::Set`] when the field's setter is called. `build()` bounds
-/// every marker by [`topcoat::view::IsSet`], so forgetting a field produces a
-/// "missing required property" error naming the field.
-///
-/// [`topcoat::view::IsSet`]: trait.IsSet.html
-/// [`topcoat::view::Props`]: trait.Props.html
-/// [`topcoat::view::Set`]: struct.Set.html
+/// The generated `builder()` method creates a builder whose `build()` method
+/// requires every field without `#[default]` to be set.
 pub struct Props {
     vis: Visibility,
     ident: Ident,

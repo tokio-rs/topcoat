@@ -5,10 +5,8 @@ use tokio::sync::mpsc;
 
 /// Listens for the manual reload key on the terminal.
 ///
-/// Reads single keys from stdin on a background thread and reports each press
-/// of `r`, the manual reload shortcut. Active only when attached to an
-/// interactive terminal; otherwise [`Self::reload_requested`] never resolves,
-/// leaving the event loop driven entirely by file changes.
+/// Reports each press of `r` from an interactive terminal.
+/// [`Self::reload_requested`] stays pending when no terminal is available.
 pub struct Keyboard {
     /// `None` when there is no terminal to read keys from.
     presses: Option<mpsc::UnboundedReceiver<()>>,
@@ -48,9 +46,8 @@ impl Keyboard {
 
     /// Wait until the manual reload key (`r`) is pressed.
     ///
-    /// Resolves once per press. Never resolves when there is no terminal, or
-    /// once the reader thread has stopped (its stdin closed), so the branch
-    /// stays quietly pending rather than spinning the event loop.
+    /// Resolves once per press. Stays pending when there is no terminal or
+    /// stdin has closed.
     ///
     /// Cancel-safe: a press arriving before cancellation is queued by the
     /// reader thread and reported by the next call.

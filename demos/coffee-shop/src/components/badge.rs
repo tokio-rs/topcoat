@@ -22,11 +22,6 @@ pub enum BadgeVariant {
 
 impl BadgeVariant {
     /// The Tailwind classes for this variant.
-    ///
-    /// Each variant sets its own border color rather than inheriting a
-    /// transparent one from [`BASE`]: with two border-color classes on the
-    /// same element, stylesheet order (not class order) would decide the
-    /// winner.
     fn classes(self) -> StaticClass {
         match self {
             Self::Primary => class!("border-transparent bg-primary text-primary-foreground"),
@@ -40,9 +35,6 @@ impl BadgeVariant {
 }
 
 /// The classes shared by every badge, regardless of variant.
-///
-/// Every badge carries a border (colored per variant) so that the `Outline`
-/// variant, which only recolors it, does not change the badge's dimensions.
 const BASE: StaticClass = class!(
     "inline-flex w-fit shrink-0 items-center justify-center gap-1 rounded-md \
      border px-2 py-0.5 text-xs font-medium whitespace-nowrap",
@@ -62,12 +54,10 @@ pub fn badge_variants(variant: BadgeVariant) -> Class<(StaticClass, StaticClass)
     class!(BASE, variant.classes())
 }
 
-/// A badge component: a small inline pill for statuses, counts, and tags.
+/// A small label for a status or category.
 ///
-/// The `variant` parameter selects the styling, defaulting to `Primary`. The
-/// `attrs` (such as `class` or `title`) are forwarded to the underlying
-/// `<span>`; a `class` among them is appended to the computed classes. Child
-/// nodes become the badge's content.
+/// `variant` defaults to `Primary`. Attributes are forwarded to the `<span>`,
+/// and classes are appended. Child content supplies the label.
 ///
 /// ```ignore
 /// view! {

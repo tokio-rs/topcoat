@@ -108,9 +108,8 @@ impl IntoResponse for Error {
 ///
 /// Implemented for [`Option`] (where `None` becomes the configured error)
 /// and [`core::result::Result`] (where any `Err` is replaced, discarding the
-/// original error). Designed to be combined with `?` so a handler can return a
-/// redirect, not-found, unauthorized, forbidden, or bad-request response when
-/// required state is missing or invalid.
+/// original error). Use the result with `?` to return the selected error
+/// response from a handler.
 ///
 /// # Examples
 ///

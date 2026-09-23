@@ -21,10 +21,8 @@ const CACHE_CONTROL_VALUE: HeaderValue =
 
 /// A [`Route`] that serves a single bundled asset from disk.
 ///
-/// One is registered per [`BundledAsset`] by the router's `assets` extension
-/// method when the configuration serves the bundle from the application; the
-/// route reads the file on demand and responds with the appropriate
-/// `Content-Type` and an immutable `Cache-Control`.
+/// Reads the file on demand and responds with its configured `Content-Type`
+/// and an immutable `Cache-Control`.
 #[derive(Debug, Clone)]
 pub struct AssetRoute {
     /// The identity of this route's handler.

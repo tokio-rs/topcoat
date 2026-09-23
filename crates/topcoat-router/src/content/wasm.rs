@@ -8,15 +8,9 @@ use crate::{
 
 /// WebAssembly response wrapper.
 ///
-/// Wrap any value convertible into a [`Body`] (such as a `&'static [u8]` from
-/// `include_bytes!`) to reply with `Content-Type: application/wasm`. Use it
-/// from a [`route`](../topcoat_router_macro/attr.route.html) that serves a
-/// module by hand.
-///
-/// The media type is load-bearing here. `WebAssembly.compileStreaming` and
-/// `instantiateStreaming` reject any response that does not carry exactly
-/// `application/wasm`, so a module served as `application/octet-stream` fails
-/// to instantiate even though the bytes are correct.
+/// Wrap a value convertible into [`Body`] to return it with
+/// `Content-Type: application/wasm`. This media type is required by the
+/// browser's streaming WebAssembly APIs.
 ///
 /// # Examples
 ///

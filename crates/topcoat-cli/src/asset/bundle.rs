@@ -42,14 +42,8 @@ pub(super) async fn run(args: BundleArgs) {
 /// Bundle the assets embedded in `exe` (already read into `bytes`), writing
 /// them to `out_override` or to an `assets` directory next to `exe`.
 ///
-/// The default is tied to the executable rather than to the target directory
-/// because an [`AssetId`](topcoat_asset::AssetId) can depend on the cargo
-/// profile: a build script writing into `OUT_DIR` puts
-/// `target/<profile>/build/...` in the asset path the ID hashes. A single
-/// shared bundle directory would let a `dev` bundle shadow a `release` one,
-/// leaving the other binary unable to resolve its own assets.
-/// [`AssetBundle::load`](topcoat_asset::AssetBundle::load) looks next to the
-/// executable first, so each profile finds the bundle built from it.
+/// Keep the bundle with the executable it was built from. Different builds
+/// can declare different asset IDs even when their file contents match.
 pub(crate) async fn run_bundle(
     exe: &Path,
     bytes: &[u8],

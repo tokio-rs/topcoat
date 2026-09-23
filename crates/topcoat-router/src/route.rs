@@ -28,8 +28,8 @@ pub type RouteFuture<'cx> = Pin<Box<dyn Future<Output = Result<Response>> + Send
 
 /// The identity of a registered handler.
 ///
-/// Ids are drawn from a process-wide counter with [`new`](RouteId::new), so
-/// every handler in an application gets a distinct one.
+/// Create a unique ID with [`new`](RouteId::new) and reuse it for the same
+/// handler.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RouteId(usize);
 

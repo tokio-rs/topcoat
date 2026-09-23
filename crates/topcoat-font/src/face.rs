@@ -6,9 +6,7 @@ use topcoat_core::{context::Cx, fnv1a::Fnv1a};
 
 use crate::{CssString, FontDisplay, FontSources, FontStyle, FontWeightRange, UnicodeRanges};
 
-/// A single CSS `@font-face` rule: a font family backed by one set of sources,
-/// scoped to an optional weight range, style, display strategy, and unicode
-/// range.
+/// A CSS `@font-face` rule describing a font family and its sources.
 ///
 /// Renders as a complete `@font-face { ... }` block, with the optional
 /// descriptors omitted when unset.
@@ -25,10 +23,7 @@ pub struct FontFace {
 impl FontFace {
     /// Creates a face for `family`, served from `src`.
     ///
-    /// The weight, style, display strategy, and unicode range start unset; add
-    /// them with [`with_weight`](Self::with_weight),
-    /// [`with_style`](Self::with_style), [`with_display`](Self::with_display),
-    /// and [`with_unicode_range`](Self::with_unicode_range).
+    /// Optional descriptors start unset. Add them with the `with_*` methods.
     ///
     /// # Panics
     ///

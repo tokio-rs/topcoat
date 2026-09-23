@@ -1,22 +1,9 @@
 //! The `topcoat dev` command: an auto-rebuilding development server.
 //!
-//! Six pieces cooperate, tied together by the event loop in
-//! [`DevCommand::run`]:
-//!
-//! - [`broadcast_server`]: a long-lived local WebSocket server that browsers connect to; it
-//!   broadcasts a reload message whenever a freshly started application reports ready.
-//! - [`watch`]: watches every local package -- workspace members and path dependencies alike -- and
-//!   coalesces bursts of filesystem events into single change notifications.
-//! - [`keyboard`]: reports the `r` keypress that triggers a manual rebuild.
-//! - [`build`]: compiles the application and bundles its assets in a cancellable background task.
-//! - [`app_server`]: the application process itself.
-//! - [`port`]: resolves the host and port the application will bind before each start.
-//!
-//! The loop's core policy is that the running application is only ever
-//! replaced by a *successful* build: while a rebuild is in flight, and after
-//! a failed one, the previous process keeps serving. A successful build that
-//! produced the very same binary also leaves the running process (and its
-//! browsers) undisturbed, unless the rebuild was requested manually.
+//! Rebuilds when local source files change or the user presses `r`.
+//! The running app keeps serving during a build and after failures.
+//! A successful build replaces it only if the binary changed or the user
+//! requested the rebuild manually.
 
 mod app_server;
 mod broadcast_server;

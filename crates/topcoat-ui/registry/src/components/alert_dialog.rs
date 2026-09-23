@@ -6,22 +6,13 @@ use topcoat::{
 
 use super::dialog::dialog;
 
-/// An alert dialog component: a dialog interrupting the page for an answer it
-/// will not go on without.
+/// A dialog that asks the user to make a decision.
 ///
-/// It is the [`dialog`] with the role that says so, which is what has
-/// assistive technology announce it as a question rather than as another
-/// panel. Everything else is the dialog's: build the inside out of
-/// [`dialog_content`](super::dialog::dialog_content),
-/// [`dialog_header`](super::dialog::dialog_header) and the rest, and give the
-/// footer the choice to make. Leave out any way of closing it that is not one
-/// of the answers, since a reader who dismisses the question is left where
-/// they started.
+/// Build its content with the dialog components and provide explicit actions.
+/// Set `aria-labelledby` and `aria-describedby` in `attrs` to the IDs of its
+/// title and description. Attributes are forwarded to the `<dialog>`.
 ///
-/// Naming the panel for assistive technology takes an `aria-labelledby` among
-/// the `attrs` pointing at the title, and an `aria-describedby` pointing at
-/// the description. The `attrs` are otherwise forwarded to the underlying
-/// `<dialog>`.
+/// Like [`dialog`], it needs application scripting for focus trapping.
 ///
 /// ```ignore
 /// view! {

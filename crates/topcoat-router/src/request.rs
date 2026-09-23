@@ -20,15 +20,12 @@ pub type Request<T = Body> = http::Request<T>;
 
 /// A type that can be built from an incoming request.
 ///
-/// A page or route handler may take a single `FromRequest` value as its request
-/// body parameter, optionally alongside `cx: &Cx`. The built-in extractors
-/// ([`Json`](crate::content::Json), [`Form`](crate::content::Form), [`Bytes`],
-/// [`String`], [`Body`], and more) all implement this trait; implement it
-/// yourself for request-specific parsing the built-ins don't cover.
+/// A handler may take one `FromRequest` parameter, optionally alongside
+/// `cx: &Cx`. Implement this trait to define how that parameter reads the
+/// request.
 ///
 /// Because the body is a stream that can only be read once, a handler may have
-/// at most one `FromRequest` parameter. This is the request-side counterpart of
-/// [`IntoResponse`](crate::response::IntoResponse).
+/// at most one `FromRequest` parameter.
 ///
 /// An implementation that buffers the body should delegate the buffering to
 /// [`Bytes`], which enforces the request's
@@ -156,9 +153,7 @@ where
 
 /// Returns the [`Parts`] of the current request.
 ///
-/// Use this when you need access to multiple components of the request at
-/// once. For individual fields, prefer the dedicated accessors
-/// ([`method`], [`uri`], [`version`], [`headers`], [`extensions`]).
+/// Use this when you need several request fields at once.
 ///
 /// # Examples
 ///
@@ -381,12 +376,8 @@ pub(crate) struct OriginalParts(pub(crate) Arc<Parts>);
 /// Returns the [`Parts`] of the request as the client sent it, before any
 /// rewrite or changes made by layers.
 ///
-/// A handler reached through a [`rewrite`](crate::error::rewrite) sees the
-/// rewritten request in [`parts`], which may differ in its URI and method;
-/// this accessor returns the parts the request arrived with. Layers can
-/// also change the current parts without a rewrite. For example,
-/// [`StripPrefixLayer`](crate::StripPrefixLayer) changes the current URI
-/// while leaving the original URI intact.
+/// Use [`parts`] for the current request, including changes made by layers or
+/// rewrites. This accessor keeps the original values.
 ///
 /// # Examples
 ///
@@ -436,9 +427,8 @@ pub fn original_method(cx: &Cx) -> &http::Method {
 ///
 /// A handler reached through a [`rewrite`](crate::error::rewrite) sees the
 /// rewritten URI in [`uri`]; this accessor returns the URI the request
-/// arrived with, for example to render a form that posts back to the visible
-/// URL. Layers such as [`StripPrefixLayer`](crate::StripPrefixLayer) can
-/// also change the current URI without changing this original URI.
+/// arrived with. Use it to render a form that posts back to the visible URL.
+/// Changes made by layers also leave this URI intact.
 ///
 /// [`Uri`]: http::Uri
 ///

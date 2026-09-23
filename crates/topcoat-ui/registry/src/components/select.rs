@@ -6,11 +6,6 @@ use topcoat::{
 };
 
 /// The classes for the native `<select>` inside the [`select`] component.
-///
-/// Sized to match the input control. The native dropdown arrow is suppressed
-/// so the component can draw its own chevron, which keeps the control looking
-/// the same across browsers; the extra right padding reserves the chevron's
-/// space.
 const SELECT: StaticClass = class!(
     "h-9 w-full appearance-none items-center rounded-lg border border-border \
      bg-transparent pr-8 pl-3 text-left text-sm transition-colors outline-none \
@@ -22,14 +17,6 @@ const SELECT: StaticClass = class!(
 /// The classes restyling the drop-down picker, for browsers that support
 /// customizable selects (`appearance: base-select`, set on the `<select>` by
 /// the component's wrapper).
-///
-/// The panel and its option rows take after the dropdown menu's content and
-/// items: the same raised surface, the same ghost-tinted hover and focus
-/// states, and the checked option marked by a checkmark on the row's right
-/// edge: the [`CHECKMARK`] icon, masked over the theme's muted foreground
-/// (see [`checkmark_style`]). The browser's own picker icon is hidden in
-/// favor of the component's chevron. On browsers without support every rule
-/// here is inert and the operating system's picker shows instead.
 const PICKER: StaticClass = class!(
     "[&::picker(select)]:[appearance:base-select] \
      [&::picker(select)]:mt-1 [&::picker(select)]:rounded-lg \
@@ -81,21 +68,15 @@ fn checkmark_style(cx: &Cx) -> String {
     style
 }
 
-/// A select component: a themed native `<select>`.
+/// A themed native select control.
 ///
-/// Child nodes become the `<select>`'s content, typically `<option>` and
-/// `<optgroup>` elements. The `attrs` (such as `name`, `disabled`, or event
-/// handlers) are forwarded to the `<select>`; a `class` among them is appended
-/// to the wrapping element's classes, so width utilities size the whole
-/// control. Like the input, it fills its container by default.
-/// Set `aria-invalid="true"` to use the error border and focus ring.
-/// For a styled group heading, add a `<legend>` as the first child of the
-/// `<optgroup>`. Keep its `label` attribute for native picker fallbacks.
+/// Provide `<option>` and `<optgroup>` children. Attributes are forwarded to
+/// the `<select>`, while classes are appended to the wrapper. It fills its
+/// container by default. Set `aria-invalid="true"` to show its error styling.
 ///
-/// On browsers with customizable select support the drop-down picker is
-/// restyled to match the dropdown menu component, and the chevron flips while
-/// it is open; other browsers keep the operating system's picker. The control
-/// itself looks the same everywhere.
+/// Browsers with customizable select support use a styled picker. Others use
+/// the native picker. For a styled group heading, put a `<legend>` first in the
+/// `<optgroup>` and retain its `label` attribute for the native fallback.
 ///
 /// ```ignore
 /// view! {

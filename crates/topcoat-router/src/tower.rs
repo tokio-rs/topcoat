@@ -27,15 +27,14 @@ use crate::{
 
 /// A [`Route`] that forwards its requests to a tower service.
 ///
-/// This adapter mounts a whole tower application (an axum router, a hyper
-/// service, a reverse proxy) as a route in a topcoat router, typically while
-/// migrating an existing application to topcoat one route at a time.
-/// Registered with [`any`](Self::any) at a catch-all path, it hands an entire
-/// URL subtree to the service. The adapter forwards the URI provided by the
-/// surrounding layers. To make paths relative to a mount point, register a
-/// [`StripPrefixLayer`](crate::StripPrefixLayer) for the route. A catch-all
-/// segment does not match the bare prefix itself, so register a second
-/// `TowerRoute` for the prefix if the service also serves that URL.
+/// Mount a service at a path with [`new`](Self::new), or at a catch-all path
+/// with [`any`](Self::any) to forward a URL subtree. The service receives
+/// the URI after surrounding layers have processed it. Use
+/// [`StripPrefixLayer`](crate::StripPrefixLayer) for paths relative to the
+/// mount point.
+///
+/// A catch-all does not match the bare prefix. Register that path separately
+/// if the service needs to handle it.
 ///
 /// The service must be `Clone`, `Send`, and `Sync`; wrap a service that is
 /// not `Sync` in `tower::buffer`. Its per-request clones share cross-request
@@ -153,11 +152,8 @@ where
 /// A [`Layer`] that wraps request handling in a [`tower::Layer`]'s
 /// middleware.
 ///
-/// This adapter runs middleware from the tower ecosystem (a timeout, a rate
-/// limit, CORS, compression) inside a topcoat router. The middleware behaves
-/// as it would in a plain tower stack: its state (a concurrency-limit
-/// semaphore, a rate-limit window) is shared across requests, and changes it
-/// makes to the request are seen by the layers and route it wraps.
+/// The middleware shares its state across requests. Changes it makes to a
+/// request are visible to the layers and route it wraps.
 ///
 /// The middleware's service must be `Clone`, `Send`, and `Sync`; wrap a
 /// service that is not `Sync` in `tower::buffer`. To run several tower
@@ -498,12 +494,9 @@ fn recover(error: BoxError) -> Error {
 
 /// A tower service dispatching every request to a topcoat [`Router`].
 ///
-/// This adapter is the opposite of [`TowerRoute`]: it serves a whole topcoat
-/// router inside a tower application (an axum router, a hyper server, a tower
-/// middleware stack), typically to embed a topcoat application in one that
-/// owns the HTTP server. The service accepts a request with any body yielding
-/// [`Bytes`] and never errors; the router renders every failure, including a
-/// handler panic, as a response.
+/// Use this when another application owns the HTTP server. The service accepts
+/// bodies yielding [`Bytes`] and returns handler errors and panics as HTTP
+/// responses.
 ///
 /// The service is `Clone`, `Send`, `Sync`, and infallible, satisfying the
 /// bounds tower servers commonly require. Clones are cheap and share the

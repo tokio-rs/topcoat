@@ -1,19 +1,14 @@
 //! A small `const` [FNV-1a] hasher.
 //!
-//! This is not a cryptographic hash; it exists to fold a handful of build
-//! inputs (crate names, paths, options, font settings, ...) into a compact,
-//! stable id at compile time, so derived URLs and identifiers stay
-//! cache-friendly and collision-free across builds.
+//! Produces deterministic hashes at compile time. It is not cryptographic,
+//! and different inputs can have the same hash.
 //!
 //! [FNV-1a]: https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
 
 /// A `const` [FNV-1a] hasher over a `u64` or `u128` state.
 ///
-/// [`new`](Self::new) starts a hash at the offset basis, [`write`](Self::write)
-/// folds a run of bytes in, and [`finish`](Self::finish) takes the value out.
-/// Every step moves the hasher, so a running hash threads through a chain of
-/// calls and cannot fork by accident. Separate runs whose boundaries matter
-/// with a delimiter so distinct inputs cannot collide by concatenation.
+/// Chain [`write`](Self::write) calls, then read the hash with
+/// [`finish`](Self::finish). Use delimiters when input boundaries matter.
 ///
 /// ```
 /// use topcoat_core::fnv1a::Fnv1a;

@@ -46,28 +46,14 @@ macro_rules! impl_push_primitive {
     };
 }
 
-/// A context-carrying writer over an instruction buffer, created per
-/// position.
+/// Writes view parts with the escaping rules for their HTML position.
 ///
-/// The `view!` macro creates a `PartsWriter` for each dynamic position it
-/// fills and hands it to the matching position trait:
-/// [`NodeViewParts`](crate::NodeViewParts),
-/// [`AttributeValueViewParts`](crate::AttributeValueViewParts),
-/// [`AttributeKeyViewParts`](crate::AttributeKeyViewParts),
-/// [`ElementNameViewParts`](crate::ElementNameViewParts), or
-/// [`AttributeViewParts`](crate::AttributeViewParts).
+/// Use the `push_*` methods when implementing a trait that renders a value
+/// in a template. Text is escaped or validated for this writer's
+/// [`HtmlContext`]. The `push_*_unescaped` methods bypass that protection
+/// and require trusted content.
 ///
-/// Implementations of those traits make a value renderable by pushing it
-/// through the `push_*` methods, which seal the pushed text with the
-/// [`HtmlContext`] of the position so rendering escapes or validates it
-/// correctly, or by delegating to another implementation of the same
-/// position trait. The `push_*_unescaped` methods are the only way to opt
-/// out of that protection.
-///
-/// The writer also accumulates a size hint: an estimate of the number of
-/// bytes everything pushed so far will write when rendered. The estimate
-/// becomes the built view's size hint, which pre-allocates the output buffer
-/// at render time.
+/// The size hint estimates the number of bytes the parts will render.
 pub struct PartsWriter<'a> {
     sink: Sink<'a>,
     context: HtmlContext,

@@ -172,11 +172,8 @@ impl Default for Compression {
 pub enum CompressionLevel {
     /// The fastest quality, usually producing the biggest output.
     Fastest,
-    /// A speed-leaning quality suited to compressing responses on the fly.
-    ///
-    /// This is deliberately not each algorithm's own default: brotli's is its
-    /// highest quality, tuned for compressing assets ahead of time, and far
-    /// too slow to run per response.
+    /// A balance of speed and size suited to compressing responses as they
+    /// are sent.
     #[default]
     Balanced,
     /// The best quality, usually producing the smallest output. With brotli

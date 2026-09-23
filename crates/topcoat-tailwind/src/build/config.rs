@@ -48,10 +48,7 @@ impl BuildConfig {
     /// Where the Tailwind CLI executable comes from. Defaults to downloading
     /// [`DEFAULT_VERSION`](crate::build::DEFAULT_VERSION) from GitHub.
     ///
-    /// [`version`](Self::version), [`version_checksum`](Self::version_checksum),
-    /// [`executable`](Self::executable), and
-    /// [`executable_env`](Self::executable_env) are shorthands for the
-    /// individual variants; the most recent call wins.
+    /// Setting the executable source replaces any earlier choice.
     #[must_use]
     pub fn executable_source(mut self, executable_source: ExecutableSource) -> Self {
         self.executable_source = executable_source;
@@ -134,15 +131,10 @@ impl BuildConfig {
     /// [`output`](Self::output) paths. Defaults to `$CARGO_MANIFEST_DIR`
     /// (the package root).
     ///
-    /// Tailwind's automatic source detection walks every file under this
-    /// directory that is not matched by `.gitignore`. That makes the ignore
-    /// file load-bearing: Cargo's generated `.gitignore` excludes `target/`,
-    /// but in a checkout without one the walk descends into build artifacts,
-    /// which is slow and resurrects class names from previous builds. If the
-    /// build environment cannot guarantee an ignore file, scope the scan
-    /// down (e.g. `.cwd("src")`), or disable directory scanning entirely
-    /// with a custom [`input`](Self::input) that uses
-    /// `@import "tailwindcss" source(none)` and explicit `@source` globs.
+    /// Keep build artifacts out of the scan with `.gitignore`, or limit the
+    /// directory, for example with `.cwd("src")`. For explicit source paths,
+    /// use a custom [`input`](Self::input) with
+    /// `@import "tailwindcss" source(none)` and `@source` directives.
     #[must_use]
     pub fn cwd(mut self, cwd: impl Into<PathBuf>) -> Self {
         self.cwd = Some(cwd.into());

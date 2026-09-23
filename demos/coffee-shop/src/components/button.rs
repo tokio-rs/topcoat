@@ -24,16 +24,6 @@ pub enum ButtonVariant {
 
 impl ButtonVariant {
     /// The Tailwind classes for this variant.
-    ///
-    /// Hover and press states apply the fill or foreground color at reduced
-    /// opacity, so they hold up in both color schemes without `dark:`
-    /// overrides. Variants with a resting fill cast the theme's control
-    /// shadow. Outline and ghost buttons have no shadow.
-    ///
-    /// Each variant sets its own border color rather than inheriting a
-    /// transparent one from [`BASE`]: with two border-color classes on the
-    /// same element, stylesheet order (not class order) would decide the
-    /// winner.
     fn classes(self) -> StaticClass {
         match self {
             Self::Primary => class!(
@@ -78,9 +68,6 @@ pub enum ButtonSize {
 
 impl ButtonSize {
     /// The Tailwind classes for this size.
-    ///
-    /// Sizes change the control's dimensions while keeping the text size
-    /// consistent.
     fn classes(self) -> StaticClass {
         match self {
             Self::Sm => class!("h-8 gap-1.5 rounded-md px-3"),
@@ -92,9 +79,6 @@ impl ButtonSize {
 }
 
 /// The classes shared by every button, regardless of variant or size.
-///
-/// Every button carries a border (colored per variant) so that the `Outline`
-/// variant, which only recolors it, does not change the button's dimensions.
 const BASE: StaticClass = class!(
     "inline-flex shrink-0 items-center justify-center border \
      text-sm font-medium whitespace-nowrap transition-colors outline-none select-none \
@@ -122,13 +106,11 @@ pub fn button_variants(
     class!(BASE, variant.classes(), size.classes())
 }
 
-/// A button component.
+/// A button with configurable styling.
 ///
-/// The `variant` and `size` parameters select the styling, defaulting to
-/// `Primary` and `Md`. The `attrs` (such as `class`, `type`, `disabled`, or
-/// event handlers) are forwarded to the underlying `<button>`; a `class` among
-/// them is appended to the computed classes. Child nodes become the button's
-/// content.
+/// `variant` defaults to `Primary`, and `size` defaults to `Md`. Attributes
+/// are forwarded to the `<button>`, and classes are appended. Child content
+/// supplies the button's label.
 ///
 /// ```ignore
 /// view! {

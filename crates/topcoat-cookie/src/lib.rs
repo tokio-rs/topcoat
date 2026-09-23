@@ -29,10 +29,9 @@ use topcoat_core::context::{Cx, app_context, request_context};
 
 /// A request-scoped cookie jar.
 ///
-/// `Cookies` is implemented by the root [`CookieJar`] and by every adapter
-/// ([`SignedJar`], [`PrivateJar`], [`Prefixed`], [`Map`]). The three core
-/// methods read and write cookies; the combinators wrap the jar in further
-/// adapters, in the style of [`Iterator`].
+/// Read cookies with [`get`](Self::get), or queue changes with
+/// [`add`](Self::add) and [`remove`](Self::remove). Configure a jar with the
+/// provided methods to apply protection and attributes to its cookies.
 ///
 /// Bring this trait into scope to use the combinators.
 pub trait Cookies {

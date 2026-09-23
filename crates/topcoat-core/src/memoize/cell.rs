@@ -12,10 +12,8 @@ use crate::context::{ContextRead, Cx, RequestContext};
 /// One cached result together with the request context reads that produced
 /// it.
 ///
-/// A variant is reusable for a caller whose scope still resolves every
-/// recorded read to the binding that was observed. A body that read no
-/// request context has an empty read list, so its variant is reusable from
-/// every scope.
+/// Reusable when every recorded read matches the caller's scope. A result
+/// with no recorded reads can be reused in any scope.
 struct Variant<V> {
     value: V,
     reads: Vec<ContextRead>,
@@ -42,9 +40,7 @@ impl<V> Variant<V> {
 /// The variants computed for one `(function, arguments)` entry, one per set
 /// of context bindings the body was observed under.
 struct Variants<V> {
-    /// The first variant is held inline. An entry rarely gets a second one, so
-    /// the lookup that matters reads it through an atomic load, without taking
-    /// the lock the list below needs or boxing the variant.
+    /// The first result, readable without locking the remaining variants.
     first: OnceLock<Variant<V>>,
     /// Further variants are boxed so their addresses stay stable while the
     /// list grows, letting the cell hand out `&V` references tied to the cache.

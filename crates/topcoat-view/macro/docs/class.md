@@ -1,4 +1,4 @@
-The [`class!`] macro builds a [`topcoat::view::Class`] value: a space-separated list of HTML classes assembled from individual entries.
+The [`class!`] macro joins HTML classes with spaces and returns a [`topcoat::view::Class`] value.
 
 Use it in the value position of a `class` attribute when the list mixes static and conditional parts:
 
@@ -43,11 +43,11 @@ Ok(view! {
 # }
 ```
 
-An entry can be any value implementing [`ClassViewParts`]: string types, `Option`s of them, a `Vec` or array of entries, another [`Class`], or a captured attribute value ([`AttributeValue`]) taken from an [`Attributes`] collection. Implement the trait for your own types to use them as entries.
+Entries can be strings or collections of entries, as shown above. Implement [`ClassViewParts`] to use your own type as an entry.
 
 # Absent entries
 
-An absent entry is skipped without leaving a leftover space: `None`, empty strings, and entries whose condition is false contribute neither text nor a separator. When every entry is absent, the surrounding element omits the whole `class` attribute:
+`None`, empty strings, and entries whose condition is false are skipped without adding a space. When every entry is absent, the whole `class` attribute is omitted:
 
 ```rust
 # #[topcoat::view::component]
@@ -65,7 +65,7 @@ Ok(view! {
 
 # Static class lists
 
-Use `class!` for a class list that never changes too. It renders faster than the same string written as a `&'static str` constant:
+Use [`StaticClass`] to store a class list made only of string literals in a constant:
 
 ```rust
 use topcoat::view::{StaticClass, class};
@@ -73,12 +73,9 @@ use topcoat::view::{StaticClass, class};
 const BUTTON: StaticClass = class!("btn btn-lg rounded");
 ```
 
-A `class!` value takes its type from its entries. A list of literals always has the same one, named by [`StaticClass`]; anything else is only practical to hold in a `let` binding, whose type is inferred.
+A class list's type depends on its entries. For other lists, let Rust infer the type with a `let` binding.
 
-[`Attributes`]: struct.Attributes.html
-[`Class`]: struct.Class.html
 [`StaticClass`]: type.StaticClass.html
 [`ClassViewParts`]: trait.ClassViewParts.html
-[`AttributeValue`]: enum.AttributeValue.html
 [`class!`]: macro.class.html
 [`topcoat::view::Class`]: struct.Class.html

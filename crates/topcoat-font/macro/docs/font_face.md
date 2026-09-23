@@ -10,7 +10,7 @@ font_face! {
 # }
 ```
 
-Literal values are validated at compile time: weights outside `100..=900`, malformed angles, code points beyond `U+10FFFF`, and unknown `format()` or `tech()` keywords are all rejected before your program builds.
+Literal descriptor values are checked at compile time. The accepted values are described below.
 
 # Descriptors
 

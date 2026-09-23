@@ -25,9 +25,8 @@ where
 {
     /// Borrows the current value.
     ///
-    /// Reads inside a runtime expression are the client-reactive path and
-    /// do not register a dependency on the server; the server-side
-    /// evaluation only records whether the expression needs a browser binding.
+    /// Changes update the runtime expression in the browser without
+    /// triggering a server render.
     #[must_use]
     pub fn read(&self) -> <&T as Surrogated>::Surrogate {
         self.0.read_untracked().into_surrogate()
@@ -108,10 +107,7 @@ numeric_signal!(
 impl SignalSurrogate<String> {
     /// Appends a string to the end of the value.
     ///
-    /// The argument is anything that dereferences to a string, so both a
-    /// borrowed `&str` and an owned `String` work. The owned form is what an
-    /// event field yields: `Event::target.value` is a `String`, so
-    /// `message.push_str(e.target.value)` is the common call.
+    /// Accepts any value that dereferences to a string.
     ///
     /// # Panics
     ///
@@ -151,12 +147,9 @@ impl<T> Serialize for SignalSurrogate<T> {
     }
 }
 
-/// A signal sent by the client, as an argument to a run: its id next to its
-/// current value.
+/// A signal argument containing its id and current value.
 ///
-/// The value is required. A run cannot read a signal it has no value for,
-/// so a client that sends only the id is rejected the same way as one that
-/// sends a value of the wrong shape.
+/// Both fields are required to resume the signal on the server.
 impl<'de, T> Deserialize<'de> for SignalSurrogate<T>
 where
     T: Surrogated,

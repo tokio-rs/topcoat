@@ -1,17 +1,10 @@
-//! Hoisted parts: content a body pushes while it runs, emitted ahead of the
-//! content the enclosing view resolves next.
+//! Content prepended to an enclosing view's next output.
 //!
-//! A body sometimes produces markup that belongs at the start of its
-//! content rather than at the point the body reached: a marker declaring
-//! state, say, that has to come before everything reading it. [`hoist`]
-//! takes such a part while a body runs, and the [`HoistView`] around the
-//! body prepends everything hoisted to the next content it resolves: its
-//! first content, or the replacement of a later swap.
+//! Call [`hoist`] while a [`HoistView`] renders to prepend content to its
+//! next output. This can be its first content or a later replacement.
 //!
-//! The collecting view travels through a thread local installed for exactly
-//! the duration of each poll, the way an identity does, so views that
-//! interleave on one task never collect each other's parts, and a part goes
-//! to the innermost view collecting when it is hoisted.
+//! Nested views collect their own parts. Collection does not extend to
+//! work spawned on another task.
 
 use std::{
     cell::Cell,
@@ -33,9 +26,8 @@ type HoistedPart = Box<dyn FnOnce(&mut PartsWriter<'_>) + Send>;
 
 /// The key of a part hoisted at most once per content.
 ///
-/// A key is the 128-bit hash of any hashable value. Parts of different
-/// kinds keep their keys apart by hashing something that names the kind
-/// next to the id, such as a type id or a tag string.
+/// Include a type or tag in the key when unrelated kinds of content could
+/// otherwise use the same value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HoistKey(u128);
 
@@ -81,9 +73,8 @@ thread_local! {
 ///
 /// # Panics
 ///
-/// Panics if no view is collecting hoisted parts, which is the case outside
-/// a page, layout, component, or shard body, and inside work those bodies
-/// spawn onto another task.
+/// Panics unless an enclosing [`HoistView`] is being polled. The collection
+/// is not available to work spawned on another task.
 #[track_caller]
 pub fn hoist(build: impl FnOnce(&mut PartsWriter<'_>) + Send + 'static) {
     with_collecting(|hoisted| hoisted.parts.push(Box::new(build)));

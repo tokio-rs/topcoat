@@ -8,10 +8,8 @@ thread_local!(static TOKEN: u8 = const { 0 });
 
 /// Detects reentry into an initializer from the call stack or poll already running it.
 ///
-/// A memoized value is produced once, so a nested call for the same key would wait on a result
-/// only the waiting caller can produce. Reporting that as a panic keeps it from surfacing as a
-/// hang. Callers reaching the same key from another thread or task are ordinary concurrency and
-/// are left to wait.
+/// Panics when a nested call would wait for its own result. Calls from other
+/// threads or tasks may wait for the active initializer.
 #[derive(Default)]
 pub(super) struct Guard {
     // This is recursion metadata, not the initialization lock. `OnceLock::get_or_init` and

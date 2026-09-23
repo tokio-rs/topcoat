@@ -1,5 +1,4 @@
-//! Tracking of request context reads, backing `#[memoize]`'s dependency
-//! checks.
+//! Records request context reads and checks whether they still match a scope.
 
 use std::{
     any::{Any, TypeId},
@@ -12,10 +11,8 @@ use crate::context::{BindingId, RequestContext};
 /// identity of the binding it resolved to, or `None` if no value was
 /// registered.
 ///
-/// A read stays valid for a context as long as that context resolves the same
-/// type to the same binding. Scopes only ever add or shadow bindings, so a
-/// read is invalidated in exactly one of two ways: a present read by
-/// shadowing the type, an absence read by registering it.
+/// A read matches a scope when the type resolves to the same binding,
+/// including when both lookups find no value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ContextRead {
     type_id: TypeId,
@@ -43,12 +40,9 @@ impl ContextRead {
 
 /// Records the request context reads made through one tracked call.
 ///
-/// A tracker is installed on a [`Cx`] handle with [`Cx::track`] and travels
-/// with every handle derived from it, including clones moved to other
-/// threads. Each read is checked against the scope the tracked call was
-/// entered with: a read that resolves differently there went through a
-/// binding the tracked body created itself, which its caller cannot see, so
-/// it is not a dependency and is dropped.
+/// [`Cx::track`] installs a tracker on a context and its descendants.
+/// Only reads that match the entry scope are retained. Values registered
+/// inside the tracked call are not dependencies of its caller.
 ///
 /// [`Cx`]: crate::context::Cx
 /// [`Cx::track`]: crate::context::Cx::track
@@ -77,11 +71,8 @@ impl ContextTracker {
     /// Records every read in `reads` that passes the entry filter, skipping
     /// reads already recorded.
     ///
-    /// Replaying a nested tracked call's reads through this re-expresses them
-    /// relative to this tracker's own entry scope: a read whose value was
-    /// shadowed after tracking started resolves through a binding the tracked
-    /// call created itself, so it is not a dependency and is dropped, even
-    /// where it was a genuine dependency of the nested call.
+    /// Reads from nested calls are checked against this tracker's entry
+    /// scope. Values registered after this tracker started are excluded.
     pub(crate) fn merge(&self, reads: &[ContextRead]) {
         // A body that read no request context has nothing to contribute, and is
         // common enough to be worth keeping off the lock.
@@ -97,10 +88,6 @@ impl ContextTracker {
     }
 
     /// Returns the reads recorded so far, leaving the tracker empty.
-    ///
-    /// Called once, when the tracked call is done and its reads are handed to
-    /// the variant they belong to, so the recorded reads are moved out rather
-    /// than copied.
     pub(crate) fn take_reads(&self) -> Vec<ContextRead> {
         std::mem::take(&mut *self.reads.lock().expect("context tracker lock poisoned"))
     }

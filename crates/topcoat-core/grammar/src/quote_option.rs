@@ -3,16 +3,10 @@ use std::ops::{Deref, DerefMut};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 
-/// A newtype wrapper around `Option<T>` that implements [`ToTokens`] by
-/// preserving the `Option` in the generated token stream.
+/// Quotes an `Option<T>` with its `Some` or `None` wrapper intact.
 ///
-/// The default `ToTokens` impl for `Option<T>` emits nothing for `None` and
-/// emits the inner value directly for `Some`. `QuoteOption` instead quotes
-/// `Some(value)` as `::core::option::Option::Some(value)` and `None` as
-/// `::core::option::Option::None`, so the resulting code still contains an
-/// `Option`.
-///
-/// Implements `Deref`/`DerefMut` to `Option<T>` for ergonomic access.
+/// Emits fully qualified `::core::option::Option` variants. The wrapped
+/// value remains accessible through `Deref` and `DerefMut`.
 #[allow(unused)]
 pub struct QuoteOption<T>(Option<T>);
 

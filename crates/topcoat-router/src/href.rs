@@ -391,7 +391,7 @@ fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bo
     true
 }
 
-/// Turns a page or route into an URL string.
+/// Builds a URL for a page or route.
 ///
 /// The first parameter, `target`, is the route handler the URL should be
 /// pointing to. The URL is built from the path the handler is mounted at, so
@@ -408,13 +408,9 @@ fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bo
 /// percent-encoded, so a parameter declared with a type, like
 /// `path_param!(post_id: u64)`, needs that type to implement [`Display`].
 ///
-/// The result can be extended with a [`query`](Href::query) string, a
-/// [`fragment`](Href::fragment), and an [`absolute`](Href::absolute) or
-/// [`relative`](Href::relative) form. Use it directly in a view to render
-/// the URL, or call [`resolve`](Href::resolve) to get the string, e.g. for
-/// a redirect. [`is_current`](Href::is_current) tells whether the URL points
-/// at the page the current request is serving, e.g. to mark the link to it in
-/// a nav.
+/// Use the returned [`Href`] in a view, or call [`resolve`](Href::resolve) to
+/// get a string. Its methods let you add query parameters and configure how
+/// the URL is rendered.
 ///
 /// ```
 /// use serde::Serialize;
@@ -460,7 +456,7 @@ where
     }
 }
 
-/// Turns a page or route into an URL string.
+/// Builds a URL for a page or route.
 ///
 /// The first argument is the route handler the URL should be pointing to.
 /// The URL is built from the path the handler is mounted at, so it stays in
@@ -476,13 +472,8 @@ where
 /// a type, like `path_param!(post_id: u64)`, needs that type to implement
 /// [`Display`].
 ///
-/// The result can be extended with a [`query`](Href::query) string, a
-/// [`fragment`](Href::fragment), and an [`absolute`](Href::absolute) or
-/// [`relative`](Href::relative) form. Use it directly in a view to render
-/// the URL, or call [`resolve`](Href::resolve) to get the string, e.g. for
-/// a redirect. [`is_current`](Href::is_current) tells whether the URL points
-/// at the page the current request is serving, e.g. to mark the link to it in
-/// a nav.
+/// Use the returned [`Href`] in a view, or call [`resolve`](Href::resolve) to
+/// get a string. See [`Href`] for query parameters and URL formatting.
 ///
 /// ```
 /// use serde::Serialize;
@@ -531,8 +522,7 @@ where
 /// }
 /// ```
 ///
-/// The macro is a thin wrapper around the [`href`] function, which takes the
-/// parameters as a tuple instead.
+/// Use the [`href`] function to pass parameters as a tuple.
 #[macro_export]
 macro_rules! href {
     // A bare path names the marker a `#[page]` or `#[route]` expands to, and is

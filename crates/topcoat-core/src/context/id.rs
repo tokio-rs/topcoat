@@ -3,10 +3,10 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-/// A unique identifier for a [`Cx`].
+/// An identifier for the request shared by a [`Cx`] and its child contexts.
 ///
-/// Every [`Cx`] is assigned a distinct `CxId` when it is created, making it
-/// cheap to compare and hash. Retrieve a context's id with [`Cx::id`].
+/// Cloning a context or adding a scoped value preserves its ID. Retrieve it
+/// with [`Cx::id`].
 ///
 /// [`Cx`]: crate::context::Cx
 /// [`Cx::id`]: crate::context::Cx::id
@@ -31,9 +31,6 @@ impl Default for CxId {
 ///
 /// A fresh `BindingId` is issued whenever a value is registered on a request
 /// context, so equal ids always refer to the same value.
-///
-/// Ids start at one so that `Option<BindingId>`, the shape a recorded read
-/// stores, is the size of a bare id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct BindingId(NonZeroU64);
 

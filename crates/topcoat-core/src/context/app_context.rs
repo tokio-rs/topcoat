@@ -1,15 +1,12 @@
-//! Type-keyed values registered once at startup and shared across every
-//! request handled by the router.
+//! Values shared across requests and looked up by type.
 
 use std::any::{Any, type_name};
 
 use crate::context::Cx;
 
-/// Returns a reference to the app context value of type `T` registered on the
-/// router, or `None` if no such value has been registered.
+/// Borrows the app context value of type `T`, or returns `None` if it is missing.
 ///
-/// The lookup is keyed by `T`'s [`TypeId`](std::any::TypeId), so each type may
-/// have at most one registered value.
+/// The requested type must exactly match the registered type.
 ///
 /// # Examples
 ///
@@ -30,11 +27,9 @@ where
     cx.state.shared.app_context.get::<T>()
 }
 
-/// Returns a reference to the app context value of type `T` registered on the
-/// router.
+/// Borrows the app context value of type `T`.
 ///
-/// The lookup is keyed by `T`'s [`TypeId`](std::any::TypeId), so each type may have at most one
-/// registered value.
+/// The requested type must exactly match the registered type.
 ///
 /// # Panics
 ///
@@ -71,13 +66,10 @@ where
     }
 }
 
-/// The type-keyed values shared by every request.
+/// Values shared across requests and looked up by type.
 ///
-/// Each registered value is stored under its [`TypeId`](std::any::TypeId), so a
-/// given type can only be registered once. An `AppContext` is assembled once at
-/// startup and then shared read-only across every request handled by the
-/// router; within a request, values are retrieved with [`app_context`] or
-/// [`try_app_context`].
+/// Holds one value per type. Build the collection before sharing it with
+/// requests, which borrow its values through [`app_context`].
 #[derive(Default, Debug)]
 pub struct AppContext {
     entries: anymap3::Map<dyn Any + Send + Sync>,
@@ -90,11 +82,8 @@ impl AppContext {
         Self::default()
     }
 
-    /// Registers `value` under its concrete type `T`, returning the value
-    /// previously registered for `T`, if any.
-    ///
-    /// A type can hold only one value at a time, so registering a type that is
-    /// already present replaces it and hands back the displaced value.
+    /// Registers `value` under its type, replacing and returning any previous
+    /// value of that type.
     pub fn insert<T>(&mut self, value: T) -> Option<T>
     where
         T: Any + Send + Sync,

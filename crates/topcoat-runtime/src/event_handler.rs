@@ -7,9 +7,7 @@ pub trait EventHandlerFn {}
 
 impl<T, R> EventHandlerFn for T where T: FnOnce(Event) -> R {}
 
-/// An event handler attribute. Emits a JavaScript closure expression into a
-/// `data-topcoat-on:<event>` attribute on the element. The browser scanner
-/// wraps it in `new Function('__cx', ...)` to obtain a real handler.
+/// An attribute that runs a closure when a browser event fires.
 pub struct EventHandler<K, F> {
     key: K,
     value: Expr<F>,

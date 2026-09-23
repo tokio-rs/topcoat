@@ -1,4 +1,4 @@
-Expands to one icon of a staged [Iconify] icon set as a const-evaluable [`IconData`] expression.
+Returns one icon from a staged [Iconify] set as an [`IconData`] value. The result can be stored in a constant.
 
 ```rust,ignore
 use topcoat::icon::IconData;
@@ -33,7 +33,7 @@ fn main() {
 
 # Whole sets
 
-To include many icons at once, reach for [`include!`], which expands a whole set, or a single icon, to named `const` items.
+Use [`include!`] to declare named constants for a set's icons.
 
 [Iconify]: https://iconify.design/
 [`IconData`]: ../struct.IconData.html

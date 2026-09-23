@@ -3,18 +3,14 @@ use topcoat::{
     view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
-/// A tooltip component: a hint that shows while its trigger is hovered or
-/// focused.
+/// A short hint shown when its trigger is hovered or focused.
 ///
-/// Child nodes are the trigger and the [`tooltip_content`] holding the hint.
-/// The hint shows on hover and on keyboard focus, both of which are the
-/// browser's own doing, so nothing here needs scripting. It also never moves
-/// out of the way of the viewport's edge, which does: keep hints short, and
-/// give the content a side that has room.
+/// Provide a trigger followed by `tooltip_content`. It uses CSS and does not
+/// reposition itself near viewport edges, so keep the text short and allow
+/// space around the trigger.
 ///
-/// The hint is only a hint. Say what the trigger does in the trigger itself,
-/// through its text or an `aria-label`, since a reader who never hovers will
-/// not meet the tooltip at all.
+/// Give the trigger its own text or accessible label. The tooltip must not be
+/// the only way to understand the control.
 ///
 /// ```ignore
 /// view! {
@@ -44,19 +40,6 @@ pub async fn tooltip(
 }
 
 /// The classes for the [`tooltip_content`] bubble.
-///
-/// The bubble is painted in the foreground color on the background one, the
-/// reverse of the page, which is what sets a hint apart from the surface it
-/// covers. It sits above the trigger, centered on it, and takes no pointer
-/// events, so hovering along the way to it never gets in the way of what is
-/// underneath.
-///
-/// It fades in on hover and on focus within the trigger, and the visibility
-/// that keeps it out of the way in between is named in the transition with
-/// `allow-discrete`: it has no in-between values, so without that it would
-/// snap and the fade would play against a hint that is already gone. Naming
-/// both properties one by one is what makes that work; `all` does not carry
-/// the visibility along.
 const BUBBLE: StaticClass = class!(
     "pointer-events-none invisible absolute bottom-full left-1/2 z-50 mb-2 \
      -translate-x-1/2 rounded-md bg-foreground px-2.5 py-1 text-xs font-medium text-background \

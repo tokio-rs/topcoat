@@ -27,14 +27,10 @@ impl BundledAsset {
 /// The mapping from [`AssetId`]s to their bundled filenames and content
 /// types.
 ///
-/// This is the part of an asset bundle needed to resolve asset URLs, without
-/// the bundled files themselves. An [`AssetConfig`](crate::AssetConfig)
-/// carries the catalog its asset URLs resolve through.
+/// Resolves asset metadata without loading the bundled files.
 ///
-/// An [`AssetBundle`](crate::AssetBundle) carries the catalog of the bundle
-/// directory it loaded, and a [`Manifest`] converts into the catalog it
-/// describes, for setups where only the manifest is available (e.g. embedded
-/// into the binary on targets without filesystem access, like WebAssembly).
+/// Obtain a catalog from a loaded [`AssetBundle`](crate::AssetBundle) or
+/// convert a [`Manifest`] into one.
 #[derive(Debug, Default, Clone)]
 pub struct AssetCatalog {
     bundled_assets: HashMap<AssetId, BundledAsset>,

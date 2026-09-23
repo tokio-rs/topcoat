@@ -17,20 +17,14 @@ use crate::{
     memoize::MemoizeCache,
 };
 
-/// The request context.
+/// Access to the current request and its shared values.
 ///
-/// Pages, layouts, components, and routes can take `cx: &Cx` as an optional
-/// parameter when they need request-scoped information; Topcoat passes it
-/// automatically. Use it to read values registered for the request with the
-/// app and request context helpers, such as [`app_context`] and
-/// [`request_context`].
+/// Use [`app_context`] to read values shared across requests and
+/// [`request_context`] to read values in the current request scope.
 ///
-/// A `Cx` is a handle to state shared by everything serving the same request.
-/// [`with`](Self::with) and [`with_many`](Self::with_many) derive a child
-/// handle whose request context holds additional values, leaving the parent
-/// untouched. Cloning a handle is cheap; work that outlives the handler, such
-/// as a streaming response body or a WebSocket task, should move an owned clone into
-/// the work.
+/// [`with`](Self::with) creates a child context with an additional value
+/// without changing the parent. Cloning a `Cx` is cheap and keeps its values
+/// available for work that outlives the handler.
 #[derive(Debug, Default, Clone)]
 pub struct Cx {
     /// The state shared by handles in the same context scope.
@@ -40,8 +34,7 @@ pub struct Cx {
 }
 
 impl Cx {
-    /// Creates the context for one request over the shared app context, with an
-    /// empty request context.
+    /// Creates a context with the given app context and no request values.
     #[must_use]
     pub fn new(app_context: Arc<AppContext>) -> Self {
         Self::from_parts(app_context, RequestContext::new())
@@ -114,13 +107,11 @@ impl Cx {
         self.state.tracker.as_deref()
     }
 
-    /// Returns a child handle whose request context also holds `value`.
+    /// Returns a child context with `value` registered under its type.
     ///
-    /// The child inherits every other request context value and shares the
-    /// rest of the request state, such as the app context and the memoize
-    /// cache, with `self`. Registering a type that is already present shadows
-    /// the inherited value: lookups through the child see `value`, while
-    /// lookups through `self` still see the original.
+    /// The child inherits the other values and shares the request state.
+    /// If the type is already present, the child sees `value` and the parent
+    /// keeps its original value.
     #[must_use]
     pub fn with<T>(&self, value: T) -> Cx
     where
@@ -197,10 +188,9 @@ struct RequestShared {
     abort_store: AbortStore,
 }
 
-/// Assembles a [`Cx`] from scratch, for tests.
+/// Builds a [`Cx`] with app and request values for a test.
 ///
-/// Unlike [`Cx::new`], which only takes an existing shared app context,
-/// `CxTestBuilder` populates both app and request context.
+/// Register the values your test needs, then call [`build`](Self::build).
 #[derive(Debug, Default)]
 pub struct CxTestBuilder {
     app_context: AppContext,
@@ -234,7 +224,7 @@ impl CxTestBuilder {
         self
     }
 
-    /// Consumes the builder, returning the assembled [`Cx`].
+    /// Builds the context with the registered values.
     #[must_use]
     pub fn build(self) -> Cx {
         Cx::from_parts(Arc::new(self.app_context), self.request_context)

@@ -1,15 +1,19 @@
 # App context
 
-Most apps need values that outlive any single request: a database pool, an HTTP client, a config struct loaded at startup. Topcoat exposes these through **app context**: register a value once on the router, then read it from any handler with `app_context(cx)`.
+App context shares values across requests. Register a value on the router, then borrow it with [`app_context`](crate::context::app_context) wherever you have a `&Cx`.
 
-App context is keyed by Rust type. Each type can be registered at most once, and lookups are typed: ask for `&Database` and you get a `&Database`.
+Values are looked up by their Rust type. The router accepts one value of each type.
 
 ## Registering values
 
-Build the router and chain `.app_context(value)` for every value you want to share:
+Call `.app_context(value)` for each value you want to share:
 
 ```rust
 use topcoat::router::{Router, RouterBuilderDiscoverExt};
+# struct Database;
+# impl Database { fn connect() -> Self { Self } }
+# struct HttpClient;
+# impl HttpClient { fn new() -> Self { Self } }
 
 pub fn router() -> Router {
     Router::builder()
@@ -20,9 +24,15 @@ pub fn router() -> Router {
 }
 ```
 
-The value is stored under its concrete type. Registering two values of the same type panics: wrap them in newtypes if you need more than one of the same underlying type:
+Registering the same type twice on the router panics. Use wrapper types to distinguish values with the same underlying type:
 
 ```rust
+# use topcoat::router::Router;
+# struct Database;
+# impl Database {
+#     fn connect_primary() -> Self { Self }
+#     fn connect_replica() -> Self { Self }
+# }
 struct PrimaryDb(Database);
 struct ReplicaDb(Database);
 
@@ -34,9 +44,14 @@ Router::builder()
 
 ## Reading values
 
-Inside any handler that has access to a `Cx`, call `app_context::<T>(cx)` to borrow the registered value:
+Read the registered value by type:
 
 ```rust
+# struct Database;
+# struct User { name: String }
+# impl Database {
+#     async fn fetch_user(&self, _: u64) -> User { User { name: "Ada".into() } }
+# }
 use topcoat::{
     context::{Cx, app_context},
     Result,
@@ -52,9 +67,9 @@ async fn user_profile(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-The lookup is keyed by `T`'s `TypeId`, so the type you ask for must exactly match the type you registered. Asking `app_context` for a type that wasn't registered panics: this is usually a startup-time bug.
+The requested type must exactly match the registered type. [`app_context`](crate::context::app_context) panics if the type is missing.
 
-When an app context value is intentionally optional, use `try_app_context::<T>(cx)` instead. It returns `None` when the type was not registered:
+For optional values, use [`try_app_context`](crate::context::try_app_context). It returns `None` if the type is missing:
 
 ```rust
 use topcoat::context::{Cx, try_app_context};
@@ -68,6 +83,6 @@ fn feature_config(cx: &Cx) -> Option<&FeatureConfig> {
 
 ## Requirements
 
-The value type `T` must be `Any + Send + Sync`. There's no `'static` bound to write yourself: `Any` implies it.
+Values must implement `Any + Send + Sync`. They cannot borrow data with a lifetime shorter than `'static`.
 
-App context is shared by reference across every request handled by the router, so values should be cheap to share (typically already wrapped in `Arc` internally, like a database pool or HTTP client) or trivially clonable.
+Requests borrow the same value, so registration does not require `Clone`. Use synchronization if requests need to mutate it.

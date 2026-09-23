@@ -14,14 +14,11 @@ use crate::datastar_request;
 
 /// Extracts the signals a Datastar action sends with a request.
 ///
-/// A Datastar action includes the page's signals with every request (except
-/// those prefixed with an underscore): GET requests carry them JSON-encoded in
-/// the `datastar` query parameter, all other requests as a JSON body.
-/// `Signals<T>` reads them from either place and deserializes them into `T`.
+/// Deserializes `T` from the JSON-encoded `datastar` query parameter on GET
+/// requests and from the JSON body on other methods.
 ///
-/// Wrap it in [`Option`] to also accept requests made without Datastar: the
-/// extractor yields [`None`] when the request carries no `Datastar-Request`
-/// header, and still reports an error when the signals are malformed.
+/// `Option<Signals<T>>` returns `None` when the `Datastar-Request` header is
+/// absent. Malformed signals still return an error.
 ///
 /// # Examples
 ///

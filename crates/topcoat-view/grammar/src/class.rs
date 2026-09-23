@@ -10,10 +10,8 @@ use topcoat_core_grammar::{ParseOption, paths::topcoat_view};
 /// The parsed body of a `class!` invocation. Lowers to a
 /// [`runtime::Class`](topcoat_view::Class).
 ///
-/// Unlike `view!` and `attributes!`, the body takes no leading `cx =>`
-/// argument: constructing a class list does not touch the request context.
-/// The entries receive it later, when the surrounding attribute machinery
-/// converts the class list into view parts.
+/// Constructing a class list needs no request context, so the body does not
+/// accept a leading `cx =>` argument.
 pub struct Class {
     pub segments: Punctuated<ClassSegment, Token![,]>,
 }
@@ -187,10 +185,7 @@ fn value_tokens(expr: &Expr) -> TokenStream {
 /// Lowers a literal class list entry to a promoted string that is already
 /// escaped for the position it renders in.
 ///
-/// A class list always renders in an attribute value, so the escaping a
-/// literal needs is settled here and the entry renders verbatim. Promoting
-/// the escaped literal also keeps it out of the view's constants, so the
-/// entry costs one instruction and no allocation.
+/// The result is escaped for an attribute value and can render verbatim.
 fn entry_tokens(value: &str, span: Span) -> TokenStream {
     let escaped = LitStr::new(&escape_attribute_value(value), span);
     quote! {

@@ -5,12 +5,12 @@ use crate::Cookies;
 /// A [`Cookies`] adapter that signs cookies written through it and verifies
 /// cookies read through it, using a [`Key`].
 ///
-/// Signing makes a cookie tamper-proof while leaving its value readable by the
-/// client. Created by [`Cookies::signed`] or [`signed_cookies`](crate::signed_cookies).
+/// The client can read the value, but changing it invalidates the signature.
+/// Reads return `None` if the cookie is missing or fails verification. Signing
+/// protects the value, not the cookie name or attributes.
 ///
-/// The signature is computed over the cookie's **value only**, so this layer
-/// composes freely with prefixing and attribute defaults in any order. Reads
-/// return `None` when a cookie is missing or its signature does not verify.
+/// Create a signed jar with [`Cookies::signed`] or
+/// [`signed_cookies`](crate::signed_cookies).
 #[derive(Debug, Clone, Copy)]
 pub struct SignedJar<'key, J> {
     inner: J,

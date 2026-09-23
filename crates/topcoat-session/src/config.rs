@@ -53,9 +53,8 @@ impl SessionConfigBuilder {
 
     /// Overrides how long a session lives without being refreshed.
     ///
-    /// The lifetime becomes the time to live of every issued token, and
-    /// [`start`](crate::start), [`refresh`](crate::refresh), and
-    /// [`rotate`](crate::rotate) derive the session's `expires_at` from it.
+    /// Determines the expiry of issued tokens and the session record returned
+    /// to the application.
     #[must_use]
     pub fn lifetime(mut self, lifetime: Duration) -> Self {
         self.lifetime = lifetime;

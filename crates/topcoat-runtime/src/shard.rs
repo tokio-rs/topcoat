@@ -56,9 +56,7 @@ pub type ShardFuture<'cx> = Pin<Box<dyn Future<Output = Result<ViewHandle>> + Se
 /// A component that re-renders on the server when its runtime expression
 /// arguments change.
 ///
-/// Registered into a [`RouterBuilder`] with
-/// [`shard`](RouterBuilderShardExt::shard), which serves it as a route
-/// dispatched by [`ShardId`].
+/// Register it with [`shard`](RouterBuilderShardExt::shard).
 pub trait Shard: Send + Sync + 'static {
     /// The identity of this shard.
     fn id(&self) -> ShardId;

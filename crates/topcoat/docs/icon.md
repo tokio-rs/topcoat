@@ -1,8 +1,8 @@
-Icons on the web are small vector graphics that flow with the text around them: the trash can on a delete button, the magnifier in a search field. Topcoat renders icons as inline `<svg>` elements, so they need no extra network requests, scale with the surrounding font, and follow the text color.
+Render icons as inline `<svg>` elements with the [`icon`] component. They scale with the surrounding text by default and need no separate image request.
 
 # Declaring icons
 
-[`IconData`] is the renderable data of an icon: a view box plus the SVG body markup. Declare an icon as a constant and render it with the [`icon`] component:
+[`IconData`] holds an icon's view box and SVG markup. Declare an icon from trusted markup, then render it:
 
 ```rust,no_run
 use topcoat::{
@@ -53,7 +53,7 @@ Ok(view! {
 
 # Iconify
 
-[Iconify] is an open catalog of icons: over 150 open source icon sets published in one uniform JSON format. Topcoat can pull icons straight from it, checking every icon reference at compile time.
+[Iconify] provides icon sets in a shared format. Topcoat can download sets for your build and check icon references at compile time.
 
 Iconify support lives behind the `icon-iconify` feature, for both your runtime dependency and your build dependency:
 
@@ -80,7 +80,7 @@ fn main() {
 # fn main() {}
 ```
 
-[`include!`] then expands a staged set to `IconData` consts, named after the icons in `SCREAMING_SNAKE_CASE`, and ready to render like any other icon:
+Use [`include!`] to make a staged set available as `IconData` constants. Icon names become `SCREAMING_SNAKE_CASE`:
 
 ```rust,ignore
 use topcoat::icon::{icon, iconify};
@@ -94,7 +94,7 @@ view! {
 
 ## Single icons
 
-[`iconify_icon!`] is the expression form: it expands one `"set:icon"` reference to a const-evaluable [`IconData`] expression, inline in a view or behind a name of your choosing:
+Use [`iconify_icon!`] to select one `"set:icon"` as an [`IconData`] value:
 
 ```rust,ignore
 const TRASH: IconData = iconify::iconify_icon!("feather:trash-2");

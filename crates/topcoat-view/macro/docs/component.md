@@ -1,4 +1,4 @@
-Components are async functions annotated with [`#[component]`][`component`]. They return a value implementing [`View`] through the usual Topcoat [`Result`] type, and can take typed parameters like any other Rust function.
+Use [`#[component]`][`component`] on an async function to define a reusable view. Its parameters become named properties, and it returns [`Result<impl View>`][`Result`].
 
 ```rust
 use topcoat::{
@@ -18,7 +18,7 @@ async fn badge(label: &str, tone: &str) -> Result<impl View> {
 
 # Calling Components
 
-Call components inside [`view!`] with a call syntax similar to function calls, but with named parameter syntax:
+Call a component inside [`view!`] with named parameters:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -77,14 +77,14 @@ Ok(view! {
 # }
 ```
 
-The trailing child nodes desugar to a `child` parameter whose value is a [`view! { ... }`][`view!`] containing those nodes.
+The component chooses where to render its children by inserting `(child)` in its template.
 
 # Parameter attributes
 
 A component's properties can be modified with attributes:
 
 - `#[default]` makes the parameter optional; when not passed, it is set to `Default::default()`. Use `#[default(expr)]` to supply a custom fallback instead, evaluated only when the parameter is omitted. The type need not implement `Default` in that case.
-- `#[into]` lets callers pass anything that converts via `Into`. While you could use `impl Into<T>` instead, using `#[into]` calls `.into()` outside of your function body and prevents many monomorphizations of the function itself.
+- `#[into]` accepts any value that converts to the parameter's type through `Into`. The component receives the converted value.
 
 ```rust
 # use topcoat::{Result, view::{View, component, view}};
@@ -119,7 +119,7 @@ async fn shout(label: impl Into<String> + Send) -> Result<impl View> {
 }
 ```
 
-Prefer the `#[into]` attribute over `impl Into<T>` to reduce generic instantiations of your component body.
+Use `#[into]` when the parameter only needs to accept values convertible to one type.
 
 # Request Context
 
@@ -144,7 +144,7 @@ async fn current_path(cx: &Cx) -> Result<impl View> {
 
 # Recursive Components
 
-A component returns an anonymous view type, so a component calling itself, directly or indirectly, describes a type that contains itself. Break the cycle by erasing the view type of one component in it: box the view with [`boxed`](trait.ViewExt.html#method.boxed).
+When a component calls itself, box its returned view with [`boxed`](trait.ViewExt.html#method.boxed). This also works for indirect recursion, where components call each other.
 
 ```rust
 use topcoat::{
@@ -164,7 +164,7 @@ async fn countdown(n: u32) -> Result<impl View> {
 }
 ```
 
-The other components in a cycle keep returning `impl View` as they are; one erased type is enough for all of them.
+Boxing the returned view of one component in each recursive cycle is enough.
 
 [`Cx`]: ../context/struct.Cx.html
 [`Result`]: ../type.Result.html

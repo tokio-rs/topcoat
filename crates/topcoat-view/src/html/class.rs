@@ -10,11 +10,8 @@ use crate::{AttributeValueViewParts, PartsWriter, PromotedStr, StaticStr, Unesca
 /// the [`class!`](https://docs.rs/topcoat/latest/topcoat/view/macro.class.html)
 /// macro or stored in a [`Class`] directly.
 ///
-/// A class list separates its entries with single spaces. An absent entry
-/// must not produce a separator, so [`is_present`](Self::is_present) is the
-/// hook that makes that decision: the built-in `Option<T>` implementation
-/// reports `None` as absent, and the string implementations report empty
-/// strings as absent.
+/// Return `false` from [`is_present`](Self::is_present) to omit an entry
+/// without adding a separator. Empty strings and `None` are omitted this way.
 pub trait ClassViewParts {
     /// Returns whether this value contributes to the class list.
     ///
@@ -177,9 +174,7 @@ where
 
 /// A writer that separates class list entries with single spaces.
 ///
-/// [`Class`] creates one per class list when the attribute value is emitted
-/// and passes it to [`ClassEntries::write_entries`]. Absent entries are
-/// skipped without producing a separator.
+/// Absent entries are skipped without producing a separator.
 pub struct ClassWriter<'a, 'b> {
     parts: &'b mut PartsWriter<'a>,
     first: bool,
@@ -212,10 +207,7 @@ impl<'a, 'b> ClassWriter<'a, 'b> {
 
 /// One or more class list entries written through a [`ClassWriter`].
 ///
-/// This is the bound [`Class`] places on its contents. It is implemented for
-/// every [`ClassViewParts`] value, for tuples of entries, and for arrays and
-/// [`Vec`]s of entries, so a class list holds a mix of static and dynamic
-/// entries inline without allocating for itself.
+/// Implement this trait to supply a custom collection of entries to [`Class`].
 pub trait ClassEntries {
     /// Returns whether any entry contributes to the class list.
     fn any_present(&self) -> bool;
@@ -321,11 +313,7 @@ impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
 
 /// A space-separated list of HTML classes.
 ///
-/// Prefer constructing `Class` with the [`class!`](../view/macro.class.html)
-/// macro. The entries live inline in the value (a single entry, a tuple, an
-/// array, or a [`Vec`]), so building a class list performs no allocation of
-/// its own; the entries are written directly into the surrounding view when
-/// the attribute value is emitted.
+/// Construct a class list with the [`class!`](../view/macro.class.html) macro.
 ///
 /// A `Class` is used in the attribute value position of an element, where a
 /// class list without present entries omits the whole attribute:
@@ -378,10 +366,8 @@ where
 
 /// The type of a class list built from string literals alone.
 ///
-/// The [`class!`](../view/macro.class.html) macro merges a run of literals
-/// into one promoted string, so a list of literals has this type no matter how
-/// many entries it was written with. Write it out to hold such a list in a
-/// constant:
+/// Use this type to store a literal [`class!`](../view/macro.class.html) list
+/// in a constant:
 ///
 /// ```rust
 /// use topcoat::view::{StaticClass, class};

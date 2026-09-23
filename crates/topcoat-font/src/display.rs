@@ -9,8 +9,7 @@
 /// renders but is swapped for the face once it loads). [`FontDisplay::default`]
 /// is [`Auto`](FontDisplay::Auto), matching CSS.
 ///
-/// Displays as the CSS keyword (`auto`, `block`, `swap`, `fallback`,
-/// `optional`).
+/// Displays as its CSS keyword.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum FontDisplay {
     /// The font display strategy is defined by the user agent, CSS `auto`.

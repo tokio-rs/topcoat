@@ -1,6 +1,17 @@
-A [`Router`] handles incoming requests. Build one with [`Router::builder`] and register your pages, layouts, layers, and API routes on it. Call [`build`](RouterBuilder::build) when you are done, then pass the router to [`start`](crate::start).
+A [`Router`] matches incoming requests to handlers. Define a page, register it with [`Router::builder`], and call [`build`](RouterBuilder::build):
 
-Handlers register in two ways: **manually**, listing each item on the builder, or with **auto-discovery** (the `discover` feature collects annotated items at link time). For most apps, the recommended way to define routes is the [`module_router!`] macro, which builds on discovery and derives each URL from the module tree instead of a path string.
+```rust
+use topcoat::{Result, router::{Router, page}, view::{View, view}};
+
+#[page("/")]
+async fn home() -> Result<impl View> {
+    Ok(view! { <h1>"Home"</h1> })
+}
+
+let router = Router::builder().page(home).build();
+```
+
+Pass the router to [`start`](crate::start) to serve requests. As your application grows, [`module_router!`] can derive route paths from your Rust modules.
 
 # Paths
 
@@ -69,7 +80,7 @@ A layout applies to every page whose path starts with the layout's path: a layou
 
 # Layers
 
-A layer wraps request handling under its path prefix. It receives the request context, the request body, and [`Next`], which represents the remaining layers and the handler. A layer that registers request-scoped values derives a child context with [`Cx::with`](crate::context::Cx::with) and passes that to `next.run`:
+A layer runs around request handling under its path prefix. Call [`Next::run`] to run the remaining layers and handler. For example, this layer measures how long they take:
 
 ```rust
 use topcoat::{
@@ -126,19 +137,11 @@ async fn create_user(cx: &Cx, Json(input): Json<CreateUser>) -> Result<Json<User
 }
 ```
 
-The context and the body parameter are both optional and may appear in either order, but there can be at most one body parameter, because the body is a stream that can only be consumed once. Pages parse bodies the same way, but return a rendered view rather than a response value. See the [`content`](mod@content) module docs for the available extractors and response types, as well as multipart uploads, WebSockets, and server-sent events.
+The context and the body parameter are both optional and may appear in either order, but there can be at most one body parameter, because the body is a stream that can only be consumed once. Pages parse bodies the same way, but return a rendered view rather than a response value. See [`content`](mod@content) for request parsing and response types.
 
 # Path and query parameters
 
-Path and query values are read from [`Cx`](crate::context::Cx), not injected as handler arguments. This keeps the handler signature limited to request context and body parsing, while allowing helper functions and layouts to read the same parameters.
-
-## Path parameters
-
-Call [`path_param!`](macro@path_param) with the parameter name from the URL. The macro generates a Pascal-cased type, so `path_param!(post_id: u64)` declares `PostId` for `{post_id}`:
-
-- After `path_param!(slug)`, `path_param::<Slug>(cx)` returns the percent-decoded segment as `&str`.
-- A type after `:` is parsed with [`FromStr`](std::str::FromStr). The default return type is `Result<&T, &<T as FromStr>::Err>`.
-- `error = bad_request`, `not_found`, `unauthorized`, `forbidden`, `redirect(...)`, or `redirect_permanent(...)` maps a parse failure to that router error.
+Read URL parameters from the request context. Declare a typed path parameter with [`path_param!`](macro@path_param), then read it with [`path_param`](fn@path_param):
 
 ```rust
 use topcoat::{
@@ -157,47 +160,15 @@ async fn post(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-Parsing occurs once per request and the result is memoized.
+Here, `/posts/42` gives the handler `42`. A value that cannot be parsed as `u64` produces `400 Bad Request`. See [`path_param!`](macro@path_param) for string parameters, catch-all paths, and error handling.
 
-Prefix the name with `*` to capture the remaining path as decoded segments. After `path_param!(*doc_path)`, `path_param::<DocPath>(cx)` returns [`CatchAllSegments`]. After `path_param!(*ids: u32)`, `path_param::<Ids>(cx)` returns `Result<&[u32], _>`.
-
-With [`module_router!`], a declaration inside a non-root route module also changes that module's segment to the parameter. See [`module_router!`] for module structure, nested parameters, and catch-all parameters.
-
-## Query parameters
-
-Apply [`#[query_params]`](macro@query_params) to a struct with named fields. The macro derives `serde::Deserialize`, and [`query_params::<T>(cx)`](fn@query_params) deserializes the request query string into that struct. Use `Option<T>` for keys that may be absent.
-
-```rust
-use topcoat::{
-    Result,
-    context::Cx,
-    router::{page, query_params},
-    view::{View, view},
-};
-
-#[query_params(error = bad_request)]
-struct PostsQuery {
-    page: Option<u32>,
-    q: Option<String>,
-}
-
-#[page("/posts")]
-async fn posts(cx: &Cx) -> Result<impl View> {
-    let query = query_params::<PostsQuery>(cx)?;
-    Ok(view! {
-        <p>"page: " (query.page.unwrap_or(1))</p>
-        <p>"search: " (query.q.as_deref().unwrap_or(""))</p>
-    })
-}
-```
-
-Query parsing also occurs once per request and returns a reference to the memoized value. A query struct is independent of the matched route, so any handler with `cx: &Cx` can read it. See [`#[query_params]`](macro@query_params) for error handling and redirecting after invalid input.
+For query strings, declare a struct with [`#[query_params]`](macro@query_params) and read it with [`query_params::<T>(cx)`](fn@query_params). Use optional fields for keys that may be absent. The macro reference shows a complete example.
 
 # Errors
 
-Every page, layout, layer, and route handler returns a [`Result`](crate::Result). An `Err` becomes the response: the router maps its own error types onto HTTP status codes and turns anything else into a 500.
+Handlers return a [`Result`](crate::Result). A router error selects an HTTP response, such as `404 Not Found`. An unhandled error of another type becomes `500 Internal Server Error`.
 
-The [`error`](mod@error) module has a constructor for each response, like [`not_found()`](error::not_found) or [`redirect(uri)`](error::redirect), and the [`RouterErrorExt`](error::RouterErrorExt) methods that turn an `Option` or `Result` into one:
+Use [`RouterErrorExt`](error::RouterErrorExt) to turn an absent or failed value into a router error:
 
 ```rust
 # use topcoat::{Result, context::Cx, router::{error::RouterErrorExt, page}, view::{View, view}};
@@ -214,54 +185,9 @@ See the [`error`](mod@error) module docs for how to raise, convert, and catch th
 
 # Status codes and headers
 
-A [`StatusCode`] in a `view!`'s body sets the response status, and a [`HeaderMap`] or a single `(HeaderName, HeaderValue)` pair adds response headers. This pairs with error handling. Wrapping the slot in an [`error_boundary`](crate::view::error_boundary) lets a layout catch a page's [`NotFoundError`](error::NotFoundError) and replace it with a branded not-found page:
+A [`StatusCode`] in a `view!` body sets the response status. A [`HeaderMap`] or a `(HeaderName, HeaderValue)` pair adds response headers. See [`view!`](crate::view::view!) for placement and precedence.
 
-```rust
-use topcoat::{
-    Result,
-    context::Cx,
-    router::{
-        Slot, StatusCode,
-        error::{NotFoundError, RouterErrorExt},
-        layout, page,
-    },
-    view::{View, error_boundary, view},
-};
-
-# struct Post { title: String }
-# async fn find_post(_cx: &Cx) -> Option<Post> { None }
-#[page("/posts/{id}")]
-async fn post(cx: &Cx) -> Result<impl View> {
-    let post = find_post(cx).await.ok_or_not_found()?;
-    Ok(view! { <h1>(post.title)</h1> })
-}
-
-#[layout("/")]
-async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
-    Ok(view! {
-        <html>
-            <body>
-                error_boundary(
-                    fallback: |error| {
-                        if error.downcast_ref::<NotFoundError>().is_none() {
-                            // Any other error type is rethrown.
-                            return Err(error);
-                        }
-
-                        Ok(view! {
-                            (StatusCode::NOT_FOUND)
-                            <h1>"Page not found"</h1>
-                        })
-                    },
-                    (slot)
-                )
-            </body>
-        </html>
-    })
-}
-```
-
-See the [`view!`](crate::view::view!) macro docs for the full placement and precedence rules, and the [`error`](mod@error) module docs for catching errors.
+A layout can use [`error_boundary`](crate::view::error_boundary) to show a replacement view when a page fails. Set the replacement's status explicitly, or it will be served as a successful response. See [`error`](mod@error) for a complete example.
 
 # Cross-origin requests
 
@@ -311,7 +237,7 @@ pub fn router() -> Router {
 
 This finds annotated items across your crate and dependencies. Discovered layers must have unique paths because link-time collection order is not stable; if you need to stack several layers on one path, register them explicitly with `.layer(...)`.
 
-Other features collect their own annotated items at link time, so `discover()` registers those too, such as the fonts declared with `font!` and the procedures and shards of the runtime. Values that are not annotated items are always registered by hand, including the asset bundle (`.assets(...)`), application context (`.app_context(...)`), and the runtime's own routes (`.runtime()`, see the [runtime guide](../runtime/index.html#setup)).
+`discover()` also runs registration hooks provided by enabled features. Follow each feature's setup instructions for any values or configuration it needs on the builder.
 
 [`module_router!`] registers module-derived handlers only. It returns a `RouterBuilder`, so call `discover()` on it, or register the remaining items by hand, exactly as above.
 
@@ -377,101 +303,8 @@ topcoat::serve(listener, router).await
 
 The socket file of a previous run is not removed automatically, so remove any stale file before binding, as above.
 
-The HTTP server uses Tokio and Hyper and sits behind the `serve` Cargo feature, enabled by default. Routing, views, and request handling work without it: [`Router::handle`] turns a [`Request`](request::Request) into a [`Response`](response::Response) directly, with no listener involved. On a platform that receives HTTP requests for you, such as a serverless or WebAssembly runtime, build `topcoat` without default features, leave `serve` off, and call [`Router::handle`] from the platform's request handler.
+The `serve` Cargo feature enables the HTTP server and is enabled by default. Without it, [`Router::handle`] turns a [`Request`](request::Request) into a [`Response`](response::Response) directly, with no listener involved. On a platform that receives HTTP requests for you, such as a serverless or WebAssembly runtime, build `topcoat` without default features, leave `serve` off, and call [`Router::handle`] from the platform's request handler.
 
 # Tower services
 
 With the `tower` feature enabled, the [`tower`](mod@tower) module bridges the tower ecosystem: [`TowerRoute`](tower::TowerRoute) mounts a tower service (like an axum router) as a route, and [`TowerLayer`](tower::TowerLayer) runs tower middleware as a layer. See the [`tower`](mod@tower) module docs for details.
-
-# Example: full manual setup
-
-```rust
-use topcoat::{
-    Result,
-    context::Cx,
-    router::{
-        Body, Next, Router, Slot, content::Json, layer, layout, page, response::Response, route,
-    },
-    view::{View, view},
-};
-
-#[derive(serde::Deserialize, serde::Serialize)]
-struct NewUser {
-    name: String,
-}
-
-#[layout("/")]
-async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
-    Ok(view! {
-        <!DOCTYPE html>
-        <html>
-            <body>
-                <nav>
-                    <a href="/">"Home"</a>
-                    <a href="/users">"Users"</a>
-                </nav>
-                (slot)
-            </body>
-        </html>
-    })
-}
-
-#[layer("/api")]
-async fn api_log(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
-    let response = next.run(cx, body).await?;
-    println!("API response: {}", response.status());
-    Ok(response)
-}
-
-#[page("/")]
-async fn home() -> Result<impl View> {
-    Ok(view! { <h1>"Welcome"</h1> })
-}
-
-#[page("/users")]
-async fn users_list() -> Result<impl View> {
-    Ok(view! { <h1>"All users"</h1> })
-}
-
-#[page("/users/{id}")]
-async fn user_profile() -> Result<impl View> {
-    Ok(view! { <h1>"User profile"</h1> })
-}
-
-#[route(GET "/api/health")]
-async fn health() -> Result<&'static str> {
-    Ok("ok")
-}
-
-// Reads a JSON request body and echoes it back as a JSON response.
-#[route(POST "/api/users")]
-async fn create_user(Json(user): Json<NewUser>) -> Result<Json<NewUser>> {
-    Ok(Json(user))
-}
-
-pub fn router() -> Router {
-    Router::builder()
-        .layout(root_layout)
-        .layer(api_log)
-        .page(home)
-        .page(users_list)
-        .page(user_profile)
-        .route(health)
-        .route(create_user)
-        .build()
-}
-```
-
-# Example: same app with `discover()`
-
-```rust
-use topcoat::router::{Router, RouterBuilderDiscoverExt};
-
-// The page, layout, layer, and route definitions are identical. Only the
-// router function changes.
-pub fn router() -> Router {
-    Router::builder().discover().build()
-}
-```
-
-All [`#[page]`](page), [`#[layout]`](layout), [`#[layer]`](layer), and [`#[route]`](macro@route) items from the example above are picked up automatically.

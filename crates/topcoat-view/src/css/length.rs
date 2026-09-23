@@ -188,8 +188,7 @@ impl Display for LengthUnit {
 ///
 /// Construct one with a per-unit helper like [`Length::px`] or [`Length::rem`],
 /// or from a value and unit with [`Length::new`]. Plain numbers convert to a
-/// pixel length, so a `#[into]` component parameter accepts `size: 24` as a
-/// 24-pixel length.
+/// pixel length.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Length {
     value: f32,

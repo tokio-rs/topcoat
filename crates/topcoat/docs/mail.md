@@ -2,15 +2,9 @@ Topcoat sends email through a pluggable [`Transport`]. Declare a mail with the [
 
 Everything below is re-exported from `topcoat::mail` and gated behind the `mail` feature. The SMTP transport additionally needs the `mail-smtp` feature.
 
-```toml
-# Cargo.toml
-[dependencies]
-topcoat = { version = "0.8.1", features = ["mail", "mail-smtp"] }
-```
-
 # Setup
 
-Wrap the transport your application delivers through in a [`MailConfig`] and register it with the router's [`mail`](RouterBuilderMailExt::mail) extension method:
+Choose a transport in [`MailConfig`] and register it with [`RouterBuilderMailExt::mail`]:
 
 ```rust
 use topcoat::{
@@ -34,7 +28,7 @@ Handlers send through whichever transport is registered, so swapping it (a file 
 
 # Declaring and sending mail
 
-The [`mail!`] macro declares a [`Mail`] as `name: value` fields: the addresses, the subject, an HTML body written as a [`view!`](crate::view::view) body, attachments, and custom headers. [`send`] then delivers it through the registered transport:
+Build a message with [`mail!`], then call [`send`] to pass it to the configured transport:
 
 ```rust
 use topcoat::{
@@ -62,7 +56,7 @@ async fn welcome(cx: &Cx) -> Result<&'static str> {
 }
 ```
 
-Addresses can be written as strings, `(name, address)` pairs, or [`Mailbox`] values, alone or in collections. A plain-text alternative is derived from the HTML body by default, since mail without one scores worse with spam filters. See the [`mail!`] reference for the full field list, and [`MailBuilder`] for assembling a mail without the macro.
+A plain-text alternative is generated from HTML by default. See [`mail!`] for address formats and message fields, or use [`MailBuilder`] to build a message without the macro.
 
 [`send`] returns a [`Receipt`] carrying the sent mail's `Message-ID`. Store it to thread a later mail onto this one through the `in_reply_to` and `references` fields. A receipt means the delivery mechanism accepted the mail, not that it reached an inbox. Sending fails with a [`SendError`] when the mail is incomplete (no `From` address, no recipients, or no body) or the delivery itself fails.
 
@@ -92,7 +86,7 @@ let mail = mail! {
 
 # Transports
 
-The crate ships three transports; each implements the [`Transport`] trait the [`MailConfig`] wraps.
+A [`Transport`] determines where mail is sent.
 
 ## SMTP
 
@@ -114,7 +108,7 @@ let from_url = SmtpTransport::from_url("smtps://user:pass@smtp.example.com:465")
 
 ## Files during development
 
-[`FileTransport`] writes each mail as an `.eml` file instead of delivering it, so you can develop without a mail server and open the results in any mail client. The filename carries the send time, so a directory listing shows sends in order.
+[`FileTransport`] writes each message as an `.eml` file for inspection during development. It does not deliver mail.
 
 ## Memory in tests
 

@@ -22,12 +22,8 @@ pub type TransportFuture<'a> = Pin<Box<dyn Future<Output = Result<Receipt>> + Se
 
 /// Delivers a [`Mail`] to its recipients.
 ///
-/// A transport receives the mail as declared content, assembles its wire
-/// form (rendering the HTML view with the request context), and hands it
-/// to a delivery mechanism. The crate ships three: `SmtpTransport` submits
-/// to an SMTP server (behind the `smtp` feature), [`FileTransport`] writes
-/// `.eml` files during development, and [`MemoryTransport`] captures mail in
-/// tests.
+/// A transport renders the mail with the request context and submits it for
+/// delivery.
 ///
 /// Implement this trait to deliver through anything else, such as a mail
 /// provider's HTTP API. [`Mail::formatted`] produces the RFC 5322 wire form

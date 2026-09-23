@@ -1,6 +1,6 @@
 # Mail
 
-A welcome mail built with the `mail!` macro: an HTML body with a derived plain-text alternative, an inline image, an attachment, and a custom header.
+Build a welcome email with `mail!` and write it to a file for inspection.
 
 Run it with:
 

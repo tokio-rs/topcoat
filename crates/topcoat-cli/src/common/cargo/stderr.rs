@@ -31,12 +31,8 @@ impl StderrTail {
     /// Cargo's own error report, extracted from the stderr it interleaves
     /// with status lines and progress bar renders.
     ///
-    /// Cargo redraws the progress bar in place with carriage returns rather
-    /// than newlines, so only the text after the last `\r` of a line was ever
-    /// visible; the report itself runs from the first `error` line to the end
-    /// of the stream. When there is no such line the build died without
-    /// reporting anything (killed by a signal, say), and the status lines are
-    /// all there is to go on.
+    /// Removes overwritten progress output and returns text from the first
+    /// error onward. If no error is found, returns the remaining status output.
     pub(super) fn error_output(&self) -> String {
         let stderr = String::from_utf8_lossy(&self.captured);
         let lines: Vec<String> = stderr

@@ -11,22 +11,13 @@ use crate::{Attachment, Mail, SendError, TextBody, text::text_from_html};
 impl Mail {
     /// Renders the mail into its RFC 5322 wire form.
     ///
-    /// The bytes are what a transport puts on the wire: the header section
-    /// followed by the MIME body tree, with `multipart/alternative` for a
-    /// mail with both bodies, `multipart/related` around an HTML body with
-    /// inline attachments, and `multipart/mixed` around downloadable
-    /// attachments. The HTML body is rendered with `cx`, the plain-text
-    /// alternative is derived from it unless the mail declares its
-    /// [`TextBody`] otherwise, and a `Date` and `Message-ID` are generated
-    /// for a mail that does not declare them, so two calls produce two
-    /// distinct messages. `Bcc` recipients are omitted, as they are on the
-    /// wire; they only ever appear in the envelope a transport derives from
-    /// the mail itself.
+    /// Returns the headers and MIME body, rendering HTML with `cx`. It derives
+    /// plain text unless the mail specifies otherwise, and generates `Date`
+    /// and `Message-ID` when absent. Repeated calls may produce different bytes.
+    /// `Bcc` recipients are excluded from this output.
     ///
-    /// Transports assemble the mail themselves, so there is no need to call
-    /// this before sending. It is for handing the wire form elsewhere: a
-    /// mail provider's API that accepts raw messages, or a test asserting
-    /// on the exact bytes.
+    /// Use this for a transport or external API that accepts raw messages.
+    /// You do not need to call it before [`send`](crate::send).
     ///
     /// # Errors
     ///

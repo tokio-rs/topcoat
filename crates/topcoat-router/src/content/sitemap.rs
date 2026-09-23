@@ -68,8 +68,7 @@ impl Sitemap {
         self
     }
 
-    /// Adds every entry of an iterator, such as one built from the rows of
-    /// a database query.
+    /// Adds every entry of an iterator.
     pub fn urls<I>(mut self, urls: I) -> Self
     where
         I: IntoIterator,
@@ -182,8 +181,7 @@ impl SitemapUrl {
 
     /// Sets the time the page was last modified.
     ///
-    /// Accepts anything convertible into a [`SystemTime`], which covers the
-    /// timestamp types of the common date and time crates.
+    /// Accepts a value convertible into [`SystemTime`].
     pub fn last_modified(mut self, last_modified: impl Into<SystemTime>) -> Self {
         self.last_modified = Some(last_modified.into());
         self

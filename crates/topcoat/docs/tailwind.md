@@ -1,6 +1,6 @@
-[Tailwind CSS](https://tailwindcss.com) is a utility-first CSS framework: instead of writing custom stylesheets, you compose small single-purpose classes (like `flex`, `pt-4`, or `text-center`) directly in your markup, and Tailwind generates only the CSS for the classes you actually use.
+[Tailwind CSS](https://tailwindcss.com) generates CSS from the utility classes in your markup.
 
-Topcoat's Tailwind integration is a thin Rust wrapper around the standalone Tailwind CSS CLI. It does not run Node, `PostCSS`, or a Vite-style asset pipeline. Instead, a Cargo build script runs Tailwind, writes a CSS file into `OUT_DIR`, and the normal Topcoat asset bundler serves that CSS file with a content-hashed URL.
+Topcoat runs Tailwind from a Cargo build script and serves the generated stylesheet as an [asset](crate::asset).
 
 # Setup
 
@@ -49,13 +49,7 @@ async fn layout(slot: Slot<'_>) -> Result<impl View> {
 }
 ```
 
-`tailwind::stylesheet!()` expands to:
-
-```rust,ignore
-topcoat::asset::asset!(concat!(env!("OUT_DIR"), "/tailwind.css"))
-```
-
-That means the generated CSS is just a Topcoat asset. During development, `topcoat dev` builds the app, runs the build script, bundles assets, and then serves the bundled CSS from `/_topcoat/assets/...`. For manual builds, bundle assets the same way as any other Topcoat app:
+`topcoat dev` regenerates and bundles the stylesheet during development. For a manual build, bundle assets before starting the app:
 
 ```sh
 topcoat asset bundle
@@ -71,32 +65,15 @@ use topcoat::{
 
 let router = Router::builder()
     .discover()
-    .assets(AssetBundle::load_dir("target/assets").unwrap())
+    .assets(AssetBundle::load().unwrap())
     .build();
 ```
 
-# Build flow
+# Build configuration
 
-`BuildConfig::render()` is intended to run from `build.rs`. It reads Cargo's `OUT_DIR` and `CARGO_MANIFEST_DIR` environment variables where a default depends on them; a fully custom configuration (executable, input, output, and cwd) runs without either.
+[`BuildConfig::render`] downloads and caches the standalone Tailwind CLI, scans the package, and writes minified CSS to `$OUT_DIR/tailwind.css`. Its default input contains `@import "tailwindcss";`.
 
-The default build does this:
-
-1. Downloads the standalone Tailwind CLI release into `OUT_DIR` if it is not already present.
-2. Generates an input CSS file in `OUT_DIR` containing:
-
-   ```css
-   @import "tailwindcss";
-   ```
-
-3. Runs Tailwind with:
-
-   ```sh
-   tailwindcss -i <input> -o <output> --cwd <cwd> --minify
-   ```
-
-4. Writes the output to `$OUT_DIR/tailwind.css`.
-
-The default Tailwind CLI version is pinned by Topcoat to `4.3.2`. The downloaded binary is cached under Cargo's target directory, in the shared Topcoat cache at `topcoat/cache/tailwind`, so every package in the workspace reuses one copy across builds.
+The default release is [`DEFAULT_VERSION`]. Configure the executable and paths when you need to run outside a Cargo build script.
 
 # CLI executable
 
@@ -111,17 +88,9 @@ A user-provided executable is used as-is: no download happens and no network acc
 
 # Class scanning
 
-Topcoat does not inspect `view!` macros or extract class names itself. Class detection is delegated to the Tailwind CLI.
+Tailwind scans from the package root by default. Write complete class names in your source, including in `view!` markup. Classes assembled dynamically at runtime are invisible to Tailwind.
 
-By default, Topcoat passes:
-
-```text
---cwd $CARGO_MANIFEST_DIR
-```
-
-So Tailwind scans from your package root: classes are found in Rust source files, including literal `class="..."` values in `view!` markup. Classes assembled dynamically at runtime are invisible to Tailwind.
-
-The scan skips files matched by `.gitignore`: that is what keeps it out of `target/`. In a checkout without an ignore file it reads build artifacts, which is slow and can resurrect classes from previous builds; scope the scan down with `.cwd("src")` in that case.
+Keep build artifacts out of the scan with `.gitignore`, or limit the scan with `.cwd("src")`.
 
 For precise control, use a custom input CSS with Tailwind's own source directives, e.g. to scan only Rust files:
 
@@ -133,7 +102,7 @@ For precise control, use a custom input CSS with Tailwind's own source directive
 
 # Custom input CSS
 
-The generated input is enough for default Tailwind output. Use `input(...)` when you need custom CSS, theme values, plugins supported by the standalone CLI, or Tailwind source directives:
+Use `input(...)` to provide your own stylesheet:
 
 ```rust,no_run
 # #[allow(clippy::needless_doctest_main)]
@@ -157,9 +126,9 @@ Example input:
 
 # Rebuild behavior
 
-`BuildConfig::render()` prints no Cargo `rerun-if-*` directives. Cargo therefore applies its default: the build script reruns whenever any non-ignored file in the package changes. That default respects `.gitignore`, always excludes `target/`, and notices created and deleted files, so class changes anywhere in the package, including in new files, regenerate the Tailwind output.
+`BuildConfig::render()` leaves Cargo's change tracking unchanged. By default, Cargo reruns the build script when package files change, including added and removed files.
 
-Printing any `rerun-if-*` directive from your build script replaces that default with exactly the paths and variables you list. Keep that in mind when combining the Tailwind build with your own directives.
+If your build script prints any `rerun-if-*` directives, include every path and variable that should trigger a rebuild.
 
 Never point a directory directive at a directory that contains `target/`. Cargo scans directories recursively and ignores `.gitignore` when it does, so the build script would rerun on its own output.
 
@@ -167,3 +136,6 @@ Two situations require directives of your own:
 
 - `executable_env(name)`: print `cargo:rerun-if-env-changed=<name>` if changing the variable should rerun the build script.
 - A `cwd` or `input` outside the package: Cargo's default only tracks package files, so print `cargo:rerun-if-changed` for the external paths.
+
+[`BuildConfig::render`]: BuildConfig::render
+[`DEFAULT_VERSION`]: DEFAULT_VERSION

@@ -1,6 +1,6 @@
 # App context
 
-A page view counter registered as app context, shared by every request the server handles.
+A page view counter shared across requests through app context.
 
 Run it with:
 

@@ -4,14 +4,7 @@ use serde::Serialize;
 use topcoat_core::context::Cx;
 use topcoat_view::{AttributeValueViewParts, PartsWriter};
 
-/// The JavaScript source of a runtime expression, captured at its `$(..)`
-/// site.
-///
-/// The `expr!` macro builds one of these next to the expression's Rust
-/// value: the source as it reaches the browser, with the values captured
-/// from the surrounding Rust scope serialized in place. Nothing is written
-/// until the expression is spliced into a view, where the source renders
-/// inside a marker comment.
+/// JavaScript source with captured values, ready to render into a view.
 #[derive(Debug, Clone)]
 pub struct Js {
     parts: Vec<JsPart>,
@@ -64,8 +57,7 @@ impl Js {
         source
     }
 
-    /// Writes the source through `parts`, sealed for the writer's current
-    /// context: a marker comment's body or a double-quoted attribute value.
+    /// Writes the source with escaping for the writer's current HTML context.
     pub(crate) fn write(&self, parts: &mut PartsWriter<'_>) {
         for part in &self.parts {
             match part {
@@ -89,8 +81,7 @@ impl Js {
     }
 }
 
-/// The source as the value of a `data-topcoat-*` attribute, like an event
-/// handler or a bind expression.
+/// Renders the source as an HTML attribute value.
 impl AttributeValueViewParts for Js {
     #[inline]
     fn attribute_present(&self) -> bool {
@@ -133,8 +124,7 @@ impl JsBuilder {
         self
     }
 
-    /// Appends a captured value, serialized now so the Rust expression can
-    /// consume it afterwards.
+    /// Serializes and appends a captured value.
     ///
     /// # Panics
     ///

@@ -13,16 +13,12 @@ use crate::{AssetConfig, config::Host};
 
 /// Registers assets on a [`RouterBuilder`].
 ///
-/// Implemented for [`RouterBuilder`] so it is in scope wherever a router is
-/// being built, enabling the [`assets`](Self::assets) method.
+/// Import this trait to call [`assets`](Self::assets) on a [`RouterBuilder`].
 pub trait RouterBuilderAssetExt {
     /// Registers an [`AssetConfig`] on the router.
     ///
-    /// The configuration is registered with the app context, where
-    /// [`asset_config`](crate::asset_config) and
-    /// [`bundled_asset`](crate::bundled_asset) read it back, and
-    /// [`Asset`](crate::Asset) handles used as attribute values in the `view!`
-    /// macro get rendered as the URL the asset is hosted at.
+    /// Views use the configuration to render [`Asset`](crate::Asset) values
+    /// as URLs.
     ///
     /// A serving configuration ([`AssetConfig::serve`](crate::AssetConfig::serve))
     /// also adds an HTTP route for each bundled file, served by the

@@ -46,9 +46,6 @@ pub enum ToggleSize {
 
 impl ToggleSize {
     /// The Tailwind classes for this size.
-    ///
-    /// The sizes line up with the button's, so a toggle sits in a row of
-    /// buttons without standing out.
     fn classes(self) -> StaticClass {
         match self {
             Self::Sm => class!("h-8 gap-1.5 rounded-md px-2"),
@@ -59,10 +56,6 @@ impl ToggleSize {
 }
 
 /// The classes shared by every toggle, regardless of size.
-///
-/// The state lives in an `<input>` the label wraps, so the label styles
-/// itself from the state of the control inside it: tinted while pressed, rung
-/// while the control has keyboard focus, and faded while it is disabled.
 const BASE: StaticClass = class!(
     "inline-flex shrink-0 cursor-pointer items-center justify-center border \
      border-transparent text-sm font-medium whitespace-nowrap transition-colors select-none \
@@ -73,16 +66,14 @@ const BASE: StaticClass = class!(
      has-[:disabled]:pointer-events-none has-[:disabled]:opacity-50",
 );
 
-/// A toggle component: a button that stays pressed.
+/// A control that stays pressed when selected.
 ///
-/// The pressed state is the browser's to keep: the toggle is a `<label>`
-/// around a hidden `<input>`, so it needs no scripting and submits with the
-/// form around it. The `kind` decides which input that is, and so whether the
-/// toggle presses on its own or lets go of the others in its group; the
-/// `name` among the `attrs` is what forms the group. Child nodes become the
-/// toggle's content, and the `attrs` (such as `name`, `value`, `checked`, or
-/// `disabled`) are forwarded to the `<input>`; a `class` among them is
-/// appended to the label's computed classes.
+/// The native input preserves its state and submits with its form without
+/// scripting. Use `kind` to choose independent or exclusive selection. Give
+/// exclusive toggles the same `name` to group them.
+///
+/// Child content supplies the label. Attributes are forwarded to the `<input>`,
+/// while classes are appended to the wrapping label.
 ///
 /// ```ignore
 /// view! {
@@ -119,11 +110,10 @@ pub async fn toggle(
     })
 }
 
-/// A row of [`toggle`]s that belong together.
+/// A row of related toggles.
 ///
-/// The group is a rail the toggles sit in, which reads as one control rather
-/// than as loose buttons. It only lays them out: what ties exclusive toggles
-/// together is still the `name` they share.
+/// This component controls layout. Give exclusive toggles the same `name` to
+/// make them share a selection.
 ///
 /// ```ignore
 /// view! {

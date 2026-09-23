@@ -19,10 +19,8 @@ pub struct AssetBundle {
 impl AssetBundle {
     /// Load the bundle sitting next to the current executable.
     ///
-    /// The bundler writes to an `assets` directory beside the executable it
-    /// scanned, so `<exe_dir>/assets` is where a bundle belongs: `cargo run`
-    /// finds `target/<profile>/assets`, and a deployment ships the directory
-    /// alongside the binary.
+    /// Reads the `assets` directory beside the executable. Deploy that
+    /// directory alongside the matching binary.
     ///
     /// Use [`AssetBundle::load_dir`] when the bundle lives anywhere else, such
     /// as a custom path passed to the asset bundler with `--out`.
@@ -61,10 +59,7 @@ impl AssetBundle {
     /// resolved like any other filesystem path, so a relative path is relative
     /// to the process working directory, not to the Cargo package or workspace.
     ///
-    /// This is useful when your application controls where bundles are written,
-    /// for example `dist/assets` or another deployment-specific location. Use
-    /// [`AssetBundle::load`] instead when you want Topcoat to look for a
-    /// conventional `assets` directory near the current executable.
+    /// Use [`AssetBundle::load`] for the default location beside the executable.
     ///
     /// # Errors
     ///

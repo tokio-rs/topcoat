@@ -3,14 +3,10 @@ use topcoat::{
     view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
-/// A radio group component: a set of options of which one can be picked.
+/// A group of options with one selection.
 ///
-/// The group is a container; what ties its options together is the `name`
-/// they share, which is how the browser knows to let go of one when another
-/// is picked. Give every [`radio_group_item`] in the group the same `name`,
-/// and the one that starts out picked a `checked` attribute. The `attrs`
-/// (such as `class`) are forwarded to the underlying `<div>`; a `class` among
-/// them is appended to the computed classes.
+/// Give every item the same `name` and mark the initial selection `checked`.
+/// Attributes are forwarded to the `<div>`, and classes are appended.
 ///
 /// ```ignore
 /// view! {
@@ -44,12 +40,6 @@ pub async fn radio_group(
 
 /// The classes for the native `<input type="radio">` inside a
 /// [`radio_group_item`].
-///
-/// The native glyph is suppressed with `appearance-none` so the component can
-/// draw its own dot, which keeps the control looking the same across
-/// browsers. The circle matches the input control's border, and
-/// picking it recolors the ring rather than filling it, which leaves room for
-/// the dot inside.
 const RADIO: StaticClass = class!(
     "peer size-4 shrink-0 appearance-none rounded-full border border-border \
      bg-background transition-colors outline-none checked:border-primary \
@@ -63,11 +53,10 @@ const DOT: StaticClass = class!(
      opacity-0 transition-opacity peer-checked:opacity-100",
 );
 
-/// One option of a [`radio_group`]: a themed native `<input type="radio">`.
+/// A themed native radio button.
 ///
-/// The `attrs` (such as `name`, `value`, `checked`, or `disabled`) are
-/// forwarded to the `<input>`; a `class` among them is appended to the
-/// wrapping element's classes. Pair it with a `label` naming the option.
+/// Pair it with a label. Attributes are forwarded to the `<input>`, while
+/// classes are appended to the wrapper.
 #[component]
 pub async fn radio_group_item(#[default] mut attrs: Attributes) -> Result<impl View> {
     // The dot cannot be drawn by the `<input>` itself, which renders no

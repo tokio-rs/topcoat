@@ -10,10 +10,8 @@ use crate::{
 
 /// HTML request extractor and response wrapper.
 ///
-/// As a response, wrap any value convertible into a [`Body`] (such as a
-/// `String`) to reply with `Content-Type: text/html`. Rendered pages are
-/// wrapped in `Html` automatically; use it directly from a
-/// [`route`](../topcoat_router_macro/attr.route.html) that returns markup by hand.
+/// Wrap a value convertible into [`Body`] to return it with
+/// `Content-Type: text/html`.
 ///
 /// As a request extractor, `Html<String>` requires a `Content-Type: text/html`
 /// header and yields the body as text.

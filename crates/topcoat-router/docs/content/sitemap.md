@@ -4,7 +4,7 @@ A [sitemap](https://www.sitemaps.org) lists the URLs of a site so crawlers can d
 
 # Serving a sitemap
 
-Crawlers expect the sitemap at `/sitemap.xml`. Add entries with [`url`](Sitemap::url), which takes a path string or a [`SitemapUrl`] carrying the optional fields, and [`urls`](Sitemap::urls), which adds every entry of an iterator, such as one built from the rows of a database query.
+Serve the sitemap at a URL such as `/sitemap.xml`. Add a path or [`SitemapUrl`] with [`url`](Sitemap::url), or add an iterator of entries with [`urls`](Sitemap::urls):
 
 ```rust
 use topcoat::{
@@ -37,7 +37,7 @@ let router = Router::builder().base_url("https://example.com").build();
 
 Beyond its location, a [`SitemapUrl`] carries the optional metadata of the sitemap format. Every builder method replaces the field it sets.
 
-- [`last_modified`](SitemapUrl::last_modified) is the time the page last changed. It accepts anything convertible into a `SystemTime`, which covers the timestamp types of the common date and time crates.
+- [`last_modified`](SitemapUrl::last_modified) is the time the page last changed, as a value convertible into `SystemTime`.
 - [`change_frequency`](SitemapUrl::change_frequency) hints how often crawlers should revisit the page, from [`Always`](ChangeFrequency::Always) for a page that changes on every access to [`Never`](ChangeFrequency::Never) for an archived one.
 - [`priority`](SitemapUrl::priority) ranks the page relative to the other pages of the site, from `0.0` to `1.0`; crawlers treat an entry without a priority as `0.5`.
 

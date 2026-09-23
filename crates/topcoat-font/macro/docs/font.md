@@ -1,12 +1,12 @@
 Declares a [`Font`] from a family name and its faces, and registers it for discovery.
 
-Expands to a `const` [`Font`]. With the `discover` feature, it is also registered so [`discover_fonts`] finds it; without it, register the returned font manually with [`RouterBuilder::font`].
+The returned [`Font`] can be stored in a constant. With the `discover` feature, [`discover_fonts`] registers it on the router. Otherwise, register it with [`RouterBuilder::font`].
 
 The faces can be given in one of two forms.
 
 # CSS-like form
 
-Follow the family name with one or more CSS [`@font-face`]-like blocks. The family name is given once and injected into every block, so the faces read like a CSS stylesheet without repeating it. Each `@font-face { ... }` block is a [`font_face!`] body (minus its `font-family`).
+Follow the family name with one or more [`@font-face`] blocks. Each uses [`font_face!`] syntax with the family name supplied by the macro:
 
 ```rust
 # use topcoat::font::{Font, font};
@@ -26,7 +26,7 @@ const INTER: Font = font! {
 
 # Expression form
 
-Alternatively, follow the family name with a single expression that evaluates to the faces: anything convertible into [`FontFaces`], such as a `Vec<FontFace>`. This uses ordinary Rust syntax instead of the CSS-like blocks, which is handy when the faces are built up programmatically or shared between fonts:
+To build faces in Rust, pass an expression convertible into [`FontFaces`]:
 
 ```rust
 # use topcoat::font::{Font, FontFace, FontFormat, FontSource, font};

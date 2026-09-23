@@ -6,16 +6,9 @@ use crate::{Cookie, Cookies};
 
 /// A typed value backed by a single cookie.
 ///
-/// A `CookieStore` holds a deserialized `T` in memory and writes it back to its
-/// cookie as JSON on [`commit`](Self::commit). It is built from any [`Cookies`]
-/// jar, so signing, encryption, prefixes, and default attributes all compose
-/// through the jar it wraps.
-///
-/// Reads and mutations operate on the in-memory value only. **Nothing is written
-/// to the response until [`commit`](Self::commit) is called**; dropping the store
-/// (or calling [`rollback`](Self::rollback)) discards any pending changes. This
-/// makes it easy to update a cookie only once some other work has succeeded:
-/// just hold off on `commit` until then.
+/// Holds a value in memory and saves it as JSON through the configured jar
+/// when [`commit`](Self::commit) is called. Dropping the store or calling
+/// [`rollback`](Self::rollback) discards uncommitted changes.
 ///
 /// Obtain one by reading the incoming cookie through [`cookie_store`]:
 ///
@@ -126,9 +119,7 @@ where
     /// Serializes the current value, queues it on the backing jar as a
     /// `Set-Cookie`, and returns the value.
     ///
-    /// This is the only method that writes anything: until it is called, the
-    /// store's value lives only in memory. Returns an error if the value cannot
-    /// be serialized.
+    /// Changes to the value remain in memory until this method is called.
     ///
     /// # Errors
     ///

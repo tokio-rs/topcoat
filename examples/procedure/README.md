@@ -1,6 +1,6 @@
 # Procedure
 
-A `#[procedure]` function called straight from a browser event handler, with its return value written back into a signal.
+Call a server function from a browser event handler with `#[procedure]`.
 
 Run it with:
 

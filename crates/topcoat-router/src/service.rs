@@ -31,9 +31,7 @@ use crate::{Body, Listener, RemoteAddr, Router, request::Request, response::Resp
 ///     RouterService::new(Router::builder().build()).shutdown_timeout(Duration::from_secs(5));
 /// ```
 ///
-/// The wrapped [`Router`] is shared behind an [`Arc`], so the service is cheap
-/// to clone. The serve functions derive a clone for each accepted connection
-/// that stamps the connection's [`RemoteAddr`] on every request it serves.
+/// Clones share the same router and application state.
 #[derive(Clone)]
 pub struct RouterService {
     router: Arc<Router>,
@@ -102,13 +100,10 @@ impl Service<Request<Incoming>> for RouterService {
 /// Serves a [`RouterService`] on an already-bound [`Listener`] until
 /// `shutdown` completes.
 ///
-/// This is the low-level accept loop, with no dev-server integration: it
-/// accepts connections in a loop, serving each on its own task. When the
-/// `shutdown` future completes, the listener is dropped and every open
-/// connection finishes its in-flight request (up to the service's shutdown
-/// timeout) before the call returns. Applications typically use the facade's
-/// `serve`/`start` helpers, which layer a default shutdown signal and
-/// dev-server readiness notification on top of this.
+/// When `shutdown` completes, the server stops accepting connections and waits
+/// for in-flight requests up to the configured shutdown timeout. Use this when
+/// supplying your own shutdown signal. Most applications can use
+/// `topcoat::serve` or `topcoat::start`.
 ///
 /// # Errors
 ///

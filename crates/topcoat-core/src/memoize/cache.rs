@@ -12,21 +12,14 @@ use siphasher::sip128::{Hasher128, SipHasher13};
 use super::cell::{AsyncMemoizeCell, SyncMemoizeCell};
 use crate::context::Cx;
 
-/// The per-request store backing `#[memoize]`.
+/// Cached function results for one request.
 ///
-/// An entry's identity is a 128 bit SipHash over the memoized function's `TypeId` and its
-/// arguments, computed through the standard `Hash` trait. The hash is the whole key: the
-/// cache keeps no owned copy of the arguments and runs no equality check. At 128 bits a
-/// collision within a request is vanishingly unlikely, and the per-process random hash keys
-/// keep colliding arguments from being crafted offline.
+/// Entries are keyed by a hash of the function type and arguments. The cache
+/// does not retain or compare the arguments, so a hash collision can reuse
+/// another call's result.
 ///
-/// This trades on the `Hash` contract in one place: an impl that feeds identical bytes for
-/// values its `Eq` distinguishes would make those values share an entry. Derived and standard
-/// library impls distinguish everything they compare.
-///
-/// Request context is not part of the hash. An entry instead holds one variant per set of
-/// context bindings its body was observed under, validated against the caller's scope on
-/// every lookup.
+/// A result is reused only when its recorded request context reads match
+/// the caller's scope.
 #[derive(Default)]
 #[doc(hidden)]
 pub struct MemoizeCache {
@@ -74,16 +67,11 @@ impl MemoizeCache {
             .expect("entries of distinct types collided on a 128 bit memoize hash")
     }
 
-    /// Runs `f(cx, params)` at most once per `(F, key)` and set of observed context bindings,
-    /// returning a reference to the cached result. `key` is the borrowed lookup key (e.g.
-    /// `(&str,)`); `params` is what gets passed to `f` on a miss.
+    /// Returns the cached result for `(F, key)` and the context values read by
+    /// the function. Calls `f(cx, params)` when no result matches.
     ///
-    /// The body runs with its request context reads tracked. A cached result is reused only
-    /// by callers whose scope still resolves every read the body made to the binding it
-    /// observed; a caller whose scope disagrees (a value shadowed or added via `Cx::with`)
-    /// computes its own variant. Bindings the body registers itself are not dependencies.
-    /// A reused or freshly computed variant replays its reads into an enclosing tracked
-    /// call, so nested memoized calls propagate their dependencies outward.
+    /// Context values registered by the body are not dependencies. Reads
+    /// propagate to enclosing memoized calls, including when a result is reused.
     pub fn memoize<'a, K, P, V, F>(&'a self, cx: &'a Cx, key: K, params: P, f: F) -> &'a V
     where
         K: Hash,
@@ -125,8 +113,8 @@ impl MemoizeCache {
         cell.reuse(cx)
     }
 
-    /// Async counterpart to [`memoize`](Self::memoize). Concurrent callers with the same key
-    /// and scope share a single in-flight computation via the cell's gate.
+    /// Async counterpart to [`memoize`](Self::memoize). Concurrent callers
+    /// with the same key and scope share one computation.
     pub async fn memoize_async<'a, K, P, V, F, Fut>(
         &'a self,
         cx: &'a Cx,

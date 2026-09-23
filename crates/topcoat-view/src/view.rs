@@ -14,8 +14,7 @@ use crate::{RegionId, buffer::ViewHandle};
 pub struct ViewFirst {
     /// The content, ready to render with the surrounding document.
     pub content: ViewHandle,
-    /// Whether the view can still change the content through
-    /// [`View::poll_swap`] after it went out.
+    /// Whether [`View::poll_swap`] can yield updates to this content.
     pub live: bool,
 }
 
@@ -29,12 +28,11 @@ pub struct ViewSwap {
     pub replacement: ViewHandle,
 }
 
-/// The value a live region's body returns to show it emitted content.
+/// The return value of a successful emission in a live region.
 ///
-/// The `emit!` macro evaluates to a [`Result`] carrying this token, and a
-/// `live!` body returns one, so ending the body with an emission is the
-/// natural way to satisfy the type. The `live!` guide describes the token
-/// and how to construct one when the body does not end with an emission.
+/// End a `live!` body with `emit!` to return this token. Constructing the
+/// token directly does not emit content; the body must still emit at least
+/// once.
 #[derive(Debug)]
 pub struct EmitToken;
 

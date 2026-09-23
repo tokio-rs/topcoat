@@ -1,4 +1,4 @@
-Constructs a [`Font`] from the [Fontsource] catalog, which can be a whole family's worth of [`FontFace`]s, one for each combination of the weights, styles, and subsets you ask for.
+Constructs a [`Font`] from a family in the [Fontsource] catalog.
 
 ```rust
 # use topcoat::font::*;
@@ -29,13 +29,13 @@ The resulting font includes one font face per combination of parameters. Each co
 
 The **family** comes first, as the name of its [`families`] constant (e.g. `ROBOTO`).
 
-The remaining arguments each take either a single value or a bracketed list of them, `[a, b]`, to fan out across:
+The `weight`, `style`, and `subset` arguments accept a single value or a bracketed list such as `[400, 700]`. The font includes each requested combination.
 
 **`weight`** is a number in `100..=900`. Omit it for every weight the family ships.
 
 **`style`** is [`Normal`] or [`Italic`]. Omit it for every style the family ships.
 
-**`subset`** is a block of characters such as [`Latin`] or [`Cyrillic`], and sets each face's `unicode-range`. Omit it for the family's default subset alone: unlike weight and style, leaving it out does *not* pull in everything.
+**`subset`** selects characters such as [`Latin`] or [`Cyrillic`] and sets each face's `unicode-range`. It defaults to the family's default subset.
 
 **`host`** says where the files are loaded from, and takes a single value rather than a list. It defaults to [`JsDelivr`], which links the fonts on the [jsDelivr] CDN. Pass [`Asset`] instead to download them at build time and serve them from your own origin as content-hashed Topcoat [`Asset`][asset-type]s: this needs the `asset` feature.
 
@@ -59,7 +59,7 @@ fontsource_font!(ROBOTO, host: Asset)
 
 # Single faces
 
-To manage individual font faces reach for [`fontsource_font_face!`], which takes a single weight, style, and subset and expands to a lone [`FontFace`].
+Use [`fontsource_font_face!`] to create a single [`FontFace`].
 
 [Fontsource]: https://fontsource.org/
 [jsDelivr]: https://www.jsdelivr.com/

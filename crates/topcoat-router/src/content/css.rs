@@ -10,10 +10,8 @@ use crate::{
 
 /// CSS request extractor and response wrapper.
 ///
-/// As a response, wrap any value convertible into a [`Body`] (such as a
-/// `String`) to reply with `Content-Type: text/css`. Use it directly from a
-/// [`route`](../topcoat_router_macro/attr.route.html) that returns a stylesheet
-/// by hand.
+/// Wrap a value convertible into [`Body`] to return it with
+/// `Content-Type: text/css`.
 ///
 /// As a request extractor, `Css<String>` requires a `Content-Type: text/css`
 /// header and yields the body as text.

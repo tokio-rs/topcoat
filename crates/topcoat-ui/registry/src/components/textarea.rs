@@ -4,11 +4,6 @@ use topcoat::{
 };
 
 /// The classes for the [`textarea`] control.
-///
-/// The text size, radius, and focus ring match the input control.
-/// `field-sizing-content` lets the control grow with its content, from the
-/// two-line minimum height; browsers without support keep the fixed minimum
-/// and scroll.
 const TEXTAREA: StaticClass = class!(
     "field-sizing-content min-h-16 w-full rounded-lg border border-border \
      bg-transparent px-3 py-2 text-sm transition-colors outline-none \
@@ -18,15 +13,12 @@ const TEXTAREA: StaticClass = class!(
      focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
 );
 
-/// A multi-line text input component.
+/// A multiline text input that grows with its content where supported.
 ///
-/// The `attrs` (such as `name`, `placeholder`, `rows`, `disabled`, or event
-/// handlers) are forwarded to the underlying `<textarea>`; a `class` among
-/// them is appended to the computed classes. Child nodes become the control's
-/// initial value. The textarea fills its container, so size it through the
-/// container or with a width class; it grows with its content from a
-/// two-line minimum.
-/// Set `aria-invalid="true"` to use the error border and focus ring.
+/// Child content supplies the initial value. Attributes are forwarded to the
+/// `<textarea>`, and classes are appended. It fills its container and starts at
+/// a two-line minimum height. Use a width class to size it directly, or
+/// `aria-invalid="true"` to show its error styling.
 ///
 /// ```ignore
 /// view! {

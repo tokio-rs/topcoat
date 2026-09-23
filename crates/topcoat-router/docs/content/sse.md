@@ -4,7 +4,7 @@ Server-sent events (SSE) push a one-way stream of events from the server to the 
 
 # Streaming events
 
-A route becomes an event stream by returning [`Sse`] wrapping the stream of events to send. An [`Event`] is assembled field by field: [`data`](Event::data) carries the payload ([`json_data`](Event::json_data) serializes a value to JSON), [`event`](Event::event) names the type an `EventSource` dispatches to its listeners, and [`id`](Event::id) and [`retry`](Event::retry) drive reconnection.
+Return [`Sse`] with a stream of [`Event`] values. Set each event's payload with [`data`](Event::data), and use [`event`](Event::event) to give it a name that clients can listen for:
 
 ```rust
 use futures_core::Stream;
@@ -59,7 +59,7 @@ async fn greetings(cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + us
 
 # Keeping quiet streams alive
 
-Proxies and load balancers drop connections that look stale. [`keep_alive`](Sse::keep_alive) fills idle gaps with events the client ignores: [`KeepAlive::new`] sends an empty comment after 15 idle seconds, and [`interval`](KeepAlive::interval), [`text`](KeepAlive::text), and [`event`](KeepAlive::event) tune what is sent and when.
+Proxies may close idle connections. Enable [`keep_alive`](Sse::keep_alive) to send comments while the event stream is quiet. Use [`KeepAlive`] to configure their interval and content.
 
 # Resuming after a reconnect
 

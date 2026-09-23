@@ -1,8 +1,4 @@
-//! Checking the CLI against the `topcoat` version a project depends on.
-//!
-//! The CLI drives the framework through code it generates and reads, so the two
-//! have to agree. Every Topcoat crate is released under one version, which makes
-//! the CLI's own version the version of `topcoat` it can drive.
+//! Checks whether the project's Topcoat dependency is compatible with the CLI.
 
 use std::{
     fmt::{self, Display},
@@ -22,8 +18,7 @@ const LOCKFILE: &str = "Cargo.lock";
 /// The environment variable that silences the check.
 const OPT_OUT: &str = "TOPCOAT_NO_VERSION_CHECK";
 
-/// Warns when the project the CLI runs in depends on a `topcoat` version this
-/// CLI cannot drive.
+/// Warns when the project depends on an incompatible `topcoat` version.
 ///
 /// The check is best effort and never fails a command. It stays quiet outside a
 /// cargo workspace, when the workspace has no lockfile yet or does not depend on
@@ -76,10 +71,7 @@ struct Mismatch {
 
 /// Every [`Mismatch`] in `lockfile`.
 ///
-/// Cargo unifies semver-compatible requirements, so a lockfile holds one entry
-/// per incompatible `topcoat` version a project pulls in. Each is reported on
-/// its own: a project spanning two incompatible versions has no CLI that drives
-/// all of it.
+/// Reports each incompatible version separately.
 fn mismatches(lockfile: &str, cli: Compat) -> Vec<Mismatch> {
     let Ok(lockfile) = toml::from_str::<Lockfile>(lockfile) else {
         return Vec::new();

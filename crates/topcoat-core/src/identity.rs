@@ -123,10 +123,7 @@ impl fmt::Display for Identity {
 
 /// Parses an identity from its hash, as written by `Display`.
 ///
-/// The result carries no ambiguity: a hash is only worth carrying forward
-/// once its identity was consumed, which an ambiguous identity refuses.
-/// This is the door for re-entering a subtree in another request at an
-/// identity captured earlier, for example one a client sends back.
+/// The parsed identity carries no ambiguity information.
 impl FromStr for Identity {
     type Err = ParseIdentityError;
 

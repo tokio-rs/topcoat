@@ -33,10 +33,8 @@ use crate::{
 pub struct View {
     /// The request context binding supplied by a leading `cx =>` argument.
     ///
-    /// Inside a `#[component]`, `#[page]`, `#[layout]`, or `#[shard]`, the
-    /// context is available implicitly, so this is [`None`]. Anywhere else
-    /// (for example a `#[route]` handler), the caller names it explicitly as
-    /// `view! { cx => ... }` and the rest of the view renders against it.
+    /// `None` uses the context already in scope. An explicit
+    /// `view! { cx => ... }` renders against the named context.
     pub cx: Option<LeadingCx>,
     pub nodes: Nodes,
 }

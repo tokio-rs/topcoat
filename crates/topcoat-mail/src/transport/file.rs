@@ -19,12 +19,8 @@ use crate::{
 /// let transport = FileTransport::new("target/mail");
 /// ```
 ///
-/// Files land in the given directory (created on first send). The name
-/// carries the UTC send time and the start of the `Message-ID`, like
-/// `20260726-143502-1a2b3c4d.eml`, so a directory listing shows sends
-/// in order. Any mail client or editor opens the format. Unlike the wire
-/// form a delivering transport produces, the file keeps the `Bcc` header,
-/// so the full recipient list stays inspectable.
+/// The directory is created on the first send. Files include the `Bcc` header
+/// so you can inspect all recipients.
 ///
 /// The file is written with blocking I/O on the calling task, which is fine
 /// for development but makes this transport unsuited for production

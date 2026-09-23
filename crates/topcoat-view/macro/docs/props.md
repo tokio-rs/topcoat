@@ -1,6 +1,6 @@
-Derives a typestate builder for a props struct.
+Derives a builder that checks required properties at compile time.
 
-For a struct `ButtonProps`, the derive generates a `ButtonPropsBuilder` whose `build()` method only becomes available once every required property has been set. Forgetting a property is a compile error, not a runtime panic.
+For a struct `ButtonProps`, the derive generates a `ButtonPropsBuilder`. Call `ButtonProps::builder()`, set the properties, then call `build()`. The call to `build()` only compiles when every required property has been set.
 
 ```rust
 # use topcoat::view::Props;
@@ -22,7 +22,7 @@ let props = ButtonProps::builder()
 
 # Field Attributes
 
-Fields can be annotated with special attributes to modify the builder's behavior:
+Use these field attributes to control the builder:
 
 - `#[default]` makes a property optional. If it is not set, the field is filled with [`Default::default()`], so its type must implement [`Default`]. Use `#[default(expr)]` to supply a custom fallback instead, evaluated only when the property is not set; the type need not implement [`Default`] in that case.
 - `#[into]` makes the generated setter accept any `impl Into<T>` instead of `T`, so callers can pass convertible values like a `&str` for a `String` field and the setter performs the conversion.

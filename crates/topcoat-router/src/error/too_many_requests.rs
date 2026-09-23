@@ -6,16 +6,8 @@ use crate::response::{IntoResponse, Response};
 /// Builds a too-many-requests (HTTP 429) response carrying a `Retry-After`
 /// hint, in seconds.
 ///
-/// Return this when a caller has exceeded a limit you set for them: a rate
-/// limit, a quota, a per-account cap. It says the request was refused because
-/// of who sent it and how often, which is what separates it from
-/// [`service_unavailable`](crate::error::service_unavailable) — that one says
-/// the server as a whole is at capacity, and applies to every caller at once.
-/// A client that can tell the two apart can back off its own traffic in the
-/// first case and fail over in the second.
-///
-/// `Retry-After` is what makes the refusal actionable. Without it a rate
-/// limiter teaches callers nothing except to retry immediately.
+/// Use this when the caller exceeds a rate limit or quota. The `Retry-After`
+/// header tells the client how many seconds to wait before trying again.
 ///
 /// # Examples
 ///

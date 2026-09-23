@@ -1,4 +1,4 @@
-Expands to `const` [`IconData`] icons from a staged [Iconify] icon set.
+Declares [`IconData`] constants from a staged [Iconify] icon set.
 
 ```rust,ignore
 iconify::include!("feather");
@@ -8,7 +8,7 @@ view! {
 }
 ```
 
-Iconify aggregates the icons of over 150 open source icon sets. The staged set is read at compile time, so every reference is checked while you build: an unknown set or icon name is a compile error with near-miss suggestions.
+Unknown set or icon names produce compile errors with suggestions for similar names.
 
 # Selections
 
@@ -45,7 +45,7 @@ fn main() {
 
 # Single icons
 
-This macro expands to items. To use an icon as an expression instead, inline in a view or behind a name of your choosing, reach for [`iconify_icon!`], which takes a single `"set:icon"` reference and expands to a const-evaluable [`IconData`] expression.
+Use [`iconify_icon!`] to get one icon as a value, for example inside a view.
 
 [Iconify]: https://iconify.design/
 [`IconData`]: ../struct.IconData.html

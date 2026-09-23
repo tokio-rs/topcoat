@@ -23,10 +23,8 @@ const APPLICATION_OCTET_STREAM: HeaderValue = HeaderValue::from_static("applicat
 
 /// Converts a value into an HTTP [`Response`].
 ///
-/// Route handlers return any type that implements this trait; the router
-/// converts it through [`AsyncIntoResponse`], which every implementation
-/// gets for free. The conversion receives the request [`Cx`], so a response
-/// can depend on request-scoped state.
+/// Implement this trait to return your type from a route handler. The request
+/// [`Cx`] lets the conversion read request-scoped state.
 ///
 /// A response can also be assembled from a tuple. The last element is converted
 /// with `IntoResponse` and becomes the body, while the earlier elements modify
@@ -102,11 +100,9 @@ impl<T: IntoResponse> AsyncIntoResponse for T {
 
 /// Modifies a [`Response`]'s [`Parts`] without supplying a body.
 ///
-/// Types that implement this trait (header arrays, [`HeaderMap`],
-/// [`Extensions`], and their [`Option`] wrappers) can appear before the final
-/// body element of an [`IntoResponse`] tuple to attach headers or extensions to
-/// the response. The conversion receives the request [`Cx`] so a part can
-/// depend on request-scoped state.
+/// Values implementing this trait can appear before the body in an
+/// [`IntoResponse`] tuple. The request [`Cx`] lets the conversion read
+/// request-scoped state.
 pub trait IntoResponseParts {
     /// Applies `self` to the response `parts`, using the request [`Cx`] for any
     /// request-scoped data.

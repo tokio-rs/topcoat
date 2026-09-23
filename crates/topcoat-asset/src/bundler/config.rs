@@ -14,7 +14,7 @@ pub const DEFAULT_TIMEOUT: Duration = Duration::from_mins(1);
 /// [`connect_timeout`](BundlerConfig::connect_timeout) is unset.
 pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// Tuning knobs for a [`Bundler`](super::Bundler).
+/// Configuration for a [`Bundler`](super::Bundler).
 ///
 /// Every field is optional; [`BundlerConfig::new`] leaves them all at
 /// their defaults, and each builder method overrides one of them.
@@ -41,7 +41,7 @@ pub struct BundlerConfig {
 }
 
 impl BundlerConfig {
-    /// A config with every knob at its default.
+    /// Creates a configuration with default settings.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
@@ -55,10 +55,7 @@ impl BundlerConfig {
 
     /// How many assets to process concurrently.
     ///
-    /// Each worker handles one asset at a time -- reading or downloading
-    /// it, hashing it, and writing it into the bundle -- so this is
-    /// effectively the number of downloads in flight. Defaults to
-    /// [`DEFAULT_PARALLELISM`]; a value of `0` is treated as `1`.
+    /// Defaults to [`DEFAULT_PARALLELISM`]. A value of `0` is treated as `1`.
     #[must_use]
     pub fn parallelism(mut self, parallelism: usize) -> Self {
         self.parallelism = Some(parallelism);

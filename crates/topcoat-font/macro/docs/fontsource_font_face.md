@@ -1,4 +1,4 @@
-Constructs a [`FontFace`] for one face from the [Fontsource] catalog, picked out by family and the weight, style, and subset that narrow it to a single font file. The family comes first as the name of its [`families`] constant; the rest are `name: value` arguments in any order. `weight` and `style` are required, `subset`, `display`, and `host` are optional.
+Constructs a single [`FontFace`] from the [Fontsource] catalog. Give the family name first, then `name: value` arguments in any order. `weight` and `style` are required.
 
 ```rust
 # use topcoat::font::*;
@@ -45,7 +45,7 @@ fontsource_font_face!(
 
 # Whole families
 
-This macro builds one face at a time. To pull in a family across several weights, styles, or subsets at once, reach for [`fontsource_font!`], which takes every weight, style, and subset you give it and expands to a [`Font`] of the resulting faces.
+Use [`fontsource_font!`] to create a [`Font`] with several faces.
 
 [Fontsource]: https://fontsource.org/
 [jsDelivr]: https://www.jsdelivr.com/

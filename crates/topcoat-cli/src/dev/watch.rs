@@ -35,11 +35,9 @@ pub enum Change {
 /// Watches every local package in the dependency graph and coalesces bursts
 /// of filesystem events into single change notifications.
 ///
-/// "Local" covers the workspace members and every path dependency they pull
-/// in, wherever it lives on disk. Within each package directory everything
-/// except gitignored paths, hidden entries, editor temp files, and the cargo
-/// target directory is watched: manifests, build scripts, and files embedded
-/// with `asset!` or `include_str!` trigger rebuilds just like Rust sources.
+/// Includes workspace members and path dependencies. Ignores gitignored
+/// paths, hidden entries, editor temporary files, and the Cargo target
+/// directory. All other package files can trigger a rebuild.
 pub struct SourceWatcher {
     watcher: notify::RecommendedWatcher,
     events: mpsc::UnboundedReceiver<Change>,
@@ -110,10 +108,8 @@ impl SourceWatcher {
 
     /// Wait until a watched file changes.
     ///
-    /// A burst of events (a save producing several events, a branch switch
-    /// touching many files) is reported as a single change: the call returns
-    /// once the burst has been quiet for [`DEBOUNCE`]. A [`Change::Manifest`]
-    /// anywhere in the burst takes precedence over plain source changes.
+    /// Reports a burst as one change after [`DEBOUNCE`] without new events.
+    /// A [`Change::Manifest`] takes precedence over other changes in the burst.
     ///
     /// Cancel-safe: a change observed before cancellation is remembered and
     /// reported by the next call.

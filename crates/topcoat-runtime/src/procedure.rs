@@ -35,9 +35,7 @@ pub type ProcedureFuture<'cx> = Pin<Box<dyn Future<Output = Result<Response>> + 
 
 /// An async server function callable from the client runtime.
 ///
-/// Registered into a [`RouterBuilder`] with
-/// [`procedure`](RouterBuilderProcedureExt::procedure), which serves it as a
-/// route dispatched by [`ProcedureId`].
+/// Register it with [`procedure`](RouterBuilderProcedureExt::procedure).
 pub trait Procedure: Send + Sync + 'static {
     /// The identity of this procedure.
     fn id(&self) -> ProcedureId;
@@ -138,10 +136,7 @@ impl RouterBuilderProcedureExt for RouterBuilder {
 /// The surrogate a [`Procedure`] value turns into inside a runtime
 /// expression.
 ///
-/// Captured as a `&'static` reference, so closures inside the expression can
-/// hold it without borrowing a local. Serializes as the procedure's id, so
-/// the browser can call it back, and exposes the typed [`call`](Self::call)
-/// that runtime expressions invoke.
+/// Its [`call`](Self::call) method can only run in the browser.
 pub struct ProcedureSurrogate<P>(P);
 
 impl<P: TypedProcedure> ProcedureSurrogate<P> {

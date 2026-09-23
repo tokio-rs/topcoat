@@ -11,12 +11,11 @@ use crate::{
     view::{View, component, view},
 };
 
-/// Notify the topcoat dev server that the application is ready.
+/// Notifies the dev server that the application is ready.
 ///
-/// Connects to the dev server's WebSocket endpoint (derived from the
-/// `TOPCOAT_DEV_URL` HTTP base URL provided by `topcoat dev`) and sends a
-/// ready message with the application listener address when available. Does
-/// nothing if the env var is not set.
+/// Reports the listener address when supplied. Does nothing when
+/// `TOPCOAT_DEV_URL` is unset. Use this when starting a server without
+/// Topcoat's serving helpers.
 #[cfg(feature = "serve")]
 pub async fn notify_ready(addr: Option<SocketAddr>) {
     let Ok(base) = std::env::var("TOPCOAT_DEV_URL") else {
@@ -50,10 +49,10 @@ fn http_to_ws(url: &str) -> String {
     }
 }
 
-/// Inject the `topcoat dev` client script.
+/// Loads the browser client for `topcoat dev`.
 ///
-/// The script morphs fresh HTML into the page once a new build is serving,
-/// keeping matching elements and their form state. When the runtime is
+/// The script updates the page after a successful rebuild, preserving
+/// matching elements and their form state. When the runtime is
 /// loaded, signals whose identities still match keep their values too.
 /// Moving signal calls or component invocations can change their identities.
 ///

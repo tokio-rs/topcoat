@@ -25,21 +25,14 @@ pub(crate) enum Host {
     External { base_url: String },
 }
 
-/// Asset configuration, registered on the router (with the router's `assets`
-/// extension method).
+/// Configures where asset URLs point and how files are served.
 ///
-/// Built with [`AssetConfig::serve`], which serves a loaded
-/// [`AssetBundle`](crate::AssetBundle)'s files from the application, or
-/// [`AssetConfig::hosted_at`], which points asset URLs at an external host
-/// instead. An [`AssetBundle`](crate::AssetBundle) also converts directly
-/// into its serving configuration, so the common case registers as
-/// `.assets(bundle)`.
+/// Register this with the router's `assets` method. Use [`serve`](Self::serve)
+/// to serve a bundle from the application or [`hosted_at`](Self::hosted_at)
+/// for external hosting. Passing a bundle directly as `.assets(bundle)`
+/// serves it from the application.
 ///
-/// Registering places the configuration in the app context, where
-/// [`asset_config`] reads it back: [`get`](Self::get) looks up an asset's
-/// bundled file, and [`resolve`](Self::resolve) forms the URL it is hosted
-/// at. [`Asset`] values rendered in a view resolve their URL through the same
-/// configuration.
+/// [`Asset`] values rendered in views use this configuration to resolve URLs.
 #[derive(Debug, Clone)]
 pub struct AssetConfig {
     pub(crate) catalog: AssetCatalog,
@@ -73,10 +66,8 @@ impl AssetConfig {
     /// ignored. Bundled filenames are content-hashed, so the files can be
     /// served with long-lived, immutable caching.
     ///
-    /// `assets` is anything that converts into an [`AssetCatalog`]: a loaded
-    /// [`AssetBundle`](crate::AssetBundle), or a [`Manifest`](crate::Manifest)
-    /// embedded into the binary on targets without filesystem access, such as
-    /// WebAssembly:
+    /// Pass a value convertible into [`AssetCatalog`]. A manifest is enough
+    /// when the application does not need local copies of the files:
     ///
     /// ```
     /// use topcoat::asset::{AssetConfig, Manifest};

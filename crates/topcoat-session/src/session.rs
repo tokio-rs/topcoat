@@ -3,8 +3,7 @@ use web_time::SystemTime;
 
 use crate::{TokenHash, config, state, token::Token, token_store};
 
-/// A session as the application should record it, returned by [`start`],
-/// [`refresh`], and [`rotate`].
+/// The token hash and expiry to save in the application's session storage.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Session {
     /// The hash identifying the session. Persist it next to the user it
@@ -89,10 +88,10 @@ pub async fn refresh(cx: &Cx) -> Result<Option<Session>> {
 
 /// Replaces the current session's token with a fresh one.
 ///
-/// Rotate after a privilege change (or periodically) so a previously leaked
-/// token stops working. Returns the [`Rotation`] describing the record to
-/// revoke and the session to record in its place, or `None` when the request
-/// carried no session.
+/// Use this after a privilege change. Save the replacement session and revoke
+/// the old record described by [`Rotation`]. The old token stops authenticating
+/// requests only after its record is revoked. Returns `None` if the request
+/// carried no valid token.
 ///
 /// # Errors
 ///

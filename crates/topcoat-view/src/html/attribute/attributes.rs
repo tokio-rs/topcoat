@@ -7,16 +7,13 @@ use crate::{
     AttributeValueViewParts, AttributeViewParts, HtmlContext, PartsWriter,
 };
 
-/// A runtime collection of HTML attributes with unique keys.
+/// A collection of HTML attributes with unique keys.
 ///
-/// `Attributes` is map-like: each key appears at most once, and inserting the
-/// same key again replaces the previous value. Do not rely on render order.
+/// Inserting an existing key replaces its value. Render order is unspecified.
 /// Prefer constructing `Attributes` with the [`attributes!`](macro.attributes.html)
 /// macro.
 ///
-/// Each key and value is captured as an [`AttributeKey`] and an
-/// [`AttributeValue`] when it is inserted, so a collection can be built and
-/// rendered anywhere.
+/// Keys and values are owned by the collection.
 #[derive(Debug, Default, Clone)]
 pub struct Attributes {
     map: HashMap<AttributeKey, AttributeValue>,
@@ -24,11 +21,6 @@ pub struct Attributes {
 
 impl Attributes {
     /// Creates an empty attribute collection.
-    ///
-    /// Prefer the
-    /// [`attributes!`](https://docs.rs/topcoat/latest/topcoat/view/macro.attributes.html)
-    /// macro when writing attributes directly. Use this constructor when the
-    /// collection must be populated incrementally.
     #[inline]
     #[must_use]
     pub fn new() -> Self {
@@ -37,12 +29,6 @@ impl Attributes {
 
     /// Creates an empty attribute collection with space for at least `capacity`
     /// attributes.
-    ///
-    /// Prefer the
-    /// [`attributes!`](https://docs.rs/topcoat/latest/topcoat/view/macro.attributes.html)
-    /// macro when writing attributes directly. This is mainly useful for
-    /// generated code or manual builders that already know how many attributes
-    /// they will insert.
     #[inline]
     #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
@@ -65,14 +51,11 @@ impl Attributes {
 
     /// Inserts or replaces an attribute.
     ///
-    /// The key is captured as an [`AttributeKey`] with
-    /// [`AttributeKeyViewParts`] and the value as an [`AttributeValue`] with
-    /// [`AttributeValueViewParts`]. If the key was already present, the
-    /// previous captured value is returned. If the implementation of
-    /// [`AttributeValueViewParts`] for `v` signals that the attribute should
-    /// not be present, an [absent](AttributeValue::Absent) value is stored
-    /// instead, which causes the previous value to be replaced and the
-    /// attribute not to be rendered in a `view!`.
+    /// Returns the previous value if the key was present. A value whose
+    /// [`attribute_present`](AttributeValueViewParts::attribute_present)
+    /// method returns `false` stores [`AttributeValue::Absent`]. This replaces
+    /// any previous value and omits the attribute when rendered, while keeping
+    /// the key in the collection.
     #[inline]
     pub fn insert(
         &mut self,

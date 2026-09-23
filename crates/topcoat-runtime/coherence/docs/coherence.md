@@ -1,4 +1,4 @@
-This unpublished crate checks that runtime expressions behave the same in Rust and JavaScript. Each case uses the production `expr!` compiler and runs its generated JavaScript in V8 with a bundle of the production runtime modules.
+This crate tests whether runtime expressions produce the same outcomes in Rust and JavaScript. Tests use the production `expr!` compiler and browser runtime.
 
 # Running the suite
 
@@ -33,9 +33,9 @@ for text in ["", "hello", "\u{0085}\u{1f980}\u{feff}"] {
 }
 ```
 
-Captured values go through production serialization and hydration. The numeric and string matrices run fixed inputs against multiple expression shapes, so the suite is deterministic.
+Captured values use the same serialization and hydration as application expressions.
 
-The default form compiles a zero-argument closure and invokes it on each side. This lets the harness retrieve the JavaScript before Rust evaluation can panic. To also test direct expression lowering, use:
+The default form runs the expression inside a closure so panics can be compared. To test an expression without that wrapper, use:
 
 ```rust
 use topcoat_runtime_coherence::coherent;
@@ -47,7 +47,7 @@ Direct cases must return normally on the Rust side. A panic during capture seria
 
 # Async expressions
 
-Use `async =>` in an ordinary synchronous test. The harness runs the compiled async closure with Tokio on the Rust side and drains promise continuations in V8 on the JavaScript side, then compares the completed values.
+Use `async =>` in a synchronous test to compare the completed results of an async expression:
 
 ```rust
 use topcoat_runtime_coherence::{Awaitable, coherent};
@@ -59,13 +59,13 @@ coherent!(async => {
 });
 ```
 
-[`Awaitable`] supplies deterministic futures that return a captured value or panic when awaited. `after_yield()` makes Rust return `Pending` once and wake the executor, and adds a promise continuation in JavaScript. This exercises suspension without network requests or timers. The fixture is lazy on both sides and uses the production JavaScript `Future` surrogate. Only its fixture hydration is added by the test bundle.
+[`Awaitable`] provides futures that return a value or panic when awaited. Call `after_yield()` to test suspension before completion without relying on timers or network requests.
 
 Async cases compare final outcomes, not polling counts or scheduling order. JavaScript runtime `Panic` rejections count as panics; other rejections fail execution. `coherent!(async known "id" => expression)` checks an async expression against a recorded mismatch.
 
 # Comparing outcomes
 
-[`Observe`] converts Rust values into a tagged representation. The JavaScript adapter reads the surrogate's stored value independently of production serialization and rendering. Values compare exactly, including float bits and negative zero. All NaN payloads compare as one NaN value. Options, results, tuples, and unit retain their structural distinctions.
+Values compare exactly, including their structure, float bits, and negative zero. All NaN payloads compare as one NaN value. The comparison uses [`Observe`] and a JavaScript adapter independently of production serialization and rendering.
 
 A Rust panic agrees with a JavaScript runtime `Panic`, regardless of message wording. Other exceptions, invalid JavaScript, and timeouts fail the case. Failure reports include the expression, both outcomes, and generated JavaScript with serialized captures.
 
@@ -82,12 +82,12 @@ coherent!(known "captured_nan" => value);
 
 These cases execute on every run. A changed outcome fails, and an unexpected pass fails with an instruction to remove the baseline. A baseline can also record an exact JavaScript compilation error or exception from evaluating the expression. Exceptions never count as coherent outcomes, even when Rust panics. Errors from the observer, stalled promises, and timeouts always fail and cannot be accepted by a baseline.
 
-# Coverage boundaries
+# Scope and limits
 
-The harness evaluates synchronous expressions and synchronous or async closures without arguments. It does not yet initialize signal fixtures, compare side effects or rendered output, drive real procedure requests, or generate expression source. Its observer can represent tuples, but expression support still depends on the production compiler and hydration code.
+The harness compares expression results and panics. Use browser or integration tests for interactions and rendered output. Supported expressions depend on the production compiler and runtime.
 
-V8 gets a fresh global context, runtime context, and microtask queue for each evaluation, with a five-second deadline. An unsettled promise with no runnable microtasks fails immediately. The host supplies the `TextEncoder.encode` operation used by the runtime, but no browser timers or networking.
+JavaScript runs in an isolated V8 context with a five-second deadline. An unsettled promise with no runnable microtasks fails immediately. Browser timers and networking are unavailable.
 
-Rust evaluation runs in the test process. Async cases have a five-second cooperative timeout, which can stop a pending future but cannot interrupt a poll that never returns. Synchronous cases have no deadline. Test expressions must terminate; process isolation is needed before adding potentially unbounded Rust programs.
+Rust evaluation runs in the test process. Async cases have a five-second cooperative timeout, which cannot interrupt a poll that never returns. Synchronous cases have no deadline. Every test expression must terminate.
 
-Both sides use the compiler's surrogate vocabulary. Agreement establishes server/client coherence; it does not independently prove agreement with every operation in ordinary Rust.
+Both sides use the compiler's surrogate types. Agreement checks server/browser consistency, not agreement with ordinary Rust outside the expression language.

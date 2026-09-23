@@ -1,8 +1,6 @@
 //! The returning customer, read from a cookie.
 //!
-//! Topcoat prefers plain `cx: &Cx` functions over middlewares and extractors:
-//! any handler, layout, component, or procedure that wants the customer calls
-//! [`current_customer`], and nothing is threaded through the router for it.
+//! Call [`current_customer`] wherever a request needs the customer's name.
 
 use topcoat::{
     context::Cx,

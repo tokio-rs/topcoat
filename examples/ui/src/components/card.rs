@@ -4,24 +4,15 @@ use topcoat::{
 };
 
 /// The classes for the [`card`] container.
-///
-/// The card is a column of sections separated by a uniform gap. It carries
-/// vertical padding only; each section brings its own horizontal padding, so
-/// full-bleed content such as an image can span the card's width. The card
-/// casts the theme's raised-surface shadow and sets its own background and
-/// text color, so it reads as a card on any ancestor.
 const CARD: StaticClass = class!(
     "flex flex-col gap-5 rounded-xl border border-border bg-card py-6 \
      text-card-foreground shadow-sm",
 );
 
-/// A card component: a bordered, raised surface grouping related content.
+/// A bordered surface for related content.
 ///
-/// A card stacks sections vertically: typically a [`card_header`], then a
-/// [`card_content`], closed by a [`card_footer`]. Any section can be omitted.
-/// The `attrs` (such as `class` or event handlers) are forwarded to the
-/// underlying `<div>`; a `class` among them is appended to the computed
-/// classes. Child nodes become the card's sections.
+/// Arrange header, content, and footer sections as needed. Attributes are
+/// forwarded to the `<div>`, and classes are appended.
 ///
 /// ```ignore
 /// view! {

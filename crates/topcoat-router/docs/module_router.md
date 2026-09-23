@@ -1,4 +1,4 @@
-The `module_router!` macro derives a handler's path from its enclosing Rust module. A handler without a path string uses the module path. A handler whose path string starts with `./` is served below the module path. Absolute path strings are ignored by the module router entirely.
+The `module_router!` macro builds routes from your Rust modules. For example, a page in `app::settings::profile` can serve `/settings/profile` without a path string.
 
 # Setup
 
@@ -28,9 +28,9 @@ Every module-derived `#[page]`, `#[layout]`, `#[layer]`, and `#[route]` under th
 
 # Registering everything else
 
-Module-derived handlers are all that `module_router!()` registers. Handlers with an explicit path string, fonts, procedures, shards, the asset bundle, and application context are registered on the builder it returns, the same way they are registered on a builder from `Router::builder()`.
+`module_router!()` registers handlers whose paths come from the module tree. Use the returned builder for other registrations.
 
-With the `discover` feature, `RouterBuilderDiscoverExt::discover` adds everything Topcoat collects at link time. That covers explicit-path handlers and the annotated items of other features, such as fonts. Registration is additive, so it composes with `module_router!()`:
+Call `RouterBuilderDiscoverExt::discover` to add handlers with absolute paths and run discovery hooks from enabled features:
 
 ```rust
 use topcoat::router::{Router, RouterBuilderDiscoverExt};
@@ -40,23 +40,7 @@ pub fn router() -> Router {
 }
 ```
 
-Anything that is registered as a value is passed in by hand. The asset bundle is the common case: a view that renders an `Asset`, such as a Tailwind stylesheet or a self-hosted font, needs the bundle on the router.
-
-```rust,no_run
-use topcoat::{
-    asset::{AssetBundle, RouterBuilderAssetExt},
-    router::{Router, RouterBuilderDiscoverExt},
-};
-
-pub fn router() -> Router {
-    topcoat::router::module_router!()
-        .discover()
-        .assets(AssetBundle::load().unwrap())
-        .build()
-}
-```
-
-A missing registration is not a compile error. It surfaces on the first request that renders the item, as a panic about a type that is not registered for the application context. The type named in that panic tells you which registration the router is missing.
+Follow each feature's setup instructions for values or configuration it needs on the builder. Discovery does not replace those setup steps.
 
 # How modules map to routes
 
@@ -202,13 +186,7 @@ This page serves `/posts/{post_id}`. A request for `/posts/42` parses `42` with 
 
 The parameter name comes from `post_id` in the declaration, not from the filename. The file could be named `id.rs` and would still contribute `{post_id}`.
 
-`path_param::<T>(cx)` returns a request-scoped value:
-
-- After `path_param!(slug)`, `path_param::<Slug>(cx)` returns the percent-decoded segment as `&str` and cannot fail.
-- After `path_param!(post_id: u64)`, `path_param::<PostId>(cx)` parses with `FromStr`. Without `error = ...`, the function returns `Result<&u64, &<u64 as FromStr>::Err>`.
-- `error = bad_request`, `not_found`, `unauthorized`, `forbidden`, `redirect(...)`, or `redirect_permanent(...)` maps a parse failure to that router error.
-
-Parsing occurs once per request. Later calls return the memoized result.
+See the [`path_param!` reference](https://docs.rs/topcoat/latest/topcoat/router/macro.path_param.html) for return types and error handling.
 
 A module contributes one segment, so it can declare one `path_param!`. Use nested modules for multiple parameters:
 
@@ -229,7 +207,7 @@ Prefix a parameter name with `*` when its module should capture the remaining pa
 path_param!(*path);
 ```
 
-The declaration emits a `CatchAll` segment override. The module must be the last served segment, and the catch-all matches at least one segment.
+The module must be the last served segment. The catch-all matches at least one segment.
 
 Handlers read an unparsed catch-all as [`CatchAllSegments`](crate::CatchAllSegments) or add a segment type to read a parsed slice.
 

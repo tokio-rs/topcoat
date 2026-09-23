@@ -131,12 +131,8 @@ impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
 
 /// An attribute key captured from any [`AttributeKeyViewParts`] value.
 ///
-/// Produced by the [`Attributes`](crate::Attributes) collection. A key that
-/// pushes a single string is kept as that string, so it costs nothing
-/// beyond the string itself; anything else is rendered into a `String` when
-/// it is captured. A variant carries the context it was pushed with, so
-/// validation happens when the key is finally written into a view. Keys
-/// compare and hash by their text alone.
+/// Keys compare and hash by their text. Validation uses the original HTML
+/// context when the key is written into a view.
 #[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum AttributeKey {

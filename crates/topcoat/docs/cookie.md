@@ -1,6 +1,6 @@
-Topcoat reads and writes cookies through a request-scoped **cookie jar**. Install cookie support on your router with `.cookies()`, then call `cookies(cx)` from any handler to get the jar, read incoming cookies, and queue changes. Anything you add or remove during the request is serialized into `Set-Cookie` response headers automatically once the handler returns, whether it returns a response or an error like a redirect. You don't need to touch headers yourself.
+Use a cookie jar to read cookies and queue changes for the response. Register cookie support with `.cookies()`, then call [`cookies`] from a handler. Changes become `Set-Cookie` headers on successful responses and error responses.
 
-Cookies are part of the default feature set, and everything below is re-exported from `topcoat::cookie`. Topcoat builds on the `cookie` crate: a cookie is a [`Cookie`], and signing and encryption use its [`Key`].
+Cookie support is enabled by default. Its API is available in `topcoat::cookie`.
 
 ```rust
 use topcoat::{
@@ -15,7 +15,7 @@ let router = Router::builder()
 
 # Reading and writing
 
-`cookies(cx)` returns the request's root jar. The incoming `Cookie` header is parsed on first access and memoized for the rest of the request, so repeated calls are cheap and see the same pending changes. Bring the [`Cookies`] trait into scope for the `get`, `add`, and `remove` methods.
+`cookies(cx)` returns the same jar throughout the request. Import the [`Cookies`] trait to read, add, or remove cookies.
 
 A cookie is a [`Cookie`] from the `cookie` crate. Build a bare one with `Cookie::new`, or use `Cookie::build` for attributes:
 
@@ -66,7 +66,7 @@ jar.add(("theme", "dark"));
 
 # Writes must happen before the response
 
-Cookies are set as part of the response headers. It is therefore impossible to set cookies after the response body has already begun streaming. This might be the case when using WebSockets, [`live!`](crate::view::live) regions, or [`suspense`](crate::view::suspense). Trying to modify a cookie after the route handler already returned will result in a panic. Reading cookies always works.
+Cookie changes must happen before the router finishes the response headers. Later writes, including writes from content that streams after the initial response, panic. Reading cookies remains allowed.
 
 ```rust
 use topcoat::{
@@ -116,7 +116,7 @@ let session: Cookie = cookie! {
 
 # Default and override attributes
 
-Rather than repeat the same attributes on every cookie, layer them onto the jar with the [`Cookies`] combinators. Each one wraps the jar and applies an attribute to cookies added through it, in the style of [`Iterator`] adapters. Every attribute comes in two flavors:
+Configure attributes on a jar to apply them to each cookie written through it:
 
 - `default_*` fills the attribute only when the cookie does not already set it.
 - `override_*` forces the attribute, replacing any value the cookie had.
@@ -136,9 +136,9 @@ jar.add(cookie!("session" = "abc123"));
 # }
 ```
 
-The same pairs exist for `path`, `domain`, and `max_age`. Because the combinators consume and return the jar, build the configured jar once and reuse it for several writes.
+Reuse the configured jar for cookies that share the same settings.
 
-Rather than repeat that chain at every call site, the idiomatic pattern is to write your own `cookies` helper that bakes in your app's defaults and have the rest of your code use it instead of the one from `topcoat::cookie`:
+Put shared settings in a helper:
 
 ```rust
 use topcoat::{
@@ -156,9 +156,9 @@ fn cookies(cx: &Cx) -> impl Cookies {
 }
 ```
 
-Every handler that calls this `cookies(cx)` gets the defaults for free, and you can tighten them in one place. The same approach works for signed or private jars: return `impl Cookies` and layer on whatever combinators your app needs.
+Handlers can call this helper to use the same settings.
 
-For anything the named combinators don't cover, [`map`](Cookies::map) is the escape hatch; it runs a closure on every added cookie:
+Use [`map`](Cookies::map) to apply a custom change to each added cookie:
 
 ```rust
 # use topcoat::cookie::{Cookies, cookies};
@@ -194,7 +194,7 @@ As with attributes, each prefix has a `default_*` form that fills the required a
 
 # Signed cookies
 
-A **signed** cookie is tamper-proof but still readable by the client: useful when the value isn't secret but must not be forged (a user id, a feature flag). Signing wraps the jar with a [`Key`]; reads return `None` when a cookie is missing or its signature doesn't verify.
+A signed jar checks that a cookie was written with the same [`Key`]. The client can read the value, but a changed value fails verification. Reads return `None` for a missing cookie or an invalid signature.
 
 ```rust
 # fn _example(cx: &topcoat::context::Cx) {
@@ -212,7 +212,7 @@ let user_id = jar.get("user_id");
 
 # Private cookies
 
-A **private** cookie is encrypted with AES-256-GCM, so its value is both tamper-proof *and* unreadable by the client. Use it for anything sensitive. The cookie's name is bound into the ciphertext, so the name must match on write and read, which it does automatically, however you compose this layer.
+A private jar encrypts and authenticates cookie values with a [`Key`]. Reads return `None` when the cookie is missing or cannot be decrypted and verified. The cookie name is also authenticated, so copying a value under a different name does not make it valid.
 
 ```rust
 # fn _example(cx: &topcoat::context::Cx) {
@@ -231,7 +231,7 @@ Signing and private encryption operate on the cookie value (and, for private, th
 
 # Keys from app context
 
-In a real app you generate the [`Key`] once at startup and share it across requests. Register it as [app context](crate::context::app_context):
+Register a shared [`Key`] as [app context](crate::context::app_context). This example generates a key for one process:
 
 ```rust
 use topcoat::{
@@ -248,7 +248,7 @@ pub fn router() -> Router {
 }
 ```
 
-Then `signed_cookies(cx)` and `private_cookies(cx)` give you a wrapped jar using that registered key, with no plumbing:
+Then [`signed_cookies`] and [`private_cookies`] use the registered key:
 
 ```rust
 use topcoat::{
@@ -265,13 +265,13 @@ async fn login(cx: &Cx) -> Result<&'static str> {
 }
 ```
 
-Both functions panic if no [`Key`] was registered: a startup-time bug, not a runtime one. Generate the key once and persist it; regenerating it on every boot invalidates every signed and encrypted cookie already in the wild.
+Both functions panic if no [`Key`] was registered. To keep cookies valid across restarts and application instances, load the same persisted secret key instead of generating a new one at startup.
 
 # Typed cookie stores
 
-The jar API works in terms of individual [`Cookie`] values. When you want to keep a *structured* value in a cookie (a cart, a preferences object, a visit counter), a [`CookieStore<T>`](CookieStore) wraps the read/serialize/write cycle so you work with your own type instead of strings. The value is stored as JSON, and `T` only needs `Serialize` and `DeserializeOwned`.
+Use [`CookieStore<T>`](CookieStore) to read and write a structured value as JSON. The type must implement `Serialize` and `DeserializeOwned`.
 
-A store is built on top of a jar with [`cookie_store`], so signing, encryption, prefixes, and default attributes all compose through the jar you hand it: a store over [`private_cookies`] is encrypted, a store over [`cookies(cx).signed(key)`](Cookies::signed) is signed, and so on.
+Build the store with [`cookie_store`]. It uses the supplied jar's protection and attributes.
 
 ```rust
 use serde::{Deserialize, Serialize};
@@ -307,7 +307,7 @@ async fn add_item(cx: &Cx) -> Result<String> {
 - [`parse_or_else(f)`](UnparsedCookieStore::parse_or_else) falls back to `f()`.
 - [`parse_or_default()`](UnparsedCookieStore::parse_or_default) falls back to `T::default()`.
 
-The `parse_or*` methods deliberately treat a malformed cookie the same as a missing one. Because you can't migrate a cookie that already lives on the client, this means a change to `T` resets stale cookies to the fallback instead of failing every returning visitor. Use [`parse`](UnparsedCookieStore::parse) when you need to surface corruption instead.
+The `parse_or*` methods treat malformed and missing cookies alike. Use [`parse`](UnparsedCookieStore::parse) when you need to distinguish them.
 
 Once parsed, you hold a [`CookieStore<T>`](CookieStore) whose value is known, so reads and mutations no longer return [`Result`]:
 

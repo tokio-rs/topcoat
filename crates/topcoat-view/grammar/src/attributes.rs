@@ -37,9 +37,8 @@ pub struct Attributes {
     /// The request context binding supplied by a leading `cx =>` argument to
     /// the `attributes!` macro.
     ///
-    /// Inside a `#[component]`, `#[page]`, or `#[layout]`, the context is
-    /// available implicitly, so this is [`None`]. Anywhere else the caller names
-    /// it explicitly as `attributes! { cx => ... }`, mirroring `view! { cx => ... }`.
+    /// `None` uses the context already in scope. An explicit
+    /// `attributes! { cx => ... }` uses the named context.
     /// Attributes parsed as part of an element tag never carry one.
     pub cx: Option<LeadingCx>,
     pub items: Vec<AttributeNode>,

@@ -11,9 +11,7 @@ use crate::{View, ViewFirst, ViewSwap};
 pin_project! {
     /// A [`View`] built from a [`Future`] that resolves to one.
     ///
-    /// The view awaits the future first and then polls the view it resolved
-    /// to in place. A component invocation becomes one: the component's
-    /// body is a future returning its view.
+    /// Awaits the future, then renders the resulting view.
     #[project = ThenViewProj]
     pub enum ThenView<F, V> {
         Future { #[pin] future: F },

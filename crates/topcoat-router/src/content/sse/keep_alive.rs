@@ -14,9 +14,8 @@ use crate::content::sse::Event;
 /// Configures the keep-alive events [`Sse`](crate::content::sse::Sse) sends while its
 /// stream is idle.
 ///
-/// Proxies and load balancers drop connections that look stale; a keep-alive
-/// event whenever nothing was sent for [`interval`](Self::interval) keeps a
-/// quiet stream open. The default sends an empty comment every 15 seconds.
+/// Sends an event after the configured idle interval to help prevent proxy
+/// timeouts. The default sends an empty comment after 15 seconds of inactivity.
 #[derive(Clone, Debug)]
 #[must_use]
 pub struct KeepAlive {

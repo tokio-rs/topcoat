@@ -30,7 +30,7 @@ async fn echo(upgrade: WebSocketUpgrade) -> Result<Response> {
 }
 ```
 
-A request that is not a conforming WebSocket handshake is rejected before the handler's callback is involved: a non-`GET` method with `405 Method Not Allowed`, and missing or malformed handshake headers with `400 Bad Request`. Because the extractor runs inside the handler like any other, request-scoped functions (a session check, `cookies(cx)`) compose with it as usual -- reject the request by returning an error before calling `on_upgrade`.
+A non-`GET` handshake is rejected with `405 Method Not Allowed`. Missing or malformed handshake headers produce `400 Bad Request`. Perform authorization and other request checks before calling `on_upgrade`; return an error to reject the connection.
 
 # Reading the request context
 
@@ -67,10 +67,12 @@ A [`Message`] is either application data (`Text`, guaranteed UTF-8, or `Binary`)
 
 [`WebSocket`] also implements `Stream` and `Sink`, so the connection can be split into halves that read and write concurrently:
 
-```rust,ignore
+```rust
 use futures_util::StreamExt;
 
+# fn split(socket: topcoat::router::content::websocket::WebSocket) {
 let (mut sender, mut receiver) = socket.split();
+# }
 ```
 
 # Subprotocols and limits

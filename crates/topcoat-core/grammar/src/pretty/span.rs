@@ -1,17 +1,8 @@
 use proc_macro2::LineColumn;
 
-/// A source code span representing a range of text from start to end position.
+/// A range of source text between two [`LineColumn`] positions.
 ///
-/// This type exists because [`proc_macro2::Span`] cannot be constructed from arbitrary
-/// line/column positions outside of macro expansion contexts. For pretty printing and
-/// testing, we need to create spans from known positions, which `proc_macro2::Span`
-/// does not support.
-///
-/// Unlike [`proc_macro2::Span`], this type stores only position information (start and end
-/// [`LineColumn`]) without any hygiene or source file metadata.
-///
-/// This type is primarily used by the trivia lexer in `trivia.rs` to track the source
-/// positions of comments and whitespace during pretty printing.
+/// Contains positions only, without hygiene or source file metadata.
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub struct Span {
     start: LineColumn,
@@ -25,10 +16,7 @@ impl Span {
         Self { start, end }
     }
 
-    /// Returns `true` if this span immediately follows another span with no gap between them.
-    ///
-    /// Two spans are considered adjacent when this span's start position matches exactly
-    /// the other span's end position (same line and column).
+    /// Returns whether this span starts exactly where `other` ends.
     #[must_use]
     pub fn immediately_follows(&self, other: &Span) -> bool {
         self.start.line == other.end.line && self.start.column == other.end.column

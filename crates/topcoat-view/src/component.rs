@@ -2,16 +2,12 @@ use topcoat_core::{context::Cx, error::Result};
 
 use crate::{Props, View};
 
+/// A reusable view with typed properties.
 pub trait Component {
-    /// The component's props, generic over the lifetime of anything they
-    /// borrow: a [`Child`](crate::Child), a `&str`, or another reference the
-    /// caller hands in.
-    ///
-    /// The lifetime lives here rather than on the implementing type so that a
-    /// component borrowing its props is still a plain unit struct, usable by
-    /// its bare name wherever a value is expected.
+    /// The component's properties, which may borrow data for `'a`.
     type Props<'a>: Props;
 
+    /// Returns a builder for the component's properties.
     #[must_use]
     fn props_builder<'a>() -> <Self::Props<'a> as Props>::Builder {
         Self::Props::builder()
@@ -19,9 +15,7 @@ pub trait Component {
 
     /// Renders the component to a [`View`].
     ///
-    /// The returned future is the component's body; the [`View`] it resolves
-    /// to builds into the buffer of the build it is polled in and may borrow
-    /// `cx` and the props.
+    /// The returned view may borrow the context and properties.
     fn render<'cx, 'a>(
         self,
         cx: &'cx Cx,

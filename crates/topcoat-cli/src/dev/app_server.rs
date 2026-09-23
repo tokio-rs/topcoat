@@ -20,10 +20,8 @@ pub struct AppServer {
 impl AppServer {
     /// Run the built executable.
     ///
-    /// On Windows the executable is copied to a shadow path and the copy is
-    /// run instead: a running process locks its image file, so launching the
-    /// original would make every subsequent rebuild fail at the link step
-    /// ("Access is denied") while the server keeps serving.
+    /// On Windows, runs a copy so the original executable can be rebuilt
+    /// while the server is running.
     pub fn spawn(exe: &Path, dev_url: &str, address: &Address) -> io::Result<Self> {
         let exe = shadow_copy_for_windows(exe)?;
         let child = Command::new(exe)

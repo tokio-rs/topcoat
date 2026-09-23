@@ -23,10 +23,9 @@ use crate::{
 
 /// A finalized Topcoat routing table.
 ///
-/// Build one with [`Router::builder`], register pages, layouts, layers, routes,
-/// and app context values on the returned [`RouterBuilder`], then call
-/// [`RouterBuilder::build`]. Most applications use the `topcoat` facade and
-/// pass the finished router to `topcoat::start`.
+/// Configure handlers with [`Router::builder`], then call
+/// [`RouterBuilder::build`]. Pass the finished router to `topcoat::start`, or
+/// call [`handle`](Self::handle) to dispatch requests yourself.
 ///
 /// # Examples
 ///

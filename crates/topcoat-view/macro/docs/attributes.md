@@ -1,6 +1,6 @@
 The [`attributes!`] macro builds a [`topcoat::view::Attributes`] value from Topcoat's attribute syntax.
 
-Use it when attributes need to be passed around, assembled outside a [`view!`] call, changed at runtime, or forwarded through components.
+Use it to prepare attributes before inserting them into an element:
 
 ```rust
 # #[topcoat::view::component]
@@ -23,7 +23,7 @@ Ok(view! {
 
 The body of [`attributes!`] has the same syntax as attributes inside an element in [`view!`].
 
-So literal attributes, expression values, dynamic names, binding attributes, event handlers, spreads, and attribute-level control flow all work the same way here:
+For example, use Rust control flow to choose attributes:
 
 ```rust
 # #[topcoat::view::component]
@@ -61,11 +61,11 @@ let attrs = attributes! {
 # }
 ```
 
-[`attributes!`] produces attributes, not child nodes. Control-flow bodies inside the macro therefore emit attributes in the same way they do inside a [`view!`] element's opening tag.
+Control-flow bodies produce attributes. See the [`view!`] guide for the full syntax.
 
 # Runtime Attributes
 
-The generated value is [`topcoat::view::Attributes`]. It is a runtime collection of attributes with unique keys.
+You can change the resulting collection before rendering it:
 
 ```rust
 # use topcoat::{Result, context::Cx, view::{View, component, view}};
@@ -86,7 +86,7 @@ assert!(attrs.contains_key("class"));
 # }
 ```
 
-Because [`Attributes`] is map-like, each key appears at most once. Inserting the same key again replaces the previous value. Do not rely on render order for attributes.
+Each key appears at most once. Inserting the same key again replaces its value. Attribute render order is unspecified.
 
 # Inserting Attributes Into Elements
 
@@ -110,7 +110,7 @@ Ok(view! {
 # }
 ```
 
-Any type that implements [`AttributeViewParts`] can be used in the same position. [`Attributes`] implements that trait, so it works as a complete reusable attribute fragment.
+Implement [`AttributeViewParts`] to insert your own attribute collection in this position.
 
 Inserting an [`Attributes`] value consumes it. Clone the value first if the same attribute collection needs to be inserted into more than one element.
 
@@ -147,7 +147,6 @@ Ok(view! {
 # }
 ```
 
-Since the value is ordinary Rust data, you can build it in helper functions, add or replace attributes before rendering, and pass it through several layers before inserting it into an element.
 
 [`AttributeViewParts`]: trait.AttributeViewParts.html
 [`Attributes`]: struct.Attributes.html

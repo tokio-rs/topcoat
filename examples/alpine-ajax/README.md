@@ -1,6 +1,6 @@
 # Alpine AJAX
 
-A counter that Alpine AJAX updates in place: the server detects the AJAX request and answers with just the targeted element, while a plain form submission still works without JavaScript.
+A counter updated in place with Alpine AJAX. Form submissions also work without JavaScript.
 
 Run it with:
 

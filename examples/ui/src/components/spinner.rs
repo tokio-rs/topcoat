@@ -4,12 +4,11 @@ use topcoat::{
     view::{Attributes, Length, View, attributes, class, component, view},
 };
 
-/// A spinner component: a spinning loader icon for pending states.
+/// A spinning icon for a pending operation.
 ///
-/// The spinner is `1em` square by default, so it scales with the surrounding
-/// text and sits inline next to it; pass `size` to set the dimensions
-/// explicitly. The `attrs` (such as `class`) are forwarded to the underlying
-/// `<svg>`; a `class` among them is appended to the computed classes.
+/// Its default size of `1em` follows the surrounding text. Set `size` for
+/// explicit dimensions. Attributes are forwarded to the `<svg>`, and classes
+/// are appended.
 ///
 /// ```ignore
 /// view! {

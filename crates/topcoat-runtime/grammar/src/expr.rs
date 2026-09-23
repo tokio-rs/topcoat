@@ -31,8 +31,7 @@ use topcoat_core_grammar::paths::topcoat_runtime;
 
 use crate::expr::{js::Js, name_resolver::NameResolver};
 
-/// The top-level `expr! { ... }` AST. A thin wrapper around `syn::Expr`; the
-/// whitelist of supported shapes is enforced when lowering to tokens.
+/// A parsed runtime expression, checked for supported syntax during lowering.
 pub struct Expr {
     pub inner: syn::Expr,
     pub comma_token: Option<syn::Token![,]>,

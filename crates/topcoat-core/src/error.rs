@@ -9,15 +9,10 @@ pub type Result<T = (), E = Error> = ::core::result::Result<T, E>;
 
 /// Error type used by Topcoat APIs.
 ///
-/// Any [`std::error::Error`] converts can be converted to a Topcoat [`Error`] using `?`.
-/// The error keeps the concrete value it was built from, so callers can inspect it with
-/// [`downcast_ref`](Self::downcast_ref) or take it back out with
-/// [`downcast`](Self::downcast), and captures a backtrace when
-/// `RUST_BACKTRACE` asks for one. Cloning is cheap: clones share the
-/// underlying error, so the same error can travel along several paths.
-///
-/// With the `anyhow` feature, `Error::from_anyhow` converts an `anyhow::Error`
-/// as well.
+/// Use `?` to convert an [`std::error::Error`] that is `Send + Sync + 'static`.
+/// Inspect the original error with [`downcast_ref`](Self::downcast_ref), or
+/// recover it with [`downcast`](Self::downcast). Clones share the error.
+/// Backtrace capture follows `RUST_BACKTRACE` and `RUST_LIB_BACKTRACE`.
 #[derive(Clone)]
 pub struct Error(Arc<dyn ErrorObject>);
 
@@ -30,10 +25,6 @@ impl Error {
     /// Builds an error from a boxed error. Its message and sources carry
     /// over, but the concrete error inside the box is not reachable through
     /// the downcast methods.
-    ///
-    /// This is a constructor rather than a `From` impl because coherence
-    /// rules do not let one sit next to the blanket conversion from every
-    /// [`std::error::Error`].
     #[must_use]
     pub fn from_boxed(error: Box<dyn std::error::Error + Send + Sync + 'static>) -> Self {
         Self::from(Boxed(error))
@@ -312,9 +303,8 @@ impl std::error::Error for DowncastFailure {}
 
 /// A failed [`Error::downcast`], carrying the original error back.
 ///
-/// Deliberately not an error type itself: the only way past it is
-/// [`into_error`](Self::into_error), so the original error cannot be
-/// replaced by a shell describing the failure through `?` or `.into()`.
+/// Use [`failure`](Self::failure) to inspect the reason and
+/// [`into_error`](Self::into_error) to recover the original error.
 #[derive(Debug)]
 pub struct DowncastError {
     failure: DowncastFailure,

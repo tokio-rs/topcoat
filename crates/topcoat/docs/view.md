@@ -1,18 +1,22 @@
-This module provides Topcoat's HTML templating primitives:
+Build HTML with [`view!`], using quoted text and parenthesized Rust expressions:
 
-- [`view!`]: the HTML-like templating macro.
-- [`#[component]`][`component`]: turns an async function into a reusable component with typed props and child content.
-- [`attributes!`]: builds a reusable runtime [`Attributes`] value from the same attribute syntax used inside [`view!`].
-- [`class!`]: space-separated class lists from static and conditional entries.
-- [`live!`] and [`emit!`]: live regions that stream replacement content into a page after it reached the browser.
-- [`suspense`] and [`error_boundary`]: components that stream child content in behind a fallback.
+```rust
+use topcoat::{
+    Result,
+    view::{View, component, view},
+};
+
+#[component]
+async fn greeting(name: &str) -> Result<impl View> {
+    Ok(view! {
+        <h1>"Hello, " (name) "!"</h1>
+    })
+}
+```
+
+A view describes content to render. Use [`#[component]`][`component`] to give a reusable view named parameters, as `greeting` does above.
+
+The [`view!`] guide explains template syntax. The [`component`] guide explains how to define and call components.
 
 [`view!`]: macro.view.html
 [`component`]: attr.component.html
-[`attributes!`]: macro.attributes.html
-[`Attributes`]: struct.Attributes.html
-[`class!`]: macro.class.html
-[`live!`]: macro.live.html
-[`emit!`]: macro.emit.html
-[`suspense`]: struct.suspense.html
-[`error_boundary`]: struct.error_boundary.html

@@ -1,10 +1,10 @@
-[`Cx`] is Topcoat's request context. Pages, layouts, components, and routes can take it as an optional parameter when they need request-scoped information.
+[`Cx`] gives you access to the current request and the values shared with it.
 
 Add `cx: &Cx` to the function signature when needed; leave it out when the function does not need request context. Topcoat passes it automatically when the parameter is present.
 
 # Router request helpers
 
-The [`router::request`](crate::router::request) module exposes small functions for reading HTTP request data from `cx`.
+Use [`router::request`](crate::router::request) to read HTTP request data from `cx`.
 
 ```rust
 use topcoat::{
@@ -21,18 +21,6 @@ fn request_summary(cx: &Cx) -> String {
     format!("{} {} from {user_agent}", method(cx), uri(cx).path())
 }
 ```
-
-The ones you reach for most, all listed in [`topcoat::router::request`](crate::router::request):
-
-- [`parts(cx)`](crate::router::request::parts) returns the current request's `http::request::Parts`.
-- [`method(cx)`](crate::router::request::method) returns the HTTP method.
-- [`uri(cx)`](crate::router::request::uri) returns the request URI.
-- [`version(cx)`](crate::router::request::version) returns the HTTP version.
-- [`headers(cx)`](crate::router::request::headers) returns the request headers.
-- [`content_type(cx)`](crate::router::request::content_type) returns the request `Content-Type`.
-- [`extensions(cx)`](crate::router::request::extensions) returns request extensions.
-- [`remote_addr(cx)`](crate::router::request::remote_addr) returns the address of the direct connection, if it has one.
-- [`client_ip(cx)`](crate::router::request::client_ip) returns the client's IP address, read through any trusted reverse proxies.
 
 Use [`parts(cx)`](crate::router::request::parts) when you need several fields at once:
 
@@ -57,11 +45,11 @@ fn request_id(cx: &Cx) -> Option<&str> {
 }
 ```
 
-A handler reached through a [rewrite](crate::router::error#rewrites) sees the rewritten request in the HTTP field helpers. Those helpers have `original_` counterparts returning the request as the client sent it, from [`original_parts(cx)`](crate::router::request::original_parts) down to [`original_uri(cx)`](crate::router::request::original_uri). Layers can also change the current request without a rewrite. For example, [`StripPrefixLayer`](crate::router::StripPrefixLayer) changes `uri(cx)` while `original_uri(cx)` keeps the incoming URI. The client's IP address is resolved when the request arrives and stays the same across rewrites.
+A layer or [rewrite](crate::router::error#rewrites) can change the current request. Use [`original_parts(cx)`](crate::router::request::original_parts) to read the request parts as they arrived, or [`original_uri(cx)`](crate::router::request::original_uri) when you only need the incoming URI.
 
 # Path and query helpers
 
-The [`path_param!`](macro@crate::router::path_param) macro and [`#[query_params]`](macro@crate::router::query_params) attribute declare typed values that you read with the [`path_param::<T>(cx)`](fn@crate::router::path_param) and [`query_params::<T>(cx)`](fn@crate::router::query_params) functions. Topcoat parses typed path parameters and query structs lazily and memoizes them for the request.
+Declare typed URL parameters with [`path_param!`](macro@crate::router::path_param) and [`#[query_params]`](macro@crate::router::query_params). Read them from `cx` with the matching functions.
 
 ```rust
 use topcoat::{
@@ -95,12 +83,7 @@ Any function with `&Cx` can read these values.
 
 # App and request context helpers
 
-This module exposes typed context accessors:
-
-- [`app_context::<T>(cx)`](app_context) reads a required value registered on the router with `.app_context(value)`.
-- [`try_app_context::<T>(cx)`](try_app_context) reads an optional value registered on the router.
-- [`request_context::<T>(cx)`](request_context) reads a required typed value attached to the current request.
-- [`try_request_context::<T>(cx)`](try_request_context) reads an optional typed value attached to the current request.
+Use [`app_context`] to read a value shared across requests. Register it on the router with `.app_context(value)`. Use [`request_context`] for a value in the current request scope.
 
 ```rust
 use topcoat::context::{Cx, app_context};
@@ -112,9 +95,9 @@ fn db(cx: &Cx) -> &Database {
 }
 ```
 
-Values are keyed by Rust type. The required helpers panic when the requested type was not registered, so they are best wrapped in small application-specific functions like `db(cx)`, `config(cx)`, or `current_tenant(cx)`.
+Values are looked up by their Rust type. These helpers panic if the type is missing. A helper like `db(cx)` gives the lookup a name that fits your app.
 
-Use the `try_` helpers when a value is intentionally optional on some requests:
+Use [`try_app_context`] or [`try_request_context`] when a value is optional. They return `None` if the type is missing:
 
 ```rust
 use topcoat::context::{Cx, try_request_context};
@@ -128,7 +111,7 @@ fn current_customer(cx: &Cx) -> Option<&Customer> {
 
 # Registering request context
 
-Request context is registered by scoping: [`Cx::with`] returns a child `Cx` whose request context also holds the given value, and [`Cx::with_many`] registers a tuple of values in one step. The child inherits every other value and shares the rest of the request state, such as the app context and the memoize cache, with its parent.
+Use [`Cx::with`] to create a child context with an additional value. The child inherits the other values and shares the request state with its parent. Use [`Cx::with_many`] to add several values at once.
 
 ```rust
 use topcoat::context::{Cx, request_context};
@@ -147,11 +130,11 @@ fn greet(cx: &Cx) -> String {
 }
 ```
 
-Registering a type that is already present shadows it for the child scope: lookups through the child see the new value, while lookups through the parent still see the original. This is how router layers make values like the cookie jar available to everything below them; they derive a child context and pass it to the rest of the chain.
+If the type is already present, lookups through the child see the new value. The parent keeps its original value. Pass the child context to any code that should use the new value.
 
 # Work that outlives the handler
 
-A [`Cx`] is a handle to state shared by everything serving one request. The router drops its own handle once the response is sent, so a streaming response body or a spawned task cannot borrow the `cx` the handler was called with. Clone the `Cx` and move the owned handle into the work instead; it reads the same app and request context.
+Clone `cx` when you need to move it into work that outlives the handler. The clone shares the same app and request context and keeps those values available.
 
 ```rust
 # async fn record(name: &str) {}
@@ -180,7 +163,7 @@ A cloned handle keeps reading the context after the response was sent, but it ca
 
 # Memoization
 
-[`#[memoize]`](macro@memoize) caches a `cx`-taking function's result for the duration of a request, keyed by its arguments. Wrap the request helpers above with it so that repeated calls (across a layout, a page, and nested components) run the work once and share the result. A memoized body that reads request context keeps a result per set of values it observed, so a cached value never leaks out of the scope it was computed in. See its documentation for the details.
+Use [`#[memoize]`](macro@memoize) when repeated calls to a helper should share its result within a request. The cache accounts for the function's arguments and the request context values it reads. See the macro's documentation for examples and caching rules.
 
 # Composing helpers
 
@@ -205,4 +188,4 @@ fn canonical_url(cx: &Cx) -> String {
 }
 ```
 
-That keeps pages, layouts, components, and routes focused on rendering or responding while shared request reads stay in ordinary Rust functions.
+Call these helpers wherever you have a `&Cx`.

@@ -73,9 +73,7 @@ impl TriggerTiming {
 
 /// Triggers client-side events via one of the `HX-Trigger` response headers.
 ///
-/// When every event has no detail, the header is a comma-separated list of
-/// names. As soon as one event carries data, the whole header is serialized as
-/// a JSON object mapping each event name to its detail (or `null`).
+/// Choose when the events fire and optionally attach data to each event.
 ///
 /// # Examples
 ///

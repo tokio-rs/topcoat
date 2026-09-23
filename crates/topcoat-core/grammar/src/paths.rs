@@ -1,31 +1,16 @@
 //! Paths to the framework crates, for naming their items in generated code.
 //!
-//! A macro like `view!` expands to code that refers to framework types -- for
-//! instance `topcoat::view::Component`. It cannot hardcode those paths, because
-//! the same macro is used from crates that reach the framework in different
-//! ways:
-//!
-//! - Application crates depend on the `topcoat` facade and name the type
-//!   `::topcoat::view::Component`.
-//! - Component libraries depend on the individual crates (`topcoat-view`, and so on) directly, and
-//!   name it `::topcoat_view::Component` instead. Forcing them onto the facade is undesirable, and
-//!   a crate that the facade itself re-exports could not depend on the facade without a cycle.
-//!
-//! Each framework crate is therefore represented by a [`Crate`] constant that
-//! resolves to the right path for whoever is compiling the call site: straight
-//! to the standalone crate when the caller depends on it directly, and through
-//! the facade otherwise.
+//! Each [`Crate`] constant resolves a path using the calling crate's
+//! dependencies. A direct dependency takes precedence over a re-export
+//! through `topcoat`. Dependency renames are respected.
 //!
 //! Interpolate a constant into `quote!` like any other path:
 //!
-//! ```ignore
-//! use topcoat_core_grammar::paths::{topcoat_context, topcoat_view};
+//! ```rust
+//! use quote::quote;
+//! use topcoat_core_grammar::paths::topcoat_context;
 //!
-//! quote! {
-//!     impl #topcoat_view::Component for #ident {
-//!         async fn render(self, cx: &#topcoat_context::Cx) -> #ret { ... }
-//!     }
-//! }
+//! let tokens = quote! { fn helper(cx: &#topcoat_context::Cx) {} };
 //! ```
 
 use proc_macro_crate::{FoundCrate, crate_name};
@@ -34,10 +19,8 @@ use quote::ToTokens;
 
 /// A framework crate, or a module within one, that generated code can refer to.
 ///
-/// Interpolate a `Crate` into a `quote!` invocation to emit its path. See the
-/// [module docs](self) for why the path is resolved rather than hardcoded: it
-/// becomes the facade path when the call site depends on `topcoat`, and the
-/// standalone-crate path otherwise.
+/// Interpolate it into `quote!` to emit the path for the calling crate's
+/// dependencies.
 pub struct Crate {
     /// Path within the `topcoat` facade, e.g. `"view"` for `::topcoat::view`.
     /// Empty for the facade root, `::topcoat` itself.
@@ -77,14 +60,8 @@ impl ToTokens for Crate {
 
 /// Resolves `krate` to a path for the crate currently being compiled.
 ///
-/// The standalone crate is preferred whenever it is a direct dependency: a
-/// component library depends on the individual crates (`topcoat-view`, and so
-/// on) and names them directly. This holds even when the library *also* pulls
-/// the facade in as a dev-dependency for its tests -- keying off the standalone
-/// crate keeps the library's own code resolving to the crates its `lib` target
-/// actually links, which a facade-first check would get wrong (`crate_name`
-/// cannot tell a dev-dependency from a real one). Only a caller that depends on
-/// the facade alone -- an application crate -- falls through to the facade path.
+/// Prefer the standalone dependency. The facade may be available only as a
+/// dev-dependency, which `crate_name` cannot distinguish from a regular one.
 fn resolve(krate: &Crate) -> String {
     if let Some(base) = crate_base(krate.package) {
         return join(&base, krate.module);
@@ -118,19 +95,11 @@ fn join(base: &str, submodule: &str) -> String {
 /// crate's own extern name when it *is* that crate. `None` when it is not a
 /// dependency.
 ///
-/// The self-referential case names the crate `::topcoat_view` rather than
-/// `crate`, because `crate_name` reports `Itself` even inside a doctest -- which
-/// is compiled as a *separate* crate that links the real one as an extern, where
-/// `crate` would point at the doctest binary. Each framework crate carries an
-/// `extern crate self as topcoat_...;` alias so that this same extern name also
-/// resolves within its own non-doctest builds. See the [module docs](self).
+/// Use the crate's external name for self references so the path also works
+/// in doctests. Framework crates provide a matching `extern crate self` alias.
 ///
-/// The lookup runs on every call rather than being cached per package: under
-/// rust-analyzer, a single long-lived proc-macro server process expands macros
-/// for every crate in the workspace, so the answer depends on which crate's
-/// call site is currently being expanded (`CARGO_MANIFEST_DIR`). `crate_name`
-/// caches the parsed manifest per `CARGO_MANIFEST_DIR` itself, keeping repeated
-/// lookups cheap.
+/// Resolve on each call because a proc-macro process can serve several
+/// crates. The answer depends on the current `CARGO_MANIFEST_DIR`.
 fn crate_base(package: &str) -> Option<String> {
     match crate_name(package) {
         Ok(FoundCrate::Itself) => Some(format!("::{}", package.replace('-', "_"))),

@@ -1,7 +1,6 @@
-//! Facade types for DOM events. These exist purely so handler bodies inside
-//! `expr!` can be type-checked by rustc; they are never constructed
-//! server-side. The browser resolves field accesses against the real DOM
-//! `Event` at runtime.
+//! DOM event values available inside runtime event handlers.
+//!
+//! These values are available only in the browser.
 
 use std::marker::PhantomData;
 

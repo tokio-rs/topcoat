@@ -6,12 +6,10 @@ use topcoat_router::response::IntoResponseParts;
 
 use crate::{SwapOption, header};
 
-/// Performs a client-side redirect that does not trigger a full page reload,
-/// via the `HX-Location` header.
+/// Redirects through htmx without reloading the full page.
 ///
-/// In its simplest form it carries just a path. Set any of the [`LocationOptions`]
-/// fields, through the builder methods, to control how htmx fetches and swaps
-/// the new content; when any option is set, the header is serialized as JSON.
+/// Sets the `HX-Location` response header. Use the builder methods to choose
+/// how htmx requests and inserts the new content.
 ///
 /// # Examples
 ///

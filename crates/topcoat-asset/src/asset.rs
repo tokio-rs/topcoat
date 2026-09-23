@@ -9,11 +9,8 @@ use crate::{AssetOptions, ConstReader, ConstWriter, Source};
 
 /// Handle to an asset declared via [`asset!`](crate::asset).
 ///
-/// `Asset` values are cheap to copy and reference the declaration the
-/// [`asset!`](crate::asset) macro embeds into the compiled binary. Rendered
-/// in a view, a handle resolves to the URL of its bundled file;
-/// [`id`](Self::id) recovers the compact [`AssetId`] the file is cataloged
-/// under.
+/// Render this value in a view to get the bundled file's URL. Use
+/// [`id`](Self::id) to look it up in an asset catalog.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Asset(&'static [u8]);
 
@@ -57,12 +54,9 @@ impl std::fmt::Debug for Asset {
 
 /// Compact identifier for an asset declared via [`asset!`](crate::asset).
 ///
-/// `AssetId` values are cheap to copy and store, and stable across runs as
-/// long as the declaring crate name, source file path, and asset path
-/// don't change. They key the catalogs and manifests a bundle is resolved
-/// through: [`Asset::id`] recovers one at runtime, and
-/// [`AssetBundle::get`](crate::AssetBundle::get) resolves it back to a
-/// file.
+/// Use [`Asset::id`] to obtain an ID and look up its bundled file in an
+/// asset catalog. The ID depends on the declaring crate, source file,
+/// asset path, and options.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct AssetId(u64);
@@ -102,9 +96,8 @@ impl AssetId {
 
 /// An asset declaration recovered from a compiled binary.
 ///
-/// This is what the [`Bundler`](crate::Bundler) sees while scanning: the
-/// [`AssetId`] together with the path, options, and the crate/source
-/// context needed to resolve relative paths back to real files.
+/// Includes the asset's ID, options, and source location for resolving
+/// relative paths.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RawAsset {
     id: AssetId,
@@ -268,18 +261,12 @@ fn normalize(path: &Path) -> PathBuf {
 /// [`AssetOptions`] using the same syntax as
 /// [`asset_options!`](crate::asset_options).
 ///
-/// Because the macro expands to compile-time items, both the path and any
-/// options must be string literals (or other const expressions): they
-/// cannot be computed at runtime.
+/// The path and options must be string literals or other constant expressions.
 ///
 /// # Discovery
 ///
-/// The macro embeds the declaration into the compiled binary, where the
-/// [`Bundler`](crate::Bundler) finds it by scanning. The embedded data is
-/// kept in the binary through the returned [`Asset`] handle: an asset is
-/// bundled only while some code path uses its handle. A declaration whose
-/// handle is never used can be optimized out of the binary, and the
-/// bundler then no longer sees it.
+/// Use the returned handle in your application to include the asset in its
+/// bundle. Unused declarations may be omitted.
 ///
 /// # Path resolution
 ///
@@ -295,35 +282,17 @@ fn normalize(path: &Path) -> PathBuf {
 ///
 /// # Options
 ///
-/// Each named argument sets a field on [`AssetOptions`], which documents
-/// them all. All are optional. The common ones:
+/// Pass named options after the path, such as `rename: "logo"`. See
+/// [`AssetOptions`] for the available options and their behavior.
 ///
-/// - `rename: "name"`: replace the file stem (everything before the final `.`) with `"name"`.
-/// - `extension: "ext"`: override the output extension (without the leading dot). Useful when the
-///   source has no extension or a wrong one.
-/// - `checksum: "sha256:<hex>"`: assert the hash of the raw, unbundled source file. The prefix
-///   selects the algorithm; only `sha256` is currently supported. The bundler returns
-///   [`AssetError::ChecksumMismatch`](crate::AssetError) if the source's actual hash differs, or
-///   [`AssetError::UnsupportedChecksum`](crate::AssetError) if the prefix is missing or
-///   unsupported. Recommended for remote assets.
-/// - `content_type: "text/css"`: set the `Content-Type` the asset is served with, instead of
-///   guessing it from the bundled file's extension.
-///
-/// Output filenames always include a short content hash so bundles stay
-/// cache-friendly: e.g. `logo-1a2b3c4d5e6f7a8b.png`, or
-/// `1a2b3c4d5e6f7a8b.png` if the stem is empty. Declarations of one file
-/// share its output filename, and with it the single route the file is
-/// served from, so they cannot disagree about the `Content-Type`: serving
-/// one file as two content types needs a different `rename` on one of the
-/// declarations, and the [`Bundler`](crate::Bundler) rejects the bundle
-/// otherwise.
+/// Output filenames include a content hash, such as `logo-1a2b3c4d5e6f7a8b.png`.
+/// Declarations that share an output filename must use the same content type
+/// or bundling fails. Use different `rename` values to serve the same source
+/// with different content types.
 ///
 /// # Returns
 ///
-/// A `const`-compatible [`Asset`] handle. Its [`AssetId`], read with
-/// [`Asset::id`], is stable across builds as long as the declaring crate,
-/// source file, and path string don't change: renaming the file on disk
-/// or changing options does *not* change the ID.
+/// An [`Asset`] handle that can be stored in a constant.
 ///
 /// # Examples
 ///

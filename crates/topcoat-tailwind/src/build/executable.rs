@@ -18,8 +18,8 @@ pub const DEFAULT_VERSION: &str = "4.3.2";
 /// Where the Tailwind CLI executable comes from.
 #[derive(Debug, Clone)]
 pub enum ExecutableSource {
-    /// Download the standalone CLI release from GitHub into `OUT_DIR`,
-    /// reusing the copy from a previous build if present.
+    /// Download the standalone CLI release from GitHub, reusing the cached
+    /// copy when present.
     Github {
         /// The release to download, without the leading `v`.
         version: String,

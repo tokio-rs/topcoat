@@ -16,14 +16,8 @@ use crate::{
 
 /// Builds a [`Router`] for a Topcoat application.
 ///
-/// This is the common construction surface used by manual routing,
-/// auto-discovery, `module_router!`, and builder extension traits. Register
-/// [`page`](Self::page), [`layout`](Self::layout), [`layer`](Self::layer), and
-/// [`route`](Self::route) handlers directly, or let a discovery helper add
-/// them, then call [`build`](Self::build) once at the end.
-///
-/// Builder extension traits add application-wide behavior before finalization,
-/// such as assets, cookies, or typed [`app_context`](Self::app_context) values.
+/// Register handlers and application configuration, then call
+/// [`build`](Self::build) to finish the router.
 ///
 /// # Examples
 ///
@@ -31,16 +25,12 @@ use crate::{
 /// # struct AppConfig;
 /// # impl AppConfig { fn load() -> Self { Self } }
 /// use topcoat::{
-///     asset::{AssetBundle, RouterBuilderAssetExt},
-///     cookie::RouterBuilderCookieExt,
 ///     router::{Router, RouterBuilderDiscoverExt},
 /// };
 ///
 /// pub fn router() -> Router {
 ///     Router::builder()
 ///         .discover()
-///         .cookies()
-///         .assets(AssetBundle::load().unwrap())
 ///         .app_context(AppConfig::load())
 ///         .build()
 /// }

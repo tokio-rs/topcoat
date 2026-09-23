@@ -1,10 +1,10 @@
 Declares a page handler.
 
-The page's URL is the path string given to the attribute (`#[page("/about")]`). When no path is given, the URL is derived from the function's enclosing module path, kebab-cased, provided the function is reachable from a [`module_router!`](macro.module_router.html). A path starting with `./` is joined onto that module-derived path: `#[page("./export")]` in `src/app/settings.rs` serves `/settings/export`. All forms register into the same router, so explicit and module-derived paths can be mixed freely in one app.
+Give the page an absolute path, such as `#[page("/about")]`. Under [`module_router!`](macro.module_router.html), omit the path to use the enclosing module's path, or start it with `./` to add a path below that module. For example, `#[page("./export")]` in `src/app/settings.rs` serves `/settings/export`.
 
 A page serves `GET` by default. To serve other methods, name them before the path, using the same forms as [`#[route]`](attr.route.html): a single method (`#[page(POST "/signup")]`), a bracketed list (`[GET, POST]`), or `*` for every method.
 
-Path strings are Topcoat [`Path`](struct.Path.html)s: literal segments (`users`), `{name}` for dynamic parameters, `{*name}` for wildcard tails, and `(name)` for groups (which participate in layout and layer matching but are stripped from the served URL).
+See [`Path`](struct.Path.html) for path syntax.
 
 A page registers like any other handler: pass the function name to [`RouterBuilder::page`](struct.RouterBuilder.html#method.page), or let [`discover`](trait.RouterBuilderDiscoverExt.html) or [`module_router!`](macro.module_router.html) collect it automatically.
 
