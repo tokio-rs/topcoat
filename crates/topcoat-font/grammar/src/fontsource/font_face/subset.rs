@@ -16,11 +16,8 @@ mod kw {
 /// A `subset:` argument carrying the single subset one face ships, e.g.
 /// `subset: Latin`.
 pub struct Subset {
-    /// The `subset` name.
     pub key: SubsetKey,
-    /// The `:` between the name and the value.
     pub colon_token: Token![:],
-    /// The written value.
     pub value: SubsetValue,
 }
 
@@ -50,9 +47,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for Subset {
     }
 }
 
-/// The `subset` argument name.
 pub struct SubsetKey {
-    /// The `subset` keyword.
     pub subset_kw: kw::subset,
 }
 

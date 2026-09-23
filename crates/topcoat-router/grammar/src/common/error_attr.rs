@@ -26,13 +26,9 @@ mod kw {
 /// and stands for the user-facing error response returned when the parameter
 /// fails to parse.
 pub struct ErrorAttr {
-    /// The `error` keyword.
     pub error_token: kw::error,
-    /// The `=` token.
     pub eq_token: Token![=],
-    /// The named constructor.
     pub kind: ErrorKind,
-    /// The arguments passed to the constructor, if any.
     pub args: Option<ErrorArgs>,
 }
 
@@ -97,19 +93,12 @@ impl ParseOption for ErrorAttr {
     }
 }
 
-/// The router error constructor named by an [`ErrorAttr`].
 pub enum ErrorKind {
-    /// `bad_request`, a 400 response.
     BadRequest(kw::bad_request),
-    /// `forbidden`, a 403 response.
     Forbidden(kw::forbidden),
-    /// `not_found`, a 404 response.
     NotFound(kw::not_found),
-    /// `redirect`, a temporary redirect.
     Redirect(kw::redirect),
-    /// `redirect_permanent`, a permanent redirect.
     RedirectPermanent(kw::redirect_permanent),
-    /// `unauthorized`, a 401 response.
     Unauthorized(kw::unauthorized),
 }
 
@@ -150,9 +139,7 @@ impl Parse for ErrorKind {
 
 /// The parenthesized arguments passed to an error constructor.
 pub struct ErrorArgs {
-    /// The parentheses around the arguments.
     pub paren_token: Paren,
-    /// The comma-separated argument expressions.
     pub args: Punctuated<Expr, Token![,]>,
 }
 

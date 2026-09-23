@@ -16,8 +16,6 @@ use super::{
     method::Methods,
 };
 
-/// The arguments of `#[route(...)]`: the HTTP methods followed by an
-/// optional path.
 pub struct RouteAttr {
     methods: Methods,
     path: Option<HandlerPath>,
@@ -32,9 +30,6 @@ impl Parse for RouteAttr {
     }
 }
 
-/// The annotated `async fn` that becomes a route: a handler taking,
-/// optionally, the request context as `cx: &Cx` and one request body
-/// parameter.
 pub struct RouteItem {
     item: ItemFn,
     args: HandlerArgs,
@@ -60,11 +55,9 @@ impl Parse for RouteItem {
     }
 }
 
-/// A parsed `#[route]` declaration, which expands to the generated code.
 pub struct Route(RouteAttr, RouteItem);
 
 impl Route {
-    /// Combines a parsed attribute and item.
     #[must_use]
     pub fn new(attr: RouteAttr, item: RouteItem) -> Self {
         Self(attr, item)

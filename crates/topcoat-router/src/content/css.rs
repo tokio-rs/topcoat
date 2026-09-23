@@ -10,28 +10,13 @@ use crate::{
 
 /// CSS request extractor and response wrapper.
 ///
-/// As a response, `Css<T>` wraps any value convertible into a [`Body`], such
-/// as a `String`, and replies with `Content-Type: text/css; charset=utf-8`.
-/// Use it from a `#[route]` that builds a stylesheet by hand.
+/// As a response, wrap any value convertible into a [`Body`] (such as a
+/// `String`) to reply with `Content-Type: text/css`. Use it directly from a
+/// [`route`](../topcoat_router_macro/attr.route.html) that returns a stylesheet
+/// by hand.
 ///
 /// As a request extractor, `Css<String>` requires a `Content-Type: text/css`
-/// header and reads the body as UTF-8 text. Wrap it in [`Option`] to accept
-/// requests without a `Content-Type` header.
-///
-/// # Examples
-///
-/// ```rust
-/// use topcoat::{
-///     Result,
-///     router::{content::Css, route},
-/// };
-///
-/// #[route(GET "/theme.css")]
-/// async fn theme() -> Result<Css<String>> {
-///     let accent = "rebeccapurple";
-///     Ok(Css(format!(":root {{ --accent: {accent}; }}")))
-/// }
-/// ```
+/// header and yields the body as text.
 #[derive(Debug, Clone, Copy, Default)]
 #[must_use]
 pub struct Css<T>(pub T);

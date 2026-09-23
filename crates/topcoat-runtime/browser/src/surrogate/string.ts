@@ -6,7 +6,7 @@ const TEXT_ENCODER = new TextEncoder();
 
 // The code points Rust's `str::trim` family treats as whitespace: the Unicode
 // `White_Space` property. `String.prototype.trim` uses the ECMAScript
-// whitespace set instead, which strips U+FEFF and keeps U+0085. Both are the
+// whitespace set instead, which strips U+FEFF and keeps U+0085 -- both the
 // opposite of Rust (#238).
 const WHITE_SPACE =
 	"\\t\\n\\v\\f\\r \\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000";
@@ -15,8 +15,8 @@ const TRIM_END = new RegExp(`[${WHITE_SPACE}]+$`, "u");
 
 // Order two strings the way Rust's `str` does: by code point, which is the
 // order of their UTF-8 bytes. JavaScript's relational operators order by
-// UTF-16 code unit, so every code point above U+FFFF sorts below U+E000,
-// since its high surrogate is 0xD800-0xDBFF, and the two sides of one `$()`
+// UTF-16 code unit, so every code point above U+FFFF sorts below U+E000 --
+// its high surrogate is 0xD800-0xDBFF -- and the two sides of one `$()`
 // expression can disagree (#236).
 function compare(a: string, b: string): number {
 	const left = a[Symbol.iterator]();
@@ -34,10 +34,6 @@ function compare(a: string, b: string): number {
 	}
 }
 
-/**
- * A Rust `str`. Lengths count UTF-8 bytes, comparisons order by code point,
- * and trimming uses the Unicode `White_Space` set, as in Rust.
- */
 export class Str implements AttributeValueViewParts, NodeViewParts {
 	constructor(protected readonly v: string) {}
 
@@ -122,7 +118,6 @@ export class Str implements AttributeValueViewParts, NodeViewParts {
 	}
 }
 
-/** A Rust `String`. */
 // biome-ignore lint/suspicious/noShadowRestrictedNames: Surrogate type
 export class String extends Str {
 	// Mirrors Rust's `Deref<Target = str>`: dereferencing an owned string

@@ -4,10 +4,6 @@ import { String as RuntimeString } from "./string";
 
 type EventTargetLike = globalThis.EventTarget | null;
 
-/**
- * A DOM event as the Rust `Event` type describes it. A missing property
- * reads as `false`, `0`, or an empty string.
- */
 export class Event {
 	constructor(private readonly inner: globalThis.Event) {}
 
@@ -160,7 +156,6 @@ export class Event {
 	}
 }
 
-/** The element an event refers to, as the Rust `EventTarget` type describes it. */
 export class EventTarget {
 	constructor(private readonly inner: EventTargetLike) {}
 

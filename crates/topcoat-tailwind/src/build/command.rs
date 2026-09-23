@@ -3,17 +3,15 @@ use std::{
     process,
 };
 
-/// The arguments for one run of the Tailwind CLI.
-///
-/// Pass it to [`Executable::run`](crate::Executable::run).
-/// [`BuildConfig::render`](crate::BuildConfig::render) builds one for you.
+/// One invocation of the Tailwind CLI: the arguments passed when an
+/// [`Executable`](crate::build::Executable) runs it.
 #[derive(Debug, Clone)]
 pub struct Command {
-    /// The input CSS file, passed with `-i`.
+    /// Input CSS file, passed with `-i`.
     pub input: PathBuf,
-    /// The output CSS file, passed with `-o`.
+    /// Output CSS file, passed with `-o`.
     pub output: PathBuf,
-    /// The directory the CLI scans for class names, passed with `--cwd`.
+    /// Working directory the CLI scans for classes, passed with `--cwd`.
     pub cwd: PathBuf,
     /// Whether to pass `--optimize`.
     pub optimize: bool,
@@ -22,7 +20,8 @@ pub struct Command {
 }
 
 impl Command {
-    /// Returns a process command that runs `program` with these arguments.
+    /// The `std::process` command invoking `program` with this command's
+    /// arguments.
     pub(crate) fn to_process(&self, program: &Path) -> process::Command {
         let mut command = process::Command::new(program);
         command

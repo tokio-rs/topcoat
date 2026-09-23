@@ -8,18 +8,11 @@ use topcoat_core_grammar::{ParseOption, paths::topcoat_runtime_macro};
 
 use crate::view::hir::{ExprKind, LowerView, ViewBuilder};
 
-/// A `$(...)` runtime expression, which expands to the runtime crate's
-/// `expr!` macro.
-///
-/// A runtime expression has both a Rust value for the server render and a
-/// JavaScript form the browser can re-evaluate.
+/// A `$(`...`)` runtime expression, lowered through `runtime::expr!`.
 #[derive(Debug, PartialEq, Clone)]
 pub struct RuntimeExpr {
-    /// The leading `$`.
     pub dollar: Token![$],
-    /// The parentheses around the expression.
     pub paren: syn::token::Paren,
-    /// The expression inside the parentheses.
     pub expr: syn::Expr,
 }
 

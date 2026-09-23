@@ -3,9 +3,9 @@ use topcoat_core::{context::Cx, error::Result};
 
 use crate::response::{IntoResponse, Response};
 
-/// Creates a `401 Unauthorized` error.
+/// Builds an unauthorized (HTTP 401) response.
 ///
-/// Use it when the request does not carry valid authentication credentials.
+/// Use this when the request lacks valid authentication credentials.
 ///
 /// # Examples
 ///
@@ -26,11 +26,10 @@ pub fn unauthorized() -> UnauthorizedError {
     UnauthorizedError::new()
 }
 
-/// A `401 Unauthorized` error.
+/// An unauthorized response carried as the `Err` variant of a handler `Result`.
 ///
-/// Create one with [`unauthorized`], or turn a missing value into one with
-/// [`RouterErrorExt`](crate::error::RouterErrorExt). Returned from a handler,
-/// it renders as a `401 Unauthorized` response.
+/// Construct one with [`unauthorized`], or derive one from an `Option` /
+/// `Result` via [`RouterErrorExt`](crate::error::RouterErrorExt).
 #[derive(Debug, Clone)]
 pub struct UnauthorizedError {
     _priv: (),

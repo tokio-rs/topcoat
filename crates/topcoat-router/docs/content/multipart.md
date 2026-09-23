@@ -1,10 +1,10 @@
-Multipart form data for Topcoat routes.
+Multipart form data for topcoat routes.
 
-`multipart/form-data` is the format browsers use for forms that upload files. This module needs the `multipart` feature. It provides the [`Multipart`] extractor, which parses the request body and yields each form field as a [`Field`] that streams its data.
+`multipart/form-data` is the request format browsers use for forms that upload files. This module (behind the `multipart` feature) provides the [`Multipart`] extractor: it parses the request body and yields each form field as a [`Field`] that streams its data.
 
 # Reading fields
 
-To read an upload, take a [`Multipart`] parameter and loop over its fields with [`next_field`](Multipart::next_field). Fields arrive in the order of the request and are read one at a time. Each field borrows the extractor mutably, so you must finish with one field before you ask for the next.
+A route reads an upload by taking a [`Multipart`] parameter and iterating its fields with [`next_field`](Multipart::next_field). Fields arrive in request order and are read one at a time; the extractor is borrowed mutably, so each field is consumed before the next one starts.
 
 ```rust
 use topcoat::{
@@ -25,6 +25,6 @@ async fn upload(mut multipart: Multipart) -> Result<&'static str> {
 }
 ```
 
-A [`Field`] gives you its metadata through [`name`](Field::name), [`file_name`](Field::file_name), [`content_type`](Field::content_type), and [`headers`](Field::headers). You can read its data all at once with [`bytes`](Field::bytes) or [`text`](Field::text), or one chunk at a time with [`chunk`](Field::chunk). A field also implements `Stream`, so you can use the usual stream combinators on its chunks.
+A [`Field`] exposes its metadata ([`name`](Field::name), [`file_name`](Field::file_name), [`content_type`](Field::content_type), [`headers`](Field::headers)) and its data, either in full with [`bytes`](Field::bytes) and [`text`](Field::text) or chunk by chunk with [`chunk`](Field::chunk). A field also implements `Stream`, so its chunks compose with the usual stream combinators.
 
-Wrap the extractor in [`Option`] to make the body optional. The route then also accepts requests without a `multipart/form-data` body. A malformed multipart body is rejected with `400 Bad Request`, and a body larger than the request's body limit with `413 Content Too Large`.
+Wrap the extractor in [`Option`] to make the body optional: the route then also accepts requests without a `multipart/form-data` body. A request whose multipart body is malformed is rejected with `400 Bad Request`.

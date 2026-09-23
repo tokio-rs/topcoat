@@ -6,11 +6,11 @@ use topcoat_view::ViewHandle;
 
 use crate::{Attachment, Mailbox};
 
-/// An email message: addresses, subject, bodies, and attachments.
+/// A mail message: addresses, subject, bodies, and attachments.
 ///
-/// A mail only declares its content. The MIME structure, the encodings, and
-/// the list of recipients for delivery are built when a [`Transport`](crate::Transport)
-/// sends it. Build one with the `mail!` macro or with [`Mail::builder`]:
+/// A mail declares its content and leaves wire concerns -- the MIME
+/// structure, encodings, and the envelope -- to the mailer that sends it.
+/// Build one with [`Mail::builder`]:
 ///
 /// ```
 /// use topcoat_mail::{Mail, Mailbox};
@@ -89,20 +89,19 @@ impl Mail {
         self.html.as_ref()
     }
 
-    /// The plain-text body: derived from the HTML, declared, or absent.
+    /// The plain-text body: derived, declared, or absent.
     #[must_use]
     pub fn text(&self) -> &TextBody {
         &self.text
     }
 
-    /// The attachments, both regular and inline.
+    /// The attachments, downloadable and inline alike.
     #[must_use]
     pub fn attachments(&self) -> &[Attachment] {
         &self.attachments
     }
 
-    /// The `In-Reply-To` header value: the `Message-ID` of the mail this one
-    /// replies to, if any.
+    /// The message id of the mail this one replies to, if any.
     #[must_use]
     pub fn in_reply_to(&self) -> Option<&str> {
         self.in_reply_to.as_deref()
@@ -120,35 +119,31 @@ impl Mail {
         &self.headers
     }
 
-    /// The `Date` header value, if one was set. Otherwise, the send time is
-    /// used.
+    /// The `Date` header value, if one was set explicitly.
     #[must_use]
     pub fn date(&self) -> Option<SystemTime> {
         self.date
     }
 
-    /// The `Message-ID`, if one was set. Otherwise, one is generated when the
-    /// mail is sent.
+    /// The `Message-ID`, if one was set explicitly.
     #[must_use]
     pub fn message_id(&self) -> Option<&str> {
         self.message_id.as_deref()
     }
 }
 
-/// Builder for a [`Mail`], created with [`Mail::builder`].
+/// Assembles a [`Mail`], created by [`Mail::builder`].
 ///
-/// [`from`](Self::from) takes a single [`Mailbox`]. The recipient methods
-/// ([`to`](Self::to), [`cc`](Self::cc), [`bcc`](Self::bcc), and
-/// [`reply_to`](Self::reply_to)) take a `Vec`, an array, or a slice of
-/// mailboxes. They add to the existing recipients on every call, and so do
-/// [`attachments`](Self::attachments) and [`headers`](Self::headers).
+/// The `From` setter takes a single address as anything `Into<Mailbox>`.
+/// The recipient setters (`to`, `cc`, `bcc`, `reply_to`) take any
+/// collection convertible into a `Vec<Mailbox>` -- a `Vec`, an array, or a
+/// slice -- and append on every call, as do `attachments` and `headers`.
+/// Building never fails; addresses are validated when they are
+/// constructed, and remaining wire concerns when the mail is sent.
 ///
-/// Building never fails. A [`Mailbox`] is validated when it is created, and
-/// the rest of the mail when it is sent.
-///
-/// The `mail!` macro calls these methods, and also accepts address strings,
-/// `(name, address)` pairs, and single values, which it converts with
-/// [`TryIntoMailboxes`](crate::TryIntoMailboxes) and similar traits.
+/// The `mail!` macro builds on this and additionally converts address
+/// strings, `(name, address)` pairs, and single values through
+/// [`TryIntoMailboxes`](crate::TryIntoMailboxes) and its siblings.
 #[derive(Clone, Debug, Default)]
 pub struct MailBuilder {
     mail: Mail,
@@ -200,22 +195,18 @@ impl MailBuilder {
     }
 
     /// Sets the HTML body.
-    ///
-    /// The body is rendered with the request context when the mail is sent.
-    /// Get a [`ViewHandle`] from a view with
-    /// [`ViewExt::single`](topcoat_view::ViewExt::single).
     #[must_use]
     pub fn html(mut self, html: ViewHandle) -> Self {
         self.mail.html = Some(html);
         self
     }
 
-    /// Sets the plain-text body, shown by mail clients that do not display
-    /// HTML.
+    /// Sets the plain-text body, the fallback for clients that do not
+    /// render HTML.
     ///
-    /// Accepts the text itself or a [`TextBody`]. By default, the text is
-    /// derived from the HTML body when the mail is sent. Pass
-    /// [`TextBody::None`] to send only the HTML.
+    /// Accepts the text itself or a [`TextBody`] variant. Without a call,
+    /// the text is derived from the HTML body when the mail is assembled;
+    /// pass [`TextBody::None`] to send the HTML alone.
     #[must_use]
     pub fn text(mut self, text: impl Into<TextBody>) -> Self {
         self.mail.text = text.into();
@@ -236,48 +227,46 @@ impl MailBuilder {
         self
     }
 
-    /// Sets the `In-Reply-To` header, which marks the mail as a reply to the
-    /// mail with the given `Message-ID`.
+    /// Marks the mail as a reply to the given message id.
     #[must_use]
     pub fn in_reply_to(mut self, message_id: impl Into<String>) -> Self {
         self.mail.in_reply_to = Some(message_id.into());
         self
     }
 
-    /// Sets the `References` header, which lists the `Message-ID`s of the
-    /// earlier mail in the thread.
+    /// Sets the `References` header linking the message ids of the thread.
     #[must_use]
     pub fn references(mut self, references: impl Into<String>) -> Self {
         self.mail.references = Some(references.into());
         self
     }
 
-    /// Sets the `Date` header. By default, the send time is used.
+    /// Sets the `Date` header. Without an explicit date, the send time is
+    /// used.
     #[must_use]
     pub fn date(mut self, date: SystemTime) -> Self {
         self.mail.date = Some(date);
         self
     }
 
-    /// Sets the `Message-ID` header. By default, one is generated when the
-    /// mail is sent.
+    /// Sets the `Message-ID`. Without an explicit id, one is generated at
+    /// send time.
     #[must_use]
     pub fn message_id(mut self, message_id: impl Into<String>) -> Self {
         self.mail.message_id = Some(message_id.into());
         self
     }
 
-    /// Returns the finished [`Mail`].
+    /// Finishes the builder into a [`Mail`].
     #[must_use]
     pub fn build(self) -> Mail {
         self.mail
     }
 }
 
-/// Conversion into a list of custom `(name, value)` headers.
-///
-/// Implemented for a single pair and for collections of pairs. The `headers`
-/// field of the `mail!` macro accepts any value of this trait.
+/// One or more custom headers, converted from a single `(name, value)` pair
+/// or a collection of pairs. The `mail!` macro's `headers` field accepts
+/// anything implementing this trait.
 pub trait IntoHeaders {
     /// Converts into `(name, value)` header pairs.
     fn into_headers(self) -> Vec<(String, String)>;
@@ -329,12 +318,12 @@ where
     }
 }
 
-/// The plain-text body of a mail: derived from the HTML, declared, or absent.
+/// The plain-text body of a mail: derived, declared, or absent.
 ///
-/// Spam filters rate mail without a plain-text version lower, so the default,
-/// [`FromHtml`](TextBody::FromHtml), derives the text from the rendered HTML
-/// body when the mail is sent. Declare your own text or turn it off with
-/// [`MailBuilder::text`]:
+/// Mail without a plain-text alternative scores worse with spam filters, so
+/// the default, [`FromHtml`](TextBody::FromHtml), derives one from the
+/// rendered HTML body when the mail is assembled. Declare the text yourself
+/// or opt out through the builder's [`text`](MailBuilder::text) setter:
 ///
 /// ```
 /// use topcoat_mail::{Mail, TextBody};
@@ -347,13 +336,13 @@ where
 /// ```
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum TextBody {
-    /// Derive the text from the HTML body when the mail is sent. A mail
-    /// without an HTML body gets no text body.
+    /// Derive the text from the HTML body when the mail is assembled. A
+    /// mail without an HTML body sends no text body.
     #[default]
     FromHtml,
     /// Send no plain-text body.
     None,
-    /// Send the given text.
+    /// Send the declared text.
     Text(String),
 }
 

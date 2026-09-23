@@ -4,18 +4,20 @@ use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{Cookie, Cookies};
 
-/// A typed value stored as JSON in a single cookie.
+/// A typed value backed by a single cookie.
 ///
-/// A `CookieStore` holds a `T` in memory. Reads and changes only affect that
-/// in-memory value. Nothing is written to the response until you call
-/// [`commit`](Self::commit). Dropping the store, or calling
-/// [`rollback`](Self::rollback), discards the changes. To update a cookie only
-/// after some other work succeeds, call `commit` after that work.
+/// A `CookieStore` holds a deserialized `T` in memory and writes it back to its
+/// cookie as JSON on [`commit`](Self::commit). It is built from any [`Cookies`]
+/// jar, so signing, encryption, prefixes, and default attributes all compose
+/// through the jar it wraps.
 ///
-/// The store reads and writes its cookie through a [`Cookies`] jar, so the
-/// jar's signing, encryption, name prefix, and attributes apply to it.
+/// Reads and mutations operate on the in-memory value only. **Nothing is written
+/// to the response until [`commit`](Self::commit) is called**; dropping the store
+/// (or calling [`rollback`](Self::rollback)) discards any pending changes. This
+/// makes it easy to update a cookie only once some other work has succeeded:
+/// just hold off on `commit` until then.
 ///
-/// Create one with [`cookie_store`] and one of the `parse*` methods:
+/// Obtain one by reading the incoming cookie through [`cookie_store`]:
 ///
 /// ```rust
 /// use serde::{Deserialize, Serialize};
@@ -54,11 +56,10 @@ where
     T: Serialize + DeserializeOwned,
     J: Cookies,
 {
-    /// Creates a store for the cookie named `key` that holds `value`, without
-    /// reading the cookie.
+    /// Builds a store around an already-known `value`.
     ///
-    /// To start from the cookie's current value, use [`cookie_store`] and one
-    /// of the `parse*` methods instead.
+    /// Most code instead goes through [`cookie_store`] and one of the `parse*`
+    /// methods, which read the existing cookie first.
     pub fn new(jar: J, key: impl Into<Cow<'static, str>>, value: T) -> Self {
         Self {
             jar,
@@ -80,18 +81,19 @@ where
         self.value.clone()
     }
 
-    /// Replaces the in-memory value and returns the store.
+    /// Replaces the in-memory value, returning the store so calls can be chained.
     ///
-    /// The change is not written until [`commit`](Self::commit).
+    /// Like every mutation, this is not persisted until [`commit`](Self::commit).
     #[must_use]
     pub fn set(mut self, value: T) -> Self {
         self.value = value;
         self
     }
 
-    /// Calls `f` to change the in-memory value in place and returns the store.
+    /// Mutates the in-memory value in place, returning the store so calls can be
+    /// chained.
     ///
-    /// The change is not written until [`commit`](Self::commit).
+    /// Like every mutation, this is not persisted until [`commit`](Self::commit).
     ///
     /// ```rust
     /// # use serde::{Deserialize, Serialize};
@@ -121,8 +123,12 @@ where
         self
     }
 
-    /// Serializes the value to JSON, adds it to the jar as the cookie's new
-    /// value, and returns the value.
+    /// Serializes the current value, queues it on the backing jar as a
+    /// `Set-Cookie`, and returns the value.
+    ///
+    /// This is the only method that writes anything: until it is called, the
+    /// store's value lives only in memory. Returns an error if the value cannot
+    /// be serialized.
     ///
     /// # Errors
     ///
@@ -133,27 +139,27 @@ where
         Ok(self.value)
     }
 
-    /// Discards the store and its uncommitted changes.
+    /// Discards the store along with any uncommitted changes.
     ///
-    /// This is the same as dropping the store, but makes the intent clear at
-    /// the call site.
+    /// Equivalent to dropping the store without calling [`commit`](Self::commit);
+    /// it exists to make that intent explicit at the call site.
     pub fn rollback(self) {}
 
-    /// Removes the cookie from the client and discards the in-memory value.
+    /// Queues a removal of the backing cookie, expiring it on the client.
     ///
-    /// The removal goes through the jar, which applies the same `Path`,
-    /// `Domain`, and name prefix as when the cookie was written, so the browser
-    /// matches and deletes it. See [`Cookies::remove`].
+    /// Writes to the response like [`commit`](Self::commit), but deletes the
+    /// cookie instead of saving a value; the in-memory value is dropped. The
+    /// removal goes through the jar, so the `Path`/`Domain` and prefix attributes
+    /// the cookie was written with are reapplied and the browser can match it.
     pub fn remove(self) {
         self.jar.remove(Cookie::new(self.key, ""));
     }
 }
 
-/// A [`CookieStore`] that has not read its cookie yet.
+/// A [`CookieStore`] that has not yet read its backing cookie.
 ///
-/// Created by [`cookie_store`]. Call one of the `parse*` methods to read the
-/// cookie and get a [`CookieStore`]. Use [`set`](Self::set) or
-/// [`remove`](Self::remove) to skip reading it.
+/// Created by [`cookie_store`]. Call one of the `parse*` methods to read and
+/// deserialize the cookie, yielding a [`CookieStore`] you can read and mutate.
 pub struct UnparsedCookieStore<T, J> {
     jar: J,
     key: Cow<'static, str>,
@@ -165,9 +171,9 @@ where
     T: Serialize + DeserializeOwned,
     J: Cookies,
 {
-    /// Creates an unparsed store for the cookie named `key` in `jar`.
+    /// Builds an unparsed store for the cookie named `key`, backed by `jar`.
     ///
-    /// Same as [`cookie_store`].
+    /// Usually called through [`cookie_store`].
     pub fn new(jar: J, key: impl Into<Cow<'static, str>>) -> Self {
         Self {
             jar,
@@ -176,12 +182,11 @@ where
         }
     }
 
-    /// Returns a [`CookieStore`] that holds `value`, without reading the
-    /// cookie.
+    /// Seeds a [`CookieStore`] with `value` without reading the existing cookie.
     ///
-    /// Use this to replace the cookie when its current value does not matter.
-    /// The value is not written until you call
-    /// [`commit`](CookieStore::commit) on the returned store.
+    /// Use this to overwrite the cookie outright when you don't need its current
+    /// contents. The value is not written until the returned store is
+    /// [`commit`](CookieStore::commit)ted.
     ///
     /// ```rust
     /// # use serde::{Deserialize, Serialize};
@@ -205,16 +210,17 @@ where
         CookieStore::new(self.jar, self.key, value)
     }
 
-    /// Removes the cookie from the client without reading it first.
+    /// Queues a removal of the backing cookie without reading it first.
     ///
-    /// See [`CookieStore::remove`].
+    /// Use this to delete the cookie regardless of its current contents.
     pub fn remove(self) {
         self.jar.remove(Cookie::new(self.key, ""));
     }
 
-    /// Reads the cookie and deserializes its value.
+    /// Reads and deserializes the backing cookie.
     ///
-    /// Returns `Ok(None)` when the cookie is absent.
+    /// Returns `Ok(None)` when the cookie is absent, and `Err` when it is
+    /// present but cannot be deserialized.
     ///
     /// # Errors
     ///
@@ -230,14 +236,14 @@ where
         }
     }
 
-    /// Reads the cookie, or uses `default` when the cookie is absent or cannot
-    /// be deserialized.
+    /// Parses the backing cookie, falling back to `default` when it is absent or
+    /// malformed.
     pub fn parse_or(self, default: T) -> CookieStore<T, J> {
         self.parse_or_else(move || default)
     }
 
-    /// Reads the cookie, or calls `f` for a value when the cookie is absent or
-    /// cannot be deserialized.
+    /// Parses the backing cookie, falling back to `f()` when it is absent or
+    /// malformed.
     pub fn parse_or_else<F>(self, f: F) -> CookieStore<T, J>
     where
         F: FnOnce() -> T,
@@ -249,8 +255,8 @@ where
         CookieStore::new(self.jar, self.key, value)
     }
 
-    /// Reads the cookie, or uses `T::default()` when the cookie is absent or
-    /// cannot be deserialized.
+    /// Parses the backing cookie, falling back to `T::default()` when it is
+    /// absent or malformed.
     pub fn parse_or_default(self) -> CookieStore<T, J>
     where
         T: Default,
@@ -259,10 +265,10 @@ where
     }
 }
 
-/// Creates an [`UnparsedCookieStore`] for the cookie named `key` in `jar`.
+/// Builds an [`UnparsedCookieStore`] for the cookie named `key`, backed by `jar`.
 ///
-/// `jar` can be any [`Cookies`] jar, and its signing, encryption, name prefix,
-/// and attributes apply to the stored cookie. Name the stored type as `T`:
+/// `jar` is any [`Cookies`] jar, so signing, encryption, prefixes, and default
+/// attributes compose through it. Specify the stored type as `T`:
 ///
 /// ```rust
 /// # use serde::{Deserialize, Serialize};

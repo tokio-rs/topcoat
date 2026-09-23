@@ -8,13 +8,9 @@ use crate::{attributes::Attributes, view::ElementName};
 
 /// An element's opening tag: `<name attr=value ...>`.
 pub struct OpeningTag {
-    /// The `<`.
     pub lt: Token![<],
-    /// The element name.
     pub name: ElementName,
-    /// The attributes.
     pub attributes: Attributes,
-    /// The `>`.
     pub gt: Token![>],
 }
 
@@ -50,15 +46,10 @@ impl topcoat_core_grammar::pretty::PrettyPrint for OpeningTag {
 
 /// An element's self-closing tag: `<name attr=value ... />`.
 pub struct SelfClosingTag {
-    /// The `<`.
     pub lt: Token![<],
-    /// The element name.
     pub name: ElementName,
-    /// The attributes.
     pub attributes: Attributes,
-    /// The `/` before the `>`.
     pub slash: Token![/],
-    /// The `>`.
     pub gt: Token![>],
 }
 
@@ -98,10 +89,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for SelfClosingTag {
 /// The tag an element starts with: either an opening tag or a self-closing
 /// tag.
 pub enum ElementTag {
-    /// An opening tag, followed by children and a closing tag unless the
-    /// element is void.
     Opening(OpeningTag),
-    /// A self-closing tag.
     SelfClosing(SelfClosingTag),
 }
 
@@ -131,13 +119,9 @@ impl Parse for ElementTag {
 
 /// An element's closing tag: `</name>`.
 pub struct ClosingTag {
-    /// The `<`.
     pub lt: Token![<],
-    /// The `/` after the `<`.
     pub slash: Token![/],
-    /// The element name, which must match the opening tag.
     pub name: ElementName,
-    /// The `>`.
     pub gt: Token![>],
 }
 

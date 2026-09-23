@@ -3,17 +3,14 @@ use topcoat::{
     view::{Attributes, Child, View, class, component, view},
 };
 
-/// A table of rows and columns.
+/// A table component: rows and columns of related data.
 ///
-/// The table is wrapped in a container that scrolls horizontally, so a wide
-/// table scrolls instead of stretching the page. Child nodes become the
-/// table's sections: a [`table_header`], a [`table_body`], and optionally a
-/// [`table_footer`] and a [`table_caption`].
-///
-/// The `attrs` (such as `class`) are forwarded to the `<table>`, not to the
-/// wrapping `<div>`. A `class` among them is appended to the component's
-/// classes. The other table components also forward their `attrs` to their
-/// element and append a `class`.
+/// The table is wrapped in a scrolling container, so a table wider than its
+/// surroundings scrolls sideways on its own instead of stretching the page.
+/// Child nodes are the table's sections: a [`table_header`], a
+/// [`table_body`], and optionally a [`table_footer`] and a [`table_caption`].
+/// The `attrs` (such as `class`) are forwarded to the `<table>` itself; a
+/// `class` among them is appended to the computed classes.
 ///
 /// ```ignore
 /// view! {
@@ -53,8 +50,7 @@ pub async fn table(
     })
 }
 
-/// The header section of a [`table`], rendered as a `<thead>` that holds the
-/// row of column headers.
+/// The heading section of a [`table`], holding the row of column headers.
 #[component]
 pub async fn table_header(
     #[default] mut attrs: Attributes,
@@ -67,10 +63,10 @@ pub async fn table_header(
     })
 }
 
-/// The main section of a [`table`], rendered as a `<tbody>` that holds the
-/// data rows.
+/// The main section of a [`table`], holding its rows of data.
 ///
-/// The last row has no bottom border.
+/// The last row's rule is dropped, so the table ends on its own edge rather
+/// than on a line.
 #[component]
 pub async fn table_body(
     #[default] mut attrs: Attributes,
@@ -86,8 +82,7 @@ pub async fn table_body(
     })
 }
 
-/// The footer section of a [`table`], rendered as a `<tfoot>`, for totals and
-/// other summaries.
+/// The closing section of a [`table`], for totals and other summaries.
 #[component]
 pub async fn table_footer(
     #[default] mut attrs: Attributes,
@@ -106,10 +101,10 @@ pub async fn table_footer(
     })
 }
 
-/// A row of a [`table`], in any of its sections.
+/// One row of a [`table`], in any of its sections.
 ///
-/// Rows have a bottom border and are tinted on hover, which makes them easier
-/// to follow across wide tables.
+/// The row is ruled off from the next one and tints on hover, so the eye can
+/// follow it across wide tables.
 #[component]
 pub async fn table_row(
     #[default] mut attrs: Attributes,
@@ -128,7 +123,7 @@ pub async fn table_row(
     })
 }
 
-/// A column header in the row of a [`table_header`], rendered as a `<th>`.
+/// A column header in a [`table_header`]'s row.
 #[component]
 pub async fn table_head(
     #[default] mut attrs: Attributes,
@@ -148,7 +143,7 @@ pub async fn table_head(
     })
 }
 
-/// A cell of a [`table_row`], rendered as a `<td>`.
+/// One cell of a [`table_row`].
 #[component]
 pub async fn table_cell(
     #[default] mut attrs: Attributes,
@@ -164,7 +159,7 @@ pub async fn table_cell(
     })
 }
 
-/// A caption shown below a [`table`] that says what it contains.
+/// A line under a [`table`] saying what it holds.
 #[component]
 pub async fn table_caption(
     #[default] mut attrs: Attributes,

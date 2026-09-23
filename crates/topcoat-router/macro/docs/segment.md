@@ -1,35 +1,37 @@
-Changes the path segment that a module adds under [`module_router!`](macro.module_router.html).
+Customizes how a module contributes to module-router URLs.
 
-By default, each module below the root adds its name in kebab-case as a segment, and a module whose name starts with `_` is a group that adds no segment. Call `segment!(...)` in a module to change this. The module that calls `module_router!` is the root and adds no segment, so `segment!` has no effect there. It also has no effect on a [`Router`](struct.Router.html) built without `module_router!`, or on handlers with an absolute path.
+`segment!(...)` is placed at the top of a non-root route module to override the URL segment the module contributes to a [`module_router!`](macro.module_router.html): by default the kebab-cased module name, or no segment for `_`-prefixed modules (groups). The module containing `module_router!` is the route root and contributes no segment. `segment!` has no effect on a regular [`Router`](struct.Router.html), nor on items whose attribute carries an explicit path.
 
 # Attributes
 
-The macro takes comma-separated `key = value` attributes. Each can appear at most once:
+The macro takes comma-separated `key = value` attributes, each at most once:
 
-- `rename = "name"`: uses the given name for the segment exactly as written, without converting it to kebab-case.
-- `kind = Static`: a literal URL segment. This is the default for regular modules. Use it to turn a `_`-prefixed module back into a normal segment.
-- `kind = Group`: adds no URL segment, but the module can still hold layouts and layers for its descendants. This is the default for `_`-prefixed modules.
-- `kind = Param`: a dynamic `{name}` parameter that matches one segment.
-- `kind = CatchAll`: a `{*name}` catch-all that matches all remaining segments.
+- `rename = "name"`: replaces the segment's name with the literal, used as-is (no kebab-casing).
+- `kind = Static`: a literal URL segment; the default for regular modules. Use it to turn a `_`-prefixed module back into a static segment.
+- `kind = Group`: no URL segment, though the module can still hold shared layouts and layers; the default for `_`-prefixed modules.
+- `kind = Param`: a dynamic `{name}` parameter, matching one segment.
+- `kind = CatchAll`: a wildcard `{*name}` tail, matching all remaining segments.
 
-A `Param` or `CatchAll` segment without a `rename` uses the module name as written. [`path_param!`](macro.path_param.html) declares the matching segment for its module, so do not also call `segment!` in that module. A `Param` or `CatchAll` declared with `segment!` captures the segment but does not generate a type for reading it. Read it with [`raw_path_params`](fn.raw_path_params.html) instead.
+A `Param` or `CatchAll` segment without a `rename` is named after the module, as-is. Declaring a [`path_param!`](macro.path_param.html) in a module emits the matching segment override automatically, so do not also call `segment!` in that module. A manual `Param` or `CatchAll` declaration creates a captured segment but no typed accessor; read it with [`raw_path_params`](fn.raw_path_params.html).
 
-A `CatchAll` matches one or more segments, including the `/` between them. It must be the last segment of the path. `raw_path_params` gives both the encoded rest of the path and each segment decoded on its own. To read the segments through a generated type, use `path_param!(*name)` instead.
+A `CatchAll` matches one or more remaining URL segments, including `/` separators, and must be the last served segment in the path.
+
+`raw_path_params` reports both views of it: the encoded tail and its separately decoded segments. Use `path_param!(*name)` to read the segments through a typed accessor instead.
 
 # Examples
 
 ```rust
-// src/app/blog_post.rs: the module is served at `/articles` instead of `/blog-post`.
+// src/app/blog_post.rs: module URL becomes `/articles` instead of `/blog-post`.
 topcoat::router::segment!(rename = "articles");
 ```
 
 ```rust
-// src/app/marketing.rs: `marketing` adds no URL segment.
+// src/app/marketing.rs: `marketing` contributes no URL segment.
 topcoat::router::segment!(kind = Group);
 ```
 
 ```rust
-// src/app/_group.rs: `_group` is served at `/group`.
+// src/app/_group.rs: `_group` is reachable as `/group`.
 topcoat::router::segment!(kind = Static);
 ```
 

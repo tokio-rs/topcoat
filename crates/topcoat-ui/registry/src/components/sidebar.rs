@@ -13,21 +13,16 @@ use super::{
     skeleton::skeleton,
 };
 
-/// The edge of the page that a [`sidebar`] sits on.
-///
-/// The default is `SidebarSide::Left`.
+/// The edge of the page occupied by a sidebar.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum SidebarSide {
-    /// The left edge.
     #[default]
     Left,
-    /// The right edge. Place the sidebar after the page content.
     Right,
 }
 
 impl SidebarSide {
-    /// The value of the `data-side` attribute.
     fn name(self) -> &'static str {
         match self {
             Self::Left => "left",
@@ -35,7 +30,6 @@ impl SidebarSide {
         }
     }
 
-    /// The side the mobile sheet comes in from.
     fn sheet(self) -> SheetSide {
         match self {
             Self::Left => SheetSide::Left,
@@ -44,9 +38,7 @@ impl SidebarSide {
     }
 }
 
-/// How the desktop [`sidebar`] looks next to the page.
-///
-/// The default is `SidebarVariant::Sidebar`.
+/// The desktop sidebar's surface and its relationship to the page.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum SidebarVariant {
@@ -55,12 +47,11 @@ pub enum SidebarVariant {
     Sidebar,
     /// A rounded panel with space around it.
     Floating,
-    /// A sidebar next to page content in a rounded [`sidebar_inset`] surface.
+    /// A sidebar beside a rounded [`sidebar_inset`] content surface.
     Inset,
 }
 
 impl SidebarVariant {
-    /// The value of the `data-variant` attribute.
     fn name(self) -> &'static str {
         match self {
             Self::Sidebar => "sidebar",
@@ -70,23 +61,20 @@ impl SidebarVariant {
     }
 }
 
-/// What the desktop [`sidebar`] does when its `open` expression is false.
-///
-/// The default is `SidebarCollapsible::Offcanvas`.
+/// How the desktop sidebar behaves when its `open` expression is false.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum SidebarCollapsible {
-    /// Hides the panel and gives its space to the page.
+    /// Hide the panel and release its space to the page.
     #[default]
     Offcanvas,
-    /// Shrinks the panel to a narrow strip of menu icons.
+    /// Keep a narrow strip of menu icons visible.
     Icon,
-    /// Keeps the desktop panel expanded, whatever `open` is.
+    /// Keep the desktop panel expanded.
     None,
 }
 
 impl SidebarCollapsible {
-    /// The value of the `data-collapsible` attribute while collapsed.
     fn name(self) -> &'static str {
         match self {
             Self::Offcanvas => "offcanvas",
@@ -96,21 +84,14 @@ impl SidebarCollapsible {
     }
 }
 
-/// The flex layout around a [`sidebar`] and the page content.
+/// The flex layout surrounding a sidebar and the page content.
 ///
-/// On desktop, the layout is as high as the viewport, and the page content
-/// scrolls inside it.
+/// On desktop, the page content scrolls within the viewport-height layout.
 ///
-/// To change the widths, set `--sidebar-width`, `--sidebar-width-mobile`, and
-/// `--sidebar-width-icon` in `attrs`, for example with a class like
-/// `[--sidebar-width:20rem]`. Place a right sidebar after the page content.
-/// The components keep no state. You pass expressions to [`sidebar`] and
-/// event handlers to [`sidebar_trigger`] and [`sidebar_rail`].
-///
-/// The `attrs` are forwarded to the `<div>`. A `class` among them is appended
-/// to the component's classes. Unless noted otherwise, the other sidebar
-/// components also forward their `attrs` to their element and append a
-/// `class`.
+/// Set `--sidebar-width`, `--sidebar-width-mobile` and `--sidebar-width-icon`
+/// through `attrs` to customize the widths. Place a right sidebar after the
+/// page content. State belongs to the caller, which passes expressions to
+/// [`sidebar`] and event handlers to [`sidebar_trigger`] and [`sidebar_rail`].
 #[component]
 pub async fn sidebar_provider(
     #[default] mut attrs: Attributes,
@@ -130,9 +111,8 @@ pub async fn sidebar_provider(
     })
 }
 
-// Other components inside the panel use the sidebar palette too. These
-// scoped aliases give buttons, inputs, and captions the sidebar colors
-// instead of the page colors.
+// Ordinary components nested in the panel inherit its palette too. The
+// scoped aliases keep buttons, inputs and captions independent of the page.
 const PANEL_THEME: StaticClass = class!(
     "[--background:var(--sidebar)] [--foreground:var(--sidebar-foreground)] \
      [--card:var(--sidebar)] [--card-foreground:var(--sidebar-foreground)] \
@@ -142,28 +122,21 @@ const PANEL_THEME: StaticClass = class!(
      [--muted-foreground:color-mix(in_oklab,var(--sidebar-foreground)_70%,transparent)]",
 );
 
-/// A navigation panel at the edge of the page, which becomes a [`sheet`]
-/// over the page on screens narrower than `md` (48rem).
+/// A desktop panel that becomes a sheet over the page below `md` (48rem).
 ///
-/// The `--sidebar-*` theme tokens set its colors, separately from cards,
-/// sheets, and the page. Components inside the sidebar use the sidebar
-/// colors too.
+/// The `--sidebar-*` theme tokens control its colors independently of cards,
+/// sheets and page content. Nested controls inherit the sidebar palette.
 ///
-/// `open` controls whether the desktop panel is expanded, and defaults to
-/// `true`. `mobile_open` controls the mobile sheet separately and defaults to
-/// `false`, so the sheet can start closed while the desktop panel starts
-/// expanded. Pass runtime expressions that read your signals to open and
-/// close them in the browser. The children, usually a [`sidebar_header`], a
-/// [`sidebar_content`], and a [`sidebar_footer`], are rendered once and used
-/// for both screen sizes, so inputs and signals inside them keep their state.
+/// `open` controls desktop expansion. `mobile_open` independently controls
+/// the mobile sheet, so it can start closed while desktop starts expanded.
+/// Pass runtime expressions reading the caller's signals to make both live.
+/// Header, content and footer children are rendered once and shared between
+/// viewport sizes, preserving their inputs and signal identities.
 ///
-/// `side`, `variant`, and `collapsible` default to `Left`, `Sidebar`, and
-/// `Offcanvas`. The `attrs` are forwarded to the outer `<aside>`. The
-/// `sheet_attrs` are forwarded to the `<dialog>` of the sheet, for example a
-/// label, an id, or event handlers that close the sheet on Escape or on a
-/// click on the overlay. Add a close button to the mobile header. Like
-/// [`sheet`], the mobile sheet does not trap focus. That needs extra
-/// scripting.
+/// `attrs` apply to the outer wrapper. `sheet_attrs` apply to the sheet and
+/// accept a label, an ID, and event handlers for Escape or backdrop dismissal.
+/// Include a close button in the mobile header. Like [`sheet`], this is a
+/// visual overlay; focus trapping requires additional application scripting.
 #[component]
 pub async fn sidebar(
     #[into]
@@ -237,13 +210,11 @@ pub async fn sidebar(
     })
 }
 
-/// A ghost icon button that opens and closes the [`sidebar`].
+/// A sidebar toggle button. Pass its signal update as an `@click` attribute.
 ///
-/// Pass the handler that updates your signal as an `@click` attribute in
-/// `attrs`. `open` sets `aria-expanded` and defaults to `true`. Set
-/// `aria-controls` in `attrs` to the id of the panel. For a trigger that
-/// works on both screen sizes, you can use different expressions and
-/// handlers for desktop and mobile.
+/// `open` controls the accessible expanded state. Set `aria-controls` in
+/// `attrs` to the controlled panel's ID. Responsive triggers can use separate
+/// desktop and mobile expressions and handlers.
 #[component]
 pub async fn sidebar_trigger(
     #[into]
@@ -267,12 +238,9 @@ pub async fn sidebar_trigger(
     })
 }
 
-/// A thin button along the inner edge of the desktop [`sidebar`] that opens
-/// and closes it.
+/// A desktop edge button that toggles the sidebar on click.
 ///
-/// Pass the handler that updates your signal as an `@click` attribute in
-/// `attrs`. `open` sets `aria-expanded` and defaults to `true`. The rail is
-/// hidden on mobile.
+/// Pass its signal update as an `@click` attribute.
 #[component]
 pub async fn sidebar_rail(
     #[into]
@@ -296,11 +264,10 @@ pub async fn sidebar_rail(
     })
 }
 
-/// The page content next to a [`sidebar`], rendered as a `<main>`.
+/// The page content beside a sidebar, scrollable independently on desktop.
 ///
-/// On desktop, it scrolls separately from the sidebar. A [`sidebar_header`]
-/// that is a direct child becomes a sticky toolbar with the same height and
-/// bottom border as the sidebar's header.
+/// An immediate [`sidebar_header`] child becomes a sticky toolbar. Its height
+/// and bottom border match the sidebar header without extra classes.
 #[component]
 pub async fn sidebar_inset(
     #[default] mut attrs: Attributes,
@@ -320,11 +287,10 @@ pub async fn sidebar_inset(
     })
 }
 
-/// A header for the [`sidebar`] or for the page content.
+/// A header for the sidebar or its page content.
 ///
-/// Its height and bottom border stay the same when the sidebar collapses to
-/// icons. Inside a [`sidebar_inset`], it lays out its children as a sticky
-/// toolbar.
+/// Its height and divider stay fixed when menu buttons collapse to icons.
+/// Inside [`sidebar_inset`], it lays out its children as a sticky toolbar.
 #[component]
 pub async fn sidebar_header(
     #[default] mut attrs: Attributes,
@@ -344,7 +310,7 @@ pub async fn sidebar_header(
     })
 }
 
-/// The footer of a [`sidebar`], below the scrolling [`sidebar_content`].
+/// The fixed footer below the sidebar's scrolling content.
 #[component]
 pub async fn sidebar_footer(
     #[default] mut attrs: Attributes,
@@ -361,7 +327,7 @@ pub async fn sidebar_footer(
     })
 }
 
-/// The scrolling area of a [`sidebar`], between the header and the footer.
+/// The scrollable region between the header and footer.
 #[component]
 pub async fn sidebar_content(
     #[default] mut attrs: Attributes,
@@ -381,9 +347,7 @@ pub async fn sidebar_content(
     })
 }
 
-/// A section of the sidebar content, usually with a
-/// [`sidebar_group_label`], an optional [`sidebar_group_action`], and a
-/// [`sidebar_group_content`].
+/// A section containing a label, an optional action and related menu items.
 #[component]
 pub async fn sidebar_group(
     #[default] mut attrs: Attributes,
@@ -403,8 +367,7 @@ pub async fn sidebar_group(
     })
 }
 
-/// The caption of a [`sidebar_group`], hidden when the desktop sidebar
-/// collapses to icons.
+/// A group's caption, hidden when the desktop sidebar collapses to icons.
 #[component]
 pub async fn sidebar_group_label(
     #[default] mut attrs: Attributes,
@@ -424,16 +387,12 @@ pub async fn sidebar_group_label(
     })
 }
 
-// Shared button styles for group and menu actions. Each one sets its own
-// position.
+// Shared button styles for group and menu actions. Each sets its own position.
 const ACTION: StaticClass = class!(
     "absolute flex size-6 items-center justify-center rounded-md text-sidebar-foreground/70 outline-none hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring disabled:pointer-events-none disabled:opacity-50 md:group-data-[collapsible=icon]/sidebar:hidden [&_svg]:size-4",
 );
 
-/// An icon button next to the label of a [`sidebar_group`].
-///
-/// Child nodes become its content, usually an icon. Give it an accessible
-/// label, such as an `aria-label` in `attrs`.
+/// An icon button beside the group label. Give it an accessible label.
 #[component]
 pub async fn sidebar_group_action(
     #[default] mut attrs: Attributes,
@@ -451,7 +410,7 @@ pub async fn sidebar_group_action(
     })
 }
 
-/// The body of a [`sidebar_group`], usually holding a [`sidebar_menu`].
+/// The body of a sidebar group.
 #[component]
 pub async fn sidebar_group_content(
     #[default] mut attrs: Attributes,
@@ -468,7 +427,7 @@ pub async fn sidebar_group_content(
     })
 }
 
-/// A list of [`sidebar_menu_item`]s, rendered as a `<ul>`.
+/// A list of sidebar menu items.
 #[component]
 pub async fn sidebar_menu(
     #[default] mut attrs: Attributes,
@@ -485,11 +444,7 @@ pub async fn sidebar_menu(
     })
 }
 
-/// A row of a [`sidebar_menu`], rendered as an `<li>`.
-///
-/// It holds a [`sidebar_menu_button`] and optionally a
-/// [`sidebar_menu_action`], a [`sidebar_menu_badge`], or a
-/// [`sidebar_menu_sub`].
+/// One menu row containing a button or link and optional actions or submenus.
 #[component]
 pub async fn sidebar_menu_item(
     #[default] mut attrs: Attributes,
@@ -506,10 +461,7 @@ pub async fn sidebar_menu_item(
     })
 }
 
-/// A text input for a sidebar header or group, hidden when the desktop
-/// sidebar collapses to icons.
-///
-/// The `attrs` are forwarded to the `<input>`.
+/// A text input styled for a sidebar header or group.
 #[component]
 pub async fn sidebar_input(#[default] mut attrs: Attributes) -> Result<impl View> {
     Ok(view! {
@@ -526,27 +478,22 @@ pub async fn sidebar_input(#[default] mut attrs: Attributes) -> Result<impl View
     })
 }
 
-/// A thin line between sidebar sections.
+/// A rule between sidebar sections.
 #[component]
 pub async fn sidebar_separator(#[default] attrs: Attributes) -> Result<impl View> {
     Ok(view! { separator(attrs: attributes! { data-sidebar="separator" (attrs) }) })
 }
 
-/// The visual style of a [`sidebar_menu_button`].
-///
-/// The default is `SidebarMenuButtonVariant::Default`.
+/// The visual style of a sidebar menu button.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum SidebarMenuButtonVariant {
-    /// No border or fill until hovered.
     #[default]
     Default,
-    /// A border, the sidebar background, and a small shadow.
     Outline,
 }
 
 impl SidebarMenuButtonVariant {
-    /// The Tailwind classes for this variant.
     fn classes(self) -> StaticClass {
         match self {
             Self::Default => class!("border-transparent"),
@@ -555,23 +502,17 @@ impl SidebarMenuButtonVariant {
     }
 }
 
-/// The size of a [`sidebar_menu_button`] or [`sidebar_menu_sub_button`].
-///
-/// The default is `SidebarMenuButtonSize::Md`.
+/// The size of a sidebar menu button.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum SidebarMenuButtonSize {
-    /// A compact row with small text.
     Sm,
-    /// The standard row height.
     #[default]
     Md,
-    /// A tall row, for example for an item with two lines of text.
     Lg,
 }
 
 impl SidebarMenuButtonSize {
-    /// The Tailwind classes for this size.
     fn classes(self) -> StaticClass {
         match self {
             Self::Sm => class!("h-7 text-xs"),
@@ -581,18 +522,14 @@ impl SidebarMenuButtonSize {
     }
 }
 
-/// The classes shared by every sidebar menu button.
 const MENU_BUTTON: StaticClass = class!(
     "flex w-full min-w-0 items-center gap-2 overflow-hidden rounded-md border px-2 text-left outline-none transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground data-[active=true]:font-medium has-[+[data-sidebar=menu-action]]:pr-8 has-[+[data-sidebar=menu-badge]]:pr-8 [&>svg]:size-4 [&>svg]:shrink-0 [&>span:last-child]:truncate md:group-data-[collapsible=icon]/sidebar:size-8 md:group-data-[collapsible=icon]/sidebar:justify-center md:group-data-[collapsible=icon]/sidebar:p-0 md:group-data-[collapsible=icon]/sidebar:[&>span:last-child]:sr-only",
 );
 
-/// Returns the full class list of a [`sidebar_menu_button`] with the given
-/// `variant` and `size`.
+/// Classes for styling another element as a sidebar menu button.
 ///
-/// Use it to style another element like a sidebar menu button. Set
-/// `data-active="true"` for the active style. Put the label in a `<span>`
-/// after the icon, so it stays available to assistive technology when the
-/// sidebar collapses to icons.
+/// Set `data-active="true"` for active styling. Put the label in a `<span>`
+/// after the icon so it remains accessible when the sidebar collapses.
 #[must_use]
 pub fn sidebar_menu_button_variants(
     variant: SidebarMenuButtonVariant,
@@ -601,16 +538,11 @@ pub fn sidebar_menu_button_variants(
     class!(MENU_BUTTON, variant.classes(), size.classes())
 }
 
-/// The main button of a [`sidebar_menu_item`]. It is an `<a>` when `href` is
-/// set, and a `<button>` otherwise.
+/// A menu action, or a navigation link when `href` is supplied.
 ///
-/// Child nodes become its content: put an icon before a `<span>` with the
-/// label. When the sidebar collapses to icons, the label is only visible to
-/// assistive technology. `tooltip` sets the `title` attribute, which gives
-/// the icon a native hint. `active` accepts a boolean or a runtime
-/// expression, sets the active style and `aria-current="page"`, and defaults
-/// to `false`. `variant` and `size` default to `Default` and `Md`. The
-/// `attrs`, such as event handlers, are forwarded to the element.
+/// Put an icon before a `<span>` containing the label. `tooltip` supplies a
+/// native title hint for the icon-only state. `active` accepts a boolean or
+/// runtime expression. Event handlers and other attributes are forwarded.
 #[component]
 pub async fn sidebar_menu_button(
     #[default] variant: SidebarMenuButtonVariant,
@@ -644,12 +576,7 @@ pub async fn sidebar_menu_button(
     })
 }
 
-/// A small icon button at the right end of a [`sidebar_menu_item`], separate
-/// from its [`sidebar_menu_button`].
-///
-/// Child nodes become its content, usually an icon. Give it an accessible
-/// label, such as an `aria-label` in `attrs`. With `show_on_hover`, it is
-/// only visible on desktop while the item is hovered or has focus.
+/// An independent action beside a menu button. Give it an accessible label.
 #[component]
 pub async fn sidebar_menu_action(
     #[default] show_on_hover: bool,
@@ -673,8 +600,7 @@ pub async fn sidebar_menu_action(
     })
 }
 
-/// A count or status at the right end of a [`sidebar_menu_item`], hidden when
-/// the desktop sidebar collapses to icons.
+/// A count or status beside a menu button.
 #[component]
 pub async fn sidebar_menu_badge(
     #[default] mut attrs: Attributes,
@@ -694,10 +620,7 @@ pub async fn sidebar_menu_badge(
     })
 }
 
-/// A loading placeholder with the shape of a menu row.
-///
-/// With `show_icon`, it also shows a placeholder for the icon. It is hidden
-/// from assistive technology.
+/// A placeholder matching a menu row, optionally including an icon.
 #[component]
 pub async fn sidebar_menu_skeleton(
     #[default] show_icon: bool,
@@ -725,9 +648,7 @@ pub async fn sidebar_menu_skeleton(
     })
 }
 
-/// A nested menu inside a [`sidebar_menu_item`], rendered as a `<ul>`.
-///
-/// It is hidden when the desktop sidebar collapses to icons.
+/// A nested menu, hidden when the sidebar collapses to icons.
 #[component]
 pub async fn sidebar_menu_sub(
     #[default] mut attrs: Attributes,
@@ -747,7 +668,7 @@ pub async fn sidebar_menu_sub(
     })
 }
 
-/// A row of a [`sidebar_menu_sub`], rendered as an `<li>`.
+/// One row of a nested sidebar menu.
 #[component]
 pub async fn sidebar_menu_sub_item(
     #[default] mut attrs: Attributes,
@@ -764,11 +685,7 @@ pub async fn sidebar_menu_sub_item(
     })
 }
 
-/// A link in a [`sidebar_menu_sub_item`], rendered as an `<a>`.
-///
-/// Pass the `href` in `attrs`. `active` accepts a boolean or a runtime
-/// expression, sets the active style and `aria-current="page"`, and defaults
-/// to `false`. `size` defaults to `Md`.
+/// A nested menu link. Pass its destination through the `href` attribute.
 #[component]
 pub async fn sidebar_menu_sub_button(
     #[into]

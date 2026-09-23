@@ -16,14 +16,11 @@ mod kw {
 /// A `tech(...)` hint on a CSS `@font-face` `src` entry.
 ///
 /// The technology may be a string literal naming a CSS technology keyword (such
-/// as `"color-colrv1"`) or any other expression that evaluates to a
-/// [`FontTech`].
+/// as `"color-colrv1"`) or a parenthesized expression resolving to a
+/// [`FontTech`] at run time.
 pub struct FontTechHint {
-    /// The `tech` keyword.
     pub tech_kw: kw::tech,
-    /// The parentheses around the technology.
     pub paren_token: Paren,
-    /// The technology.
     pub value: FontTech,
 }
 

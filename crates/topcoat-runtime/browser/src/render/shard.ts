@@ -17,7 +17,6 @@ export const SHARD_ROUTE_PREFIX = "/_topcoat/runtime/shards";
  */
 export class ShardUnit extends RenderUnit {
 	protected readonly label = "Shard";
-	/** The end marker, known once the scan reaches it. */
 	endNode: Comment | null = null;
 	/**
 	 * One compiled function per shard parameter, in declaration order. Each

@@ -4,13 +4,14 @@ use serde::Serialize;
 use topcoat_core::context::Cx;
 use topcoat_view::{AttributeValueViewParts, PartsWriter};
 
-/// The JavaScript source of a runtime expression.
+/// The JavaScript source of a runtime expression, captured at its `$(..)`
+/// site.
 ///
-/// The `expr!` macro builds one next to the expression's Rust value. It holds
-/// the source as the browser receives it, with the values captured from the
-/// surrounding Rust scope serialized in place. The source is written out
-/// when the expression renders into a view, inside a marker comment or an
-/// attribute value.
+/// The `expr!` macro builds one of these next to the expression's Rust
+/// value: the source as it reaches the browser, with the values captured
+/// from the surrounding Rust scope serialized in place. Nothing is written
+/// until the expression is spliced into a view, where the source renders
+/// inside a marker comment.
 #[derive(Debug, Clone)]
 pub struct Js {
     parts: Vec<JsPart>,
@@ -28,7 +29,7 @@ enum JsPart {
 }
 
 impl Js {
-    /// Creates source without captured values.
+    /// Source without captured values.
     #[must_use]
     pub fn source(js: impl Into<Cow<'static, str>>) -> Self {
         Self {
@@ -36,17 +37,16 @@ impl Js {
         }
     }
 
-    /// Starts building source that mixes text with captured values.
+    /// Starts source that interleaves captured values.
     #[must_use]
     pub fn builder() -> JsBuilder {
         JsBuilder { parts: Vec::new() }
     }
 
-    /// Returns the source as executable JavaScript, with the captured values
-    /// inlined.
+    /// Returns executable JavaScript, including serialized captured values.
     ///
-    /// The source expects the browser runtime's context in a variable named
-    /// `cx`. It is not escaped for embedding in HTML.
+    /// The source expects the runtime context to be available as `cx`. It is
+    /// not escaped for embedding in HTML.
     #[must_use]
     pub fn to_source(&self) -> String {
         let mut source = String::new();
@@ -103,17 +103,14 @@ impl AttributeValueViewParts for Js {
     }
 }
 
-/// Builds a [`Js`] from source text and captured values, in order.
-///
-/// Create one with [`Js::builder`].
+/// Builds a [`Js`] from source and captured values, in order.
 #[derive(Debug)]
 pub struct JsBuilder {
     parts: Vec<JsPart>,
 }
 
 impl JsBuilder {
-    /// Appends the source of another expression in parentheses, keeping its
-    /// captured values.
+    /// Appends an expression in parentheses, preserving its captured values.
     #[must_use]
     pub fn expression<T>(mut self, expression: &crate::Expr<T>) -> Self {
         self.parts.push(JsPart::Raw("("));
@@ -129,18 +126,15 @@ impl JsBuilder {
         self
     }
 
-    /// Appends trusted source that is written as is, without escaping.
+    /// Appends trusted scaffolding, written verbatim.
     #[must_use]
     pub fn raw(mut self, js: &'static str) -> Self {
         self.parts.push(JsPart::Raw(js));
         self
     }
 
-    /// Appends a captured value, which the browser reads back with the
-    /// runtime's hydration.
-    ///
-    /// The value is serialized immediately, so the Rust side can consume it
-    /// afterwards.
+    /// Appends a captured value, serialized now so the Rust expression can
+    /// consume it afterwards.
     ///
     /// # Panics
     ///

@@ -6,21 +6,17 @@ use crate::pretty::{Lexer, Macro, MacroSnippet, PrettyPrint, Printer};
 
 type MacroPrettyPrintFn = fn(&Registry, &MacroSnippet) -> syn::Result<String>;
 
-/// The pretty-printers for macro bodies, looked up by macro name.
 #[derive(Default)]
 pub struct Registry {
     macro_fns: HashMap<String, MacroPrettyPrintFn>,
 }
 
 impl Registry {
-    /// Creates an empty registry.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Creates a registry with a single pretty-printer, for the macro named
-    /// `name` whose body parses as `T`.
     pub fn one<T>(name: impl Into<String>) -> Self
     where
         T: Parse + PrettyPrint,
@@ -30,8 +26,7 @@ impl Registry {
         result
     }
 
-    /// Registers a pretty-printer for the macro named `name` whose body
-    /// parses as `T`.
+    /// Registers a pretty-printer for the macro named `name`.
     ///
     /// # Panics
     ///
@@ -64,11 +59,6 @@ impl Registry {
         self
     }
 
-    /// Formats the body of `snippet` with the pretty-printer registered for
-    /// its macro name.
-    ///
-    /// Returns `None` if no pretty-printer is registered for the name, and an
-    /// error if the body does not parse.
     #[must_use]
     pub fn pretty_print_macro(&self, snippet: &MacroSnippet) -> Option<syn::Result<String>> {
         self.macro_fns

@@ -27,36 +27,18 @@ pub use slice::*;
 pub use string::*;
 pub use vec::*;
 
-/// A type from the runtime vocabulary: a Rust type that runtime expressions
-/// can use.
-///
-/// Inside a runtime expression, each value is replaced by its surrogate: a
-/// wrapper that exposes only the operations the browser runtime can perform
-/// the same way. Owned values, shared references, and mutable references
-/// each have their own implementation.
 pub trait Surrogated {
-    /// The type that stands in for this type inside runtime expressions.
     type Surrogate: Surrogate<Real = Self>;
 
-    /// Wraps the value in its surrogate.
     fn into_surrogate(self) -> Self::Surrogate;
 }
 
-/// The stand-in for a [`Surrogated`] type inside runtime expressions.
 pub trait Surrogate {
-    /// The type this surrogate stands in for.
     type Real: Surrogated<Surrogate = Self>;
 
-    /// Unwraps the value this surrogate stands in for.
     fn into_real(self) -> Self::Real;
 }
 
-/// Implements [`Surrogated`] and [`Surrogate`] between an owned type and a
-/// surrogate newtype around it.
-///
-/// The surrogate must be a tuple struct with an associated `new` function
-/// that wraps the real value. Optional generic parameters go in braces
-/// before the types, and an optional `where` clause follows them.
 #[macro_export]
 macro_rules! impl_surrogate {
     (
@@ -85,11 +67,6 @@ macro_rules! impl_surrogate {
     };
 }
 
-/// Implements [`Surrogated`] and [`Surrogate`] between a shared reference to
-/// a type and a shared reference to its surrogate.
-///
-/// The surrogate must be a `#[repr(transparent)]` tuple struct deriving
-/// `ref_cast::RefCast`. The syntax matches [`impl_surrogate!`].
 #[macro_export]
 macro_rules! impl_surrogate_ref {
     (
@@ -118,11 +95,6 @@ macro_rules! impl_surrogate_ref {
     };
 }
 
-/// Implements [`Surrogated`] and [`Surrogate`] between a mutable reference to
-/// a type and a mutable reference to its surrogate.
-///
-/// The surrogate must be a `#[repr(transparent)]` tuple struct deriving
-/// `ref_cast::RefCast`. The syntax matches [`impl_surrogate!`].
 #[macro_export]
 macro_rules! impl_surrogate_mut {
     (

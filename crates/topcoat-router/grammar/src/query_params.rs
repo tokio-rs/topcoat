@@ -10,7 +10,6 @@ use topcoat_core_grammar::paths::{
 
 use super::common::ErrorAttr;
 
-/// The arguments of `#[query_params(...)]`: an optional `error = ...`.
 pub struct QueryParamsAttr {
     error: Option<ErrorAttr>,
 }
@@ -27,7 +26,6 @@ impl Parse for QueryParamsAttr {
     }
 }
 
-/// The annotated struct whose fields are read from the query string.
 pub struct QueryParamsItem {
     item: DeriveInput,
 }
@@ -40,11 +38,9 @@ impl Parse for QueryParamsItem {
     }
 }
 
-/// A parsed `#[query_params]` declaration, which expands to the generated code.
 pub struct QueryParams(QueryParamsAttr, QueryParamsItem);
 
 impl QueryParams {
-    /// Combines a parsed attribute and item.
     #[must_use]
     pub fn new(attr: QueryParamsAttr, item: QueryParamsItem) -> Self {
         Self(attr, item)

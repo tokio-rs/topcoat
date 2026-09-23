@@ -12,11 +12,11 @@ use crate::{Arguments, SignalValues};
 
 pub(crate) const SHARD_ROUTE_PREFIX: &str = "/_topcoat/runtime/shards";
 
-/// The body of a request that re-renders a shard: the current values of its
+/// The body of a request re-rendering a shard: the current values of its
 /// arguments and of the signals its content created.
 ///
-/// The identity of the shard invocation is not part of the body. It travels
-/// in the request's identity header.
+/// The identity of the shard invocation travels separately, in the
+/// request's identity header.
 #[derive(Debug, Deserialize)]
 #[serde(bound(deserialize = "Arguments<A>: Deserialize<'de>"))]
 pub struct ShardRequest<A> {
@@ -26,28 +26,23 @@ pub struct ShardRequest<A> {
 }
 
 impl<A> ShardRequest<A> {
-    /// Splits the request into the arguments for the shard body and the
+    /// Splits the request into the arguments to hand the shard body and the
     /// signal values to register on its request context.
     pub fn into_parts(self) -> (A, SignalValues) {
         (self.args.0, self.signals)
     }
 }
 
-/// The identity of a shard, shared by the server and the browser runtime.
-///
-/// The id names the shard's route. `#[shard]` generates a unique id for each
-/// shard.
+/// The identity of a shard, stable across the server and the client runtime.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct ShardId(&'static str);
 
 impl ShardId {
-    /// Creates an id from its string form.
     #[must_use]
     pub const fn new(inner: &'static str) -> Self {
         Self(inner)
     }
 
-    /// Returns the id as a string.
     #[must_use]
     pub fn as_str(&self) -> &str {
         self.0
@@ -58,18 +53,18 @@ impl ShardId {
 /// the shard and its request context.
 pub type ShardFuture<'cx> = Pin<Box<dyn Future<Output = Result<ViewHandle>> + Send + 'cx>>;
 
-/// A component that re-renders on the server when its inputs change in the
-/// browser.
+/// A component that re-renders on the server when its runtime expression
+/// arguments change.
 ///
-/// `#[shard]` implements this trait. Register a shard on a [`RouterBuilder`]
-/// with [`shard`](RouterBuilderShardExt::shard), which serves it on a route
-/// named after its [`ShardId`].
+/// Registered into a [`RouterBuilder`] with
+/// [`shard`](RouterBuilderShardExt::shard), which serves it as a route
+/// dispatched by [`ShardId`].
 pub trait Shard: Send + Sync + 'static {
     /// The identity of this shard.
     fn id(&self) -> ShardId;
 
-    /// Renders the shard for a re-render request, reading its arguments and
-    /// signal values from the JSON `body`.
+    /// Renders the shard for an endpoint request, deserializing its arguments
+    /// from `body`.
     fn render<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> ShardFuture<'cx>;
 }
 
@@ -87,8 +82,6 @@ impl<S: Shard + ?Sized> Shard for &'static S {
 inventory::collect!(&'static dyn Shard);
 
 /// A [`Route`] that re-renders one shard.
-///
-/// [`RouterBuilderShardExt::shard`] creates and registers one.
 pub struct ShardRoute {
     id: RouteId,
     path: PathBuf,
@@ -96,7 +89,7 @@ pub struct ShardRoute {
 }
 
 impl ShardRoute {
-    /// Creates the route that serves `shard`.
+    /// Builds the route that serves a shard.
     pub fn new(shard: impl Shard) -> Self {
         Self {
             id: RouteId::new(),
@@ -130,13 +123,11 @@ impl Route for ShardRoute {
 
 /// Registers shards on a [`RouterBuilder`].
 pub trait RouterBuilderShardExt {
-    /// Mounts the route that serves `shard`.
+    /// Mounts a shard route.
     #[must_use]
     fn shard(self, shard: impl Shard) -> Self;
 
-    /// Registers every `#[shard]` linked into the binary.
-    ///
-    /// The `discover` method of the router builder already calls this.
+    /// Registers every shard linked into the binary.
     #[cfg(feature = "discover")]
     #[must_use]
     fn discover_shards(self) -> Self;

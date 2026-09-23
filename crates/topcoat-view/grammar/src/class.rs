@@ -7,15 +7,14 @@ use syn::{
 };
 use topcoat_core_grammar::{ParseOption, paths::topcoat_view};
 
-/// The parsed body of a `class!` invocation. Expands to a
-/// [`topcoat_view::Class`].
+/// The parsed body of a `class!` invocation. Lowers to a
+/// [`runtime::Class`](topcoat_view::Class).
 ///
 /// Unlike `view!` and `attributes!`, the body takes no leading `cx =>`
-/// argument, because building a class list does not need the request
-/// context. Runs of unconditional string literals merge into a single entry
-/// that is escaped at compile time.
+/// argument: constructing a class list does not touch the request context.
+/// The entries receive it later, when the surrounding attribute machinery
+/// converts the class list into view parts.
 pub struct Class {
-    /// The comma-separated entries.
     pub segments: Punctuated<ClassSegment, Token![,]>,
 }
 
@@ -104,9 +103,7 @@ fn entries_tuple(mut entries: Vec<TokenStream>) -> TokenStream {
 /// A single class list entry: an expression with an optional trailing
 /// `if cond` or `if cond else alt` condition.
 pub struct ClassSegment {
-    /// The entry's value.
     pub value: Expr,
-    /// The condition that decides whether the entry is included.
     pub condition: Option<ClassCondition>,
 }
 
@@ -225,12 +222,8 @@ fn as_lit_str(expr: &Expr) -> Option<&LitStr> {
 /// The trailing `if cond` of a [`ClassSegment`], with an optional
 /// `else alt`.
 pub struct ClassCondition {
-    /// The `if` keyword.
     pub if_token: Token![if],
-    /// The condition expression.
     pub condition: Expr,
-    /// The value used when the condition is false. Without it, the entry is
-    /// left out.
     pub else_branch: Option<ClassElse>,
 }
 
@@ -252,9 +245,7 @@ impl ParseOption for ClassCondition {
 
 /// The `else alt` branch of a [`ClassCondition`].
 pub struct ClassElse {
-    /// The `else` keyword.
     pub else_token: Token![else],
-    /// The value used when the condition is false.
     pub value: Expr,
 }
 

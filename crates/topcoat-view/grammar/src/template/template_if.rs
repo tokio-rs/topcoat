@@ -10,15 +10,11 @@ use crate::{
     view::hir::{LowerView, ViewBuilder},
 };
 
-/// An `if cond { ... } else { ... }` chain in a view or among attributes.
+/// An `if cond { ... } else { ... }` chain in view-body position.
 pub struct TemplateIf<T> {
-    /// The `if` keyword.
     pub if_token: Token![if],
-    /// The condition, which may be an `if let` pattern match.
     pub cond: syn::Expr,
-    /// The branch rendered when the condition holds.
     pub then_branch: TemplateBlock<T>,
-    /// The `else if` or `else` branch, if any.
     pub else_branch: Option<TemplateElse<T>>,
 }
 
@@ -78,18 +74,12 @@ impl<T: topcoat_core_grammar::pretty::PrettyPrint> topcoat_core_grammar::pretty:
 
 /// The trailing `else if ...` or `else { ... }` of a [`TemplateIf`].
 pub enum TemplateElse<T> {
-    /// An `else if ...` that continues the chain.
     ElseIf {
-        /// The `else` keyword.
         else_token: Token![else],
-        /// The `if` after `else`.
         template_if: Box<TemplateIf<T>>,
     },
-    /// A final `else { ... }`.
     Else {
-        /// The `else` keyword.
         else_token: Token![else],
-        /// The branch rendered when no condition holds.
         then_branch: TemplateBlock<T>,
     },
 }

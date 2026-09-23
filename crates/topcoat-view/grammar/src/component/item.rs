@@ -4,17 +4,15 @@ use syn::{
     spanned::Spanned,
 };
 
-/// The `async fn` annotated with `#[component]`.
-///
-/// Parsing checks the signature: the function must be `async`, must declare
-/// a return type, must not take a `self` receiver, and must use a plain
-/// identifier for each parameter.
+/// The annotated `async fn` that becomes a component. Validates the function
+/// signature: components must be `async`, must declare a return type, must
+/// not take a `self` receiver, and must use identifier patterns for their
+/// arguments.
 pub struct ComponentItem {
     item: ItemFn,
 }
 
 impl ComponentItem {
-    /// Returns the parsed function.
     pub fn item(&self) -> &ItemFn {
         &self.item
     }

@@ -18,13 +18,9 @@ mod kw {
     custom_keyword!(optional);
 }
 
-/// A `font-display: ...` descriptor in a `font_face!` body.
 pub struct FontDisplay {
-    /// The `font-display` name.
     pub key: FontDisplayKey,
-    /// The `:` between the name and the value.
     pub colon_token: Token![:],
-    /// The descriptor's value.
     pub value: FontDisplayValue,
 }
 
@@ -60,13 +56,9 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontDisplay {
     }
 }
 
-/// The `font-display` descriptor name.
 pub struct FontDisplayKey {
-    /// The `font` keyword.
     pub font_kw: kw::font,
-    /// The `-` between the keywords.
     pub dash_token: Token![-],
-    /// The `display` keyword.
     pub display_kw: kw::display,
 }
 
@@ -96,11 +88,8 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontDisplayKey {
     }
 }
 
-/// The value of a `font-display` descriptor: CSS syntax or a Rust expression.
 pub enum FontDisplayValue {
-    /// A Rust expression that evaluates to a `FontDisplay`.
     Expr(Box<Expr>),
-    /// A CSS keyword such as `swap`.
     Css(FontDisplayKind),
 }
 
@@ -136,15 +125,10 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontDisplayValue {
 /// The display strategy of a font face: `auto`, `block`, `swap`, `fallback`, or
 /// `optional`.
 pub enum FontDisplayKind {
-    /// `auto`.
     Auto(kw::auto),
-    /// `block`.
     Block(kw::block),
-    /// `swap`.
     Swap(kw::swap),
-    /// `fallback`.
     Fallback(kw::fallback),
-    /// `optional`.
     Optional(kw::optional),
 }
 

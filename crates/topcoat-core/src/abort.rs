@@ -1,17 +1,19 @@
-//! Stopping a future early with a value.
+//! Aborting a future early with a value.
 //!
-//! Sometimes code deep inside a future needs to stop the whole future and hand
-//! a value back to its caller, without passing that value up through the
-//! `Output` type of every future in between. This module does that:
+//! Sometimes work running deep inside a future needs to stop the whole future
+//! and hand a value back to its caller, without threading that value up through
+//! the `Output` type of every intermediate future. This module makes that
+//! possible:
 //!
-//! - [`WatchAbort`] wraps a future and watches an [`AbortStore`].
-//! - Code running inside that future calls [`abort`] to put a value into the store and stop.
-//! - [`WatchAbort`] then resolves to [`MaybeAborted::Aborted`] with that value and drops the rest
-//!   of the wrapped future. If nothing aborts, it resolves to [`MaybeAborted::Completed`] with the
-//!   future's output.
+//! - [`WatchAbort`] wraps a future and watches a shared [`AbortStore`].
+//! - Any code running inside that future calls [`abort`] to stash a value in the store and stop
+//!   making progress.
+//! - The wrapping [`WatchAbort`] then resolves to [`MaybeAborted::Aborted`] carrying that value,
+//!   dropping the rest of the wrapped future. If no abort happens, it resolves to
+//!   [`MaybeAborted::Completed`] with the future's normal output.
 //!
-//! The value is passed as a `Box<dyn Any>`, so the caller gets the concrete
-//! type back with [`downcast`](Box::downcast).
+//! The value travels as a type-erased `Box<dyn Any>`, so the watcher recovers
+//! the concrete type with [`downcast`](Box::downcast).
 //!
 //! ```rust
 //! # use std::boxed::Box;
@@ -45,30 +47,29 @@ use pin_project_lite::pin_project;
 
 /// The outcome of a [`WatchAbort`] future.
 ///
-/// Either the wrapped future ran to completion, or it was stopped by
-/// [`abort`] before finishing.
+/// Either the wrapped future ran to completion, or it was aborted via [`abort`]
+/// before finishing.
 pub enum MaybeAborted<T> {
     /// The wrapped future finished normally, producing this output.
     Completed(T),
-    /// The wrapped future was aborted with this value, as passed to
-    /// [`abort`]. Get the original type back with
+    /// The wrapped future was aborted, carrying the type-erased value passed to
+    /// [`abort`]. Recover the original type with
     /// [`downcast`](Box::downcast).
     Aborted(Box<dyn Any>),
 }
 
-/// A slot shared by a [`WatchAbort`] and the [`abort`] calls running inside
-/// it.
+/// A one-shot slot shared between a [`WatchAbort`] and the [`abort`] calls
+/// running inside it.
 ///
-/// It holds the value passed to [`abort`] until the [`WatchAbort`] takes it
-/// out. Aborting the same store a second time before the first value was
-/// taken out panics.
+/// It holds the value handed over by an abort until the watching [`WatchAbort`]
+/// takes it out. Aborting the same store more than once before it is observed is
+/// a bug and panics.
 #[derive(Default)]
 pub struct AbortStore {
     inner: Mutex<Option<Box<dyn Any + Send + Sync>>>,
 }
 
 impl AbortStore {
-    /// Creates an empty store.
     #[must_use]
     pub fn new() -> Self {
         AbortStore::default()
@@ -94,12 +95,12 @@ impl std::fmt::Debug for AbortStore {
 }
 
 pin_project! {
-    /// A future that runs `f` while watching `store`.
+    /// A future that drives `f` to completion while watching `store`.
     ///
-    /// If code inside `f` calls [`abort`] on the same store, this future
-    /// resolves to [`MaybeAborted::Aborted`] with the value and `f` is
-    /// dropped. Otherwise it resolves to [`MaybeAborted::Completed`] with
-    /// `f`'s output.
+    /// If anything inside `f` calls [`abort`] on the same store, this future
+    /// resolves to [`MaybeAborted::Aborted`] with the stored value and `f` is
+    /// dropped. Otherwise it resolves to [`MaybeAborted::Completed`] with `f`'s
+    /// output.
     pub struct WatchAbort<'a, F> {
         store: &'a AbortStore,
         #[pin]
@@ -108,7 +109,7 @@ pin_project! {
 }
 
 impl<'a, F> WatchAbort<'a, F> {
-    /// Wraps `f` so that an [`abort`] on `store` stops it.
+    /// Wrap `f` so that aborts on `store` short-circuit it.
     pub fn new(store: &'a AbortStore, f: F) -> Self {
         Self { store, f }
     }
@@ -133,19 +134,19 @@ where
     }
 }
 
-/// A future that puts a value into an [`AbortStore`] and then never
+/// A future that stores `value` into the [`AbortStore`] and then never
 /// completes.
 ///
-/// On its first poll it stores the value and wakes itself, so the surrounding
-/// [`WatchAbort`] is polled again, sees the value, and resolves. Most code
-/// calls [`abort`] instead of using this type directly.
+/// On its first poll it deposits the value and yields, leaving the surrounding
+/// [`WatchAbort`] to observe the abort and resolve. This is the building block
+/// behind [`abort`].
 pub struct Abort<'a> {
     store: &'a AbortStore,
     value: Option<Box<dyn Any + Send + Sync>>,
 }
 
 impl<'a> Abort<'a> {
-    /// Creates a future that aborts `store` with `value` when polled.
+    /// Create a future that will abort `store` with `value`.
     pub fn new(store: &'a AbortStore, value: Box<dyn Any + Send + Sync>) -> Self {
         Self {
             store,
@@ -164,16 +165,11 @@ impl Future for Abort<'_> {
     }
 }
 
-/// Aborts the surrounding [`WatchAbort`] with `value`.
+/// Abort the surrounding [`WatchAbort`] with `value`.
 ///
-/// Puts `value` into `store` and yields, so the [`WatchAbort`] watching
-/// `store` resolves to [`MaybeAborted::Aborted`]. This call never returns: the
-/// future it runs in stops here and is dropped.
-///
-/// # Panics
-///
-/// Panics if `store` already holds a value from an earlier abort that was not
-/// taken out yet.
+/// Stashes `value` in `store` and yields so the watching [`WatchAbort`] can pick
+/// it up and resolve to [`MaybeAborted::Aborted`]. This call never returns: the
+/// future it lives in stops at this point and is dropped.
 pub async fn abort(store: &AbortStore, value: Box<dyn Any + Send + Sync>) -> ! {
     match Abort::new(store, value).await {}
 }

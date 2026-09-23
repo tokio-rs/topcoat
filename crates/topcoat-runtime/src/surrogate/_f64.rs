@@ -3,10 +3,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{BoolSurrogate, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref};
 
-/// An `f64` in a runtime expression.
-///
-/// It renders like Rust's `Display` for `f64`, both on the server and in the
-/// browser.
 #[derive(Debug, RefCast, Clone, Copy, Serialize, Deserialize)]
 #[repr(transparent)]
 #[serde(transparent)]
@@ -53,7 +49,6 @@ impl core::ops::Neg for F64Surrogate {
 macro_rules! impl_cmp_op {
     ($method:ident, $op:tt) => {
         impl F64Surrogate {
-            #[doc = concat!("Compares two values with `", stringify!($op), "`.")]
             #[inline]
             pub fn $method(&self, rhs: &F64Surrogate) -> BoolSurrogate {
                 BoolSurrogate::new(self.0 $op rhs.0)

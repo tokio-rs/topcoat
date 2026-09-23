@@ -2,27 +2,24 @@ use std::path::{Path, PathBuf};
 
 use super::state::STATE_FILE;
 
-/// The Cargo package that the `topcoat ui` commands work on.
-///
-/// Every relative path in `components.toml` is relative to the package root,
-/// the directory that holds `components.toml`. So the commands behave the same
-/// whatever the working directory is.
+/// The cargo crate a management operation acts on. Every relative path in the
+/// install state (the components directory and installed file paths) is relative
+/// to the crate root (the directory that holds `components.toml`), so operations
+/// behave the same regardless of the working directory.
 pub struct Package {
     root: PathBuf,
 }
 
 impl Package {
-    /// Finds the package root.
-    ///
-    /// When `package` names a workspace member, like `cargo -p`, its manifest
-    /// directory is the root. Otherwise the root is the package that contains
-    /// the current directory, or the current directory itself if it is not
-    /// inside a package.
+    /// Locates the crate root. When `package` names a workspace member (like
+    /// `cargo -p`), its manifest directory is used; otherwise the cargo crate
+    /// root containing the current directory is used, falling back to the
+    /// current directory itself when it is not inside a crate.
     ///
     /// # Errors
     ///
-    /// Returns an error if `cargo metadata` fails, if the named package is not
-    /// in the workspace, or if the root cannot be canonicalized.
+    /// Returns an error if `cargo metadata` fails or the named package is not
+    /// found in the workspace, or if the resolved root cannot be canonicalized.
     pub fn locate(package: Option<String>) -> Result<Self, String> {
         let root = if let Some(name) = package {
             package_root(&name)?
@@ -39,7 +36,7 @@ impl Package {
         Ok(Self { root })
     }
 
-    /// Returns the package root directory.
+    /// The resolved package root directory.
     #[must_use]
     pub fn root(&self) -> &Path {
         &self.root

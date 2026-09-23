@@ -11,13 +11,9 @@ use syn::{
 /// [`WeightValue`](crate::fontsource::font_face::WeightValue)) in this to cross-product
 /// the faces.
 pub enum List<T> {
-    /// A bare value.
     One(T),
-    /// A bracketed list of values.
     Many {
-        /// The `[...]` brackets.
         bracket_token: Bracket,
-        /// The comma-separated values.
         items: Punctuated<T, Token![,]>,
     },
 }

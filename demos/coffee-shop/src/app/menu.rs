@@ -21,9 +21,7 @@ use crate::{
     models::{Drink, Roast, drinks},
 };
 
-/// The menu, with a search box that filters the drinks as you type.
-///
-/// The `menu` module adds a URL segment, so this page renders at `/menu`.
+// The `menu` module adds a URL segment: this page renders at /menu.
 #[page]
 pub async fn page(cx: &Cx) -> Result<impl View> {
     // The signal lives in the browser; typing filters without a reload.

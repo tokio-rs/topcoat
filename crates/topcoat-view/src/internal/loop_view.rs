@@ -30,7 +30,6 @@ impl<V> LoopView<V>
 where
     V: View + Unpin,
 {
-    /// Creates the view from the loop's bodies, in iteration order.
     #[must_use]
     pub fn new(bodies: impl IntoIterator<Item = V>) -> Self {
         Self {

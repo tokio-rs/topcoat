@@ -1,16 +1,16 @@
-//! The shared Topcoat cache for files that build scripts download.
+//! The shared Topcoat cache for files downloaded at build time.
 //!
 //! The cache lives at `topcoat/cache/<scope>` inside the Cargo target
-//! directory. Every package of a workspace shares it, and it survives
-//! rebuilds, though not `cargo clean`.
+//! directory, so it is shared by every package of a workspace and survives
+//! changes to a package's build fingerprint, though not `cargo clean`.
 
 use std::{
     env,
     path::{Path, PathBuf},
 };
 
-/// Returns the Topcoat cache directory for `scope` inside `target_dir`, which
-/// is `<target_dir>/topcoat/cache/<scope>`.
+/// The Topcoat cache directory for `scope` inside `target_dir`:
+/// `<target_dir>/topcoat/cache/<scope>`.
 #[must_use]
 pub fn cache_dir_in(target_dir: impl AsRef<Path>, scope: &str) -> PathBuf {
     target_dir
@@ -20,12 +20,12 @@ pub fn cache_dir_in(target_dir: impl AsRef<Path>, scope: &str) -> PathBuf {
         .join(scope)
 }
 
-/// Returns the Topcoat cache directory for `scope`, for use from a build
-/// script.
+/// The Topcoat cache directory for `scope` of the build the calling build
+/// script runs in, located by resolving the Cargo target directory (or its
+/// target-triple subdirectory, for cross builds) from `OUT_DIR`.
 ///
-/// The Cargo target directory is found from `OUT_DIR`. For cross builds this
-/// is the target-triple subdirectory. Returns `None` when `OUT_DIR` is unset
-/// or does not follow Cargo's `build/<package>-<hash>/out` layout.
+/// Returns `None` when `OUT_DIR` is unset or does not follow Cargo's
+/// `build/<package>-<hash>/out` layout.
 #[must_use]
 pub fn cache_dir(scope: &str) -> Option<PathBuf> {
     let out_dir = PathBuf::from(env::var_os("OUT_DIR")?);

@@ -18,10 +18,9 @@ use crate::content::websocket::Message;
 /// [`WebSocketUpgrade::on_upgrade`](crate::content::websocket::WebSocketUpgrade::on_upgrade).
 ///
 /// Exchange [`Message`]s with [`recv`](Self::recv) and [`send`](Self::send),
-/// and end the connection with [`close`](Self::close). A `WebSocket` is also a
-/// [`Stream`] of received messages and a [`Sink`] for outgoing ones, so it
-/// works with the usual stream and sink adapters, such as splitting it into a
-/// read half and a write half.
+/// and end the conversation with [`close`](Self::close). The connection also
+/// implements [`Stream`] and [`Sink`], so the halves can be split and combined
+/// with the usual stream and sink adapters.
 #[must_use]
 pub struct WebSocket {
     inner: WebSocketStream<TokioIo<Upgraded>>,
@@ -38,9 +37,9 @@ impl WebSocket {
 
     /// Receives the next message, or [`None`] once the connection has closed.
     ///
-    /// Incoming pings are answered automatically, and are still returned as
-    /// [`Message::Ping`]. An error means the connection is broken. Later calls
-    /// return [`None`].
+    /// An incoming ping is answered automatically, but still surfaced as a
+    /// [`Message::Ping`]. A returned error is fatal: the connection is broken,
+    /// and subsequent calls return [`None`].
     pub async fn recv(&mut self) -> Option<Result<Message>> {
         poll_fn(|cx| Pin::new(&mut *self).poll_next(cx)).await
     }
@@ -50,7 +49,7 @@ impl WebSocket {
     /// # Errors
     ///
     /// Returns an error if the message cannot be written, for example because
-    /// the client disconnected or the write buffer is full.
+    /// the client disconnected or the message exceeds the configured sizes.
     pub async fn send(&mut self, message: Message) -> Result<()> {
         poll_fn(|cx| Pin::new(&mut *self).poll_ready(cx)).await?;
         Pin::new(&mut *self).start_send(message)?;
@@ -59,7 +58,7 @@ impl WebSocket {
 
     /// Performs the closing handshake and consumes the connection.
     ///
-    /// To close with a status code and a reason, first [`send`](Self::send) a
+    /// To close with a status code and reason instead, [`send`](Self::send) a
     /// [`Message::Close`] carrying a
     /// [`CloseFrame`](crate::content::websocket::CloseFrame) first.
     ///

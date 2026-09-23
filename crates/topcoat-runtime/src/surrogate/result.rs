@@ -6,7 +6,6 @@ use crate::{
     impl_surrogate_mut, impl_surrogate_ref,
 };
 
-/// A `Result` in a runtime expression.
 #[derive(Debug, Clone, RefCast)]
 #[repr(transparent)]
 pub struct ResultSurrogate<T, E>(Result<T, E>);
@@ -17,25 +16,21 @@ impl<T, E> ResultSurrogate<T, E> {
         Self(v)
     }
 
-    /// Returns whether the result is `Ok`.
     #[inline]
     pub fn is_ok(&self) -> BoolSurrogate {
         BoolSurrogate::new(self.0.is_ok())
     }
 
-    /// Returns whether the result is `Err`.
     #[inline]
     pub fn is_err(&self) -> BoolSurrogate {
         BoolSurrogate::new(self.0.is_err())
     }
 
-    /// Converts the result into an option holding the `Ok` value.
     #[inline]
     pub fn ok(self) -> OptionSurrogate<T> {
         OptionSurrogate::new(self.0.ok())
     }
 
-    /// Converts the result into an option holding the `Err` value.
     #[inline]
     pub fn err(self) -> OptionSurrogate<E> {
         OptionSurrogate::new(self.0.err())
@@ -43,7 +38,6 @@ impl<T, E> ResultSurrogate<T, E> {
 }
 
 impl<T, E> ResultSurrogate<T, E> {
-    /// Creates an `Ok` value.
     #[inline]
     pub fn from_ok(v: impl Surrogate<Real = T>) -> Self {
         Self(Result::Ok(v.into_real()))
@@ -79,7 +73,6 @@ where
 }
 
 impl<T, E> ResultSurrogate<T, E> {
-    /// Creates an `Err` value.
     #[inline]
     pub fn from_err(v: impl Surrogate<Real = E>) -> Self {
         Self(Result::Err(v.into_real()))
@@ -91,22 +84,12 @@ where
     T: std::fmt::Debug,
     E: Surrogated,
 {
-    /// Returns the contained `Err` value.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the result is `Ok`.
     #[inline]
     #[track_caller]
     pub fn unwrap_err(self) -> E::Surrogate {
         self.0.unwrap_err().into_surrogate()
     }
 
-    /// Returns the contained `Err` value, panicking with `msg` if `Ok`.
-    ///
-    /// # Panics
-    ///
-    /// Panics with `msg` if the result is `Ok`.
     #[inline]
     #[track_caller]
     pub fn expect_err(self, msg: &StrSurrogate) -> E::Surrogate {

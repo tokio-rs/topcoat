@@ -16,13 +16,11 @@ mod kw {
 /// A `format(...)` hint on a CSS `@font-face` `src` entry.
 ///
 /// The format may be a string literal naming a CSS format keyword (such as
-/// `"woff2"`) or any other expression that evaluates to a [`FontFormat`].
+/// `"woff2"`) or a parenthesized expression resolving to a [`FontFormat`] at
+/// run time.
 pub struct FontFormatHint {
-    /// The `format` keyword.
     pub format_kw: kw::format,
-    /// The parentheses around the format.
     pub paren_token: Paren,
-    /// The format.
     pub value: FontFormat,
 }
 

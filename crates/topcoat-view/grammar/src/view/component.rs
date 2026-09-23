@@ -18,41 +18,31 @@ use crate::{
     },
 };
 
-/// A component call in a view, written as
-/// `path(name: value, ..., child_node child_node ...)`.
+/// A component invocation, written as `path(name: value, ..., child_node child_node ...)`.
 ///
-/// Named arguments come first, separated by commas. Child nodes follow the
-/// last named argument, separated from it by a comma, and are not separated
-/// from each other. Parsing rejects a name that is passed twice.
+/// Named arguments come first, separated by `,`. Any child nodes appear after
+/// the last named argument (separated from it by `,`) and run together without
+/// separators.
 pub struct Component {
-    /// The path to the component, like `badge` or `ui::badge`.
     pub path: Path,
-    /// The parentheses around the arguments.
     pub paren_token: Paren,
-    /// The named arguments, in source order.
     pub named_args: Vec<NamedArg>,
-    /// The child nodes passed as the component's `child` argument.
     pub children: Nodes,
 }
 
-/// A `name: value` argument in a component call.
+/// A `name: value` entry in a component's argument list.
 #[derive(Clone)]
 pub struct NamedArg {
-    /// The parameter name.
     pub ident: Ident,
-    /// The `:` between name and value.
     pub colon: Token![:],
-    /// The value passed.
     pub value: NamedArgValue,
 }
 
-/// The value of a [`NamedArg`]: a plain Rust expression or a `$(...)` runtime
-/// expression.
+/// The value of a [`NamedArg`]. Either a plain Rust expression or a `$(...)`
+/// runtime expression.
 #[derive(Clone)]
 pub enum NamedArgValue {
-    /// A plain Rust expression.
     Expr(Expr),
-    /// A `$(...)` runtime expression.
     Runtime(RuntimeExpr),
 }
 

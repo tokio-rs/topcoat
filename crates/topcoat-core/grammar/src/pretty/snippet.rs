@@ -6,8 +6,6 @@ use syn::{
 
 use crate::pretty::{INDENT, MARGIN};
 
-/// A macro invocation found in a source file, with what is needed to format
-/// its body in place.
 pub struct MacroSnippet {
     name: String,
     source_text: String,
@@ -18,7 +16,6 @@ pub struct MacroSnippet {
 }
 
 impl MacroSnippet {
-    /// Returns the macro invocations in `file`, in source order.
     #[must_use]
     pub fn collect_from_file(file: &syn::File) -> Vec<Self> {
         // `file.span()` covers the whole file, so its source text is the
@@ -56,37 +53,32 @@ impl MacroSnippet {
         })
     }
 
-    /// Returns the name of the macro, which is the last segment of its path.
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    /// Returns the source text of the body, delimiters included.
     #[must_use]
     pub fn source_text(&self) -> &str {
         &self.source_text
     }
 
-    /// Returns the span of the body, delimiters included.
     #[must_use]
     pub fn span(&self) -> Span {
         self.span
     }
 
-    /// Returns the width available on the line the body starts on.
     #[must_use]
     pub fn initial_space(&self) -> isize {
         self.initial_space
     }
 
-    /// Returns the indentation level the body is laid out at.
     #[must_use]
     pub fn initial_indent(&self) -> isize {
         self.initial_indent
     }
 
-    /// Returns whether `rustfmt` lays this invocation out itself.
+    /// Whether `rustfmt` lays this invocation out itself.
     ///
     /// `rustfmt` reflows a macro call delimited by `()` or `[]` whose body is a
     /// comma-separated list of Rust expressions, treating it like a function

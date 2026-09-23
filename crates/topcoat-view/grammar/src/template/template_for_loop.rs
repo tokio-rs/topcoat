@@ -11,20 +11,14 @@ use crate::{
     view::hir::{LowerView, ViewBuilder},
 };
 
-/// A `for pat in expr { ... }` loop in a view or among attributes. The body is
-/// rendered once per item.
+/// A `for pat in expr { ... }` loop in view-body position. The body is
+/// rendered once per iteration.
 pub struct TemplateForLoop<T> {
-    /// The outer attributes on the loop, like `#[key(expr)]`.
     pub attributes: Vec<Attribute>,
-    /// The `for` keyword.
     pub for_token: Token![for],
-    /// The pattern each item is bound to.
     pub pat: Box<Pat>,
-    /// The `in` keyword.
     pub in_token: Token![in],
-    /// The expression producing the items.
     pub expr: Box<Expr>,
-    /// The loop body.
     pub body: TemplateBlock<T>,
 }
 
@@ -86,11 +80,9 @@ impl<T: topcoat_core_grammar::pretty::PrettyPrint> topcoat_core_grammar::pretty:
     }
 }
 
-/// A `continue;` statement inside a loop.
+/// A `continue;` statement.
 pub struct TemplateContinue {
-    /// The `continue` expression.
     pub expr_continue: ExprContinue,
-    /// The trailing `;`.
     pub semi_token: Token![;],
 }
 
@@ -137,11 +129,9 @@ impl topcoat_core_grammar::pretty::PrettyPrint for TemplateContinue {
     }
 }
 
-/// A `break;` statement inside a loop.
+/// A `break;` statement.
 pub struct TemplateBreak {
-    /// The `break` expression.
     pub expr_break: ExprBreak,
-    /// The trailing `;`.
     pub semi_token: Token![;],
 }
 

@@ -5,25 +5,24 @@ pub use hash::*;
 use sha2::Digest;
 pub use store::*;
 
-/// A session token: 32 random bytes that the client holds as proof of its
-/// session.
+/// A session token: 32 bytes of cryptographically secure randomness, held by
+/// the client as its proof of a session.
 ///
-/// The token only travels between the client and the [`TokenStore`].
-/// Applications save its [`hash`](Self::hash) instead, so a leaked session
-/// database contains nothing a client could use to log in. The `Debug` output
-/// does not show the bytes.
+/// The raw token only ever travels between the client and the [`TokenStore`].
+/// Applications persist its [`hash`](Self::hash) instead, so a leaked session
+/// database never contains a credential a client could present.
 #[derive(Clone)]
 pub struct Token([u8; 32]);
 
 impl Token {
-    /// Creates a token from raw bytes, for example in a [`TokenStore`] that
-    /// reads the token from the client in its own format.
+    /// Creates a token from raw bytes, typically inside a [`TokenStore`] that
+    /// has deserialized a client-presented token.
     #[must_use]
     pub fn new(bytes: [u8; 32]) -> Self {
         Self(bytes)
     }
 
-    /// Creates a new random token.
+    /// Generates a fresh random token.
     ///
     /// # Panics
     ///
@@ -36,8 +35,7 @@ impl Token {
         Self::new(bytes)
     }
 
-    /// Parses a token from the URL-safe base64 text returned by
-    /// [`encode`](Self::encode).
+    /// Parses a token from its URL-safe base64 [`encode`](Self::encode)d form.
     ///
     /// # Errors
     ///
@@ -58,16 +56,16 @@ impl Token {
         Ok(Self::new(bytes))
     }
 
-    /// Encodes the token as URL-safe base64 text, for a [`TokenStore`] to send
-    /// to the client.
+    /// Encodes the token as URL-safe base64, for a [`TokenStore`] to send to
+    /// the client.
     #[must_use]
     pub fn encode(&self) -> String {
         use base64::{Engine as _, engine::general_purpose::URL_SAFE};
         URL_SAFE.encode(self.0)
     }
 
-    /// Returns the SHA-256 [`TokenHash`] of this token, which the application
-    /// can safely save.
+    /// Returns the [`TokenHash`] identifying this token's session, safe for
+    /// the application to persist.
     #[must_use]
     pub fn hash(&self) -> TokenHash {
         let mut hasher = sha2::Sha256::new();
@@ -75,10 +73,10 @@ impl Token {
         TokenHash::new(hasher.finalize().0)
     }
 
-    /// Returns the raw token bytes.
+    /// Exposes the raw token bytes.
     ///
-    /// Only a [`TokenStore`] that sends the token to the client in its own
-    /// format should need this. Never save the raw bytes on the server.
+    /// Only a [`TokenStore`] serializing the token for the client should need
+    /// this; never persist the raw bytes server-side.
     #[must_use]
     pub fn dangerous_as_array(&self) -> &[u8; 32] {
         &self.0
@@ -91,13 +89,11 @@ impl std::fmt::Debug for Token {
     }
 }
 
-/// The error returned by [`Token::decode`] for invalid input.
+/// The reason a [`Token::decode`] call rejected its input.
 #[derive(Debug, thiserror::Error)]
 pub enum DecodeError {
-    /// The input is not valid URL-safe base64.
     #[error("base64 decoding failed")]
     Base64(#[from] base64::DecodeError),
-    /// The input does not decode to exactly 32 bytes.
     #[error("invalid number of bytes in token")]
     Length,
 }

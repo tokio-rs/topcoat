@@ -21,12 +21,12 @@ use crate::{
     response::{Response, ResponseHeaders, response_headers},
 };
 
-/// The routing table of a Topcoat application.
+/// A finalized Topcoat routing table.
 ///
-/// Create one with [`Router::builder`]: register pages, layouts, layers,
-/// routes, and app context values on the returned [`RouterBuilder`], then call
-/// [`RouterBuilder::build`]. A router cannot be changed once it is built. Pass
-/// it to `topcoat::start` to serve it.
+/// Build one with [`Router::builder`], register pages, layouts, layers, routes,
+/// and app context values on the returned [`RouterBuilder`], then call
+/// [`RouterBuilder::build`]. Most applications use the `topcoat` facade and
+/// pass the finished router to `topcoat::start`.
 ///
 /// # Examples
 ///
@@ -60,16 +60,15 @@ impl Router {
         }
     }
 
-    /// Handles a request by running the route registered for its path and
-    /// method, and returns the response.
+    /// Dispatches a request to the route registered for its path and method,
+    /// producing a response.
     ///
-    /// A route registered for the request's method wins over an any-method
-    /// route at the same path. When no route matches the path, the response
-    /// is `404 Not Found`. When the path matches but no route accepts the
-    /// method, it is `405 Method Not Allowed` with an `Allow` header. A
-    /// request the [`OriginPolicy`](crate::OriginPolicy) rejects gets
-    /// `403 Forbidden`. An error returned by a handler becomes its error
-    /// response, and a panic becomes `500 Internal Server Error`.
+    /// A route registered for the request's specific method wins over an
+    /// any-method route at the same path. Returns `404 Not Found` when no
+    /// route matches the path, or `405 Method Not Allowed` (with an `Allow`
+    /// header) when the path matches but no route accepts the method. A panic
+    /// while processing the request becomes a `500 Internal Server Error`
+    /// response.
     pub async fn handle(&self, request: Request) -> Response {
         let mut future = pin!(self.handle_inner(request));
 
@@ -301,9 +300,9 @@ pub fn endpoint(cx: &Cx) -> &Endpoint {
 }
 
 /// Returns the endpoint the current request matched, or `None` if its path
-/// matched no endpoint (a 404) or no router handled the request.
+/// matched none (a 404) or no router dispatched it.
 ///
-/// See [`endpoint`] for details.
+/// See [`endpoint`] for what the match holds.
 #[must_use]
 pub fn try_endpoint(cx: &Cx) -> Option<&Endpoint> {
     let (router, matched) = try_matched(cx)?;
@@ -311,8 +310,6 @@ pub fn try_endpoint(cx: &Cx) -> Option<&Endpoint> {
 }
 
 /// Returns the route handling the current request.
-///
-/// Use [`try_route`] when the request may have matched no route.
 ///
 /// # Panics
 ///
@@ -327,9 +324,9 @@ pub fn route(cx: &Cx) -> &dyn Route {
     }
 }
 
-/// Returns the route handling the current request, or `None` if no route
-/// matched: the path matched no endpoint (a 404), the endpoint holds no route
-/// for the request's method (a 405), or no router handled the request.
+/// Returns the route handling the current request, or `None` if none matched:
+/// the path matched no endpoint (a 404), the endpoint holds no route for the
+/// request's method (a 405), or no router dispatched the request.
 #[must_use]
 pub fn try_route(cx: &Cx) -> Option<&dyn Route> {
     let (router, matched) = try_matched(cx)?;

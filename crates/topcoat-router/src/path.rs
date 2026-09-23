@@ -8,23 +8,21 @@ use std::{
 
 use ref_cast::{RefCastCustom, ref_cast_custom};
 
-/// A borrowed route path pattern, like [`std::path::Path`] but for URL paths.
+/// A borrowed route path, similar to [`std::path::Path`] but for URL paths.
 ///
-/// A `Path` is a list of `/`-separated [`PathSegment`]s. Each segment is one
-/// of:
+/// A `Path` consists of `/`-separated segments, where each segment is one of:
+/// - **`Static`**: a literal string (e.g. `users`)
+/// - **`Param`**: a dynamic parameter in braces (e.g. `{id}`)
+/// - **`CatchAll`**: a wildcard tail in braces with `*` (e.g. `{*rest}`)
+/// - **`Group`**: a logical grouping in parentheses (e.g. `(auth)`), stripped when converting to a
+///   `matchit` path
 ///
-/// - a static segment, like `users`, that matches itself,
-/// - a parameter, like `{id}`, that matches any one segment,
-/// - a catch-all, like `{*rest}`, that matches the rest of the URL,
-/// - a group, like `(auth)`, that is not part of the URL but lets layouts and layers apply to only
-///   some routes.
+/// The root path `"/"` is normalized to an empty inner string. Use [`Path::new`] to
+/// create a `&Path` from a string slice.
 ///
 /// A trailing `/` is part of the path: `/users/` and `/users` are different
-/// paths. The trailing slash is an empty static segment at the end. No other
-/// segment may be empty.
-///
-/// Create a `&Path` from a string with [`Path::new`], or build an owned
-/// [`PathBuf`].
+/// paths, and the trailing slash appears as an empty `Static` segment at the
+/// end. Only the last segment may be empty.
 ///
 /// # Examples
 ///
@@ -46,14 +44,18 @@ pub struct Path {
 }
 
 impl Path {
-    /// The root path `/`.
+    // The root path "/".
     pub const ROOT: &Path = Path::new("/");
 
-    /// Creates a `&Path` from a string.
+    /// Creates a `&Path` from a string slice.
     ///
-    /// This is the panicking version of [`from_str`](Path::from_str). It is a
-    /// `const fn`, so a malformed path in a constant is rejected at compile
-    /// time.
+    /// The root path `"/"` is normalized to an empty inner representation so that
+    /// it produces zero segments, matching the convention that the root layout
+    /// applies to all pages.
+    ///
+    /// This is the panicking counterpart of [`from_str`](Path::from_str).
+    /// Because it is a `const fn`, malformed paths handed to the routing macros
+    /// are rejected at compile time.
     ///
     /// # Panics
     ///
@@ -68,16 +70,17 @@ impl Path {
         }
     }
 
-    /// Creates a `&Path` from a string, checking that it is well formed.
+    /// Creates a `&Path` from a string slice, validating its segments.
     ///
-    /// A path is either empty, the root `/`, or a list of segments that each
-    /// start with `/` and are valid [`PathSegment`]s. Only the last segment
-    /// may be empty, which is how a trailing `/` is written. The empty string
-    /// and `/` both give the root path.
+    /// The root path `"/"` is normalized to an empty inner representation. Every
+    /// other path must be a sequence of `/`-prefixed segments, each a valid
+    /// [`PathSegment`]. Only the last segment may be empty, which is how a
+    /// trailing `/` is kept. Returns [`PathError`] if `s` is malformed.
     ///
     /// # Errors
     ///
-    /// Returns a [`PathError`] if `s` is not a well-formed path.
+    /// Returns [`PathError`] if `s` is not a valid path: it must be empty, be
+    /// the root `"/"`, or be a sequence of `/`-prefixed valid segments.
     #[allow(clippy::should_implement_trait)]
     pub const fn from_str(s: &str) -> Result<&Self, PathError> {
         let s = match s.as_bytes() {
@@ -111,12 +114,13 @@ impl Path {
         Ok(Self::new_unchecked(s))
     }
 
-    /// Creates a `&Path` from a string without checking it.
+    /// Creates a `&Path` from a string slice without validating or normalizing it.
     ///
-    /// Unlike [`new`](Path::new), this does not turn `"/"` into the empty
-    /// string that backs the root path. Only pass a string that came from
-    /// another `Path`, such as the result of [`as_str`](Path::as_str). Any
-    /// other string can give a `Path` whose segments read wrong.
+    /// This is a zero-cost reference cast. Unlike [`new`](Path::new), it
+    /// performs no segment validation and does *not* normalize the root path `"/"`
+    /// to an empty inner string. The caller must pass an already-valid, normalized
+    /// path string (for example one obtained from another `Path`); passing
+    /// anything else yields a `Path` that misbehaves when its segments are read.
     #[ref_cast_custom]
     #[must_use]
     pub const fn new_unchecked(s: &str) -> &Self;
@@ -145,11 +149,12 @@ impl Path {
         PathSegments::new(self)
     }
 
-    /// Returns the path the router matches URLs against: this path without its
-    /// group segments.
+    /// Converts this path to a `matchit`-compatible route string, stripping group
+    /// segments.
     ///
-    /// A path with no segments left, like the root or a path of only groups,
-    /// becomes `/`.
+    /// Group segments (e.g. `(auth)`) are used for layout matching but are not
+    /// part of the URL that the router matches against. This method removes them
+    /// and returns the remaining path.
     ///
     /// # Examples
     ///
@@ -186,12 +191,13 @@ impl Path {
         Cow::Owned(stripped)
     }
 
-    /// Returns `true` if the segments of `other` are the first segments of
-    /// this path.
+    /// Returns `true` if this path starts with the given prefix path.
     ///
-    /// Segments are compared whole, so `/users` does not start with `/use`.
-    /// Group segments and parameter names are compared too. The root path is
-    /// a prefix of every path.
+    /// Comparison is done segment-by-segment using [`PathSegment`] equality.
+    /// This is used to determine which layouts apply to a given page: a layout
+    /// at `"/settings"` matches any page whose path starts with `/settings`.
+    ///
+    /// Group segments are included in the comparison.
     ///
     /// # Examples
     ///
@@ -210,11 +216,10 @@ impl Path {
         self.segments().zip(other.segments()).all(|(a, b)| a == b)
     }
 
-    /// Returns a new path with the segments of `other` added to the end of
-    /// this path.
+    /// Returns a new path with the segments of `other` appended to this one.
     ///
-    /// Joining the root path on either side gives the other path unchanged. A
-    /// trailing slash on this path is dropped when segments follow it.
+    /// Joining the root path onto either side leaves the other path unchanged.
+    /// A trailing slash on this path is dropped when segments follow it.
     ///
     /// # Examples
     ///
@@ -237,16 +242,18 @@ impl Path {
         buf
     }
 
-    /// Returns `true` if the URL path `url` matches this path pattern.
+    /// Returns `true` if `url`, a concrete URL path, matches this route path
+    /// exactly.
     ///
-    /// - A static segment must equal the URL segment.
-    /// - A parameter matches any one non-empty URL segment.
-    /// - A catch-all matches the rest of the URL, including `/` separators, but not an empty rest.
-    /// - A group segment is skipped, since it is not part of the URL.
+    /// Each segment is matched against the corresponding URL segment:
+    /// - **`Static`** segments must equal the URL segment.
+    /// - **`Param`** segments match any single non-empty URL segment.
+    /// - **`CatchAll`** segments match the remaining URL (including any `/` separators) and require
+    ///   at least one segment to be present.
+    /// - **`Group`** segments are ignored, as they are not part of the URL.
     ///
-    /// A trailing `/` must match too: a path without one does not match a
-    /// URL with one, and the other way around. The URL is compared as it is,
-    /// without percent-decoding.
+    /// A trailing `/` is significant: a path without one does not match a URL
+    /// with one, and the other way around.
     ///
     /// # Examples
     ///
@@ -312,9 +319,10 @@ impl Path {
         rest.is_none()
     }
 
-    /// Returns this path as a string.
+    /// Returns the string backing this path.
     ///
-    /// The root path is the empty string, not `"/"`.
+    /// The root path is backed by the empty string rather than `"/"`, matching
+    /// the normalization [`new`](Path::new) applies.
     ///
     /// # Examples
     ///
@@ -329,8 +337,8 @@ impl Path {
         &self.inner
     }
 
-    /// Returns `true` if this path ends in a `/`, which means its last segment
-    /// is empty. The root path does not count.
+    /// Returns `true` if this path ends in a `/`, which is to say its last
+    /// segment is empty. The root path does not.
     ///
     /// # Examples
     ///
@@ -346,16 +354,16 @@ impl Path {
         self.inner.ends_with('/')
     }
 
-    /// Returns the length of [`as_str`](Path::as_str) in bytes.
+    /// Returns the length of the string backing this path.
     ///
-    /// The root path has length zero.
+    /// This length is in bytes, not [`char`]s or graphemes. In other words,
+    /// it might not be what a human considers the length of the string.
     #[must_use]
     pub fn len(&self) -> usize {
         self.inner.len()
     }
 
-    /// Returns `true` if this path has no segments, which means it is the root
-    /// path `/`.
+    /// Returns `true` if `self` has no path segments, i.e. `self` is the root path `/`.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
@@ -454,13 +462,14 @@ impl DoubleEndedIterator for PathSegments<'_> {
 
 impl FusedIterator for PathSegments<'_> {}
 
-/// The reason a string is not a well-formed [`Path`] or [`PathSegment`].
+/// The reason a string could not be parsed into a [`Path`] by
+/// [`Path::from_str`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum PathError {
     /// The path was non-empty but did not start with `/`.
     MissingLeadingSlash,
-    /// A segment other than the last was empty, as in `/a//b`.
+    /// A segment other than the last was empty, as produced by a doubled `/`.
     EmptySegment,
     /// A `{` parameter or catch-all segment was missing its closing `}`.
     MissingClosingBrace,
@@ -468,7 +477,7 @@ pub enum PathError {
     MissingClosingParen,
     /// A static segment contained a `{`, `}`, `(`, or `)`.
     UnexpectedBracket,
-    /// A parameter, catch-all, or group name was empty.
+    /// A param, catch-all, or group name was empty.
     EmptyName,
     /// A name did not start with an ASCII letter or `_`.
     InvalidNameStart,
@@ -502,12 +511,11 @@ impl Display for PathError {
 
 impl std::error::Error for PathError {}
 
-/// An owned route path pattern, like [`std::path::PathBuf`] but for URL
-/// paths.
+/// An owned route path, similar to [`std::path::PathBuf`] but for URL paths.
 ///
-/// `PathBuf` is the owned version of [`Path`] and dereferences to it. Build
-/// one by adding [`PathSegment`]s or whole paths with `+=`, or collect it
-/// from an iterator of segments.
+/// `PathBuf` is the owned counterpart of [`Path`]. It can be built incrementally
+/// by adding [`PathSegment`]s or whole [`Path`]s with `+=`, or collected from an
+/// iterator of segments.
 ///
 /// # Examples
 ///
@@ -525,7 +533,7 @@ pub struct PathBuf {
 }
 
 impl PathBuf {
-    /// Creates a `PathBuf` holding the root path `/`.
+    /// Creates a new empty `PathBuf`.
     #[must_use]
     pub fn new() -> Self {
         PathBuf::default()
@@ -593,11 +601,11 @@ impl<'a> FromIterator<PathSegment<'a>> for PathBuf {
     }
 }
 
-/// A value that converts into a route [`Path`].
+/// Conversion into a route path, accepted by APIs that take a path prefix.
 ///
-/// APIs that take a path accept any `IntoPath` value. A `&'static str` is
-/// parsed with [`Path::new`]. [`Path`], [`PathBuf`], and `Cow<'static, Path>`
-/// values are used as they are.
+/// A `&'static str` is parsed with [`Path::new`] and panics when it is not a
+/// well-formed path; [`Path`], [`PathBuf`], and `Cow<'static, Path>` values
+/// convert as they are.
 pub trait IntoPath {
     /// Converts the value into a route path.
     ///
@@ -639,34 +647,36 @@ impl Display for PathBuf {
     }
 }
 
-/// One segment of a route [`Path`].
+/// A single segment of a route [`Path`].
 ///
-/// | Syntax    | Variant    | Example   | Matches                                   |
-/// |-----------|------------|-----------|-------------------------------------------|
-/// | `name`    | `Static`   | `users`   | The same URL segment                      |
-/// | `{name}`  | `Param`    | `{id}`    | Any one URL segment                       |
-/// | `{*name}` | `CatchAll` | `{*path}` | The rest of the URL                       |
-/// | `(name)`  | `Group`    | `(auth)`  | Nothing, it is not part of the URL        |
+/// Topcoat paths use four segment types:
 ///
-/// The names of parameters, catch-alls, and groups must start with an ASCII
-/// letter or `_` and contain only ASCII letters, digits, and `_`. A static
-/// segment must not contain `{`, `}`, `(`, or `)`.
+/// | Syntax      | Variant    | Example     | Description                                             |
+/// |-------------|------------|-------------|---------------------------------------------------------|
+/// | `foo`       | `Static`   | `users`     | Literal URL segment                                     |
+/// | `{name}`    | `Param`    | `{id}`      | Dynamic parameter, extracted at request time            |
+/// | `{*name}`   | `CatchAll` | `{*path}`   | Wildcard tail, matches the rest of the URL              |
+/// | `(name)`    | `Group`    | `(auth)`    | Logical grouping for layout matching, stripped from URL |
+///
+/// Segment names (for `Param`, `CatchAll`, and `Group`) must be valid
+/// identifiers: starting with a letter or underscore, containing only
+/// ASCII alphanumerics and underscores.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum PathSegment<'a> {
-    /// A literal URL segment, like `users`.
+    /// A literal URL segment (e.g. `users`).
     Static(&'a str),
-    /// A group, like `(auth)`, that is not part of the URL.
+    /// A logical grouping segment (e.g. `(auth)`), stripped from the URL path.
     Group(&'a str),
-    /// A parameter, like `{id}`, that matches one URL segment.
+    /// A dynamic parameter segment (e.g. `{id}`).
     Param(&'a str),
-    /// A catch-all, like `{*rest}`, that matches the rest of the URL.
+    /// A wildcard tail segment (e.g. `{*rest}`), matching the remainder of the URL.
     CatchAll(&'a str),
 }
 
 impl<'a> PathSegment<'a> {
-    /// Parses one path segment, like `users` or `{id}`.
+    /// Parses a single path segment string into a [`PathSegment`].
     ///
-    /// This is the panicking version of [`from_str`](PathSegment::from_str).
+    /// This is the panicking counterpart of [`from_str`](PathSegment::from_str).
     ///
     /// # Panics
     ///
@@ -681,14 +691,15 @@ impl<'a> PathSegment<'a> {
         }
     }
 
-    /// Parses one path segment, like `users` or `{id}`, checking that it is
-    /// well formed.
+    /// Parses a single path segment string into a [`PathSegment`], validating it.
+    ///
+    /// Returns [`PathError`] if `s` is not a well-formed segment: an empty string,
+    /// a `{...}`/`(...)` segment missing its closing bracket, a static segment that
+    /// contains a bracket, or a name that is not a valid identifier.
     ///
     /// # Errors
     ///
-    /// Returns a [`PathError`] if `s` is not a well-formed segment: it is
-    /// empty, a `{` or `(` is not closed, a static segment contains a
-    /// bracket, or a name is not valid.
+    /// Returns [`PathError`] if `s` is not a well-formed segment.
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &'a str) -> Result<Self, PathError> {
         // Validate first, then extract the variant from the now-known-valid input.
@@ -696,10 +707,14 @@ impl<'a> PathSegment<'a> {
         Ok(Self::new_unchecked(s))
     }
 
-    /// Parses one path segment without checking it.
+    /// Parses a single path segment string into a [`PathSegment`] without
+    /// validating it.
     ///
-    /// Only pass a segment that is known to be well formed. A malformed
-    /// segment gives a meaningless result instead of an error.
+    /// Unlike [`new`](PathSegment::new) and [`from_str`](PathSegment::from_str),
+    /// this performs no validation; the caller must pass an already-valid segment
+    /// (for example one produced by [`Path::segments`]). A malformed input is
+    /// parsed on a best-effort basis and yields a nonsensical segment rather than
+    /// an error.
     #[must_use]
     pub fn new_unchecked(s: &'a str) -> Self {
         if let Some(inner) = s.strip_prefix('{') {
@@ -747,7 +762,7 @@ impl<'a> PathSegment<'a> {
         matches!(self, Self::CatchAll(..))
     }
 
-    /// Returns the text if this is a [`Static`](PathSegment::Static) segment.
+    /// Returns the inner string if this is a [`Static`](PathSegment::Static) segment.
     #[must_use]
     pub fn as_static(&self) -> Option<&&'a str> {
         if let Self::Static(v) = self {
@@ -757,7 +772,7 @@ impl<'a> PathSegment<'a> {
         }
     }
 
-    /// Returns the name if this is a [`Group`](PathSegment::Group) segment.
+    /// Returns the inner string if this is a [`Group`](PathSegment::Group) segment.
     #[must_use]
     pub fn as_group(&self) -> Option<&&'a str> {
         if let Self::Group(v) = self {
@@ -767,8 +782,8 @@ impl<'a> PathSegment<'a> {
         }
     }
 
-    /// Returns the name of a parameter or catch-all segment, or `None` for
-    /// other segments.
+    /// Returns the name this segment captures a value under, or `None` if it
+    /// captures nothing.
     ///
     /// # Examples
     ///
@@ -787,7 +802,7 @@ impl<'a> PathSegment<'a> {
         }
     }
 
-    /// Returns the name if this is a [`Param`](PathSegment::Param) segment.
+    /// Returns the inner string if this is a [`Param`](PathSegment::Param) segment.
     #[must_use]
     pub fn as_param(&self) -> Option<&&'a str> {
         if let Self::Param(v) = self {
@@ -797,8 +812,7 @@ impl<'a> PathSegment<'a> {
         }
     }
 
-    /// Returns the name if this is a [`CatchAll`](PathSegment::CatchAll)
-    /// segment.
+    /// Returns the inner string if this is a [`CatchAll`](PathSegment::CatchAll) segment.
     #[must_use]
     pub fn as_catch_all(&self) -> Option<&&'a str> {
         if let Self::CatchAll(v) = self {

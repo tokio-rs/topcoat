@@ -11,7 +11,6 @@ use topcoat_core_grammar::paths::{
     topcoat_runtime,
 };
 
-/// The arguments of the `#[procedure]` attribute, which takes none.
 pub struct ProcedureAttr {}
 
 impl Parse for ProcedureAttr {
@@ -20,10 +19,9 @@ impl Parse for ProcedureAttr {
     }
 }
 
-/// The annotated `async fn` that becomes a procedure.
-///
-/// Parsing checks the signature: a procedure must be `async`, must declare a
-/// return type, and must not take a `self` receiver.
+/// The annotated `async fn` that becomes a procedure. Validates the function
+/// signature: procedures must be `async`, must declare a return type, and must
+/// not take a `self` receiver.
 pub struct ProcedureItem {
     item: ItemFn,
 }
@@ -55,12 +53,9 @@ impl Parse for ProcedureItem {
     }
 }
 
-/// A parsed `#[procedure] async fn ...`, which expands to a unit struct
-/// named after the function that implements the runtime's `Procedure` trait.
 pub struct Procedure(ProcedureAttr, ProcedureItem);
 
 impl Procedure {
-    /// Combines a parsed attribute and function.
     #[must_use]
     pub fn new(attr: ProcedureAttr, item: ProcedureItem) -> Self {
         Self(attr, item)

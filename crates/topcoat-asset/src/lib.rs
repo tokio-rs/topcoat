@@ -1,8 +1,3 @@
-//! Static assets for Topcoat: the [`asset!`] macro, the asset bundle, and
-//! serving bundled files from the router.
-//!
-//! Use this crate through `topcoat::asset`, which also hosts the guide.
-
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod asset;

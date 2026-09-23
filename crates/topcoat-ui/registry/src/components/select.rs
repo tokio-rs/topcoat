@@ -7,9 +7,10 @@ use topcoat::{
 
 /// The classes for the native `<select>` inside the [`select`] component.
 ///
-/// It has the same size as the input control. The native arrow is hidden, so
-/// the component can draw its own chevron and look the same in all browsers.
-/// The extra right padding leaves room for the chevron.
+/// Sized to match the input control. The native dropdown arrow is suppressed
+/// so the component can draw its own chevron, which keeps the control looking
+/// the same across browsers; the extra right padding reserves the chevron's
+/// space.
 const SELECT: StaticClass = class!(
     "h-9 w-full appearance-none items-center rounded-lg border border-border \
      bg-transparent pr-8 pl-3 text-left text-sm transition-colors outline-none \
@@ -18,17 +19,17 @@ const SELECT: StaticClass = class!(
      focus-visible:ring-offset-background disabled:pointer-events-none",
 );
 
-/// The classes that style the drop-down list, in browsers that support
-/// customizable selects (`appearance: base-select`, which the wrapper sets on
-/// the `<select>`).
+/// The classes restyling the drop-down picker, for browsers that support
+/// customizable selects (`appearance: base-select`, set on the `<select>` by
+/// the component's wrapper).
 ///
-/// The list and its options look like the dropdown menu's panel and items:
-/// the same raised surface and the same hover and focus tints. The selected
-/// option has a checkmark at its right edge. The checkmark is the
-/// [`CHECKMARK`] icon used as a mask over the muted foreground color (see
-/// [`checkmark_style`]). The browser's own picker icon is hidden in favor of
-/// the component's chevron. Browsers without support ignore these rules and
-/// show the operating system's list.
+/// The panel and its option rows take after the dropdown menu's content and
+/// items: the same raised surface, the same ghost-tinted hover and focus
+/// states, and the checked option marked by a checkmark on the row's right
+/// edge: the [`CHECKMARK`] icon, masked over the theme's muted foreground
+/// (see [`checkmark_style`]). The browser's own picker icon is hidden in
+/// favor of the component's chevron. On browsers without support every rule
+/// here is inert and the operating system's picker shows instead.
 const PICKER: StaticClass = class!(
     "[&::picker(select)]:[appearance:base-select] \
      [&::picker(select)]:mt-1 [&::picker(select)]:rounded-lg \
@@ -51,13 +52,14 @@ const PICKER: StaticClass = class!(
      [&_option::checkmark]:[mask-image:var(--select-checkmark)]",
 );
 
-/// The icon that marks the selected option in the list.
+/// The icon marking the picker's checked option.
 const CHECKMARK: IconData = iconify_icon!("lucide:check");
 
-/// The inline style for the [`select`] wrapper. It sets the
-/// `--select-checkmark` custom property to [`CHECKMARK`] as a data URI. The
-/// `::checkmark` pseudo-element can only get the icon from CSS, as a mask
-/// image, and the icon's markup is only available here.
+/// The inline style for the [`select`] wrapper, carrying [`CHECKMARK`] as a
+/// data URI in the `--select-checkmark` custom property. The indirection
+/// exists because the `::checkmark` pseudo-element can only take the icon
+/// through a stylesheet, as a mask image, while the icon's markup is only
+/// available here.
 fn checkmark_style(cx: &Cx) -> String {
     let svg = format!(
         r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="{}">{}</svg>"#,
@@ -79,24 +81,21 @@ fn checkmark_style(cx: &Cx) -> String {
     style
 }
 
-/// A drop-down list, rendered as a styled native `<select>`.
+/// A select component: a themed native `<select>`.
 ///
-/// Child nodes become the content of the `<select>`, usually `<option>` and
+/// Child nodes become the `<select>`'s content, typically `<option>` and
 /// `<optgroup>` elements. The `attrs` (such as `name`, `disabled`, or event
-/// handlers) are forwarded to the `<select>`. A `class` among them is not put
-/// on the `<select>` but appended to the classes of the `<span>` that wraps
-/// it, so width classes size the whole control. Like the input, it fills the
-/// width of its container by default. Set `aria-invalid="true"` to show the
-/// error border and focus ring.
+/// handlers) are forwarded to the `<select>`; a `class` among them is appended
+/// to the wrapping element's classes, so width utilities size the whole
+/// control. Like the input, it fills its container by default.
+/// Set `aria-invalid="true"` to use the error border and focus ring.
+/// For a styled group heading, add a `<legend>` as the first child of the
+/// `<optgroup>`. Keep its `label` attribute for native picker fallbacks.
 ///
-/// For a styled group heading, add a `<legend>` as the first child of an
-/// `<optgroup>`. Keep the `label` attribute of the `<optgroup>` for browsers
-/// that show the native list.
-///
-/// In browsers that support customizable selects, the list looks like the
-/// dropdown menu component, and the chevron flips while it is open. Other
-/// browsers show the operating system's list. The closed control looks the
-/// same everywhere.
+/// On browsers with customizable select support the drop-down picker is
+/// restyled to match the dropdown menu component, and the chevron flips while
+/// it is open; other browsers keep the operating system's picker. The control
+/// itself looks the same everywhere.
 ///
 /// ```ignore
 /// view! {
@@ -113,11 +112,11 @@ pub async fn select(
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
-    // `appearance: base-select` turns on the customizable list. It is set
-    // from the wrapper because the descendant selector has a higher
-    // specificity than the `appearance-none` fallback, so stylesheet order
-    // does not matter. Browsers without support drop the invalid declaration
-    // and keep the fallback.
+    // `appearance: base-select` opts into the customizable picker. It is set
+    // from the wrapper because the descendant selector outranks the
+    // `appearance-none` fallback in specificity, making the outcome
+    // independent of stylesheet order; browsers without support drop the
+    // invalid declaration and keep the fallback.
     Ok(view! {
         <span
             class=(class!(

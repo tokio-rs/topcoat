@@ -2,10 +2,10 @@ use topcoat_core::context::Cx;
 
 use crate::{PartsWriter, PromotedStr, StaticStr, Unescaped};
 
-/// A value that can be used as an element's tag name in a template.
+/// Converts a value used as an element name into view parts.
 ///
-/// A type that implements this trait can be used in the element name
-/// position of the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
+/// When this trait is implemented on a type, it can be used in the element name position of an
+/// element in the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
 ///
 /// ```rust
 /// # use topcoat::view::{View, component, view};
@@ -17,13 +17,8 @@ use crate::{PartsWriter, PromotedStr, StaticStr, Unescaped};
 /// })
 /// # }
 /// ```
-///
-/// Tag names have no escape mechanism, so strings pushed in this position are
-/// validated when the view renders. Rendering panics if the name contains a
-/// character that could break out of it, such as whitespace or `>`. See
-/// [`HtmlContext`](crate::HtmlContext) for the exact rules.
 pub trait ElementNameViewParts {
-    /// Pushes this element name into `parts`.
+    /// Appends this element name to the view being built.
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>);
 }
 

@@ -11,31 +11,32 @@ use crate::{
     response::AsyncIntoResponse, route,
 };
 
-/// A handler that renders a [`View`](topcoat_view::View) for a URL path.
+/// A page handler that renders a [`View`](topcoat_view::View) for a specific
+/// URL path.
 ///
-/// Every [`Layout`] whose path is a prefix of the page's path wraps the
-/// rendered view. `#[page]` with an absolute path implements this trait.
-/// Register a page with [`RouterBuilder::page`](crate::RouterBuilder::page),
-/// or use [`PageFn`] to make one from a function.
+/// Registered into a [`RouterBuilder`](crate::RouterBuilder) with
+/// [`page`](crate::RouterBuilder::page), alongside [`Layout`]s, which wrap it
+/// when their path is a prefix of the page's.
+///
+/// A page serves `GET` unless it declares other methods.
 pub trait Page: Send + Sync + 'static {
-    /// Returns the id of this page's handler.
-    ///
-    /// Return the same [`RouteId`] on every call.
+    /// The identity of this page's handler.
     fn id(&self) -> RouteId;
 
-    /// Returns the HTTP methods this page responds to.
+    /// The HTTP methods this page responds to.
     fn methods(&self) -> Methods<'_>;
 
-    /// Returns the path pattern this page handles.
+    /// The URL path this page handles.
     fn path(&self) -> &Path;
 
-    /// Renders the page for the request `cx` belongs to.
+    /// Renders the page to a [`View`](topcoat_view::View) under the request
+    /// context `cx`.
     fn render<'a>(&'a self, cx: &'a Cx, body: Body) -> BoxView<'a>;
 
-    /// Returns whether this page is the one handling the current request.
+    /// Returns whether this page handles the current request.
     ///
-    /// Only the page's id is compared, so the result does not depend on the
-    /// values of path parameters or on the query string.
+    /// Only the handler is compared, so a page is current for every value its
+    /// path parameters take, whatever the request's query or fragment.
     ///
     /// # Panics
     ///
@@ -67,13 +68,13 @@ impl<P: Page + ?Sized> Page for &'static P {
 #[cfg(feature = "discover")]
 inventory::collect!(&'static dyn Page);
 
-/// The render function of a [`PageFn`].
+/// The render function backing a [`PageFn`].
 pub type PageRenderFn = for<'a> fn(cx: &'a Cx, body: Body) -> BoxView<'a>;
 
-/// A [`Page`] made from a render function, a path, and a set of methods.
+/// A [`Page`] backed by a plain render function.
 ///
-/// Use it to register a page without implementing [`Page`] on a type of your
-/// own.
+/// Turns a function into a page without implementing [`Page`] on a struct,
+/// pairing it with the methods and path it serves.
 #[derive(Debug, Clone)]
 pub struct PageFn {
     /// The identity of this page's handler.
@@ -87,11 +88,10 @@ pub struct PageFn {
 }
 
 impl PageFn {
-    /// Creates a page that runs `render` for requests to `path` with one of
-    /// `methods`.
+    /// Creates a new page with explicit methods, path, and render function.
     ///
-    /// `methods` accepts anything that converts into [`OwnedMethods`], like a
-    /// single [`Method`](crate::Method), a slice or `Vec` of methods, or
+    /// The methods are anything convertible into [`OwnedMethods`]: a single
+    /// [`Method`](crate::Method), a `&'static [Method]`, a `Vec<Method>`, or
     /// [`Methods::Any`] to respond to every method.
     ///
     /// # Panics
@@ -130,26 +130,25 @@ impl Page for PageFn {
     }
 }
 
-/// The content a [`Layout`] wraps: the page, already wrapped in any inner
+/// The content a [`Layout`] wraps: the page, already composed with any inner
 /// layouts.
 pub type Slot<'a> = Child<'a>;
 
-/// A handler that wraps every page whose path starts with the layout's path.
+/// A layout handler that wraps pages whose path starts with the layout's path
+/// prefix.
 ///
-/// When several layouts match a page, the layout with the longer path is
-/// nested inside the one with the shorter path. For example, layouts at `/`
-/// and `/settings` both match `/settings/profile`, which renders as
-/// root -> settings -> page.
+/// When multiple layouts match a page, they nest from most-specific (innermost)
+/// to least-specific (outermost). For example, layouts at `/` and `/settings`
+/// both match `/settings/profile`, rendering as: root -> settings -> page.
 ///
-/// `#[layout]` with an absolute path implements this trait. Register a
-/// layout with [`RouterBuilder::layout`](crate::RouterBuilder::layout), or
-/// use [`LayoutFn`] to make one from a function.
+/// Registered into a [`RouterBuilder`](crate::RouterBuilder) with
+/// [`layout`](crate::RouterBuilder::layout).
 pub trait Layout: Send + Sync + 'static {
-    /// Returns the path whose pages this layout wraps.
+    /// The path prefix this layout applies to.
     fn path(&self) -> &Path;
 
-    /// Renders the layout around `slot`, the content it wraps, for the
-    /// request `cx` belongs to.
+    /// Renders the layout, embedding the given child content [`Slot`], to a
+    /// [`View`](topcoat_view::View) under the request context `cx`.
     fn render<'a>(&'a self, cx: &'a Cx, slot: Slot<'a>) -> BoxView<'a>;
 }
 
@@ -166,14 +165,14 @@ impl<L: Layout + ?Sized> Layout for &'static L {
 #[cfg(feature = "discover")]
 inventory::collect!(&'static dyn Layout);
 
-/// The render function of a [`LayoutFn`]. It receives the wrapped content as
+/// The render function backing a [`LayoutFn`], receiving the child content as
 /// a [`Slot`].
 pub type LayoutRenderFn = for<'a> fn(cx: &'a Cx, slot: Slot<'a>) -> BoxView<'a>;
 
-/// A [`Layout`] made from a render function and a path.
+/// A [`Layout`] backed by a plain render function.
 ///
-/// Use it to register a layout without implementing [`Layout`] on a type of
-/// your own.
+/// Turns a function into a layout without implementing [`Layout`] on a
+/// struct, pairing it with the path prefix it applies to.
 #[derive(Debug, Clone)]
 pub struct LayoutFn {
     /// The path prefix this layout applies to.
@@ -183,7 +182,7 @@ pub struct LayoutFn {
 }
 
 impl LayoutFn {
-    /// Creates a layout that runs `render` for the pages under `path`.
+    /// Creates a new layout with an explicit path and render function.
     ///
     /// # Panics
     ///
@@ -207,8 +206,7 @@ impl Layout for LayoutFn {
     }
 }
 
-/// A [`Page`] together with the [`Layout`]s that wrap it, served as a
-/// [`Route`].
+/// A [`Page`] paired with the [`Layout`]s that wrap it.
 pub struct PageWithLayouts {
     inner: Arc<PageWithLayoutsInner>,
 }
@@ -235,10 +233,10 @@ impl PageWithLayoutsInner {
 }
 
 impl PageWithLayouts {
-    /// Combines `page` with the `layouts` that wrap it.
+    /// Pairs `page` with the `layouts` that wrap it.
     ///
-    /// Order `layouts` from outermost to innermost, which is by ascending path
-    /// length.
+    /// `layouts` must be ordered from least- to most-specific (ascending path
+    /// length); they are applied from the innermost (most specific) outward.
     #[must_use]
     pub fn new(page: Box<dyn Page>, layouts: Vec<Arc<dyn Layout>>) -> Self {
         Self {

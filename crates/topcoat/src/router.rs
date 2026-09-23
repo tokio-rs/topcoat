@@ -8,23 +8,8 @@
 pub use topcoat_router::*;
 pub use topcoat_router_macro::*;
 
-/// Adds [`discover`](Self::discover) to [`RouterBuilder`].
-///
-/// See [auto-discovery](crate::router#auto-discovery-with-discover) in the
-/// router guide.
 #[cfg(feature = "discover")]
 pub trait RouterBuilderDiscoverExt {
-    /// Registers every item that was declared with a Topcoat attribute or
-    /// macro anywhere in the program.
-    ///
-    /// This covers every `#[page]`, `#[layout]`, `#[layer]`, and `#[route]`,
-    /// plus the items of enabled features that are collected the same way,
-    /// like fonts, procedures, and shards.
-    ///
-    /// # Panics
-    ///
-    /// Panics if two discovered layouts, or two discovered layers, share the
-    /// same path.
     #[must_use]
     fn discover(self) -> Self;
 }

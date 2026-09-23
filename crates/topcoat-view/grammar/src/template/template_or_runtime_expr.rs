@@ -5,16 +5,10 @@ use topcoat_core_grammar::{ParseOption, paths::topcoat_runtime};
 
 use crate::template::{RuntimeExpr, TemplateExpr};
 
-/// The value of a bind attribute or event handler: either a plain `(expr)` or
-/// a `$(expr)` runtime expression.
-///
-/// Both expand to a runtime `Expr` value. A plain expression is converted
-/// into one with `From`.
+/// An expression that can either be emitted directly or wrapped for runtime use.
 #[derive(Debug, PartialEq)]
 pub enum TemplateOrRuntimeExpr {
-    /// A plain `(expr)`.
     Template(TemplateExpr),
-    /// A `$(expr)` runtime expression.
     Runtime(RuntimeExpr),
 }
 

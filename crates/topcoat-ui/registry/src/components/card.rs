@@ -5,25 +5,23 @@ use topcoat::{
 
 /// The classes for the [`card`] container.
 ///
-/// The card is a column of sections with an even gap between them. The card
-/// only has vertical padding. Each section has its own horizontal padding, so
-/// content such as an image can span the full width of the card. The card has
-/// a shadow and sets its own background and text color, so it looks the same
-/// on any background.
+/// The card is a column of sections separated by a uniform gap. It carries
+/// vertical padding only; each section brings its own horizontal padding, so
+/// full-bleed content such as an image can span the card's width. The card
+/// casts the theme's raised-surface shadow and sets its own background and
+/// text color, so it reads as a card on any ancestor.
 const CARD: StaticClass = class!(
     "flex flex-col gap-5 rounded-xl border border-border bg-card py-6 \
      text-card-foreground shadow-sm",
 );
 
-/// A raised surface with a border that groups related content.
+/// A card component: a bordered, raised surface grouping related content.
 ///
-/// A card stacks its sections vertically. Usually these are a
-/// [`card_header`], a [`card_content`], and a [`card_footer`], in that order.
-/// Each section is optional. Child nodes become the card's sections.
-///
+/// A card stacks sections vertically: typically a [`card_header`], then a
+/// [`card_content`], closed by a [`card_footer`]. Any section can be omitted.
 /// The `attrs` (such as `class` or event handlers) are forwarded to the
-/// `<div>`. A `class` among them is appended to the component's classes. The
-/// same holds for the section components.
+/// underlying `<div>`; a `class` among them is appended to the computed
+/// classes. Child nodes become the card's sections.
 ///
 /// ```ignore
 /// view! {
@@ -48,8 +46,8 @@ pub async fn card(
     Ok(view! { <div class=(class!(CARD, attrs.remove("class"))) (attrs)>(child)</div> })
 }
 
-/// The first section of a [`card`]. It holds a [`card_title`] and an
-/// optional [`card_description`], stacked vertically.
+/// The opening section of a [`card`], stacking a [`card_title`] and an
+/// optional [`card_description`].
 #[component]
 pub async fn card_header(
     #[default] mut attrs: Attributes,
@@ -81,7 +79,7 @@ pub async fn card_title(
     })
 }
 
-/// Muted text under a [`card_title`], rendered as a `<p>`.
+/// The supporting text under a [`card_title`].
 #[component]
 pub async fn card_description(
     #[default] mut attrs: Attributes,
@@ -106,7 +104,7 @@ pub async fn card_content(
     Ok(view! { <div class=(class!("px-6", attrs.remove("class"))) (attrs)>(child)</div> })
 }
 
-/// The last section of a [`card`]: a horizontal row, usually for actions.
+/// The closing section of a [`card`], a horizontal row for actions.
 #[component]
 pub async fn card_footer(
     #[default] mut attrs: Attributes,

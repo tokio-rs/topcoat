@@ -17,18 +17,8 @@ use crate::{
     },
 };
 
-/// The parsed body of a `live!` invocation: an optional `cx =>` argument and
-/// the statements of an async block.
-///
-/// Expands to a live region view. The region's id is derived from the
-/// identity of the context and the body's source location, so it is the same
-/// across renders.
 pub struct Live {
-    /// The context named by a leading `cx =>` argument. The region then holds
-    /// its own clone of it. [`None`] uses the context of the enclosing body.
     pub cx: Option<LeadingCx>,
-    /// The statements of the region's body, which run inside an `async move`
-    /// block.
     pub body: Vec<syn::Stmt>,
 }
 
@@ -95,14 +85,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for Live {
     }
 }
 
-/// The parsed body of an `emit!` invocation, written with the same syntax as
-/// `view!`.
-///
-/// Expands to an expression that renders the view into the enclosing `live!`
-/// region and awaits it. The expression evaluates to a `Result` holding an
-/// `EmitToken`, or to the error the view failed to render with.
 pub struct Emit {
-    /// The markup to emit, with an optional `cx =>` argument.
     pub view: View,
 }
 

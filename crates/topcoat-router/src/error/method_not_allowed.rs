@@ -6,11 +6,11 @@ use crate::{
     response::{IntoResponse, Response},
 };
 
-/// Creates a `405 Method Not Allowed` error.
+/// Builds a method-not-allowed (HTTP 405) response whose `Allow` header lists
+/// `methods`, the methods the matched path actually supports.
 ///
-/// `methods` are the methods the path supports. The response lists them in
-/// its `Allow` header. The router returns this error on its own when a
-/// request's path matches a route but its method does not.
+/// The router returns this when a request's path matches a route but its method
+/// does not.
 ///
 /// # Examples
 ///
@@ -23,10 +23,10 @@ pub fn method_not_allowed(methods: impl IntoIterator<Item = Method>) -> MethodNo
     MethodNotAllowedError::new(methods)
 }
 
-/// A `405 Method Not Allowed` error.
+/// A method-not-allowed response carried as the `Err` variant of a handler
+/// `Result`.
 ///
-/// Create one with [`method_not_allowed`]. Returned from a handler, it
-/// renders as a `405 Method Not Allowed` response with an `Allow` header.
+/// Construct one with [`method_not_allowed`].
 #[derive(Debug, Clone)]
 pub struct MethodNotAllowedError {
     /// The value of the `Allow` header: the supported methods, comma-separated.

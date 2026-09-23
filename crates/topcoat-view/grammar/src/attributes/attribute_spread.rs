@@ -12,21 +12,16 @@ use crate::{
     view::hir::{ExprKind, LowerView, ViewBuilder},
 };
 
-/// A parenthesized expression that inserts whole attributes, like the
-/// `(attrs)` in `<button (attrs)>`.
+/// A parenthesized expression spread into an element as a complete attribute
+/// fragment, e.g. the `(attrs)` in `<button (attrs)>`.
 ///
-/// Unlike an [`Attribute`](super::Attribute), it has no `=value`. In an
-/// opening tag, the expression must implement
-/// [`AttributeViewParts`](topcoat_view::AttributeViewParts). In `attributes!`,
-/// it extends the collection being built, so it must be iterable as
-/// [`AttributeKey`](topcoat_view::AttributeKey) and
-/// [`AttributeValue`](topcoat_view::AttributeValue) pairs, as an
-/// [`Attributes`](topcoat_view::Attributes) collection is.
-///
-/// A parenthesized expression followed by `=` is an attribute name instead,
-/// as in `(name)="value"`.
+/// Unlike an [`Attribute`](super::Attribute), a spread has no `=value`: the
+/// expression evaluates to a value implementing
+/// [`AttributeViewParts`](topcoat_view::AttributeViewParts) and contributes
+/// zero or more whole attributes. A parenthesized expression *followed* by `=`
+/// is instead a dynamic attribute key (`(name)="value"`), so spreads are only
+/// recognized when no `=` follows.
 pub struct AttributeSpread {
-    /// The inserted expression.
     pub expr: TemplateExpr,
 }
 

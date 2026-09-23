@@ -23,23 +23,16 @@ use topcoat_core_grammar::{ParseOption, paths::topcoat_font};
 pub use unicode::*;
 pub use weight::*;
 
-/// A `font_face!` body: a set of CSS `@font-face` descriptors written as
-/// `name: value` pairs separated by semicolons.
 pub struct FontFace {
     /// The `font-family` descriptor. Optional in the AST because a
     /// [`font!`](super::font::Font) `@font-face` block omits it and has the
     /// family injected by the enclosing macro; the `font_face!` macro requires
     /// it.
     pub family: Option<FontFamily>,
-    /// The required `src` descriptor.
     pub src: FontSources,
-    /// The `font-weight` descriptor, if written.
     pub weight: Option<FontWeight>,
-    /// The `font-style` descriptor, if written.
     pub style: Option<FontStyle>,
-    /// The `font-display` descriptor, if written.
     pub display: Option<FontDisplay>,
-    /// The `unicode-range` descriptor, if written.
     pub unicode_range: Option<UnicodeRanges>,
 }
 

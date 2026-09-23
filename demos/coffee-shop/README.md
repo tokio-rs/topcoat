@@ -1,8 +1,8 @@
 # Coffee shop
 
-A small coffee shop storefront that shows many Topcoat features working together: routes derived from the module tree, vendored `topcoat ui` components, a menu that is loaded once per request and shared, a returning customer read from a cookie by a plain function, and a menu that you can search and order from without a page reload.
+A small storefront that tours Topcoat's features together: routes derived from the module tree, vendored `topcoat ui` components, a memoized menu shared across the request, a customer read from a cookie by a plain function, and a menu that searches and orders without a page reload.
 
-Run it from the repository root with:
+Run it with:
 
 ```sh
 cargo topcoat dev -p coffee-shop

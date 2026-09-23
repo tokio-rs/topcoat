@@ -1,61 +1,39 @@
 use serde::{Deserialize, Serialize};
 
-/// A value in the form both sides report it for comparison, independent of
-/// the runtime's own serialization and rendering.
+/// A value compared independently of runtime serialization and rendering.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "value", deny_unknown_fields)]
 pub enum Value {
-    /// The unit value `()`.
     Unit,
-    /// A `bool`.
     Bool(bool),
-    /// An `f64` as its bits in hex, or `"nan"` for every NaN.
     F64(String),
-    /// An integer with its Rust type name, bit width, and decimal digits.
     Integer {
-        /// The Rust type name, such as `"u8"`.
         kind: String,
-        /// The width in bits.
         bits: u32,
-        /// The value in decimal.
         digits: String,
     },
-    /// A string.
     String(String),
-    /// `Option::None`.
     None,
-    /// `Option::Some` with its value.
     Some(Box<Value>),
-    /// `Result::Ok` with its value.
     Ok(Box<Value>),
-    /// `Result::Err` with its value.
     Err(Box<Value>),
-    /// A tuple with its fields in order.
     Tuple(Vec<Value>),
-    /// A vector, array, or slice with its elements in order.
     Sequence(Vec<Value>),
 }
 
-/// How an evaluation ended: with a value, a panic, or a JavaScript error.
+/// An expression's value, language panic, or JavaScript error.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", deny_unknown_fields)]
 pub enum Outcome {
-    /// The expression returned this value.
     Return(Value),
-    /// The expression panicked in Rust or threw the runtime's `Panic` in
-    /// JavaScript, with this message.
     Panic(String),
-    /// The generated JavaScript failed to compile, with this error.
     CompileError(String),
-    /// The JavaScript threw an exception other than a `Panic`.
     Exception(String),
 }
 
 impl Outcome {
-    /// Whether two outcomes count as the same.
-    ///
-    /// Returned values must be equal. Two panics always agree, whatever their
-    /// messages. Every other combination disagrees.
+    /// Compares values exactly and panics by category, retaining their messages
+    /// for diagnostics.
     #[must_use]
     pub fn agrees_with(&self, other: &Self) -> bool {
         match (self, other) {
@@ -68,7 +46,6 @@ impl Outcome {
 
 /// Converts a Rust value into the harness's comparison format.
 pub trait Observe {
-    /// Returns this value as a [`Value`].
     fn observe(&self) -> Value;
 }
 

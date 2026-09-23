@@ -7,7 +7,7 @@ use http::HeaderName;
 
 // -- Request headers (sent by Alpine AJAX to the server) --
 
-/// `X-Alpine-Request`: always set to `true` on requests sent by Alpine AJAX.
+/// `X-Alpine-Request`: always set to `true` on requests issued by Alpine AJAX.
 pub const X_ALPINE_REQUEST: HeaderName = HeaderName::from_static("x-alpine-request");
 
 /// `X-Alpine-Target`: a space-separated list of the `id`s of the target

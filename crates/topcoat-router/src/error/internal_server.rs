@@ -6,11 +6,10 @@ use topcoat_core::{
 
 use crate::response::{IntoResponse, Response};
 
-/// Creates a `500 Internal Server Error` error that wraps `error`.
+/// Builds an internal-server-error (HTTP 500) response.
 ///
-/// The response does not show `error` to the client. Any error that is not a
-/// router error already renders as a `500 Internal Server Error`, so use this
-/// function when you need the error as an [`InternalServerError`] value.
+/// Use this when a handler needs to turn an unexpected application error
+/// into a response without exposing the underlying error to the client.
 ///
 /// # Examples
 ///
@@ -30,11 +29,9 @@ pub fn internal_server_error(error: impl Into<Error>) -> InternalServerError {
     InternalServerError::new(error.into())
 }
 
-/// A `500 Internal Server Error` error.
+/// An internal-server-error response carried as the `Err` variant of a handler `Result`.
 ///
-/// Create one with [`internal_server_error`] or [`From`]. Returned from a
-/// handler, it renders as a `500 Internal Server Error` response that hides
-/// the wrapped error from the client.
+/// Construct one with [`internal_server_error`].
 #[derive(Debug, Clone)]
 pub struct InternalServerError {
     _inner: Error,

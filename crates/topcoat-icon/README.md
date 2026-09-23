@@ -1,1 +1,1 @@
-This crate is part of [`topcoat`](https://github.com/tokio-rs/topcoat). It provides inline SVG icons and an optional integration with the [Iconify](https://iconify.design/) icon catalog. Use it through the `topcoat::icon` module.
+This crate is part of [`topcoat`](https://github.com/tokio-rs/topcoat).

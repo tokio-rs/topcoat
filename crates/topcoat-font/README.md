@@ -1,1 +1,1 @@
-This crate is part of [`topcoat`](https://github.com/tokio-rs/topcoat). It provides web fonts: `@font-face` rules declared in Rust, served as stylesheets from the router, and an optional integration with the [Fontsource](https://fontsource.org/) catalog. Use it through the `topcoat::font` module.
+This crate is part of [`topcoat`](https://github.com/tokio-rs/topcoat).

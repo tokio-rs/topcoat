@@ -1,18 +1,18 @@
-Declares a layout: a view that wraps the pages below its path.
+Declares a layout that wraps inner pages.
 
-A layout wraps every page whose path starts with the layout's path. The attribute takes an optional path string. With an absolute path, such as `#[layout("/settings")]`, the layout uses that path. Without a path, the layout uses the path of its module, as described in [`module_router!`](macro.module_router.html). A path that starts with `./` is added to the end of the module path, so `#[layout("./admin")]` in `src/app/settings.rs` wraps the pages under `/settings/admin`.
+A layout wraps every page whose URL begins with the layout's URL. The layout's URL is the path string given to the attribute (`#[layout("/settings")]`). When no path is given, it is derived from the function's enclosing module path, kebab-cased, provided the function is reachable from a [`module_router!`](macro.module_router.html). A path starting with `./` is joined onto that module-derived path: `#[layout("./admin")]` in `src/app/settings.rs` wraps the pages under `/settings/admin`.
 
-Register a layout with an absolute path by passing its name to [`RouterBuilder::layout`](struct.RouterBuilder.html#method.layout), or let [`discover`](trait.RouterBuilderDiscoverExt.html) collect it. A layout with a module-derived path is registered by [`module_router!`](macro.module_router.html).
+A layout registers like any other handler: pass the function name to [`RouterBuilder::layout`](struct.RouterBuilder.html#method.layout), or let [`discover`](trait.RouterBuilderDiscoverExt.html) or [`module_router!`](macro.module_router.html) collect it automatically.
 
 # Handler signature
 
-The function must be `async` and return a [`Result`](../type.Result.html) of a value that implements [`View`](../view/trait.View.html). It must take the wrapped content as `slot: Slot<'_>` (see [`Slot`](type.Slot.html)) and place it somewhere in its view. It can also take the request context as [`cx: &Cx`](../context/struct.Cx.html). Both parameters are recognized by name and can come in either order. No other parameters are allowed.
+The function is `async` and returns a [`Result`](../type.Result.html) of a value implementing [`View`](../view/trait.View.html). It takes the inner page's content as `slot`, of type [`Slot`](type.Slot.html), and interpolates it somewhere in its own view. It may also take [`cx: &Cx`](../context/struct.Cx.html). Both parameters are recognized by name, may appear in either order, and no other parameters are accepted.
 
-The layout decides where and when the wrapped page, or the next nested layout, is rendered. A layout can also catch errors from the pages it wraps by putting the slot in an [`error_boundary`](../view/struct.error_boundary.html). This is how you build a custom error page. See the [error guide](error/index.html).
+A layout decides where and when its page (or nested layout) is rendered. Layouts can catch errors by wrapping the slot in an [`error_boundary`](../view/struct.error_boundary.html), which is how a branded error page is built; see the [error](../router/error/index.html) docs.
 
 # Examples
 
-An absolute path:
+Explicit path:
 
 ```rust
 use topcoat::{Result, router::{Slot, layout}, view::{View, view}};
@@ -31,7 +31,7 @@ async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
 }
 ```
 
-A module-derived path. In `src/app/settings.rs` under `module_router!()`, this wraps every page under `/settings`:
+Module-derived path (in `src/app/settings.rs` under `module_router!()`, this wraps every page under `/settings`):
 
 ```rust
 # use topcoat::{Result, router::{Slot, layout}, view::{View, view}};
@@ -46,7 +46,7 @@ async fn settings_layout(slot: Slot<'_>) -> Result<impl View> {
 }
 ```
 
-A path below the module. In `src/app/settings.rs` under `module_router!()`, this wraps every page under `/settings/admin`:
+Path below the module (in `src/app/settings.rs` under `module_router!()`, this wraps every page under `/settings/admin`):
 
 ```rust
 # use topcoat::{Result, router::{Slot, layout}, view::{View, view}};
@@ -63,7 +63,7 @@ async fn admin_layout(slot: Slot<'_>) -> Result<impl View> {
 
 # Nested layouts
 
-When several layouts match a page, they nest by path length. The layout with the shortest path is the outermost, and the one with the longest path is the innermost:
+When several layouts match a page, they nest from least specific (outermost) to most specific (innermost):
 
 ```rust
 # use topcoat::{Result, router::{Slot, layout, page}, view::{View, view}};
@@ -88,11 +88,11 @@ async fn profile() -> Result<impl View> {
 }
 ```
 
-A request to `/settings/profile` renders `profile` inside `settings_layout`, inside `root_layout`.
+A request to `/settings/profile` renders `root_layout` > `settings_layout` > `profile`.
 
 # Layouts as components
 
-A layout is also a [component](../view/attr.component.html). It takes a [`Slot`](type.Slot.html) as its `slot` prop:
+A layout doubles as a [component](../view/attr.component.html), taking a [`Slot`](type.Slot.html) as its `slot` property:
 
 ```rust
 # use topcoat::{Result, router::{Slot, layout, page}, view::{View, view}};

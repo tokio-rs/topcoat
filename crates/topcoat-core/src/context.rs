@@ -1,6 +1,3 @@
-//! The request context [`Cx`] and the app and request context values it
-//! gives access to.
-
 mod app_context;
 mod id;
 mod request_context;
@@ -22,21 +19,18 @@ use crate::{
 
 /// The request context.
 ///
-/// Pages, layouts, components, and routes can take a `cx: &Cx` parameter when
-/// they need request-scoped information, and Topcoat passes it in for them.
-/// Pass it on to helper functions that need it. Read values registered for
-/// the whole application with [`app_context`] and values registered for the
-/// request with [`request_context`].
+/// Pages, layouts, components, and routes can take `cx: &Cx` as an optional
+/// parameter when they need request-scoped information; Topcoat passes it
+/// automatically. Use it to read values registered for the request with the
+/// app and request context helpers, such as [`app_context`] and
+/// [`request_context`].
 ///
 /// A `Cx` is a handle to state shared by everything serving the same request.
 /// [`with`](Self::with) and [`with_many`](Self::with_many) derive a child
 /// handle whose request context holds additional values, leaving the parent
-/// unchanged. Cloning a handle is cheap. Work that outlives the handler, such
-/// as a streaming response body or a WebSocket task, should move an owned
-/// clone into the work.
-///
-/// `Cx::default()` creates a context with empty app and request contexts,
-/// which is handy in tests. Use [`CxTestBuilder`] to create one with values.
+/// untouched. Cloning a handle is cheap; work that outlives the handler, such
+/// as a streaming response body or a WebSocket task, should move an owned clone into
+/// the work.
 #[derive(Debug, Default, Clone)]
 pub struct Cx {
     /// The state shared by handles in the same context scope.
@@ -46,8 +40,8 @@ pub struct Cx {
 }
 
 impl Cx {
-    /// Creates the context for a new request that shares `app_context`, with
-    /// an empty request context.
+    /// Creates the context for one request over the shared app context, with an
+    /// empty request context.
     #[must_use]
     pub fn new(app_context: Arc<AppContext>) -> Self {
         Self::from_parts(app_context, RequestContext::new())
@@ -70,21 +64,18 @@ impl Cx {
         }
     }
 
-    /// Returns the [`CxId`] of the request this handle belongs to.
-    ///
-    /// Every handle derived from the same request, including clones and
-    /// children, returns the same id.
+    /// Returns this request's unique [`CxId`].
     #[inline]
     #[must_use]
     pub fn id(&self) -> CxId {
         self.state.shared.id
     }
 
-    /// Returns a child context whose [`Identity`] is derived from this
-    /// context's identity, the source location of this call, and `key`.
+    /// Returns a child context with a key derived from the parent's key,
+    /// this call's source location, and `key`.
     ///
-    /// Pass `()` when the source location alone tells calls apart, or a key
-    /// such as an item id to tell apart repeated calls at one location:
+    /// Use `()` to distinguish separate call locations, or an item key to
+    /// distinguish repeated calls at one location:
     ///
     /// ```
     /// # use topcoat_core::context::Cx;
@@ -97,9 +88,9 @@ impl Cx {
     /// }
     /// ```
     ///
-    /// The same inputs always produce the same identity. Moving the call to
-    /// another place in the source changes it. The child shares the parent's
-    /// request state and context values.
+    /// The same inputs produce the same key. Moving the call in source
+    /// changes it. The child shares the parent's request state and context
+    /// values.
     #[must_use]
     #[track_caller]
     pub fn keyed(&self, key: impl IdentityKey) -> Self {
@@ -127,21 +118,9 @@ impl Cx {
     ///
     /// The child inherits every other request context value and shares the
     /// rest of the request state, such as the app context and the memoize
-    /// cache, with `self`. If a value of the same type is already present,
-    /// the child shadows it: lookups through the child see `value`, while
+    /// cache, with `self`. Registering a type that is already present shadows
+    /// the inherited value: lookups through the child see `value`, while
     /// lookups through `self` still see the original.
-    ///
-    /// ```
-    /// use topcoat::context::{Cx, request_context};
-    ///
-    /// struct Locale(&'static str);
-    ///
-    /// let cx = Cx::default().with(Locale("en"));
-    /// let child = cx.with(Locale("de"));
-    ///
-    /// assert_eq!(request_context::<Locale>(&cx).0, "en");
-    /// assert_eq!(request_context::<Locale>(&child).0, "de");
-    /// ```
     #[must_use]
     pub fn with<T>(&self, value: T) -> Cx
     where
@@ -153,10 +132,10 @@ impl Cx {
     }
 
     /// Returns a child handle whose request context also holds every value in
-    /// `values`, which is either a tuple of values or a [`RequestContext`].
+    /// `values`, a tuple of context values or a [`RequestContext`].
     ///
-    /// This behaves like chained [`with`](Self::with) calls, but builds the
-    /// child in one step.
+    /// Behaves like chained [`with`](Self::with) calls, but builds the child's
+    /// request context in one step.
     #[must_use]
     pub fn with_many<V>(&self, values: V) -> Cx
     where
@@ -218,22 +197,10 @@ struct RequestShared {
     abort_store: AbortStore,
 }
 
-/// Builds a [`Cx`] with app and request context values, for tests.
+/// Assembles a [`Cx`] from scratch, for tests.
 ///
-/// ```
-/// use topcoat::context::{CxTestBuilder, app_context, request_context};
-///
-/// struct Config(u32);
-/// struct UserId(u64);
-///
-/// let cx = CxTestBuilder::new()
-///     .app_context(Config(3))
-///     .request_context(UserId(42))
-///     .build();
-///
-/// assert_eq!(app_context::<Config>(&cx).0, 3);
-/// assert_eq!(request_context::<UserId>(&cx).0, 42);
-/// ```
+/// Unlike [`Cx::new`], which only takes an existing shared app context,
+/// `CxTestBuilder` populates both app and request context.
 #[derive(Debug, Default)]
 pub struct CxTestBuilder {
     app_context: AppContext,
@@ -247,8 +214,7 @@ impl CxTestBuilder {
         Self::default()
     }
 
-    /// Registers `value` on the app context, replacing any earlier value of
-    /// the same type.
+    /// Registers `value` on the app context.
     #[must_use]
     pub fn app_context<T>(mut self, value: T) -> Self
     where
@@ -258,8 +224,7 @@ impl CxTestBuilder {
         self
     }
 
-    /// Registers `value` on the request context, replacing any earlier value
-    /// of the same type.
+    /// Registers `value` on the request context.
     #[must_use]
     pub fn request_context<T>(mut self, value: T) -> Self
     where
@@ -276,13 +241,12 @@ impl CxTestBuilder {
     }
 }
 
-/// Returns the [`Identity`] of `cx`'s scope.
+/// Returns the identity of this context's scope.
 ///
 /// # Panics
 ///
-/// Panics if `cx` belongs to a memoized call, or if an enclosing scope made
-/// the identity ambiguous. Use [`try_identity`] when an identity may be
-/// ambiguous.
+/// Panics if `cx` belongs to a memoized call or an enclosing scope introduced
+/// ambiguity. Use [`try_identity`] when an identity may be ambiguous.
 #[must_use]
 #[track_caller]
 pub fn identity(cx: &Cx) -> Identity {
@@ -292,13 +256,11 @@ pub fn identity(cx: &Cx) -> Identity {
     }
 }
 
-/// Returns the [`Identity`] of `cx`'s scope, or an error if an enclosing
-/// scope made it ambiguous.
+/// Returns this context's identity, or the ambiguity inherited by it.
 ///
 /// # Errors
 ///
-/// Returns an [`AmbiguousIdentityError`] naming the scope that introduced the
-/// ambiguity.
+/// Returns an error naming the scope that introduced ambiguity.
 ///
 /// # Panics
 ///
@@ -313,22 +275,20 @@ pub fn try_identity(cx: &Cx) -> Result<Identity, AmbiguousIdentityError> {
     cx.identity.checked()
 }
 
-/// Returns the identity of `cx`'s scope without checking for ambiguity, for
-/// deriving child identities from it.
+/// Reads the identity for derivation without checking ambiguity.
 #[doc(hidden)]
 #[must_use]
 pub fn identity_raw(cx: &Cx) -> Identity {
     cx.identity
 }
 
-/// Returns `cx` with its identity replaced by `identity`.
+/// Sets the identity of an owned context.
 #[doc(hidden)]
 #[must_use]
 pub fn with_identity(cx: Cx, identity: Identity) -> Cx {
     Cx { identity, ..cx }
 }
 
-/// Returns the memoize cache of the request `cx` belongs to.
 #[inline]
 #[must_use]
 #[doc(hidden)]
@@ -336,7 +296,6 @@ pub fn memoize_cache(cx: &Cx) -> &MemoizeCache {
     &cx.state.shared.memoize_cache
 }
 
-/// Returns the abort store of the request `cx` belongs to.
 #[inline]
 #[must_use]
 #[doc(hidden)]

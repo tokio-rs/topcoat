@@ -16,13 +16,9 @@ mod kw {
     custom_keyword!(oblique);
 }
 
-/// A `font-style: ...` descriptor in a `font_face!` body.
 pub struct FontStyle {
-    /// The `font-style` name.
     pub key: FontStyleKey,
-    /// The `:` between the name and the value.
     pub colon_token: Token![:],
-    /// The descriptor's value.
     pub value: FontStyleValue,
 }
 
@@ -58,13 +54,9 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontStyle {
     }
 }
 
-/// The `font-style` descriptor name.
 pub struct FontStyleKey {
-    /// The `font` keyword.
     pub font_kw: kw::font,
-    /// The `-` between the keywords.
     pub dash_token: Token![-],
-    /// The `style` keyword.
     pub style_kw: kw::style,
 }
 
@@ -94,11 +86,8 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontStyleKey {
     }
 }
 
-/// The value of a `font-style` descriptor: CSS syntax or a Rust expression.
 pub enum FontStyleValue {
-    /// A Rust expression that evaluates to a `FontStyle`.
     Expr(Box<Expr>),
-    /// A CSS style such as `italic` or `oblique 14deg`.
     Css(FontStyleKind),
 }
 
@@ -134,15 +123,10 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontStyleValue {
 /// The style axis of a font face: `normal`, `italic`, or `oblique` with an
 /// optional slant angle or angle range.
 pub enum FontStyleKind {
-    /// `normal`.
     Normal(kw::normal),
-    /// `italic`.
     Italic(kw::italic),
-    /// `oblique`, with an optional angle or angle range.
     Oblique {
-        /// The `oblique` keyword.
         oblique_kw: kw::oblique,
-        /// The slant angle or angle range, if written.
         angles: Option<ObliqueAngleRange>,
     },
 }
@@ -215,9 +199,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontStyleKind {
 /// range carried by a variable font, written as two space-separated angles
 /// (`20deg 40deg`).
 pub struct ObliqueAngleRange {
-    /// The first angle.
     pub start: ObliqueAngle,
-    /// The second angle, if this is a range.
     pub end: Option<ObliqueAngle>,
 }
 
@@ -257,11 +239,8 @@ impl ToTokens for ObliqueAngleRange {
 /// A single oblique slant angle in degrees (`14deg`, `-12.5deg`), validated to
 /// be in `-90deg..=90deg`.
 pub struct ObliqueAngle {
-    /// The leading `-` of a negative angle.
     pub minus_token: Option<Token![-]>,
-    /// The angle in degrees, including its sign.
     pub degrees: f32,
-    /// The span of the written angle.
     pub span: Span,
 }
 

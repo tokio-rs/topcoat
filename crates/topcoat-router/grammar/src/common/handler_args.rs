@@ -2,7 +2,6 @@ use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{FnArg, Ident, ItemFn, Type};
 
-/// The parameters of a page or route handler function, classified by role.
 pub struct HandlerArgs {
     args: Vec<HandlerArg>,
 }
@@ -70,8 +69,6 @@ impl HandlerArgs {
         })
     }
 
-    /// The arguments to call the handler with, in declaration order: `cx` for
-    /// the request context and [`request_ident`] for the request body.
     #[must_use]
     pub fn call_args(&self) -> Vec<TokenStream> {
         self.args
@@ -87,8 +84,6 @@ impl HandlerArgs {
     }
 }
 
-/// The hygienic name of the local variable that holds the parsed request
-/// body in generated code.
 #[must_use]
 pub fn request_ident() -> Ident {
     Ident::new("__topcoat_request", Span::mixed_site())

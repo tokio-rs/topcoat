@@ -11,17 +11,13 @@ use crate::{Surrogate, Surrogated};
 
 const PROCEDURE_ROUTE_PREFIX: &str = "/_topcoat/runtime/procedures";
 
-/// The identity of a procedure, shared by the server and the browser
+/// The identity of a procedure, stable across the server and the client
 /// runtime.
-///
-/// The id names the procedure's route. `#[procedure]` generates a unique id
-/// for each procedure.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct ProcedureId(&'static str);
 
 impl ProcedureId {
-    /// Creates an id from its string form.
     #[must_use]
     pub const fn new(inner: &'static str) -> Self {
         Self(inner)
@@ -37,18 +33,16 @@ impl ProcedureId {
 /// borrowing the procedure and its request context.
 pub type ProcedureFuture<'cx> = Pin<Box<dyn Future<Output = Result<Response>> + Send + 'cx>>;
 
-/// An async server function that runtime expressions can call from the
-/// browser.
+/// An async server function callable from the client runtime.
 ///
-/// `#[procedure]` implements this trait. Register a procedure on a
-/// [`RouterBuilder`] with [`procedure`](RouterBuilderProcedureExt::procedure),
-/// which serves it on a route named after its [`ProcedureId`].
+/// Registered into a [`RouterBuilder`] with
+/// [`procedure`](RouterBuilderProcedureExt::procedure), which serves it as a
+/// route dispatched by [`ProcedureId`].
 pub trait Procedure: Send + Sync + 'static {
     /// The identity of this procedure.
     fn id(&self) -> ProcedureId;
 
-    /// Handles a call, reading the arguments from the JSON `body` and
-    /// responding with the JSON result.
+    /// Handles a procedure call, deserializing its arguments from `body`.
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> ProcedureFuture<'cx>;
 }
 
@@ -65,20 +59,17 @@ impl<P: Procedure + ?Sized> Procedure for &'static P {
 #[cfg(feature = "discover")]
 inventory::collect!(&'static dyn Procedure);
 
-/// The argument and return types of a [`Procedure`], which runtime
-/// expressions calling it are type-checked against.
+/// The argument and return types of a [`Procedure`], as seen by runtime
+/// expressions calling it.
 pub trait TypedProcedure: Procedure {
     /// The arguments, as a tuple in declaration order.
     type Args: Surrogated;
 
-    /// The value a successful call resolves to: the `Ok` type of the
-    /// procedure's result.
+    /// The value a successful call resolves to.
     type Output: Surrogated;
 }
 
-/// A [`Route`] that handles calls to one procedure.
-///
-/// [`RouterBuilderProcedureExt::procedure`] creates and registers one.
+/// A [`Route`] that handles calls to one server procedure.
 pub struct ProcedureRoute {
     id: RouteId,
     path: PathBuf,
@@ -86,7 +77,7 @@ pub struct ProcedureRoute {
 }
 
 impl ProcedureRoute {
-    /// Creates the route that serves `procedure`.
+    /// Builds the route that serves `procedure`.
     pub fn new(procedure: impl Procedure) -> Self {
         Self {
             id: RouteId::new(),
@@ -118,15 +109,13 @@ impl Route for ProcedureRoute {
     }
 }
 
-/// Registers procedures on a [`RouterBuilder`].
+/// Registers server procedures on a [`RouterBuilder`].
 pub trait RouterBuilderProcedureExt {
-    /// Mounts the route that serves `procedure`.
+    /// Mounts a procedure route.
     #[must_use]
     fn procedure(self, procedure: impl Procedure) -> Self;
 
-    /// Registers every `#[procedure]` linked into the binary.
-    ///
-    /// The `discover` method of the router builder already calls this.
+    /// Registers every procedure linked into the binary.
     #[cfg(feature = "discover")]
     #[must_use]
     fn discover_procedures(self) -> Self;
@@ -146,29 +135,26 @@ impl RouterBuilderProcedureExt for RouterBuilder {
     }
 }
 
-/// The form a procedure takes inside a runtime expression.
+/// The surrogate a [`Procedure`] value turns into inside a runtime
+/// expression.
 ///
-/// Runtime expressions capture it as a `&'static` reference, so closures in
-/// the expression can hold it without borrowing a local. It serializes as
-/// the procedure's id, so the browser can call the procedure, and provides
-/// the typed [`call`](Self::call) that calls in runtime expressions become.
+/// Captured as a `&'static` reference, so closures inside the expression can
+/// hold it without borrowing a local. Serializes as the procedure's id, so
+/// the browser can call it back, and exposes the typed [`call`](Self::call)
+/// that runtime expressions invoke.
 pub struct ProcedureSurrogate<P>(P);
 
 impl<P: TypedProcedure> ProcedureSurrogate<P> {
-    /// Wraps a procedure.
     #[must_use]
     pub const fn new(procedure: P) -> Self {
         Self(procedure)
     }
 
-    /// Calls the procedure with its arguments as a tuple.
-    ///
-    /// Only the browser can call a procedure. On the server this exists so
-    /// that calls type-check.
+    /// Invokes the procedure from the client side.
     ///
     /// # Panics
     ///
-    /// Always panics when awaited on the server.
+    /// Always panics; procedures can only be invoked from the client runtime.
     #[allow(clippy::unused_async)]
     pub async fn call(
         &self,

@@ -1,9 +1,3 @@
-//! Integration with the `topcoat dev` server.
-//!
-//! Render [`script`] in the `<head>` of your pages to update them in the
-//! browser whenever `topcoat dev` finishes a new build. Outside of
-//! `topcoat dev`, it renders nothing.
-
 #[cfg(feature = "serve")]
 use std::net::SocketAddr;
 
@@ -17,15 +11,12 @@ use crate::{
     view::{View, component, view},
 };
 
-/// Tells the `topcoat dev` server that the application is ready to accept
-/// connections.
+/// Notify the topcoat dev server that the application is ready.
 ///
-/// Pass the address the application listens on, if it has one. Does nothing
-/// when the application is not running under `topcoat dev`.
-///
-/// [`serve`](crate::serve), [`serve_until`](crate::serve_until), and
-/// [`start`](crate::start) call this for you. Call it yourself only when you
-/// run the server another way.
+/// Connects to the dev server's WebSocket endpoint (derived from the
+/// `TOPCOAT_DEV_URL` HTTP base URL provided by `topcoat dev`) and sends a
+/// ready message with the application listener address when available. Does
+/// nothing if the env var is not set.
 #[cfg(feature = "serve")]
 pub async fn notify_ready(addr: Option<SocketAddr>) {
     let Ok(base) = std::env::var("TOPCOAT_DEV_URL") else {
@@ -59,10 +50,9 @@ fn http_to_ws(url: &str) -> String {
     }
 }
 
-/// Renders the `topcoat dev` client script.
+/// Inject the `topcoat dev` client script.
 ///
-/// Place it in the `<head>` of your pages. Once `topcoat dev` serves a new
-/// build, the script fetches the page again and merges the new HTML into it,
+/// The script morphs fresh HTML into the page once a new build is serving,
 /// keeping matching elements and their form state. When the runtime is
 /// loaded, signals whose identities still match keep their values too.
 /// Moving signal calls or component invocations can change their identities.

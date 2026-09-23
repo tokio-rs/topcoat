@@ -1,10 +1,3 @@
-//! Foundations shared by the Topcoat crates: the [`Error`](error::Error) and
-//! [`Result`](error::Result) types, the request context [`Cx`](context::Cx),
-//! and per-request memoization.
-//!
-//! Use this crate through the `topcoat` facade, which re-exports its public
-//! items and hosts the guides.
-
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod abort;

@@ -16,33 +16,21 @@ use crate::{
     },
 };
 
-/// A single node in a view: any construct that can appear between elements.
+/// A single child within a [`View`](super::View): the union of every construct
+/// that can appear at view-body position.
 pub enum Node {
-    /// A quoted text node, like `"Hello"`.
     Text(LitStr),
-    /// The `<!DOCTYPE html>` declaration.
     DocumentType(DocumentType),
-    /// An HTML element.
     Element(Box<Element>),
-    /// A component call.
     Component(Component),
-    /// A Rust expression in parentheses.
     Expr(TemplateExpr),
-    /// A `$(...)` runtime expression.
     RuntimeExpr(RuntimeExpr),
-    /// An `if` whose branches contain nodes.
     If(TemplateIf<Nodes>),
-    /// A `let` binding.
     Local(TemplateLocal),
-    /// A `for` loop, with an optional key.
     ForLoop(ForLoop),
-    /// A `continue;` statement. Parsing currently rejects it in a view.
     Continue(TemplateContinue),
-    /// A `break;` statement. Parsing currently rejects it in a view.
     Break(TemplateBreak),
-    /// A `match` whose arms each contain a node.
     Match(TemplateMatch<Node>),
-    /// A `{ ... }` block of nodes, used as a match arm body.
     Block(TemplateBlock<Nodes>),
 }
 

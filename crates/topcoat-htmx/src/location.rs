@@ -6,14 +6,12 @@ use topcoat_router::response::IntoResponseParts;
 
 use crate::{SwapOption, header};
 
-/// Redirects on the client without a full page reload by setting the
-/// `HX-Location` response header.
+/// Performs a client-side redirect that does not trigger a full page reload,
+/// via the `HX-Location` header.
 ///
-/// htmx fetches the new path as if the user had followed an `hx-boost` link
-/// and swaps it into the page. By default the header carries only the path.
-/// Call the builder methods to set [`LocationOptions`] that control how htmx
-/// fetches and swaps the content. When any option is set, the header is sent
-/// in JSON form.
+/// In its simplest form it carries just a path. Set any of the [`LocationOptions`]
+/// fields, through the builder methods, to control how htmx fetches and swaps
+/// the new content; when any option is set, the header is serialized as JSON.
 ///
 /// # Examples
 ///
@@ -37,7 +35,7 @@ pub struct HxLocation {
 }
 
 impl HxLocation {
-    /// Creates a location for `path` with no options set.
+    /// Creates a location targeting `path` with no extra options.
     #[must_use]
     pub fn new(path: impl Into<String>) -> Self {
         Self {
@@ -46,7 +44,7 @@ impl HxLocation {
         }
     }
 
-    /// Sets the source element of the request (`source`).
+    /// Sets the source element for the request (`source`).
     #[must_use]
     pub fn source(mut self, source: impl Into<String>) -> Self {
         self.options.source = Some(source.into());
@@ -60,7 +58,7 @@ impl HxLocation {
         self
     }
 
-    /// Sets the name of a callback that handles the response (`handler`).
+    /// Sets a callback that handles the response (`handler`).
     #[must_use]
     pub fn handler(mut self, handler: impl Into<String>) -> Self {
         self.options.handler = Some(handler.into());
@@ -88,15 +86,14 @@ impl HxLocation {
         self
     }
 
-    /// Sets the values to submit with the request (`values`), as a JSON object.
+    /// Sets values to submit with the request (`values`).
     #[must_use]
     pub fn values(mut self, values: Value) -> Self {
         self.options.values = Some(values);
         self
     }
 
-    /// Sets the headers to submit with the request (`headers`), as a JSON
-    /// object.
+    /// Sets headers to submit with the request (`headers`).
     #[must_use]
     pub fn headers(mut self, headers: Value) -> Self {
         self.options.headers = Some(headers);
@@ -140,7 +137,7 @@ impl IntoResponseParts for HxLocation {
     }
 }
 
-/// The options of an [`HxLocation`].
+/// The optional context of an [`HxLocation`].
 ///
 /// Each field maps to a property of the htmx
 /// [`HX-Location` JSON form](https://htmx.org/headers/hx-location/). Fields left
@@ -156,7 +153,7 @@ pub struct LocationOptions {
     /// A callback that handles the response.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub handler: Option<String>,
-    /// A CSS selector for the element to swap the response into.
+    /// The target to swap the response into.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
     /// How the response is swapped in.

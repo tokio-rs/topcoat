@@ -2,10 +2,10 @@ use topcoat_router::RouterBuilder;
 
 use crate::MailConfig;
 
-/// Extension trait that adds mail support to a [`RouterBuilder`].
+/// Installs mail support on a [`RouterBuilder`].
 pub trait RouterBuilderMailExt {
-    /// Registers `config` as app context, so every handler can send mail
-    /// with [`send`](crate::send).
+    /// Registers the mail `config` on the app context, so every handler can
+    /// deliver mail with [`send`](crate::send).
     #[must_use]
     fn mail(self, config: MailConfig) -> Self;
 }

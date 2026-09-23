@@ -8,13 +8,15 @@ use crate::{
 
 /// JavaScript response wrapper.
 ///
-/// `Js<T>` wraps any value convertible into a [`Body`], such as a `String`,
-/// and replies with `Content-Type: text/javascript; charset=utf-8`. Use it
-/// from a `#[route]` that serves a script by hand instead of as a static
-/// asset.
+/// Wrap any value convertible into a [`Body`] (such as a `String`) to reply
+/// with `Content-Type: text/javascript`. Use it from a
+/// [`route`](../topcoat_router_macro/attr.route.html) that serves a script by
+/// hand, rather than as a bundled [`asset`](crate).
 ///
-/// Browsers only run a `<script type="module">` when its response carries a
-/// JavaScript media type, so module scripts need this header.
+/// The media type is not cosmetic for module scripts: a browser refuses to
+/// execute `<script type="module">` whose response does not carry a JavaScript
+/// media type, and reports it as a MIME type mismatch rather than a script
+/// error.
 ///
 /// # Examples
 ///

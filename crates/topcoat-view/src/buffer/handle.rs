@@ -9,32 +9,27 @@ use crate::{
     buffer::{InstructionPtr, Renderer, ViewBuffer, ViewBufferId, ViewBufferScope},
 };
 
-/// A piece of HTML content resolved from a [`View`](crate::View), ready to
-/// render.
+/// A self-contained piece of HTML content.
 ///
-/// The content may contain several sibling nodes, but every tag it opens
-/// must also be closed, so the fragment can be nested safely inside a larger
-/// document.
+/// A view handle may contain multiple sibling nodes, but opened tags must be closed
+/// so the fragment can be nested safely inside a larger document.
 ///
 /// ```html
 /// <!-- Valid: all tags are closed, safe to nest -->
 /// <div>Hello</div>
 /// <p>World</p>
 ///
-/// <!-- Invalid: the unclosed tag would corrupt the parent document -->
+/// <!-- Invalid: unclosed tag would corrupt the parent document -->
 /// <div>Hello
 /// ```
 ///
 /// A handle is either self-contained or nested. A self-contained handle
-/// carries everything it needs to render. It can be stored, sent across
+/// carries everything it needs to render: it can be stored, sent across
 /// tasks, spliced into another view, and rendered anywhere. The outermost
-/// view of a build resolves to one, for example through
-/// [`ViewExt::first`](crate::ViewExt::first). A nested handle is what a view
-/// inside that build resolves to. It points into data owned by the build, so
-/// it can only be spliced into the enclosing views and rendered while the
-/// build is running.
-///
-/// Cloning a handle is cheap: it shares the content instead of copying it.
+/// view of a build resolves to one. A nested handle is what a
+/// [`View`](crate::View) inside that build resolves to: it points into the
+/// build's buffer, so it splices into the content of the enclosing views
+/// and renders only while the build is running.
 #[derive(Debug, Default, Clone)]
 pub struct ViewHandle {
     repr: ViewRepr,
@@ -142,29 +137,25 @@ impl ViewHandle {
         }
     }
 
-    /// Returns a handle that renders nothing.
+    /// Returns a `ViewHandle` that renders to an empty string.
     #[inline]
     #[must_use]
     pub fn empty() -> Self {
         Self::default()
     }
 
-    /// Returns `true` if the view is known to render no output without
-    /// rendering it.
+    /// Returns `true` if the view is statically known to render no output.
     ///
-    /// This is only `true` for [`empty`](Self::empty) handles and handles
-    /// created from an empty string. Built content reports `false` even when
-    /// it renders nothing.
+    /// A view holding an instruction block reports `false` even when the
+    /// block happens to write nothing.
     #[inline]
     #[must_use]
     pub fn is_empty(&self) -> bool {
         matches!(self.repr, ViewRepr::Static(""))
     }
 
-    /// Creates a view that renders `body` verbatim.
-    ///
-    /// The string is neither escaped nor checked for valid HTML, so it must be
-    /// trusted markup whose tags are all closed.
+    /// Creates a view from a `&'static str` without escaping it and without checking for syntax
+    /// errors.
     #[inline]
     #[must_use]
     pub const fn unescaped_unchecked(body: &'static str) -> Self {
@@ -227,9 +218,9 @@ impl ViewHandle {
     /// Writes the view's output through `f`.
     ///
     /// The formatter appends to its destination as it goes, so reserve the
-    /// [`size_hint`](Self::size_hint) in the destination up front to avoid
-    /// reallocations. A nested handle can only render while the build it
-    /// belongs to is running on the current task.
+    /// [`size_hint`](Self::size_hint) up front to avoid reallocations. A
+    /// nested handle renders against the buffer of the build it belongs to,
+    /// which must be the one running on the current task.
     ///
     /// # Panics
     ///
@@ -255,20 +246,22 @@ impl ViewHandle {
     }
 }
 
-/// The output of [`ViewHandle::render_response`]: the rendered HTML together
-/// with the status code and headers the view declared.
+/// The output of rendering a [`ViewHandle`] for an HTTP response.
+///
+/// Returned by [`ViewHandle::render_response`]: the rendered HTML alongside the
+/// status code and headers the view declared.
 #[cfg(feature = "http")]
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct RenderedResponse {
     /// The rendered HTML.
     pub html: String,
-    /// The first status code the view declared, if any.
+    /// The first status code the render encountered, if any.
     pub status_code: Option<StatusCode>,
-    /// The response headers the view declared.
+    /// The collected response headers.
     ///
-    /// Each header name carries the values of the first declaration that
-    /// mentioned it.
+    /// Each name carries the values of the first render part that mentioned
+    /// it.
     pub headers: HeaderMap,
 }
 

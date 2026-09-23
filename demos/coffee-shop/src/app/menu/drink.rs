@@ -17,7 +17,6 @@ use crate::{
 // below renders at /menu/{slug}.
 path_param!(pub slug);
 
-/// A single drink, with a quantity picker and an order button.
 #[page]
 pub async fn page(cx: &Cx) -> Result<impl View> {
     let slug = path_param::<Slug>(cx);

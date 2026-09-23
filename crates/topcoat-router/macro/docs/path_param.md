@@ -1,6 +1,6 @@
 Declares a typed path parameter.
 
-Name the parameter as it appears in the URL. The macro generates a type for it, named in Pascal case, which you use to read the parameter and to build URLs.
+Name the parameter as it appears in the URL. The macro converts that name to Pascal case for the generated type.
 
 ```rust
 # use topcoat::router::path_param;
@@ -10,7 +10,7 @@ path_param!(post_id: u64);
 
 # Matching the URL
 
-In an absolute route path, write a `{name}` placeholder with the same name as the declaration.
+For an explicit route path, write a placeholder with the declaration's name.
 
 ```rust
 # use topcoat::{Result, router::{page, path_param}, view::{View, view}};
@@ -22,7 +22,7 @@ async fn post() -> Result<impl View> {
 }
 ```
 
-The declaration also acts as a [`segment!`](macro.segment.html) override. Under [`module_router!`](macro.module_router.html), it turns the segment of the declaring module into the parameter, so pages in that module do not need a path.
+The declaration also emits a [`segment!`](macro.segment.html) override. Under [`module_router!`](../router/macro.module_router.html), it changes the declaring module's segment to the parameter, so the page does not write a path.
 
 ```rust
 // src/app/posts/id.rs serves /posts/{post_id}.
@@ -35,13 +35,13 @@ async fn post() -> Result<impl View> {
 }
 ```
 
-A module adds one segment, so it can declare only one path parameter. Put further parameters in descendant modules.
+A module contributes one segment and can declare one path parameter. Put another parameter in a descendant module.
 
-Reading a parameter that the matched route did not capture panics with `path parameter "post_id" was not found in request path`.
+Reading a name that the matched route did not capture panics with `path parameter "post_id" was not found in request path`.
 
 # Reading one segment
 
-[`path_param::<T>(cx)`](fn.path_param.html) reads the parameter from the matched route. With a type after `:`, the segment is parsed with [`FromStr`](core::str::FromStr). The result is memoized, so the segment is parsed at most once per request.
+[`path_param::<T>(cx)`](fn.path_param.html) reads the parameter from the matched route. A declaration with `: Type` parses the segment with [`FromStr`](core::str::FromStr) and memoizes the result for the request.
 
 ```rust
 # use topcoat::{context::Cx, Result, router::{error::RouterErrorExt, page, path_param}, view::{View, view}};
@@ -54,7 +54,7 @@ async fn post(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-Without a type, `path_param::<Slug>(cx)` returns the percent-decoded segment as a `&str`. It does not allocate and cannot fail.
+Without a type, `path_param::<Slug>(cx)` returns the percent-decoded segment as `&str` without allocating or failing.
 
 ```rust
 # use topcoat::{context::Cx, Result, router::{page, path_param}, view::{View, view}};
@@ -67,11 +67,11 @@ async fn post(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-A declaration without a type generates `struct Slug<T: AsRef<str> = String>(T)`. Because `String` is the default type argument, you can write just `Slug` in type positions. You can construct it from an owned or a borrowed string.
+The unparsed declaration generates `struct Slug<T: AsRef<str> = String>(T)`. `String` is the default type argument, so type positions can use `Slug`; construction accepts owned or borrowed strings.
 
 # Failing with an error response
 
-Add `error = ...` to turn a parse failure into a router error. The handler can then use `?`.
+`error = ...` maps a parse failure to a router error, so a handler can use `?`.
 
 ```rust
 # use topcoat::{context::Cx, Result, router::{page, path_param}, view::{View, view}};
@@ -84,7 +84,7 @@ async fn post(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-The supported forms match the router's error constructors:
+The supported forms mirror the router's error constructors:
 
 - `error = not_found`
 - `error = unauthorized`
@@ -93,15 +93,15 @@ The supported forms match the router's error constructors:
 - `error = redirect("/path")`
 - `error = redirect_permanent("/path")`
 
-A bare `error = bad_request` uses the description `invalid value for path parameter "post_id"`.
+A bare `error = bad_request` uses `invalid value for path parameter "post_id"`.
 
-Without `error = ...`, the reader returns `Result<&T, &<T as FromStr>::Err>`, and each call site picks a response, for example with [`RouterErrorExt`](error/trait.RouterErrorExt.html).
+Without `error = ...`, the reader returns `Result<&T, &<T as FromStr>::Err>` and the call site chooses a response with [`RouterErrorExt`](error/trait.RouterErrorExt.html).
 
-A parameter without a type cannot use `error`, because reading it cannot fail.
+An unparsed parameter cannot use `error` because it cannot fail.
 
 # Visibility and construction
 
-The visibility you write applies to the generated type and to its field.
+The declared visibility applies to the generated type and its field.
 
 ```rust
 # use topcoat::router::path_param;
@@ -116,11 +116,11 @@ let ids = Ids(vec![1, 2, 3]);
 # let _ = (id, borrowed, owned, ids);
 ```
 
-Keep the declaration private when only the declaring module and its descendants read it. Otherwise use the narrowest visibility that the code naming or constructing the type needs, such as `pub(super)`, `pub(crate)`, or `pub`.
+Keep the declaration private when only descendant modules read it. Use the narrowest visibility needed by code that names or constructs the type, such as `pub(super)`, `pub(crate)`, or `pub`.
 
 # Catch-all parameters
 
-Put `*` before the name to capture the rest of the path as separate decoded segments. A catch-all must be the last segment of the path, and it matches one or more segments.
+Prefix the name with `*` to capture the remaining path as separate decoded segments. A catch-all must be the last served segment and matches at least one segment.
 
 ```rust
 # use topcoat::{context::Cx, Result, router::{CatchAllSegments, page, path_param}, view::{View, view}};
@@ -134,9 +134,9 @@ async fn document(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-[`CatchAllSegments`](struct.CatchAllSegments.html) yields one decoded `&str` for each URL segment. For `/docs/api%2Frouter/start`, it yields `"api/router"` and then `"start"`. The encoded slash stays inside the first segment.
+[`CatchAllSegments`](struct.CatchAllSegments.html) yields one decoded `&str` per URL segment. For `/docs/api%2Frouter/start`, it yields `"api/router"` and `"start"`; the encoded slash stays inside the first segment.
 
-With a type, a catch-all parses each segment and returns a memoized slice.
+A typed catch-all parses each segment and returns a memoized slice.
 
 ```rust
 # use topcoat::{context::Cx, Result, router::{page, path_param}, view::{View, view}};
@@ -149,15 +149,15 @@ async fn archive(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-The type after `:` is the type of one segment, so this declaration generates `struct Ids(Vec<u32>)`. Without `error = ...`, the reader returns `Result<&[u32], &<u32 as FromStr>::Err>`. The error is the first parse error, without the index of the segment.
+The type after `:` is the type of one segment, so this declaration generates `struct Ids(Vec<u32>)`. Without `error = ...`, the reader returns `Result<&[u32], &<u32 as FromStr>::Err>`; it returns the first parse error without a segment index.
 
-A bare `error = bad_request` includes the zero-based index of the failing segment. For `/archive/1/x/3`, the description is `invalid value for path parameter "ids" at segment 1`.
+A bare `error = bad_request` includes the zero-based failing segment index. For `/archive/1/x/3`, its description is `invalid value for path parameter "ids" at segment 1`.
 
-A catch-all without a type accepts any `IntoIterator` whose items implement `AsRef<str>`. For example, `path_param!(pub *doc_path)` accepts `DocPath(["guide", "start"])`, and `DocPath` in type positions means `DocPath<Vec<String>>`.
+An unparsed catch-all accepts any `IntoIterator` whose items implement `AsRef<str>`. For example, `path_param!(pub *doc_path)` accepts `DocPath(["guide", "start"])` and defaults to `DocPath<Vec<String>>` in type positions.
 
 # Building URLs
 
-The generated type also works with the [`href!`](macro.href.html) macro, where it fills the matching parameter in a handler's path:
+The declared type can also be used in combination with the [`href!`](macro.href.html) macro. It fills the parameter slot of the handler's path to construct a URL string:
 
 ```rust
 # use topcoat::{Result, router::{href, page, path_param}, view::{View, view}};
@@ -185,18 +185,18 @@ async fn home() -> Result<impl View> {
 }
 ```
 
-Values are matched to the path by name, not only by position. Filling `{post_id}` with anything other than a `PostId` panics instead of building a wrong URL.
+Values are matched to the path by name, not by position alone, so filling `{post_id}` with anything but a `PostId` panics rather than building a wrong URL.
 
-Each segment is written with [`Display`](core::fmt::Display) and percent-encoded, so a value always stays inside its own segment. For example, `Slug("a/b")` becomes the single segment `a%2Fb`. A catch-all adds one segment per element, so the only `/` it adds are the separators between them.
+Each segment is written with [`Display`](core::fmt::Display) and percent-encoded, so a value stays inside the segment it fills: `Slug("a/b")` fills its one segment as `a%2Fb`. A catch-all contributes one segment per element, so the separators between them are the only `/` it adds.
 
-Filling a segment with an empty string, `.`, or `..` panics. A browser would resolve such a segment against the rest of the path instead of reading it as a segment, even when it is encoded.
+Filling a segment with nothing, `.`, or `..` panics. A browser resolves those against the path around them instead of reading them as one segment, and encoding them does not take that meaning away.
 
-[`href`](fn.href.html) takes the same values as a tuple, for building a URL outside a macro.
+[`href`](fn.href.html) takes the same values as a tuple, for a URL built outside a macro.
 
 # Requirements
 
-- A segment type must implement [`FromStr`](core::str::FromStr).
-- A segment type must implement [`Display`](core::fmt::Display) to be used with [`href`](fn.href.html).
-- The segment type and its `<T as FromStr>::Err` must be `Send + Sync + 'static`, so the result can be [memoized](../context/attr.memoize.html).
-- In an absolute route path, the parameter name must match the declaration.
-- A module can contain either one `path_param!` or one `segment!`, not both.
+- Parsed segment types must implement [`FromStr`](core::str::FromStr).
+- Parsed segment types must implement [`Display`](core::fmt::Display) to be filled into an [`href`](fn.href.html).
+- The parsed segment type and its `<T as FromStr>::Err` must be `Send + Sync + 'static` so the result can be [memoized](../context/attr.memoize.html).
+- The parameter name in an explicit route must match the declaration.
+- A module can contain either one `path_param!` declaration or one manual `segment!` override.

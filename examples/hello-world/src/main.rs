@@ -6,8 +6,7 @@ use topcoat::{
 
 #[tokio::main]
 async fn main() {
-    // `discover` registers every page, layout, and route that declares its own
-    // path, so none of them has to be listed here.
+    // `discover` picks up every page, layout, and route declared in the crate.
     topcoat::start(Router::builder().discover().build())
         .await
         .unwrap();

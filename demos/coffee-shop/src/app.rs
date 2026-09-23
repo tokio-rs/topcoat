@@ -34,7 +34,6 @@ use crate::{
 /// as a Topcoat asset.
 const GEIST: Font = fontsource_font!(GEIST, host: Asset);
 
-/// Builds the app's router, with the database shared as app context.
 pub fn router(db: Db) -> Router {
     module_router!()
         .runtime()
@@ -111,9 +110,7 @@ async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     })
 }
 
-/// The home page, which greets returning customers.
-///
-/// A page in the root module renders at `/`.
+// A page in the root module renders at /.
 #[page]
 pub async fn page(cx: &Cx) -> Result<impl View> {
     Ok(view! {
@@ -190,7 +187,6 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
     })
 }
 
-/// The form data posted by the sign-in forms.
 #[derive(Deserialize)]
 struct SignIn {
     name: String,

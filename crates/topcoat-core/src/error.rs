@@ -1,5 +1,3 @@
-//! The [`Error`] and [`Result`] types used across Topcoat.
-
 use std::{
     any::Any,
     backtrace::{Backtrace, BacktraceStatus},
@@ -7,65 +5,43 @@ use std::{
     sync::Arc,
 };
 
-/// A [`Result`](std::result::Result) whose error type defaults to [`Error`]
-/// and whose success type defaults to `()`.
 pub type Result<T = (), E = Error> = ::core::result::Result<T, E>;
 
-/// The error type used by Topcoat APIs.
+/// Error type used by Topcoat APIs.
 ///
-/// Any [`std::error::Error`] that is `Send + Sync + 'static` converts into an
-/// `Error`, so `?` works on most results. Use [`Error::msg`] to build an error
-/// from a message, and [`context`](Self::context) to add a message in front of
-/// an existing error.
-///
-/// ```
-/// use topcoat::{Error, Result};
-///
-/// fn parse_port(input: &str) -> Result<u16> {
-///     let port = input
-///         .parse::<u16>()
-///         .map_err(|error| Error::from(error).context("invalid port"))?;
-///     if port == 0 {
-///         return Err(Error::msg("port must not be zero"));
-///     }
-///     Ok(port)
-/// }
-///
-/// assert_eq!(parse_port("8080")?, 8080);
-/// assert_eq!(parse_port("http").unwrap_err().to_string(), "invalid port");
-/// # Ok::<(), Error>(())
-/// ```
-///
-/// The error keeps the value it was built from. Inspect it with
+/// Any [`std::error::Error`] converts can be converted to a Topcoat [`Error`] using `?`.
+/// The error keeps the concrete value it was built from, so callers can inspect it with
 /// [`downcast_ref`](Self::downcast_ref) or take it back out with
-/// [`downcast`](Self::downcast). A backtrace is captured when the
-/// `RUST_BACKTRACE` or `RUST_LIB_BACKTRACE` environment variable asks for one.
-/// Cloning is cheap, because clones share the underlying error.
+/// [`downcast`](Self::downcast), and captures a backtrace when
+/// `RUST_BACKTRACE` asks for one. Cloning is cheap: clones share the
+/// underlying error, so the same error can travel along several paths.
 ///
-/// With the `anyhow` feature, `Error::from_anyhow` converts an
-/// `anyhow::Error` as well.
+/// With the `anyhow` feature, `Error::from_anyhow` converts an `anyhow::Error`
+/// as well.
 #[derive(Clone)]
 pub struct Error(Arc<dyn ErrorObject>);
 
 impl Error {
-    /// Builds an error from a message, which becomes its [`Display`] output.
+    /// Builds an error from a message.
     pub fn msg(message: impl Display + Debug + Send + Sync + 'static) -> Self {
         Self::from(Message(message))
     }
 
-    /// Builds an error from a boxed error.
+    /// Builds an error from a boxed error. Its message and sources carry
+    /// over, but the concrete error inside the box is not reachable through
+    /// the downcast methods.
     ///
-    /// The message and sources carry over, but the downcast methods cannot
-    /// reach the concrete error inside the box.
+    /// This is a constructor rather than a `From` impl because coherence
+    /// rules do not let one sit next to the blanket conversion from every
+    /// [`std::error::Error`].
     #[must_use]
     pub fn from_boxed(error: Box<dyn std::error::Error + Send + Sync + 'static>) -> Self {
         Self::from(Boxed(error))
     }
 
-    /// Builds an error from an [`anyhow::Error`].
-    ///
-    /// The message and sources carry over, but the downcast methods cannot
-    /// reach the concrete error inside it.
+    /// Builds an error from an [`anyhow::Error`]. Its message and sources
+    /// carry over, but the concrete error inside it is not reachable through
+    /// the downcast methods.
     #[cfg(feature = "anyhow")]
     #[must_use]
     pub fn from_anyhow(error: anyhow::Error) -> Self {
@@ -73,9 +49,8 @@ impl Error {
     }
 
     /// Wraps this error in a context message, which becomes its [`Display`]
-    /// output.
-    ///
-    /// The wrapped error stays reachable through [`chain`](Self::chain) and
+    /// output. The wrapped error stays reachable through
+    /// [`source`](std::error::Error::source), [`chain`](Self::chain), and
     /// the downcast methods.
     #[must_use]
     pub fn context(self, context: impl Display + Send + Sync + 'static) -> Self {
@@ -85,7 +60,7 @@ impl Error {
         })
     }
 
-    /// Returns whether the stored error is an `E`, looking through
+    /// Whether the stored error is an instance of `E`, looking through
     /// [`context`](Self::context) layers.
     #[inline]
     #[must_use]
@@ -96,18 +71,19 @@ impl Error {
         self.downcast_ref::<E>().is_some()
     }
 
-    /// Moves the stored error out as an `E`, looking through
-    /// [`context`](Self::context) layers and discarding their messages.
+    /// Attempt to move the concrete error out of this error object, looking
+    /// through [`context`](Self::context) layers and discarding their
+    /// messages.
     ///
-    /// This never clones the stored error, so it only succeeds while no clone
-    /// of this error is alive. To fall back to a clone instead, use
+    /// This never clones the stored error, so it only succeeds while this is
+    /// the sole handle to it. To fall back to a clone instead, use
     /// [`downcast_cloned`](Self::downcast_cloned).
     ///
     /// # Errors
     ///
-    /// Returns a [`DowncastError`] that carries the original error back and
-    /// says why the downcast failed: the stored error is not an `E`, or a
-    /// clone of this error is still alive.
+    /// Returns a [`DowncastError`] carrying the original error back, and
+    /// saying whether the stored error is not an instance of `E` or a clone
+    /// of it is still alive.
     pub fn downcast<E>(self) -> Result<E, DowncastError>
     where
         E: std::error::Error + Send + Sync + 'static,
@@ -118,16 +94,16 @@ impl Error {
         self.unwrap::<E>()
     }
 
-    /// Returns the stored error as an `E`, looking through
-    /// [`context`](Self::context) layers.
+    /// Attempt to downcast the error object to a concrete type, looking
+    /// through [`context`](Self::context) layers.
     ///
-    /// The stored error is moved out when no clone of this error is alive,
-    /// and cloned otherwise.
+    /// The stored error is moved out when this is the sole handle to it and
+    /// cloned otherwise.
     ///
     /// # Errors
     ///
-    /// Returns the original error unchanged if the stored error is not an
-    /// `E`.
+    /// Returns `Err(Self)` if the stored error is not an instance of `E`,
+    /// handing back the original error unchanged.
     pub fn downcast_cloned<E>(self) -> Result<E, Self>
     where
         E: std::error::Error + Send + Sync + Clone + 'static,
@@ -144,8 +120,8 @@ impl Error {
         }
     }
 
-    /// Returns a reference to the stored error if it is an `E`, looking
-    /// through [`context`](Self::context) layers.
+    /// Downcast this error object by reference, looking through
+    /// [`context`](Self::context) layers.
     #[must_use]
     pub fn downcast_ref<E>(&self) -> Option<&E>
     where
@@ -160,14 +136,14 @@ impl Error {
         }
     }
 
-    /// Returns a mutable reference to the stored error if it is an `E`,
-    /// looking through [`context`](Self::context) layers.
+    /// Downcast this error object by mutable reference, looking through
+    /// [`context`](Self::context) layers.
     ///
     /// # Errors
     ///
-    /// Returns a [`DowncastFailure`] saying why the downcast failed: the
-    /// stored error is not an `E`, or a clone of this error is still alive,
-    /// which means the error cannot be borrowed mutably.
+    /// Returns a [`DowncastFailure`] saying whether the stored error is not
+    /// an instance of `E` or a clone of it is still alive: shared contents
+    /// cannot be handed out mutably.
     pub fn downcast_mut<E>(&mut self) -> Result<&mut E, DowncastFailure>
     where
         E: std::error::Error + Send + Sync + 'static,
@@ -237,17 +213,15 @@ impl Error {
             .unwrap_mut::<E>()
     }
 
-    /// Returns the backtrace captured when the error was built.
-    ///
-    /// Capture follows the `RUST_BACKTRACE` and `RUST_LIB_BACKTRACE`
-    /// environment variables. Check [`Backtrace::status`] to see whether one
-    /// was captured.
+    /// The backtrace captured when the error was built. Capture follows the
+    /// `RUST_BACKTRACE` and `RUST_LIB_BACKTRACE` environment variables; check
+    /// [`Backtrace::status`] before relying on its contents.
     #[inline]
     pub fn backtrace(&self) -> &Backtrace {
         self.0.backtrace()
     }
 
-    /// Returns an iterator over the stored error followed by each of its
+    /// The stored error followed by each of its
     /// [`source`](std::error::Error::source)s, outermost first.
     pub fn chain(&self) -> impl Iterator<Item = &(dyn std::error::Error + 'static)> {
         let mut next: Option<&(dyn std::error::Error + 'static)> = Some(self.0.error());
@@ -259,7 +233,7 @@ impl Error {
     }
 }
 
-/// Prints the stored error's message. The alternate form (`{:#}`) appends
+/// Prints the stored error's message; the alternate form (`{:#}`) appends
 /// each source after a colon.
 impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -274,7 +248,7 @@ impl Display for Error {
 }
 
 /// Prints the stored error's message, its sources, and the backtrace when one
-/// was captured. The alternate form (`{:#?}`) prints the stored error's own
+/// was captured; the alternate form (`{:#?}`) prints the stored error's own
 /// [`Debug`] output instead.
 impl Debug for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -315,13 +289,13 @@ impl From<Error> for Box<dyn std::error::Error + Send + Sync + 'static> {
     }
 }
 
-/// The reason a downcast of an [`Error`] failed.
+/// Why a downcast could not hand out the stored error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DowncastFailure {
-    /// The stored error is not of the requested type.
+    /// The stored error is not an instance of the requested type.
     Mismatch,
-    /// A clone of the error is still alive, so the stored error can neither
-    /// be moved out nor borrowed mutably.
+    /// A clone of the error is still alive, so its contents can neither be
+    /// moved out nor borrowed mutably.
     Shared,
 }
 
@@ -338,9 +312,9 @@ impl std::error::Error for DowncastFailure {}
 
 /// A failed [`Error::downcast`], carrying the original error back.
 ///
-/// This type does not implement [`std::error::Error`], so `?` cannot turn it
-/// into a new error that hides the original one. Get the original error back
-/// with [`into_error`](Self::into_error).
+/// Deliberately not an error type itself: the only way past it is
+/// [`into_error`](Self::into_error), so the original error cannot be
+/// replaced by a shell describing the failure through `?` or `.into()`.
 #[derive(Debug)]
 pub struct DowncastError {
     failure: DowncastFailure,
@@ -352,19 +326,19 @@ impl DowncastError {
         Self { failure, error }
     }
 
-    /// Returns the reason the downcast failed.
+    /// Why the downcast failed.
     #[must_use]
     pub fn failure(&self) -> DowncastFailure {
         self.failure
     }
 
-    /// Returns the error the downcast was attempted on.
+    /// The error the downcast was attempted on.
     #[must_use]
     pub fn error(&self) -> &Error {
         &self.error
     }
 
-    /// Returns the original error.
+    /// Hands the original error back.
     #[must_use]
     pub fn into_error(self) -> Error {
         self.error

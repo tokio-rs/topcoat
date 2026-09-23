@@ -8,15 +8,10 @@ use topcoat_core_grammar::ParseOption;
 
 use crate::view::hir::{ExprKind, LowerView, ViewBuilder};
 
-/// A Rust expression in parentheses, like `(5 + 6)`.
-///
-/// It appears as a child node, an attribute name or value, an element name,
-/// or an inserted attribute collection.
+/// A parenthesized Rust expression embedded as a child node, e.g. `(5 + 6)`.
 #[derive(Debug, PartialEq)]
 pub struct TemplateExpr {
-    /// The parentheses around the expression.
     pub paren: syn::token::Paren,
-    /// The expression inside the parentheses.
     pub expr: syn::Expr,
 }
 

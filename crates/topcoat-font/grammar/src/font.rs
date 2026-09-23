@@ -19,11 +19,8 @@ mod kw {
 /// A `font!` invocation: a family name followed by its faces, given either as
 /// CSS-like `@font-face` blocks or as a single expression.
 pub struct Font {
-    /// The family name.
     pub family: Expr,
-    /// The `,` after the family name.
     pub comma_token: Token![,],
-    /// The font's faces.
     pub faces: FontFaces,
 }
 
@@ -70,9 +67,7 @@ impl ToTokens for Font {
 /// single expression convertible into
 /// [`FontFaces`](topcoat_font::FontFaces).
 pub enum FontFaces {
-    /// One or more `@font-face { ... }` blocks.
     Css(Vec<FontFaceBlock>),
-    /// A Rust expression convertible into `FontFaces`.
     Expr(Box<Expr>),
 }
 
@@ -96,17 +91,11 @@ impl Parse for FontFaces {
 /// [`FontFace`] whose `font-family` is supplied by the enclosing [`Font`]
 /// rather than written in the block.
 pub struct FontFaceBlock {
-    /// The `@`.
     pub at_token: Token![@],
-    /// The `font` keyword.
     pub font_kw: kw::font,
-    /// The `-` between the keywords.
     pub dash_token: Token![-],
-    /// The `face` keyword.
     pub face_kw: kw::face,
-    /// The braces around the body.
     pub brace_token: Brace,
-    /// The face's descriptors, without `font-family`.
     pub face: FontFace,
 }
 

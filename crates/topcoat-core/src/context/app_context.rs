@@ -1,15 +1,15 @@
-//! Values registered once at startup, looked up by type and shared by every
-//! request the router handles.
+//! Type-keyed values registered once at startup and shared across every
+//! request handled by the router.
 
 use std::any::{Any, type_name};
 
 use crate::context::Cx;
 
-/// Returns the app context value of type `T` registered on the router, or
-/// `None` if no such value is registered.
+/// Returns a reference to the app context value of type `T` registered on the
+/// router, or `None` if no such value has been registered.
 ///
-/// Values are looked up by type, so the app context holds at most one value
-/// per type. Register values on the router builder with `.app_context(value)`.
+/// The lookup is keyed by `T`'s [`TypeId`](std::any::TypeId), so each type may
+/// have at most one registered value.
 ///
 /// # Examples
 ///
@@ -30,13 +30,15 @@ where
     cx.state.shared.app_context.get::<T>()
 }
 
-/// Returns the app context value of type `T` registered on the router.
+/// Returns a reference to the app context value of type `T` registered on the
+/// router.
 ///
-/// This is [`try_app_context`] for values that must be present.
+/// The lookup is keyed by `T`'s [`TypeId`](std::any::TypeId), so each type may have at most one
+/// registered value.
 ///
 /// # Panics
 ///
-/// Panics if no value of type `T` is registered.
+/// Panics if no value of type `T` has been registered.
 ///
 /// # Examples
 ///
@@ -69,11 +71,13 @@ where
     }
 }
 
-/// The values shared by every request, looked up by type.
+/// The type-keyed values shared by every request.
 ///
-/// An `AppContext` holds at most one value per type. It is built once at
-/// startup and then shared, read-only, by every request the router handles.
-/// Within a request, read values with [`app_context`] or [`try_app_context`].
+/// Each registered value is stored under its [`TypeId`](std::any::TypeId), so a
+/// given type can only be registered once. An `AppContext` is assembled once at
+/// startup and then shared read-only across every request handled by the
+/// router; within a request, values are retrieved with [`app_context`] or
+/// [`try_app_context`].
 #[derive(Default, Debug)]
 pub struct AppContext {
     entries: anymap3::Map<dyn Any + Send + Sync>,
@@ -86,10 +90,11 @@ impl AppContext {
         Self::default()
     }
 
-    /// Registers `value` under its type `T`.
+    /// Registers `value` under its concrete type `T`, returning the value
+    /// previously registered for `T`, if any.
     ///
-    /// Registering a type that is already present replaces the previous value
-    /// and returns it.
+    /// A type can hold only one value at a time, so registering a type that is
+    /// already present replaces it and hands back the displaced value.
     pub fn insert<T>(&mut self, value: T) -> Option<T>
     where
         T: Any + Send + Sync,
@@ -109,7 +114,8 @@ impl AppContext {
     /// Returns a reference to the registered value of type `T`, or `None` if
     /// no such value has been registered.
     ///
-    /// Within a request, use [`app_context`] or [`try_app_context`] instead.
+    /// Within a request, prefer the [`app_context`] and [`try_app_context`]
+    /// free functions over reaching for this directly.
     #[must_use]
     pub fn get<T>(&self) -> Option<&T>
     where

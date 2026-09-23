@@ -13,30 +13,19 @@ use crate::{
     view::hir::{LowerView, ViewBuilder},
 };
 
-/// A single item in an [`Attributes`](super::Attributes) list: any construct
-/// that can appear among attributes.
+/// A single entry within an [`Attributes`](super::Attributes) list: the union
+/// of every construct that can appear at attribute-list position.
 pub enum AttributeNode {
-    /// A `name=value` attribute.
     Attribute(Attribute),
-    /// An inserted collection, like `(attrs)`.
     Spread(AttributeSpread),
-    /// A `:name=...` bind attribute.
     BindAttribute(Box<BindAttribute>),
-    /// An `@name=...` event handler.
     EventHandler(EventHandler),
-    /// An `if` whose branches contain attributes.
     If(Box<TemplateIf<AttributeNodes>>),
-    /// A `let` binding.
     Local(TemplateLocal),
-    /// A `for` loop whose body contains attributes.
     ForLoop(TemplateForLoop<AttributeNodes>),
-    /// A `continue;` statement inside a loop.
     Continue(TemplateContinue),
-    /// A `break;` statement inside a loop.
     Break(TemplateBreak),
-    /// A `match` whose arms each contain an attribute.
     Match(TemplateMatch<AttributeNode>),
-    /// A `{ ... }` block of attributes, used as a match arm body.
     Block(TemplateBlock<AttributeNodes>),
 }
 

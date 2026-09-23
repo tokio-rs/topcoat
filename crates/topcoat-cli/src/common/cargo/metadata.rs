@@ -53,8 +53,8 @@ impl Metadata {
     }
 
     /// The manifest directory of every local package: a package without a
-    /// `source` is local, which covers workspace members and path
-    /// dependencies wherever they live on disk.
+    /// `source` is local -- a workspace member or a path dependency, wherever
+    /// it lives on disk.
     pub fn local_package_dirs(&self) -> Vec<PathBuf> {
         self.0["packages"]
             .as_array()

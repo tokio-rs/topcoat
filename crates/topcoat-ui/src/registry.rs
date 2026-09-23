@@ -7,32 +7,31 @@ use std::{
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-/// The filename of the manifest in a registry directory.
+/// The manifest file naming the components within a registry.
 pub const MANIFEST_FILE: &str = "registry.toml";
 
-/// The newest `registry.toml` format version this crate can read.
-///
-/// [`Registry::load`] rejects a manifest whose `version` is higher.
+/// The `registry.toml` format version this build understands. Stored in the
+/// manifest's `version` field so older and newer formats can be told apart; a
+/// manifest declaring a newer version than this is rejected.
 pub const MANIFEST_VERSION: u32 = 1;
 
-/// The name of the built-in registry.
-///
-/// Commands use this registry when no other is named. It is the name used on
-/// the `topcoat ui` command line and in a project's install state. It refers
-/// to the [`DEFAULT_REGISTRY_CRATE`] crate.
+/// The registry name used when a project does not specify one. It is also the
+/// name under which the built-in registry is recorded in a project's install
+/// state and given on the `topcoat ui` command line. It is an alias for the
+/// [`DEFAULT_REGISTRY_CRATE`] crate, which the `topcoat` facade pulls in under
+/// its `ui` feature.
 pub const DEFAULT_REGISTRY: &str = "topcoat";
 
-/// The crate that provides the built-in registry, which is named
-/// [`DEFAULT_REGISTRY`].
-///
-/// Other registries must be direct dependencies of the project. This one does
-/// not have to be, because the `ui` feature of `topcoat` depends on it.
+/// The crate that provides the built-in registry. It is referred to by the name
+/// [`DEFAULT_REGISTRY`] everywhere a registry is named, and, unlike other
+/// registries, need not be a direct dependency of the project: the `topcoat`
+/// facade pulls it in transitively under its `ui` feature.
 pub const DEFAULT_REGISTRY_CRATE: &str = "topcoat-ui-registry";
 
-/// The parsed `registry.toml` manifest. It records no hashes, because the hash
-/// of a component is computed from its source (see [`content_hash`]). The
-/// registry is identified by its crate name, so the manifest only holds the
-/// format version, the themes, and the components.
+/// The parsed `registry.toml` manifest. Written by hand: it records no hashes,
+/// since a component's hash is computed from its source (see [`content_hash`]).
+/// The registry's identity is its crate name, so the manifest names only the
+/// format version and the components.
 #[derive(Deserialize)]
 struct Manifest {
     /// The manifest format version (see [`MANIFEST_VERSION`]).
@@ -55,30 +54,18 @@ struct ThemeEntry {
     source: String,
 }
 
-/// A component that must be installed together with another component.
-///
-/// In `registry.toml`, a dependency is either a plain name, for a component in
-/// the same registry, or a `{ registry = "...", name = "..." }` table, for a
-/// component in another registry.
+/// Another component that must be installed alongside a component.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(untagged)]
 pub enum Dependency {
-    /// A component in the same registry.
+    /// A component in the same registry, named directly.
     Same(String),
-    /// A component in another registry. The project must also depend on that
-    /// registry's crate.
-    Other {
-        /// The crate name of the other registry.
-        registry: String,
-        /// The name of the component.
-        name: String,
-    },
+    /// A component in another registry, identified by that registry's crate
+    /// name. The crate must itself be a dependency of the project.
+    Other { registry: String, name: String },
 }
 
-/// A component registry, loaded from the registry directory of a crate.
-///
-/// A registry offers components and themes, each read from a source file in
-/// the registry directory.
+/// A component registry loaded from a crate's registry directory.
 pub struct Registry {
     dir: PathBuf,
     themes: BTreeMap<String, ThemeEntry>,
@@ -86,12 +73,13 @@ pub struct Registry {
 }
 
 impl Registry {
-    /// Loads the registry whose `registry.toml` is in `dir`.
+    /// Loads a registry by reading and parsing the `registry.toml` in `dir` (a
+    /// registry crate's declared registry directory).
     ///
     /// # Errors
     ///
-    /// Returns an error if the manifest cannot be read or parsed, or if its
-    /// format version is newer than [`MANIFEST_VERSION`].
+    /// Returns an error if the manifest cannot be read or parsed, or if it
+    /// declares a format version newer than [`MANIFEST_VERSION`].
     pub fn load(dir: PathBuf) -> Result<Self, Error> {
         let manifest_path = dir.join(MANIFEST_FILE);
         let raw = std::fs::read_to_string(&manifest_path).map_err(|source| Error::Read {
@@ -112,12 +100,12 @@ impl Registry {
         })
     }
 
-    /// Returns the names of all components in the registry, sorted.
+    /// The names of every component in the registry, sorted.
     pub fn names(&self) -> impl Iterator<Item = &str> {
         self.components.keys().map(String::as_str)
     }
 
-    /// Looks up a component by name.
+    /// Looks up a component by its registry name.
     #[must_use]
     pub fn get(&self, name: &str) -> Option<Component<'_>> {
         self.components
@@ -129,12 +117,12 @@ impl Registry {
             })
     }
 
-    /// Returns the names of all themes in the registry, sorted.
+    /// The names of every theme the registry offers, sorted.
     pub fn theme_names(&self) -> impl Iterator<Item = &str> {
         self.themes.keys().map(String::as_str)
     }
 
-    /// Looks up a theme by name.
+    /// Looks up a theme by its registry name.
     #[must_use]
     pub fn theme(&self, name: &str) -> Option<Theme<'_>> {
         self.themes.get_key_value(name).map(|(name, entry)| Theme {
@@ -145,7 +133,7 @@ impl Registry {
     }
 }
 
-/// A component in a [`Registry`].
+/// A single component within a [`Registry`].
 pub struct Component<'a> {
     name: &'a str,
     entry: &'a Entry,
@@ -153,13 +141,14 @@ pub struct Component<'a> {
 }
 
 impl Component<'_> {
-    /// Returns the name used to add the component, such as `button`.
+    /// The name used to add the component, e.g. `button`.
     #[must_use]
     pub fn name(&self) -> &str {
         self.name
     }
 
-    /// Reads the component's source and returns its [`content_hash`].
+    /// Computes the component's content hash by reading and hashing its source
+    /// (see [`content_hash`]).
     ///
     /// # Errors
     ///
@@ -168,8 +157,7 @@ impl Component<'_> {
         Ok(content_hash(&self.read_source()?))
     }
 
-    /// Returns the filename the component is installed as in the project's
-    /// components directory, such as `button.rs`.
+    /// The file name written into the user's components directory.
     #[must_use]
     pub fn file_name(&self) -> &str {
         Path::new(&self.entry.source)
@@ -188,17 +176,15 @@ impl Component<'_> {
         std::fs::read_to_string(&path).map_err(|source| Error::Read { path, source })
     }
 
-    /// Returns the components that are installed together with this one.
+    /// The other components this component depends on.
     #[must_use]
     pub fn dependencies(&self) -> &[Dependency] {
         &self.entry.dependencies
     }
 }
 
-/// A theme in a [`Registry`].
-///
-/// A theme is a CSS file. `topcoat ui init` copies it into the project, where
-/// it becomes the Tailwind input.
+/// A single theme within a [`Registry`]: a CSS file that becomes a project's
+/// Tailwind input, copied into the project at `init` time.
 pub struct Theme<'a> {
     name: &'a str,
     entry: &'a ThemeEntry,
@@ -206,22 +192,22 @@ pub struct Theme<'a> {
 }
 
 impl Theme<'_> {
-    /// Returns the name used to select the theme, such as `neutral`.
+    /// The name used to select the theme, e.g. `neutral`.
     #[must_use]
     pub fn name(&self) -> &str {
         self.name
     }
 
-    /// Returns the filename the theme is installed as in the project.
-    ///
-    /// This is always `styles.css`, whatever the name of the source file in
-    /// the registry.
+    /// The file name written into the user's project. Every theme installs to
+    /// the same `styles.css` (it becomes the project's Tailwind input), rather
+    /// than carrying its registry source name (e.g. `neutral.css`) into the project.
     #[must_use]
     pub fn file_name(&self) -> &'static str {
         "styles.css"
     }
 
-    /// Reads the theme's source and returns its [`content_hash`].
+    /// Computes the theme's content hash by reading and hashing its source (see
+    /// [`content_hash`]).
     ///
     /// # Errors
     ///
@@ -241,12 +227,11 @@ impl Theme<'_> {
     }
 }
 
-/// Returns the content hash of a component or theme source: `sha256:`
-/// followed by the SHA-256 of the source as lowercase hex.
-///
-/// The same source always gives the same hash. A project records the hash when
-/// it installs a component, and a different hash of the registry's current
-/// source means that an update is available.
+/// Computes the content hash recorded for a component, the sha256 of its source
+/// prefixed with `sha256:`. Hashing the same source always yields the same
+/// value, so a project can tell its installed component apart from an updated
+/// one by comparing the hash it recorded against a fresh hash of the registry's
+/// current source.
 #[must_use]
 pub fn content_hash(source: &str) -> String {
     format!("sha256:{}", hex(Sha256::digest(source.as_bytes()).as_ref()))
@@ -261,29 +246,19 @@ fn hex(bytes: &[u8]) -> String {
     out
 }
 
-/// An error while loading a registry or reading one of its sources.
+/// An error loading a registry or one of its components.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    /// A file could not be read.
     #[error("failed to read {path:?}")]
     Read {
-        /// The path of the file.
         path: PathBuf,
-        /// The underlying I/O error.
         #[source]
         source: std::io::Error,
     },
-    /// The `registry.toml` manifest is not valid.
     #[error("failed to parse registry manifest")]
     Parse(#[from] toml::de::Error),
-    /// The manifest has a format version newer than [`MANIFEST_VERSION`].
     #[error(
         "registry manifest has format version {found}, but this build supports up to {supported}"
     )]
-    UnsupportedVersion {
-        /// The version in the manifest.
-        found: u32,
-        /// The newest supported version.
-        supported: u32,
-    },
+    UnsupportedVersion { found: u32, supported: u32 },
 }
