@@ -4,15 +4,11 @@ import type { SignalId } from "../signal-registry";
 import { RenderRequest } from "./request";
 
 /**
- * A part of the page that re-runs on the server when its inputs change: the
- * page itself, or a shard.
+ * Content that re-renders on the server when its inputs change.
  *
- * A unit's content lives in a child `contentScope` holding its bindings,
- * declared signals, nested units, and the dependencies the server read while
- * rendering it. The watch effect subscribes to the unit's inputs, the
- * dependencies among them, and re-fetches the content when one changes. It
- * lives in the content scope and is rebuilt with every replacement, because
- * the new content decides the new dependencies.
+ * `contentScope` owns the current content's resources. Its watch effect
+ * subscribes to inputs and server-read dependencies. Replacing content rebuilds
+ * the scope and effect so subscriptions reflect the new content.
  */
 export abstract class RenderUnit {
 	protected readonly lifetime: Scope;
@@ -96,18 +92,12 @@ export abstract class RenderUnit {
 	}
 
 	/**
-	 * Replaces the content with `html`, keeping the signals the new content
-	 * declares again and every element the new content can be morphed into.
+	 * Replaces content with `html`, preserving matching elements and signals.
 	 *
-	 * The old content's effects and listeners are disposed first, so nothing
-	 * reacts while the document changes. The new markup is then morphed into
-	 * the existing nodes rather than swapped in, so focus, scroll position,
-	 * and what the user is typing survive, and the result is scanned again
-	 * as if it were fresh content. The old signals stay registered
-	 * throughout, so an existing one wins when the new content declares its
-	 * id and a value the user changed while the request was in flight
-	 * survives. The signals the new content no longer declares are deleted
-	 * afterwards.
+	 * Disposes the old effects and listeners before updating the DOM, then
+	 * hydrates the result. Existing signal values take precedence over new
+	 * declarations, preserving changes made while the request was pending.
+	 * Signals absent from the new content are deleted.
 	 */
 	replaceContent(html: string): void {
 		if (this.isDisposed) return;

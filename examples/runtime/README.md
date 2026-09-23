@@ -1,6 +1,6 @@
 # Runtime
 
-Interactive pages built with the browser runtime: signals holding state, `@` event handlers updating them, expressions re-rendering on change, a `:` bind attribute, and a page that reads a signal on the server and runs again when it changes.
+Interactive pages that keep state in signals and update it through browser event handlers.
 
 Run it with:
 

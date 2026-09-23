@@ -23,11 +23,10 @@ struct PageRerunRequest {
 
 /// A [`Route`] that re-runs a page with the signal values a client sends.
 ///
-/// The browser runtime posts to the route with the page's path and query
-/// appended, and the route rewrites the request into a plain `GET` for the
-/// page with the signal values on its request context, so the page runs
-/// through its layouts and guards as if the client had requested it, and
-/// [`signal`](crate::signal) resumes from the values sent.
+/// The request appends the page's path and query to this route. The route
+/// rewrites it as a `GET` and puts the signal values in the request context.
+/// The page runs through its layouts and guards, and its signals resume
+/// from the supplied values.
 ///
 /// A page path is matched by a catch-all segment, which needs at least one
 /// segment, so the root page has a route of its own at the bare prefix.

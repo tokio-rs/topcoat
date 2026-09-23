@@ -9,8 +9,7 @@ pub struct Drink {
     pub slug: String,
     pub name: String,
     pub tasting_notes: String,
-    /// The price in dollars, as `f64` so runtime expressions in the browser
-    /// can multiply it by a quantity signal.
+    /// The price in dollars.
     pub price: f64,
     pub roast: Roast,
     pub(super) menu_order: i64,

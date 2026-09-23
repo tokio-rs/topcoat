@@ -18,8 +18,8 @@ pub const DEFAULT_VERSION: &str = "4.3.2";
 /// Where the Tailwind CLI executable comes from.
 #[derive(Debug, Clone)]
 pub enum ExecutableSource {
-    /// Download the standalone CLI release from GitHub into `OUT_DIR`,
-    /// reusing the copy from a previous build if present.
+    /// Downloads the standalone CLI release from GitHub into a shared cache.
+    /// Reuses an existing cached copy.
     Github {
         /// The release to download, without the leading `v`.
         version: String,
@@ -66,19 +66,13 @@ impl ExecutableSource {
         }
     }
 
-    /// Download the Tailwind CLI for `version` into the shared Topcoat cache,
-    /// reusing the cached copy without downloading when it is already present.
+    /// Downloads `version` into the shared Topcoat cache unless already cached.
     ///
-    /// The binary is cached at
-    /// `topcoat/cache/tailwind/tailwindcss-<version>-<platform>` inside the
-    /// Cargo target directory, so it is shared across the workspace and reused
-    /// by later builds even after a package's build fingerprint changes. Build
-    /// scripts racing to download the same version are serialized with an
-    /// exclusive file lock so only one downloads while the others wait and
-    /// reuse its result. When `checksum` is given, the download's hash is
-    /// verified against it before the file is moved into place; `checksum` must
-    /// carry a supported algorithm prefix (`sha256:`). On Unix the file is made
-    /// executable.
+    /// Cache entries are specific to the version and host platform. A file
+    /// lock prevents concurrent downloads from overwriting one another.
+    /// When supplied, `checksum` must use the `sha256:` prefix and is checked
+    /// before the downloaded file enters the cache. Cached files are reused
+    /// without verification. On Unix, the downloaded file is made executable.
     fn download_from_github(version: &str, checksum: Option<&str>) -> Result<Executable> {
         // Parse the algorithm prefix up front so a malformed checksum fails
         // before anything is downloaded.
@@ -102,9 +96,8 @@ impl ExecutableSource {
         );
         let dest = dir.join(&file_name);
 
-        // Fast path: a previous build already cached a verified copy. `dest`
-        // only ever appears via an atomic rename of a fully downloaded and
-        // checksum-verified file, so its mere existence means it is complete.
+        // Cached files are complete downloads. Verification only happens
+        // during the download, when a checksum was supplied.
         if dest.exists() {
             return Ok(Executable::new(dest));
         }
@@ -114,21 +107,11 @@ impl ExecutableSource {
             source,
         })?;
 
-        // Serialize the download across processes. Cargo runs build scripts
-        // concurrently, so several packages can reach here at once for the same
-        // version; without this they would all download and race to rename over
-        // `dest`. Holding an exclusive lock on a sibling lock file lets the
-        // first process download while the rest block, then find the cached
-        // copy below. The lock is advisory, but every code path that writes
-        // `dest` goes through here, and the OS drops the lock if a holder dies,
-        // so a crash can never wedge later builds. It is held until this
-        // function returns.
+        // Lock across processes so one build downloads while the others wait.
+        // Keep the lock until this function returns.
         //
-        // The lock file is intentionally left on disk and never removed:
-        // `lock` acts on the file's inode, so unlinking it would let a waiter
-        // and a newcomer that recreates the path lock two different inodes and
-        // both proceed. It is an empty marker; once `dest` exists the fast path
-        // above returns before it is even opened.
+        // Leave the lock file in place. Removing it could let a waiter and a
+        // new process lock different inodes and download concurrently.
         let lock_path = dir.join(format!("{file_name}.lock"));
         let lock = fs::OpenOptions::new()
             .read(true)
@@ -232,10 +215,7 @@ impl ExecutableSource {
         })
     }
 
-    /// The host platform suffix baked into cache file names, e.g.
-    /// `macos-arm64` or `windows-x64.exe`. Derived from
-    /// [`asset_name`](Self::asset_name), which every supported platform
-    /// prefixes with `tailwindcss-`.
+    /// The host platform suffix used in cache filenames.
     fn platform() -> Result<&'static str> {
         let asset = Self::asset_name()?;
         Ok(asset.strip_prefix("tailwindcss-").unwrap_or(asset))
@@ -284,18 +264,10 @@ impl Executable {
     /// Returns `Err` if the process cannot be spawned or exits with a
     /// non-zero status.
     pub fn run(&self, command: &Command) -> Result {
-        // The standalone Tailwind CLI is a Bun single-file executable that
-        // unpacks its embedded native modules (the Oxide scanner, Lightning
-        // CSS, the file watcher) into the temporary directory and loads them
-        // with `dlopen`. On filesystems that support `O_TMPFILE` each run gets
-        // a private anonymous copy, but otherwise Bun falls back to named files
-        // at deterministic paths derived from the binary. Two processes running
-        // the same shared executable then race on those paths, and one can load
-        // a module while another is still writing it -- which surfaces, for the
-        // scanner, as its `Scanner` export being undefined. Give each run its
-        // own temporary directory so the extraction paths never collide.
-        // Rooting it next to the executable keeps it on a filesystem that
-        // permits execution, which the system temporary directory may not.
+        // The CLI extracts native modules before loading them. Give each run
+        // a private directory so concurrent processes cannot read files that
+        // another process is still writing. Prefer a location that permits
+        // loading executable files.
         let scratch = ScratchDir::new(&self.scratch_root())?;
 
         let status = command
@@ -316,11 +288,8 @@ impl Executable {
         Ok(())
     }
 
-    /// The directory a per-run [`ScratchDir`] is created under: Cargo's
-    /// `OUT_DIR` when set, otherwise the directory holding the executable, and
-    /// finally the system temporary directory. The first two sit under the
-    /// Cargo target directory, which permits executing the native modules Bun
-    /// unpacks there.
+    /// Selects a parent for each run's temporary directory. Prefers `OUT_DIR`,
+    /// then the executable's directory, then the system temporary directory.
     fn scratch_root(&self) -> PathBuf {
         if let Some(out_dir) = env::var_os("OUT_DIR") {
             return PathBuf::from(out_dir);

@@ -10,23 +10,16 @@ pub(crate) trait Emit {
 
 /// Collects the two phases a view template expands to.
 ///
-/// The hoist phase evaluates every expression of the view in source order
-/// and binds the results to fresh identifiers. The burst phase pushes the
-/// view's instruction block in one synchronous burst that only reads the
-/// hoisted bindings.
+/// The hoist phase evaluates expressions in source order and binds their
+/// results to fresh identifiers. The burst phase writes an instruction
+/// block synchronously using those bindings.
 ///
-/// A scope that renders a component, or fills a node position, resolves
-/// its content by being polled: the expansion is the value expression of
-/// the template's `JoinView`. Every dynamic node position is registered as
-/// a *unit*, an inert view driven concurrently with the other units by the
-/// join, and the burst phase becomes the join's burst closure, splicing the
-/// contents the join resolved. After the burst builds the template's
-/// content, the join keeps streaming the units' swaps.
+/// Scopes with dynamic nodes use a `JoinView`. It polls each node as a
+/// unit, then runs the burst with the resolved content. Later updates
+/// stream through the join.
 ///
-/// A scope that renders no component and fills no node position builds
-/// synchronously: the hoist phase runs and the burst pushes the block right
-/// where the scope is evaluated, with control flow splicing the handles of
-/// blocks built the same way. Nothing is polled, boxed, or captured.
+/// Scopes without dynamic nodes build synchronously. Their hoist and burst
+/// phases run together where the scope is evaluated.
 pub(crate) struct Emitter {
     hoist: TokenStream,
     burst: TokenStream,
@@ -85,13 +78,10 @@ impl Emitter {
     /// `JoinView` against the ambient `__cx` context, and ends with `tail`
     /// applied to the join expression.
     ///
-    /// The units nest as `JoinUnit` pairs terminated by `()`, and their
-    /// contents come back in the same nested shape, destructured into the
-    /// `__view` identifiers the burst reads. The closure takes ownership of
-    /// the hoisted bindings it reads, so the view owns everything it
-    /// renders. What the hoisted bindings borrow stays alive for the whole
-    /// block, so `tail` can consume the view where those borrows are still
-    /// valid.
+    /// Units form a nested list ending in `()`. Their contents use the same
+    /// structure and bind to the `__view` identifiers read by the burst.
+    /// The burst owns its captured bindings. `tail` can consume the view
+    /// before anything borrowed by those bindings leaves scope.
     pub(super) fn finish(self, tail: impl FnOnce(TokenStream) -> TokenStream) -> TokenStream {
         let units = self.units.iter().rev().fold(quote! { () }, |rest, ident| {
             quote! { #topcoat_view::internal::JoinUnit::new(#ident, #rest) }

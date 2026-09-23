@@ -37,7 +37,7 @@ async fn post() -> Result<impl View> {
 
 A module contributes one segment and can declare one path parameter. Put another parameter in a descendant module.
 
-Reading a name that the matched route did not capture panics with `path parameter "post_id" was not found in request path`.
+Reading a parameter that the matched route did not capture panics.
 
 # Reading one segment
 
@@ -157,7 +157,7 @@ An unparsed catch-all accepts any `IntoIterator` whose items implement `AsRef<st
 
 # Building URLs
 
-The declared type can also be used in combination with the [`href!`](macro.href.html) macro. It fills the parameter slot of the handler's path to construct a URL string:
+Pass the generated type to [`href!`](macro.href.html) to fill the matching parameter in a handler's URL:
 
 ```rust
 # use topcoat::{Result, router::{href, page, path_param}, view::{View, view}};
@@ -185,11 +185,11 @@ async fn home() -> Result<impl View> {
 }
 ```
 
-Values are matched to the path by name, not by position alone, so filling `{post_id}` with anything but a `PostId` panics rather than building a wrong URL.
+Each argument must have the name expected by its path parameter. For example, filling `{post_id}` with a parameter named `slug` panics.
 
 Each segment is written with [`Display`](core::fmt::Display) and percent-encoded, so a value stays inside the segment it fills: `Slug("a/b")` fills its one segment as `a%2Fb`. A catch-all contributes one segment per element, so the separators between them are the only `/` it adds.
 
-Filling a segment with nothing, `.`, or `..` panics. A browser resolves those against the path around them instead of reading them as one segment, and encoding them does not take that meaning away.
+Empty values, `.`, and `..` panic because browsers treat them as path structure rather than segment content.
 
 [`href`](fn.href.html) takes the same values as a tuple, for a URL built outside a macro.
 

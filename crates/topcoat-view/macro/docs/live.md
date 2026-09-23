@@ -1,4 +1,4 @@
-A page normally renders in full before the browser sees any of it, so a single slow database query or upstream request delays everything, even the parts that are ready. The [`live!`] and [`emit!`] macros let a page send what it has right away and stream the slow parts in when they finish, over the same response and without any client-side fetching.
+The [`live!`] and [`emit!`] macros stream updates to part of a page. Use them to show content while slower work finishes. Updates travel over the page's HTTP response.
 
 [`live!`] marks a region of the page whose content can still change while the response streams. Its body is ordinary async Rust. Inside the body, [`emit!`] renders markup into the region, and every emission replaces the previous one in the browser.
 
@@ -18,15 +18,15 @@ Ok(view! {
 # async fn fetch_quote() -> &'static str { "..." }
 ```
 
-The heading and the loading message reach the browser immediately. While `fetch_quote` runs, the rest of the page streams as usual, and once the quote is ready it replaces the loading message in place. The browser needs no client library for this; the response carries everything the swap requires.
+The heading and loading message render before `fetch_quote` finishes. The quote then replaces the loading message. The response includes the script needed to update the region.
 
 The page waits for a region's first emission and renders it with the rest of the document, so start the body with something that is ready right away, like the loading message above.
 
-The two most common shapes, a fallback that waits for one piece of content and a guard that catches a failed render, come prepackaged as the [`suspense`] and [`error_boundary`] components, described at the end of this guide. If one of them fits, you never need the macros; they are the general form behind both.
+Use [`suspense`] to show a fallback while content loads, or [`error_boundary`] to show one when rendering fails. The last section covers these components.
 
 # Emitting Many Times
 
-[`emit!`] accepts everything [`view!`] does: elements, text, interpolated expressions, control flow, and components. Between emissions the body is plain async Rust, so it can await work, loop, and branch. Because each emission replaces the previous one, a live region can narrate a long-running task as it happens:
+[`emit!`] accepts the same syntax as [`view!`]. The surrounding body is ordinary async Rust. Emit repeatedly to show the progress of a task:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -46,13 +46,13 @@ Ok(view! {
 # async fn run_step() {}
 ```
 
-Emissions can also run concurrently, for example as `async` blocks under `join!`. Every one of them reaches the browser, but since they all replace the same region, the last to arrive is what stays visible. Emit concurrently when only the final emission matters, and sequence emissions when each one should be seen.
+Emissions can run concurrently, for example in `async` blocks under `join!`. Each replaces the same region, so the last to arrive remains visible. Emit sequentially when their order matters.
 
 # The Emit Token
 
-A live region has to emit at least once, so it never leaves a hole in the page. The body's return type is a safety net that reminds you of this: [`emit!`] evaluates to a [`Result`] carrying an [`EmitToken`], and the body returns one, so the natural way to finish is to end with an emission, as the examples above do. Intermediate emissions use a `?` to stop when one fails.
+A live region must emit at least once. Its body returns [`Result<EmitToken>`][`Result`], the same type as [`emit!`], so it can end with an emission. Use `?` on intermediate emissions to stop if rendering fails.
 
-When the body's control flow does not end with an emission, construct the token yourself to opt out of the reminder:
+If the body cannot end with an emission, return the token explicitly:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -70,11 +70,11 @@ Ok(view! {
 # async fn next_price() -> Option<u32> { None }
 ```
 
-The region here emits inside the loop, so returning `Ok(EmitToken)` afterwards only satisfies the type. The token is a compile-time reminder, nothing more; the body still has to emit at least once.
+Returning `Ok(EmitToken)` satisfies the return type but does not emit content. The body still needs to emit at least once, so the loop above must receive a price.
 
 # Handling Errors
 
-An emission fails when the markup inside it fails to render, for example when a component it calls returns an error. The failure comes back as the `Err` value of [`emit!`] instead of ending the stream, and the body decides what happens next: propagate it with `?`, or handle it and emit a fallback in its place.
+If markup fails to render, [`emit!`] returns `Err`. Propagate the error with `?`, or handle it and emit a fallback:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -101,7 +101,7 @@ An error the body returns propagates like any other rendering error. When it hap
 
 # A Region Is A View
 
-A live region is a view like any other. The examples above interpolate one into a [`view!`] body, but a component can just as well return one directly, or take one as child content:
+A live region implements `View`. A component can return it directly:
 
 ```rust
 use topcoat::{
@@ -128,13 +128,13 @@ async fn page() -> Result<impl View> {
 }
 ```
 
-Several regions on one page stream independently, each replacing its own content as it becomes ready, and emitted markup can itself contain components and further live regions.
+Regions on the same page stream independently. Emitted markup can also contain live regions.
 
-A region's id comes from its source location and the enclosing context's identity, so it stays the same across renders. When a `view!` loop contains live regions, put `#[key(item)]` on the loop to distinguish its iterations, as described in the [`view!`] guide.
+Regions need a stable identity across renders. When a `view!` loop contains live regions, use `#[key(item)]` to distinguish its iterations. See the [`view!`] guide.
 
 # Request Context
 
-Inside a [`component`], `#[page]`, or `#[layout]`, the request context is in scope implicitly and emitted markup can call components with no ceremony. In a plain function, name the context at the start of the live region, the same way [`view!`] does:
+Inside a [`component`], the request context is available implicitly. In a plain function, pass it at the start of the live region:
 
 ```rust
 use topcoat::{context::Cx, view::{View, emit, live}};
@@ -148,7 +148,7 @@ With `cx =>`, the returned view owns a clone of the supplied context. Without `c
 
 # Suspense And Error Boundaries
 
-The [`suspense`] component shows a fallback until its child content is ready. The child gets the first chance to render: when it is ready right away, it renders in place and the fallback never shows. Otherwise the fallback goes out with the page and the child replaces it once it resolves:
+The [`suspense`] component shows a fallback while its child content loads. If the child is ready immediately, the fallback never appears:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -184,7 +184,7 @@ Ok(view! {
 # }
 ```
 
-Both are small components over the same region mechanism as [`live!`]. Reach for the macros directly when a region needs more than they cover, like progress updates or retrying after a failure.
+Use [`live!`] directly when you need to control the updates, such as showing progress or retrying after a failure.
 
 [`EmitToken`]: struct.EmitToken.html
 [`Result`]: ../type.Result.html

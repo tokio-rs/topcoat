@@ -1,6 +1,6 @@
 # Alpine AJAX
 
-A counter that Alpine AJAX updates in place: the server detects the AJAX request and answers with just the targeted element, while a plain form submission still works without JavaScript.
+A counter that updates in place with Alpine AJAX. The server returns the requested element for AJAX requests and a complete page for ordinary form submissions.
 
 Run it with:
 

@@ -47,12 +47,8 @@ pub(super) async fn run(args: CleanArgs) {
     }
 }
 
-/// Every asset bundle in the target directory. Bundles are written next to
-/// the executable they were scanned from, so they sit at
-/// `<target>/<profile>/assets` and, for cross builds,
-/// `<target>/<triple>/<profile>/assets`. Only directories holding a manifest
-/// are returned, so an unrelated `assets` directory in the target tree is
-/// left alone.
+/// Finds asset bundle directories under the Cargo target directory. Only directories
+/// containing a bundle manifest are included.
 fn bundle_dirs(target_dir: &Path) -> Vec<PathBuf> {
     let mut candidates = Vec::new();
     for dir in subdirs(target_dir) {

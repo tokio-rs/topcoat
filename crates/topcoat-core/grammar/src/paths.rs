@@ -1,20 +1,8 @@
 //! Paths to the framework crates, for naming their items in generated code.
 //!
-//! A macro like `view!` expands to code that refers to framework types -- for
-//! instance `topcoat::view::Component`. It cannot hardcode those paths, because
-//! the same macro is used from crates that reach the framework in different
-//! ways:
-//!
-//! - Application crates depend on the `topcoat` facade and name the type
-//!   `::topcoat::view::Component`.
-//! - Component libraries depend on the individual crates (`topcoat-view`, and so on) directly, and
-//!   name it `::topcoat_view::Component` instead. Forcing them onto the facade is undesirable, and
-//!   a crate that the facade itself re-exports could not depend on the facade without a cycle.
-//!
-//! Each framework crate is therefore represented by a [`Crate`] constant that
-//! resolves to the right path for whoever is compiling the call site: straight
-//! to the standalone crate when the caller depends on it directly, and through
-//! the facade otherwise.
+//! Generated code must use paths available to the calling crate. Each [`Crate`]
+//! constant resolves to a direct dependency when present, or through the
+//! `topcoat` facade otherwise. Dependency renames are respected.
 //!
 //! Interpolate a constant into `quote!` like any other path:
 //!
@@ -34,10 +22,8 @@ use quote::ToTokens;
 
 /// A framework crate, or a module within one, that generated code can refer to.
 ///
-/// Interpolate a `Crate` into a `quote!` invocation to emit its path. See the
-/// [module docs](self) for why the path is resolved rather than hardcoded: it
-/// becomes the facade path when the call site depends on `topcoat`, and the
-/// standalone-crate path otherwise.
+/// Interpolate it into `quote!` to emit a path available at the call site.
+/// Direct dependencies take precedence over the facade.
 pub struct Crate {
     /// Path within the `topcoat` facade, e.g. `"view"` for `::topcoat::view`.
     /// Empty for the facade root, `::topcoat` itself.

@@ -11,10 +11,9 @@ use crate::{View, ViewBuffer, ViewBufferScope, ViewFirst, ViewSwap};
 pin_project! {
     /// Installs a buffer for a [`View`]'s content while it is polled.
     ///
-    /// A scope first polled with no build running owns its buffer and seals
-    /// its first content with it, making the content self-contained. Polled
-    /// inside a running build it defers to that build's buffer, and its
-    /// content splices into the enclosing view.
+    /// On its first poll, a scope uses the active build's buffer if there
+    /// is one. Otherwise, it creates a buffer and returns self-contained
+    /// initial content.
     pub struct ScopeView<V> {
         #[pin]
         view: V,

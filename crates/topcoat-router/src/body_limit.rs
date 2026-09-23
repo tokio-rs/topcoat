@@ -11,12 +11,9 @@ pub(crate) const DEFAULT_BODY_LIMIT: usize = 2 * 1024 * 1024;
 /// A router layer that overrides the request body size limit for the routes
 /// under its path.
 ///
-/// Extractors that buffer the request body ([`Bytes`](crate::request::Bytes),
-/// [`Json`](crate::content::Json), [`Form`](crate::content::Form), and the
-/// other built-ins) read at most the request's body limit and reject a larger
-/// body with `413 Content Too Large`, so a client cannot exhaust the server's
-/// memory. The limit defaults to 2 MiB and applies without any configuration;
-/// register this layer to change it.
+/// Buffering extractors reject bodies above the limit with
+/// `413 Content Too Large`. The default limit applies without a layer.
+/// Register this layer to override it.
 ///
 /// Create the layer with [`max`](Self::max) or [`disable`](Self::disable) and
 /// register it with [`RouterBuilder::layer`](crate::RouterBuilder::layer). It
@@ -100,7 +97,7 @@ enum BodyLimitKind {
 /// Returns the request's effective body size limit in bytes.
 ///
 /// This is the limit registered by the innermost [`BodyLimit`] layer wrapping
-/// the matched route, the 2 MiB default when no layer matches, or
+/// the matched route, the default limit when no layer matches, or
 /// [`usize::MAX`] when the limit is disabled.
 ///
 /// The built-in buffering extractors enforce this limit already. In a custom

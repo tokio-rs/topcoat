@@ -2,13 +2,11 @@
 
 /// Derives a plain-text rendering from HTML the view renderer produced.
 ///
-/// The converter leans on the renderer's guarantees (balanced tags, quoted
-/// attributes, escaped text), so it scans tags instead of parsing arbitrary
-/// HTML; raw markup spliced into a view converts on a best-effort basis.
-/// Content flows as lines: block elements start a new line, paragraphs and
-/// headings stand as separate blocks, list items get a marker, links keep
-/// their target in parentheses, and images fall back to their alt text.
-/// The head of a document, styles, and scripts contribute nothing.
+/// Expects balanced tags, quoted attributes, and escaped text from the view
+/// renderer. Raw markup is converted on a best-effort basis.
+///
+/// Preserves block boundaries, list markers, link targets, and image alt text.
+/// Omits document head content, styles, and scripts.
 pub(crate) fn text_from_html(html: &str) -> String {
     let mut converter = Converter::default();
     let mut rest = html;

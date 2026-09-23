@@ -15,9 +15,8 @@ mod kw {
 
 /// A `tech(...)` hint on a CSS `@font-face` `src` entry.
 ///
-/// The technology may be a string literal naming a CSS technology keyword (such
-/// as `"color-colrv1"`) or a parenthesized expression resolving to a
-/// [`FontTech`] at run time.
+/// Accepts a CSS keyword string such as `"color-colrv1"` or an expression that
+/// evaluates to [`topcoat_font::FontTech`].
 pub struct FontTechHint {
     pub tech_kw: kw::tech,
     pub paren_token: Paren,
@@ -63,9 +62,8 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontTechHint {
 
 /// The technology inside a [`FontTechHint`].
 ///
-/// Wraps an expression that resolves to a [`topcoat_font::FontTech`] at run
-/// time. When the expression is a string literal, it is validated at compile
-/// time against the known CSS technology keywords.
+/// String literals are validated as CSS keywords during parsing. Other
+/// expressions must evaluate to [`topcoat_font::FontTech`].
 pub struct FontTech(pub Expr);
 
 impl Parse for FontTech {
@@ -106,11 +104,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontTech {
     }
 }
 
-/// The `FontTech` variant identifier for a CSS `tech(...)` keyword, or `None` if
-/// the keyword names no known technology.
-///
-/// This single mapping backs both parse-time validation and codegen, so the two
-/// can never disagree.
+/// Returns the `FontTech` variant for a CSS keyword, or `None` if unknown.
 fn tech_variant(keyword: &str) -> Option<&'static str> {
     Some(match keyword {
         "color-cbdt" => "ColorCbdt",

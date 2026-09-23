@@ -2,10 +2,8 @@ use std::fmt::Write;
 
 /// A [`Write`] adapter that escapes its input as the body of a CSS `<string>`.
 ///
-/// Wrap a destination writer and write the unquoted contents through it; the
-/// adapter escapes the characters that are significant inside a CSS string, so
-/// the result is safe to place between `"` delimiters. It does not emit the
-/// surrounding quotes itself.
+/// Write unquoted content through the adapter to escape it for a double-quoted
+/// CSS string. The adapter does not write the surrounding quotes.
 pub(crate) struct CssString<'a, W: ?Sized>(pub(crate) &'a mut W);
 
 impl<W: Write + ?Sized> Write for CssString<'_, W> {

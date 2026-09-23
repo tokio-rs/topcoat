@@ -19,10 +19,7 @@ pub enum AvatarSize {
 }
 
 impl AvatarSize {
-    /// The Tailwind classes for this size.
-    ///
-    /// Each size sets a text size along with the dimensions, which is what
-    /// scales the initials in an [`avatar_fallback`].
+    /// Classes for the avatar dimensions and fallback text size.
     fn classes(self) -> StaticClass {
         match self {
             Self::Sm => class!("size-8 text-xs"),
@@ -32,20 +29,15 @@ impl AvatarSize {
     }
 }
 
-/// The classes shared by every avatar, regardless of size.
-///
-/// The circle clips whatever is inside it, and is positioned so that an
-/// [`avatar_image`] can cover the [`avatar_fallback`] behind it.
+/// Classes that clip the avatar to a circle and position its image over the fallback.
 const AVATAR: StaticClass = class!("relative flex shrink-0 overflow-hidden rounded-full");
 
-/// An avatar component: a circular portrait of a person or an organization.
+/// A circular image with optional fallback content.
 ///
-/// An avatar holds an [`avatar_image`], an [`avatar_fallback`], or both. With
-/// both, the fallback shows until the image has loaded, and keeps showing if
-/// the image never arrives. The `size` parameter selects the dimensions,
-/// defaulting to `Md`. The `attrs` (such as `class` or `title`) are forwarded
-/// to the underlying `<span>`; a `class` among them is appended to the
-/// computed classes.
+/// Add an `avatar_image`, an `avatar_fallback`, or both. The fallback sits behind the
+/// image and remains visible if the image cannot load. `size` defaults to `Md`.
+///
+/// `attrs` are forwarded to the outer `<span>`. Extra classes are added to its classes.
 ///
 /// ```ignore
 /// view! {
@@ -74,20 +66,17 @@ pub async fn avatar(
     })
 }
 
-/// The portrait of an [`avatar`], covering the fallback behind it.
+/// An image that fills the avatar and covers its fallback.
 ///
-/// The image fills the circle and is cropped to it rather than squashed, so
-/// portraits of any aspect ratio stay undistorted. Pass the `src` among the
-/// `attrs`.
+/// Pass `src` in `attrs`. The image is cropped to fit without changing its aspect
+/// ratio.
 #[component]
 pub async fn avatar_image(
-    /// The image's alternative text.
+    /// Alternative text for the image.
     ///
-    /// It is empty by default, which suits the usual case: an avatar beside
-    /// the name it belongs to says nothing the name does not, and empty
-    /// alternative text is also what leaves the [`avatar_fallback`] visible
-    /// when the image fails to load, where a caption would be painted over it
-    /// instead.
+    /// Defaults to empty text, suitable when an adjacent name already identifies the
+    /// person. Empty text also prevents a failed image from drawing text over the
+    /// fallback.
     #[into]
     #[default]
     alt: String,
@@ -107,12 +96,10 @@ pub async fn avatar_image(
     })
 }
 
-/// What an [`avatar`] shows in place of its image: initials, or any small
-/// view such as an icon.
+/// Content displayed behind the avatar image while it loads or when no image is
+/// available.
 ///
-/// It fills the circle and centers its content on a tinted background, and is
-/// laid out behind the [`avatar_image`], so it stands in while the image
-/// loads and whenever there is none.
+/// Pass initials or another small view as children.
 #[component]
 pub async fn avatar_fallback(
     #[default] mut attrs: Attributes,

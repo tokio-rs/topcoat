@@ -1,4 +1,4 @@
-The [`class!`] macro builds a [`topcoat::view::Class`] value: a space-separated list of HTML classes assembled from individual entries.
+The [`class!`] macro builds a [`topcoat::view::Class`] value by joining HTML class names with spaces.
 
 Use it in the value position of a `class` attribute when the list mixes static and conditional parts:
 
@@ -43,11 +43,11 @@ Ok(view! {
 # }
 ```
 
-An entry can be any value implementing [`ClassViewParts`]: string types, `Option`s of them, a `Vec` or array of entries, another [`Class`], or a captured attribute value ([`AttributeValue`]) taken from an [`Attributes`] collection. Implement the trait for your own types to use them as entries.
+Entries must implement [`ClassViewParts`]. This includes strings, optional values, and collections of entries. Implement the trait to use your own types.
 
 # Absent entries
 
-An absent entry is skipped without leaving a leftover space: `None`, empty strings, and entries whose condition is false contribute neither text nor a separator. When every entry is absent, the surrounding element omits the whole `class` attribute:
+Absent entries contribute no text or separator. This includes `None`, empty strings, and entries with a false condition. When every entry is absent, the element omits the `class` attribute:
 
 ```rust
 # #[topcoat::view::component]
@@ -65,7 +65,7 @@ Ok(view! {
 
 # Static class lists
 
-Use `class!` for a class list that never changes too. It renders faster than the same string written as a `&'static str` constant:
+Use [`StaticClass`] to store a literal class list in a constant:
 
 ```rust
 use topcoat::view::{StaticClass, class};
@@ -73,7 +73,7 @@ use topcoat::view::{StaticClass, class};
 const BUTTON: StaticClass = class!("btn btn-lg rounded");
 ```
 
-A `class!` value takes its type from its entries. A list of literals always has the same one, named by [`StaticClass`]; anything else is only practical to hold in a `let` binding, whose type is inferred.
+A class list's type depends on its entries. Use a `let` binding to let Rust infer the type when the list contains expressions.
 
 [`Attributes`]: struct.Attributes.html
 [`Class`]: struct.Class.html

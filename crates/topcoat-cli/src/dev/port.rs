@@ -25,12 +25,9 @@ impl Address {
     }
 }
 
-/// Find a host and port for the application to bind, starting from
-/// `HOST`/`PORT` and walking up from an occupied port to the first free one.
-/// Picking a different port than the configured one is reported on the
-/// terminal.
-///
-/// Returns `None` when every port from the configured one upward is occupied.
+/// Finds an available address starting with `HOST` and `PORT`. If the port is occupied,
+/// tries higher ports and reports the selected port. Returns `None` if none is
+/// available.
 pub fn resolve() -> Option<Address> {
     let mut address = Address::from_env();
     let original_port = address.port;

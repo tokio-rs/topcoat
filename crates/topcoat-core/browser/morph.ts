@@ -1,19 +1,11 @@
 /**
- * Morphs a range of the document into new content, keeping every node it
- * can match so that focus, scroll position, and other state the browser
- * holds on an element survive a replacement.
+ * Updates a DOM range while reusing matching nodes to preserve browser state.
  *
- * The algorithm is a port of idiomorph's, on a sibling range instead of an
- * element: old and new siblings are paired in order by node type and tag
- * name, an `id` is a hard identity that is never paired with a different
- * one, and an element containing an id that survives the morph is matched
- * to the element that contains the same id in the new content, so a
- * container is found again even when the siblings around it shifted. An
- * element with a surviving id that ended up somewhere else is moved into
- * place rather than recreated.
+ * Adapted from idiomorph for sibling ranges. Nodes match by type and tag.
+ * IDs present in both versions identify elements across moves and help match
+ * their containing elements. Those elements keep their IDs when matched.
  *
- * Attributes and text are synced in place. The value of the focused element
- * is left alone, so a morph never disturbs what the user is typing.
+ * Attributes and text update in place. The focused element keeps its value.
  */
 
 export interface MorphOptions {
@@ -207,11 +199,10 @@ function morphChildren(
  * Finds the old sibling from `start` up to `end` that `newNode` should
  * morph into, or `null` to insert `newNode` instead.
  *
- * An id-set match wins outright. Otherwise the first soft match without
- * any persistent id is taken, unless the search would remove the focused
- * element or more persistent ids than `newNode` carries, or `newNode`'s
- * following siblings match the old nodes better, which means `newNode` was
- * inserted in front of them.
+ * Prefer a match sharing persistent IDs. Otherwise, choose a compatible
+ * node without persistent IDs. Stop before displacing focus or too many
+ * persistent IDs. Matching later siblings can indicate that `newNode`
+ * should be inserted before them instead.
  */
 function findBestMatch(
 	ctx: Ctx,
@@ -336,10 +327,8 @@ function morphNode(ctx: Ctx, oldNode: ChildNode, newNode: Node): ChildNode {
 }
 
 /**
- * Inserts `newNode` before `before`. A node whose subtree carries a
- * persistent id is not inserted as is, because the id's old element must
- * move into it: an empty element of the same kind is inserted and morphed
- * into the new node instead.
+ * Inserts `newNode` before `before`. If it contains persistent IDs, insert
+ * an empty element and morph it so matching old elements can move into it.
  */
 function insertNode(
 	ctx: Ctx,

@@ -19,18 +19,14 @@ use crate::{
 
 /// The request context.
 ///
-/// Pages, layouts, components, and routes can take `cx: &Cx` as an optional
-/// parameter when they need request-scoped information; Topcoat passes it
-/// automatically. Use it to read values registered for the request with the
-/// app and request context helpers, such as [`app_context`] and
-/// [`request_context`].
+/// Add `cx: &Cx` to a handler or component to access context. Topcoat supplies
+/// it automatically. Read shared application values with [`app_context`] and
+/// values scoped to the request with [`request_context`].
 ///
-/// A `Cx` is a handle to state shared by everything serving the same request.
-/// [`with`](Self::with) and [`with_many`](Self::with_many) derive a child
-/// handle whose request context holds additional values, leaving the parent
-/// untouched. Cloning a handle is cheap; work that outlives the handler, such
-/// as a streaming response body or a WebSocket task, should move an owned clone into
-/// the work.
+/// Clones share the request's state. Use [`with`](Self::with) or
+/// [`with_many`](Self::with_many) to add context values in a child scope
+/// without changing the parent. Move an owned clone into work that outlives
+/// the handler, such as a streaming response.
 #[derive(Debug, Default, Clone)]
 pub struct Cx {
     /// The state shared by handles in the same context scope.
@@ -116,11 +112,9 @@ impl Cx {
 
     /// Returns a child handle whose request context also holds `value`.
     ///
-    /// The child inherits every other request context value and shares the
-    /// rest of the request state, such as the app context and the memoize
-    /// cache, with `self`. Registering a type that is already present shadows
-    /// the inherited value: lookups through the child see `value`, while
-    /// lookups through `self` still see the original.
+    /// The child inherits other context values and shares the request's state.
+    /// If this type is already registered, the child sees `value` while the
+    /// parent still sees the original.
     #[must_use]
     pub fn with<T>(&self, value: T) -> Cx
     where
@@ -197,10 +191,9 @@ struct RequestShared {
     abort_store: AbortStore,
 }
 
-/// Assembles a [`Cx`] from scratch, for tests.
+/// Builds a [`Cx`] with app and request context values for a test.
 ///
-/// Unlike [`Cx::new`], which only takes an existing shared app context,
-/// `CxTestBuilder` populates both app and request context.
+/// Use this when a test needs context without handling an HTTP request.
 #[derive(Debug, Default)]
 pub struct CxTestBuilder {
     app_context: AppContext,

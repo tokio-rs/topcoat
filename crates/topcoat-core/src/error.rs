@@ -9,12 +9,11 @@ pub type Result<T = (), E = Error> = ::core::result::Result<T, E>;
 
 /// Error type used by Topcoat APIs.
 ///
-/// Any [`std::error::Error`] converts can be converted to a Topcoat [`Error`] using `?`.
-/// The error keeps the concrete value it was built from, so callers can inspect it with
-/// [`downcast_ref`](Self::downcast_ref) or take it back out with
-/// [`downcast`](Self::downcast), and captures a backtrace when
-/// `RUST_BACKTRACE` asks for one. Cloning is cheap: clones share the
-/// underlying error, so the same error can travel along several paths.
+/// Use `?` to convert a compatible [`std::error::Error`] into this type.
+/// Inspect its concrete value with [`downcast_ref`](Self::downcast_ref), or
+/// recover it with [`downcast`](Self::downcast). Clones share the stored error.
+/// Backtrace capture follows the environment settings described by
+/// [`backtrace`](Self::backtrace).
 ///
 /// With the `anyhow` feature, `Error::from_anyhow` converts an `anyhow::Error`
 /// as well.
@@ -30,10 +29,6 @@ impl Error {
     /// Builds an error from a boxed error. Its message and sources carry
     /// over, but the concrete error inside the box is not reachable through
     /// the downcast methods.
-    ///
-    /// This is a constructor rather than a `From` impl because coherence
-    /// rules do not let one sit next to the blanket conversion from every
-    /// [`std::error::Error`].
     #[must_use]
     pub fn from_boxed(error: Box<dyn std::error::Error + Send + Sync + 'static>) -> Self {
         Self::from(Boxed(error))
@@ -60,7 +55,7 @@ impl Error {
         })
     }
 
-    /// Whether the stored error is an instance of `E`, looking through
+    /// Returns whether the stored error is an instance of `E`, looking through
     /// [`context`](Self::context) layers.
     #[inline]
     #[must_use]
@@ -71,7 +66,7 @@ impl Error {
         self.downcast_ref::<E>().is_some()
     }
 
-    /// Attempt to move the concrete error out of this error object, looking
+    /// Attempts to move the concrete error out of this error object, looking
     /// through [`context`](Self::context) layers and discarding their
     /// messages.
     ///
@@ -94,7 +89,7 @@ impl Error {
         self.unwrap::<E>()
     }
 
-    /// Attempt to downcast the error object to a concrete type, looking
+    /// Attempts to downcast the error object to a concrete type, looking
     /// through [`context`](Self::context) layers.
     ///
     /// The stored error is moved out when this is the sole handle to it and
@@ -120,7 +115,7 @@ impl Error {
         }
     }
 
-    /// Downcast this error object by reference, looking through
+    /// Borrows the concrete error, looking through
     /// [`context`](Self::context) layers.
     #[must_use]
     pub fn downcast_ref<E>(&self) -> Option<&E>
@@ -136,7 +131,7 @@ impl Error {
         }
     }
 
-    /// Downcast this error object by mutable reference, looking through
+    /// Mutably borrows the concrete error, looking through
     /// [`context`](Self::context) layers.
     ///
     /// # Errors

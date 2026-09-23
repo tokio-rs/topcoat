@@ -26,8 +26,7 @@ pub fn products_url(page: usize, sort: Option<&str>, category: Option<&str>) -> 
     url
 }
 
-/// Maps the raw `sort` query value onto the four supported sort orders;
-/// anything else falls back to the default (ascending id) order.
+/// Normalizes the requested sort order. Unknown values select ascending ID order.
 pub fn normalize_sort(sort: Option<&str>) -> Option<&'static str> {
     match sort {
         Some("name") => Some("name"),

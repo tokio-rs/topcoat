@@ -15,10 +15,8 @@ pin_project! {
     /// A [`View`] that replaces its child content with a fallback when any
     /// part of the child fails to render.
     ///
-    /// The child renders in place. When its first content is settled, no
-    /// region is created. Otherwise the content renders inside a live
-    /// region, so a failure while it streams can still swap the fallback in
-    /// over everything the child already sent.
+    /// A child with no live updates renders directly. A live child renders
+    /// in a region so a later failure can replace all its content.
     ///
     /// The fallback closure runs once on the first child error. When it
     /// returns a view, the failed child is dropped and that view takes over,

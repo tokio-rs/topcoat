@@ -28,9 +28,9 @@ Every module-derived `#[page]`, `#[layout]`, `#[layer]`, and `#[route]` under th
 
 # Registering everything else
 
-Module-derived handlers are all that `module_router!()` registers. Handlers with an explicit path string, fonts, procedures, shards, the asset bundle, and application context are registered on the builder it returns, the same way they are registered on a builder from `Router::builder()`.
+`module_router!()` registers module-derived handlers. Register other handlers and application services on the returned builder, just as you would with `Router::builder()`.
 
-With the `discover` feature, `RouterBuilderDiscoverExt::discover` adds everything Topcoat collects at link time. That covers explicit-path handlers and the annotated items of other features, such as fonts. Registration is additive, so it composes with `module_router!()`:
+Call `RouterBuilderDiscoverExt::discover` to add explicit-path handlers and other items collected through discovery:
 
 ```rust
 use topcoat::router::{Router, RouterBuilderDiscoverExt};
@@ -56,7 +56,7 @@ pub fn router() -> Router {
 }
 ```
 
-A missing registration is not a compile error. It surfaces on the first request that renders the item, as a panic about a type that is not registered for the application context. The type named in that panic tells you which registration the router is missing.
+Some integrations require registered application values. A missing value may cause a panic when a request first uses it. Follow the integration's setup guide when adding it to the router.
 
 # How modules map to routes
 
@@ -206,7 +206,7 @@ The parameter name comes from `post_id` in the declaration, not from the filenam
 
 - After `path_param!(slug)`, `path_param::<Slug>(cx)` returns the percent-decoded segment as `&str` and cannot fail.
 - After `path_param!(post_id: u64)`, `path_param::<PostId>(cx)` parses with `FromStr`. Without `error = ...`, the function returns `Result<&u64, &<u64 as FromStr>::Err>`.
-- `error = bad_request`, `not_found`, `unauthorized`, `forbidden`, `redirect(...)`, or `redirect_permanent(...)` maps a parse failure to that router error.
+- An `error = ...` option maps a parse failure to a router error. See the [`path_param!` reference](https://docs.rs/topcoat/latest/topcoat/router/macro.path_param.html) for the supported forms.
 
 Parsing occurs once per request. Later calls return the memoized result.
 

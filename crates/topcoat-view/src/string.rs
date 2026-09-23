@@ -1,9 +1,8 @@
 use std::ops::Deref;
 
-/// A static string held by reference so a view can record it in place.
+/// A reference to a static string that a view can store without copying.
 ///
-/// This is the most efficient way to pass a `&'static str` to a `view!`.
-/// Use it to optimize your rendering, for example for static class strings.
+/// Use this when interpolating a string constant into a view:
 ///
 /// ```rust
 /// # use topcoat::view::{PromotedStr, View, component, view};
@@ -15,10 +14,8 @@ use std::ops::Deref;
 /// # }
 /// ```
 ///
-/// The leading `&` is what makes this work: Rust promotes a reference to a
-/// constant into the binary's read-only data. Only a constant can be
-/// promoted, so a string that is only known at run time goes through
-/// [`StaticStr`] instead.
+/// The leading `&` borrows the constant for the `'static` lifetime. Use
+/// [`StaticStr`] for a static string selected at runtime.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PromotedStr(pub &'static &'static str);
 
@@ -33,9 +30,8 @@ impl Deref for PromotedStr {
 
 /// A static string a view records without copying it.
 ///
-/// The `&str` implementations copy their contents into the view, since the
-/// view can outlive the borrow. A `&'static str` outlives every view, so
-/// wrapping one in this type records the string as is:
+/// Wrap a `&'static str` in this type to avoid the copy made when a view
+/// captures an ordinary `&str`:
 ///
 /// ```rust
 /// # use topcoat::view::{StaticStr, View, component, view};

@@ -3,13 +3,10 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-/// A lightweight abstraction over [`VecDeque`] that preserves stable indexing after elements
-/// are removed from the front.
+/// A queue whose indices remain stable when elements are removed from the front.
 ///
-/// Unlike a plain [`VecDeque`], where removing elements from the front causes all remaining
-/// elements to shift their indices, `RingBuffer` maintains stable absolute indices by tracking
-/// an internal offset. This allows you to refer to elements by their original insertion position
-/// even after earlier elements have been removed.
+/// Each element keeps its insertion index until removed. Removing an earlier
+/// element does not change the indices of the remaining elements.
 ///
 /// # Example
 ///
@@ -50,13 +47,8 @@ impl<T> RingBuffer<T> {
 
     /// Removes and returns the element at the front of the buffer.
     ///
-    /// This operation increments the internal offset, preserving the absolute indices
-    /// of all remaining elements.
-    ///
-    /// # Returns
-    ///
-    /// - `Some(value)` if the buffer is not empty
-    /// - `None` if the buffer is empty
+    /// Returns `None` if the buffer is empty. Remaining elements keep their
+    /// indices.
     pub fn pop_front(&mut self) -> Option<T> {
         self.offset += 1;
         self.inner.pop_front()

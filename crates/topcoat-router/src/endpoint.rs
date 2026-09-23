@@ -48,9 +48,6 @@ fn standard_slot(method: &Method) -> Option<usize> {
 /// The router matches a request URL to one endpoint, then picks the route
 /// registered for the request's method. Read the endpoint a request matched
 /// with [`endpoint`](crate::endpoint).
-///
-/// The standard methods occupy a fixed-size array for O(1), allocation-free
-/// lookup; the rare custom methods spill into a map that is usually empty.
 #[derive(Debug)]
 pub struct Endpoint {
     standard: [Option<RouteIndex>; STANDARD_METHODS.len()],

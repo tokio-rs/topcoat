@@ -6,11 +6,9 @@ use topcoat_view::ViewHandle;
 
 use crate::{Attachment, Mailbox};
 
-/// A mail message: addresses, subject, bodies, and attachments.
+/// An email message ready to be formatted or sent.
 ///
-/// A mail declares its content and leaves wire concerns -- the MIME
-/// structure, encodings, and the envelope -- to the mailer that sends it.
-/// Build one with [`Mail::builder`]:
+/// Create one with [`Mail::builder`]. Building a message does not send it:
 ///
 /// ```
 /// use topcoat_mail::{Mail, Mailbox};
@@ -134,16 +132,12 @@ impl Mail {
 
 /// Assembles a [`Mail`], created by [`Mail::builder`].
 ///
-/// The `From` setter takes a single address as anything `Into<Mailbox>`.
-/// The recipient setters (`to`, `cc`, `bcc`, `reply_to`) take any
-/// collection convertible into a `Vec<Mailbox>` -- a `Vec`, an array, or a
-/// slice -- and append on every call, as do `attachments` and `headers`.
-/// Building never fails; addresses are validated when they are
-/// constructed, and remaining wire concerns when the mail is sent.
+/// The sender must convert into a [`Mailbox`]. Recipient setters accept
+/// collections that convert into `Vec<Mailbox>` and append on each call.
+/// Attachment and header setters also append.
 ///
-/// The `mail!` macro builds on this and additionally converts address
-/// strings, `(name, address)` pairs, and single values through
-/// [`TryIntoMailboxes`](crate::TryIntoMailboxes) and its siblings.
+/// Building is infallible. Addresses are validated when constructed, and the
+/// message is checked for completeness when formatted or sent.
 #[derive(Clone, Debug, Default)]
 pub struct MailBuilder {
     mail: Mail,
@@ -320,10 +314,9 @@ where
 
 /// The plain-text body of a mail: derived, declared, or absent.
 ///
-/// Mail without a plain-text alternative scores worse with spam filters, so
-/// the default, [`FromHtml`](TextBody::FromHtml), derives one from the
-/// rendered HTML body when the mail is assembled. Declare the text yourself
-/// or opt out through the builder's [`text`](MailBuilder::text) setter:
+/// The default, [`FromHtml`](TextBody::FromHtml), derives text from the rendered
+/// HTML body. Set your own text or omit the text body with
+/// [`MailBuilder::text`]:
 ///
 /// ```
 /// use topcoat_mail::{Mail, TextBody};

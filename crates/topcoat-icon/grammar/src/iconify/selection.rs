@@ -29,9 +29,7 @@ impl Selection {
         )
     }
 
-    /// The module name for the selected set: the same rule as
-    /// [`const_ident`](Self::const_ident), in lowercase (`simple-icons` ->
-    /// `simple_icons`).
+    /// The selected set's module name in snake case (`simple-icons` -> `simple_icons`).
     #[must_use]
     pub fn module_ident(&self) -> Ident {
         let name = guard_leading_digit(self.prefix.to_snake_case());
@@ -75,8 +73,7 @@ impl Parse for Selection {
     }
 }
 
-/// Prefixes `name` with a `_` when it starts with a digit, which idents must
-/// not.
+/// Adds a leading `_` when `name` starts with a digit.
 fn guard_leading_digit(name: String) -> String {
     if name.starts_with(|c: char| c.is_ascii_digit()) {
         format!("_{name}")
@@ -95,8 +92,7 @@ pub enum Selected {
     Icon(String),
 }
 
-/// Checks that a written set prefix or icon name sticks to Iconify's
-/// character set.
+/// Checks that a set prefix or icon name uses valid Iconify characters.
 fn validate_name(name: &str, what: &str, lit: &LitStr) -> syn::Result<()> {
     let valid = |c: char| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-';
     if name.is_empty() || !name.chars().all(valid) {

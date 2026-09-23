@@ -10,11 +10,9 @@ pub type TokenStoreFuture<'a, T> = Pin<Box<dyn Future<Output = Result<T>> + Send
 
 /// The client-side transport for the session token.
 ///
-/// A token store moves the raw [`Token`] between the client and the server;
-/// it is not the session database, which the application owns. The default
-/// [`CookieTokenStore`](cookie::CookieTokenStore) carries the token in a
-/// hardened cookie; implement this trait to carry it elsewhere, such as an
-/// `Authorization` header.
+/// Reads a raw [`Token`] from the request and sends token changes to the
+/// client. The application stores session records separately. Implement this
+/// trait to choose a transport other than the default cookie.
 pub trait TokenStore: Send + Sync {
     /// Reads the token presented by the current request, or `None` when the
     /// request carries none (or a malformed one).

@@ -9,13 +9,10 @@ use crate::{
     mime::{self, BccHeader},
 };
 
-/// A [`Transport`] that captures sent mail in memory instead of delivering
-/// it, for asserting on mail in tests.
+/// A [`Transport`] that captures messages in memory for tests.
 ///
-/// Sending assembles the mail exactly as a delivering transport would, so a
-/// mail that would fail to send (one without recipients, say) fails here
-/// too. Cloning is cheap and every clone shares the same capture, so a test
-/// can keep one clone and hand the other to the code under test:
+/// Validates message content before recording it. Clones share the same
+/// capture, so a test can keep one clone and give another to the application:
 ///
 /// ```
 /// # use topcoat_core::context::Cx;

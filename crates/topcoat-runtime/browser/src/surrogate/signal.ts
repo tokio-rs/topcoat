@@ -56,9 +56,7 @@ export class WriteSignal<T> {
 	}
 
 	/**
-	 * The form the signal takes as an argument to a run on the server: its
-	 * id next to its current value, so the server can rebuild the signal
-	 * without holding the value itself.
+	 * Sends the signal's id and current value so the server can restore it.
 	 */
 	dehydrate(): { t: "Signal"; id: SignalId; v: DehydratedSurrogate } {
 		return { t: "Signal", id: this.id, v: dehydrate(this.inner()) };

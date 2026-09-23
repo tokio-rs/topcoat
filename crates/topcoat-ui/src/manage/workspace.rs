@@ -9,14 +9,10 @@ use serde::Deserialize;
 use super::package::Package;
 use crate::{DEFAULT_REGISTRY, DEFAULT_REGISTRY_CRATE};
 
-/// The cargo dependency graph of a package, used to resolve registries.
+/// The Cargo dependency graph used to resolve component registries.
 ///
-/// A registry is a crate, referenced by name. To be used as a registry a crate
-/// must (a) be reachable in the package's dependency graph and (b) be a *direct*
-/// dependency declared in the package's `Cargo.toml`. The built-in registry is
-/// the one exception: it is named by the alias [`DEFAULT_REGISTRY`], provided by
-/// the [`DEFAULT_REGISTRY_CRATE`] crate, and pulled in transitively by the
-/// `topcoat` facade's `ui` feature, so it need not be a direct dependency.
+/// Custom registries must be direct dependencies. The built-in registry uses
+/// [`DEFAULT_REGISTRY`] as its name and may be a transitive dependency.
 pub(super) struct Workspace {
     /// Every resolved package, indexed by crate name.
     packages: HashMap<String, MetadataPackage>,
@@ -90,12 +86,8 @@ impl Workspace {
         })
     }
 
-    /// Resolves a registry name to its registry directory (the directory holding
-    /// `registry.toml`), enforcing the dependency rules.
-    ///
-    /// The built-in registry is named by the alias [`DEFAULT_REGISTRY`]: it
-    /// resolves to the [`DEFAULT_REGISTRY_CRATE`] crate and, since that crate is
-    /// pulled in transitively, is exempt from the direct-dependency rule.
+    /// Finds a registry's manifest directory and checks that it is an allowed
+    /// dependency. The built-in registry may be transitive.
     pub(super) fn registry_dir(&self, name: &str) -> Result<PathBuf, String> {
         if name == DEFAULT_REGISTRY {
             let package = self.packages.get(DEFAULT_REGISTRY_CRATE).ok_or_else(|| {
@@ -120,9 +112,8 @@ impl Workspace {
         registry_path(package, name)
     }
 
-    /// The names of every registry the package may add from, sorted: the built-in
-    /// registry under its alias [`DEFAULT_REGISTRY`] whenever its crate is
-    /// reachable, plus every direct dependency that declares a registry.
+    /// Returns allowed registry names in sorted order, including the built-in registry
+    /// when available.
     pub(super) fn available_registries(&self) -> Vec<String> {
         let mut names: Vec<String> = self
             .packages

@@ -8,7 +8,7 @@ use std::{
 
 use ref_cast::{RefCastCustom, ref_cast_custom};
 
-/// A borrowed route path, similar to [`std::path::Path`] but for URL paths.
+/// A borrowed route pattern made of `/`-separated segments.
 ///
 /// A `Path` consists of `/`-separated segments, where each segment is one of:
 /// - **`Static`**: a literal string (e.g. `users`)
@@ -17,12 +17,12 @@ use ref_cast::{RefCastCustom, ref_cast_custom};
 /// - **`Group`**: a logical grouping in parentheses (e.g. `(auth)`), stripped when converting to a
 ///   `matchit` path
 ///
-/// The root path `"/"` is normalized to an empty inner string. Use [`Path::new`] to
-/// create a `&Path` from a string slice.
+/// Create one from a string with [`Path::new`]. The root path `"/"` is stored
+/// as an empty string and has no segments.
 ///
-/// A trailing `/` is part of the path: `/users/` and `/users` are different
-/// paths, and the trailing slash appears as an empty `Static` segment at the
-/// end. Only the last segment may be empty.
+/// A trailing slash is significant, so `/users/` and `/users` are different
+/// paths. It is represented by an empty final `Static` segment. No other
+/// segment may be empty.
 ///
 /// # Examples
 ///
@@ -49,13 +49,10 @@ impl Path {
 
     /// Creates a `&Path` from a string slice.
     ///
-    /// The root path `"/"` is normalized to an empty inner representation so that
-    /// it produces zero segments, matching the convention that the root layout
-    /// applies to all pages.
+    /// The root path `"/"` is stored as an empty string with no segments.
     ///
-    /// This is the panicking counterpart of [`from_str`](Path::from_str).
-    /// Because it is a `const fn`, malformed paths handed to the routing macros
-    /// are rejected at compile time.
+    /// Use [`from_str`](Path::from_str) to receive an error instead of a panic.
+    /// This function also works in const contexts.
     ///
     /// # Panics
     ///
@@ -72,10 +69,9 @@ impl Path {
 
     /// Creates a `&Path` from a string slice, validating its segments.
     ///
-    /// The root path `"/"` is normalized to an empty inner representation. Every
-    /// other path must be a sequence of `/`-prefixed segments, each a valid
-    /// [`PathSegment`]. Only the last segment may be empty, which is how a
-    /// trailing `/` is kept. Returns [`PathError`] if `s` is malformed.
+    /// The root path `"/"` is stored as an empty string. Other paths contain
+    /// `/`-prefixed [`PathSegment`]s. Only the final segment may be empty,
+    /// representing a trailing slash.
     ///
     /// # Errors
     ///
@@ -116,11 +112,9 @@ impl Path {
 
     /// Creates a `&Path` from a string slice without validating or normalizing it.
     ///
-    /// This is a zero-cost reference cast. Unlike [`new`](Path::new), it
-    /// performs no segment validation and does *not* normalize the root path `"/"`
-    /// to an empty inner string. The caller must pass an already-valid, normalized
-    /// path string (for example one obtained from another `Path`); passing
-    /// anything else yields a `Path` that misbehaves when its segments are read.
+    /// The caller must provide a valid, normalized path, such as the string
+    /// from another `Path`. In particular, use an empty string for the root.
+    /// Other input can produce incorrect segment results.
     #[ref_cast_custom]
     #[must_use]
     pub const fn new_unchecked(s: &str) -> &Self;
@@ -193,11 +187,9 @@ impl Path {
 
     /// Returns `true` if this path starts with the given prefix path.
     ///
-    /// Comparison is done segment-by-segment using [`PathSegment`] equality.
-    /// This is used to determine which layouts apply to a given page: a layout
-    /// at `"/settings"` matches any page whose path starts with `/settings`.
-    ///
-    /// Group segments are included in the comparison.
+    /// Compares segments using [`PathSegment`] equality, including groups.
+    /// Parameters must match by name. They do not match arbitrary values as
+    /// they do in [`matches`](Self::matches).
     ///
     /// # Examples
     ///
@@ -356,8 +348,7 @@ impl Path {
 
     /// Returns the length of the string backing this path.
     ///
-    /// This length is in bytes, not [`char`]s or graphemes. In other words,
-    /// it might not be what a human considers the length of the string.
+    /// Measures bytes, not characters.
     #[must_use]
     pub fn len(&self) -> usize {
         self.inner.len()
@@ -710,11 +701,9 @@ impl<'a> PathSegment<'a> {
     /// Parses a single path segment string into a [`PathSegment`] without
     /// validating it.
     ///
-    /// Unlike [`new`](PathSegment::new) and [`from_str`](PathSegment::from_str),
-    /// this performs no validation; the caller must pass an already-valid segment
-    /// (for example one produced by [`Path::segments`]). A malformed input is
-    /// parsed on a best-effort basis and yields a nonsensical segment rather than
-    /// an error.
+    /// The caller must provide a valid segment, such as one from
+    /// [`Path::segments`]. Malformed input can produce an incorrect segment
+    /// rather than an error.
     #[must_use]
     pub fn new_unchecked(s: &'a str) -> Self {
         if let Some(inner) = s.strip_prefix('{') {

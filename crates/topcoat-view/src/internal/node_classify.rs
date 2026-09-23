@@ -3,14 +3,11 @@ use crate::{
     internal::{LiveView, MoveView, ScopeView},
 };
 
-/// Splits a node position's value into the parts the template's burst
-/// pushes and the view the template's join drives.
+/// Splits a node value into synchronous parts and a view to poll.
 ///
-/// A value implementing [`NodeViewParts`] is all parts: it is pushed into
-/// the template's block where the position sits, and the join drives the
-/// unit view `()`, which resolves at once to empty content. A view is all
-/// unit: nothing is pushed for it, and the join drives it in place and
-/// splices the content it resolves at the position.
+/// A [`NodeViewParts`] value supplies parts and an empty view. A view
+/// supplies no parts and is polled for its content. Both forms preserve
+/// the node's position in the template.
 pub trait NodeClassify {
     /// The parts the burst pushes at the position.
     type Parts: NodeViewParts;

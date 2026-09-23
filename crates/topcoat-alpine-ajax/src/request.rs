@@ -3,12 +3,8 @@ use topcoat_core::context::{Cx, request_context};
 
 use crate::header;
 
-/// Reads the request header `name` as a string slice, or [`None`] when it is
-/// absent or not valid UTF-8.
-///
-/// The header map is borrowed straight from the request, so these reads are
-/// cheap pointer lookups: there is nothing worth caching with `#[memoize]`,
-/// and borrowing avoids the allocation a memoized owned value would require.
+/// Borrows the header value, or returns [`None`] if it is missing or cannot
+/// be represented as text.
 #[track_caller]
 fn header<'cx>(cx: &'cx Cx, name: &HeaderName) -> Option<&'cx str> {
     request_context::<Parts>(cx)
@@ -18,8 +14,7 @@ fn header<'cx>(cx: &'cx Cx, name: &HeaderName) -> Option<&'cx str> {
         .ok()
 }
 
-/// Returns `true` when the current request was issued by Alpine AJAX, i.e. it
-/// carries an `X-Alpine-Request: true` header.
+/// Returns whether the request carries `X-Alpine-Request: true`.
 ///
 /// # Panics
 ///
@@ -44,8 +39,7 @@ pub fn ajax_targets(cx: &Cx) -> impl Iterator<Item = &str> {
         .split_whitespace()
 }
 
-/// Returns `true` when `id` is among the requested target elements, i.e. it
-/// appears in the `X-Alpine-Target` header.
+/// Returns whether `id` appears in the `X-Alpine-Target` header.
 ///
 /// # Panics
 ///

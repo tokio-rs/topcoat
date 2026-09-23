@@ -8,8 +8,8 @@ use crate::{PartsWriter, PromotedStr, StaticStr, Unescaped, buffer::ViewHandle};
 
 /// Converts a value used in node position into view parts.
 ///
-/// When this trait is implemented on a type, it can be used in the node position of an element
-/// in the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
+/// Implement this trait to interpolate a type as content in
+/// [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html):
 ///
 /// ```rust
 /// # use topcoat::view::{View, component, view};

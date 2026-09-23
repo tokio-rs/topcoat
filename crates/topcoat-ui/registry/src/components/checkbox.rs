@@ -4,13 +4,7 @@ use topcoat::{
     view::{Attributes, StaticClass, View, attributes, class, component, view},
 };
 
-/// The classes for the native `<input type="checkbox">` inside the
-/// [`checkbox`] component.
-///
-/// The native glyph is suppressed with `appearance-none` so the component can
-/// draw its own checkmark, which keeps the control looking the same across
-/// browsers. The unchecked box matches the input control's border;
-/// checking it fills the box with the primary color.
+/// Classes for the native checkbox input and its checked state.
 const CHECKBOX: StaticClass = class!(
     "peer size-4 shrink-0 appearance-none rounded-[4px] border border-border \
      bg-background transition-colors outline-none \
@@ -19,13 +13,12 @@ const CHECKBOX: StaticClass = class!(
      focus-visible:ring-offset-background disabled:pointer-events-none",
 );
 
-/// A checkbox component: a themed native `<input type="checkbox">`.
+/// A styled native checkbox.
 ///
-/// The `attrs` (such as `name`, `checked`, `disabled`, or event handlers) are
-/// forwarded to the `<input>`; a `class` among them is appended to the
-/// wrapping element's classes. Set the checked state with a plain `checked`
-/// attribute. The indeterminate state is not styled: it is only reachable
-/// through the DOM property, so setting it takes a script to begin with.
+/// Pass input attributes and event handlers through `attrs`. Classes apply to the
+/// wrapper, while other attributes go on the `<input>`. Use `checked` for the initial
+/// state. The indeterminate state requires setting a DOM property and has no custom
+/// styling.
 ///
 /// ```ignore
 /// view! {

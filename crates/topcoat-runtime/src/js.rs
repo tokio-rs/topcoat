@@ -4,14 +4,10 @@ use serde::Serialize;
 use topcoat_core::context::Cx;
 use topcoat_view::{AttributeValueViewParts, PartsWriter};
 
-/// The JavaScript source of a runtime expression, captured at its `$(..)`
-/// site.
+/// JavaScript source and captured values for a runtime expression.
 ///
-/// The `expr!` macro builds one of these next to the expression's Rust
-/// value: the source as it reaches the browser, with the values captured
-/// from the surrounding Rust scope serialized in place. Nothing is written
-/// until the expression is spliced into a view, where the source renders
-/// inside a marker comment.
+/// Captured Rust values are serialized into the source. Embedding it in a
+/// view escapes it for the surrounding HTML context.
 #[derive(Debug, Clone)]
 pub struct Js {
     parts: Vec<JsPart>,

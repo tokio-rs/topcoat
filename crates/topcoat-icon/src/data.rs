@@ -1,10 +1,9 @@
 use topcoat_view::{ViewHandle, svg::ViewBox};
 
-/// The renderable data of an SVG icon: its view box and its body markup.
+/// An SVG icon's view box and body markup.
 ///
 /// The body is the icon's inner SVG markup, without the `<svg>` element
-/// itself. Pass it to the [`icon`](../topcoat/icon/struct.icon.html) component
-/// to turn it into a renderable HTML element.
+/// itself. Render it with the [`icon`](../topcoat/icon/struct.icon.html) component.
 #[derive(Debug, Clone)]
 pub struct IconData {
     view_box: ViewBox,
@@ -18,8 +17,8 @@ impl IconData {
         Self { view_box, body }
     }
 
-    /// Creates an icon whose body renders verbatim. The body is not checked
-    /// for syntax errors or XSS injections.
+    /// Creates an icon from trusted SVG markup. The body is rendered without
+    /// escaping or validation, so it must not contain untrusted input.
     #[must_use]
     pub const fn unescaped_unchecked(view_box: ViewBox, body: &'static str) -> Self {
         Self {

@@ -7,15 +7,13 @@ use crate::{
 
 /// Shows a fallback in place of child content that fails to render.
 ///
-/// The child renders as if it stood in the boundary's place. When any part
-/// of it returns an error, the error is passed to the fallback closure and
-/// the view it returns replaces the boundary's content, leaving the rest of
-/// the page intact. Content the child already streamed out is replaced along
-/// with it.
+/// If any child content fails, the fallback closure receives the error.
+/// Its view replaces all of the boundary's content, including content
+/// already streamed to the browser. The rest of the page is unchanged.
 ///
-/// Returning `Err` from the closure rethrows: the error propagates as if
-/// there were no boundary, so an error the fallback does not handle can
-/// still reach the enclosing handler and set the response status.
+/// Returning `Err` from the closure propagates the error to the enclosing
+/// handler. The handler can change the response status only before the
+/// response starts streaming.
 ///
 /// ```rust
 /// use topcoat::{
@@ -51,8 +49,8 @@ use crate::{
 #[component]
 pub async fn error_boundary<V, F>(
     cx: &Cx,
-    /// Builds the view shown when the child content fails, from the error
-    /// that caused it. Returns the error itself, or another one, to rethrow.
+    /// Builds a fallback from the child's error. Return `Err` to propagate
+    /// an error instead.
     fallback: F,
     /// The content the boundary guards.
     #[default]

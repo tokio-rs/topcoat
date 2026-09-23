@@ -22,14 +22,12 @@ pub use weight::*;
 
 use crate::fontsource::font_face::{Display, FamilyName, Host};
 
-/// One `fontsource_font!` invocation: a family and the axes to cross-product
-/// into faces.
+/// A `fontsource_font!` invocation with a family and the face settings to combine.
 ///
-/// Holds the parsed descriptors. An omitted `weight` or `style` expands to every
-/// value the family ships; an omitted `subset` expands to the family's default
-/// subset only. `display` applies to every face and defaults to `swap`. The
-/// cross product is emitted as `fontsource_font_face!` calls, each of which
-/// verifies its own combination against the catalog.
+/// Omitted weights and styles include every available value. An omitted subset
+/// selects only the default subset. The display strategy applies to every face
+/// and defaults to `swap`. Each combination is emitted as a
+/// `fontsource_font_face!` call for validation against the catalog.
 pub struct FontsourceFont {
     pub family: FamilyName,
     pub weight: Option<Weight>,

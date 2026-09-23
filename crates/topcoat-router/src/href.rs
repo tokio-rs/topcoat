@@ -49,16 +49,12 @@ where
 
 /// A value for one path parameter, named after the parameter it fills.
 ///
-/// The `path_param!` macro implements this trait for the types it declares.
-/// An [`href`] hands each provided value the [`HrefSegments`] of the path
-/// parameter carrying the same name, and the value pushes what it fills that
-/// parameter with: one segment for a regular parameter, one per element for a
-/// catch-all.
+/// `path_param!` implements this trait for its generated types. An [`href`]
+/// matches each argument to a parameter with the same name. The argument
+/// supplies one segment for a regular parameter or several for a catch-all.
 ///
-/// Pushing a segment does not render it. A URL renders its segments with
-/// [`Display`], so that is what [`HrefParams`] requires of the
-/// [`Segment`](Self::Segment) type. A parameter whose type cannot be rendered
-/// still declares; only building a URL from it is rejected.
+/// Segments need [`Display`] only when used to build a URL. A type can
+/// implement this trait without making its segments renderable.
 pub trait HrefParam {
     /// The type of one segment this value fills its parameter with.
     type Segment: ?Sized;
@@ -391,12 +387,10 @@ fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bo
     true
 }
 
-/// Turns a page or route into an URL string.
+/// Builds a URL for a page or route.
 ///
-/// The first parameter, `target`, is the route handler the URL should be
-/// pointing to. The URL is built from the path the handler is mounted at, so
-/// it stays in sync when the route moves. A [`Path`] or a plain path string
-/// works as well.
+/// Pass the handler as `target` to use its registered path. The URL then
+/// follows changes to that path. You can also pass a [`Path`] or path string.
 ///
 /// Inside a handler's own body its name refers to the handler function, so a
 /// handler linking to itself names its marker as a type, e.g. `posts {}`, or
@@ -408,13 +402,9 @@ fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bo
 /// percent-encoded, so a parameter declared with a type, like
 /// `path_param!(post_id: u64)`, needs that type to implement [`Display`].
 ///
-/// The result can be extended with a [`query`](Href::query) string, a
-/// [`fragment`](Href::fragment), and an [`absolute`](Href::absolute) or
-/// [`relative`](Href::relative) form. Use it directly in a view to render
-/// the URL, or call [`resolve`](Href::resolve) to get the string, e.g. for
-/// a redirect. [`is_current`](Href::is_current) tells whether the URL points
-/// at the page the current request is serving, e.g. to mark the link to it in
-/// a nav.
+/// Use the returned [`Href`] to configure the query, fragment, or URL form.
+/// Render it in a view, or call [`resolve`](Href::resolve) to obtain a string.
+/// Use [`is_current`](Href::is_current) to mark a navigation link as active.
 ///
 /// ```
 /// use serde::Serialize;
@@ -460,14 +450,12 @@ where
     }
 }
 
-/// Turns a page or route into an URL string.
+/// Builds a URL for a page or route.
 ///
-/// The first argument is the route handler the URL should be pointing to.
-/// The URL is built from the path the handler is mounted at, so it stays in
-/// sync when the route moves. A handler links to itself as well, so a page
-/// can point at its own path. A [`Path`] or a plain path string works too,
-/// but a bare path always names a handler, so a [`Path`] held in a constant
-/// goes through the [`href`] function instead.
+/// Pass a handler as the first argument to use its registered path, including
+/// when linking to the handler from its own body. A [`Path`] expression or
+/// path string also works. A bare Rust path is interpreted as a handler name,
+/// so pass `Path` constants through the [`href`] function instead.
 ///
 /// Every further argument fills in one of the path's parameters, with one
 /// `path_param!` value per parameter in the order the path declares them, so
@@ -476,13 +464,9 @@ where
 /// a type, like `path_param!(post_id: u64)`, needs that type to implement
 /// [`Display`].
 ///
-/// The result can be extended with a [`query`](Href::query) string, a
-/// [`fragment`](Href::fragment), and an [`absolute`](Href::absolute) or
-/// [`relative`](Href::relative) form. Use it directly in a view to render
-/// the URL, or call [`resolve`](Href::resolve) to get the string, e.g. for
-/// a redirect. [`is_current`](Href::is_current) tells whether the URL points
-/// at the page the current request is serving, e.g. to mark the link to it in
-/// a nav.
+/// Use the returned [`Href`] to configure the query, fragment, or URL form.
+/// Render it in a view, or call [`resolve`](Href::resolve) to obtain a string.
+/// Use [`is_current`](Href::is_current) to mark a navigation link as active.
 ///
 /// ```
 /// use serde::Serialize;
@@ -531,8 +515,7 @@ where
 /// }
 /// ```
 ///
-/// The macro is a thin wrapper around the [`href`] function, which takes the
-/// parameters as a tuple instead.
+/// Use the [`href`] function to pass parameters as a tuple.
 #[macro_export]
 macro_rules! href {
     // A bare path names the marker a `#[page]` or `#[route]` expands to, and is

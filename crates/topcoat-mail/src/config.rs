@@ -7,13 +7,11 @@ use topcoat_core::{
 
 use crate::{Mail, Receipt, Transport};
 
-/// Mail configuration, registered on the app context (with the router's
-/// `mail` extension method).
+/// The transport used to send application mail.
 ///
-/// Assemble one with [`MailConfig::builder`], wrapping the [`Transport`] the
-/// application delivers through. Handlers then [`send`] mail without naming
-/// the transport, so swapping it (a file transport in development, SMTP in
-/// production) changes nothing at the call sites:
+/// Choose a [`Transport`] with [`MailConfig::builder`] and register the
+/// configuration in app context. Handlers can then call [`send`] without
+/// choosing a transport:
 ///
 /// ```
 /// use topcoat_core::context::CxTestBuilder;
@@ -78,8 +76,8 @@ impl MailConfigBuilder {
     }
 }
 
-/// Sends a mail through the transport of the registered [`MailConfig`],
-/// returning its [`Receipt`] once the delivery mechanism accepts it.
+/// Sends a message through the registered [`MailConfig`]. Returns a [`Receipt`]
+/// when the transport accepts it.
 ///
 /// # Panics
 ///
@@ -87,8 +85,8 @@ impl MailConfigBuilder {
 ///
 /// # Errors
 ///
-/// Returns an error when the mail cannot be assembled into its wire form or
-/// the transport fails to deliver it; see [`SendError`](crate::SendError).
+/// Returns an error if the message cannot be formatted or delivered.
+/// See [`SendError`](crate::SendError).
 pub async fn send(cx: &Cx, mail: Mail) -> Result<Receipt> {
     let config: &MailConfig = app_context(cx);
     config.transport.send(cx, mail).await

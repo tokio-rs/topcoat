@@ -11,10 +11,9 @@ use crate::{RegionId, View, ViewBufferScope, ViewFirst, ViewSwap, internal::Scop
 pin_project! {
     /// A [`View`] that shows a fallback until its child content is ready.
     ///
-    /// The child is polled first. When its first content is ready right
-    /// away, it renders in place and no region is created. Otherwise the
-    /// fallback renders inside a live region and the child's content swaps
-    /// into it once it resolves.
+    /// Polls the child first. If its initial content is ready, it renders
+    /// directly. Otherwise, a live region shows the fallback until the
+    /// child's content replaces it.
     ///
     /// With `wait` enabled, the boundary waits for the child's first content
     /// and renders it in place. It never polls the fallback or creates a

@@ -1,8 +1,6 @@
-//! Checking the CLI against the `topcoat` version a project depends on.
+//! Checks whether the CLI is compatible with a project's Topcoat dependency.
 //!
-//! The CLI drives the framework through code it generates and reads, so the two
-//! have to agree. Every Topcoat crate is released under one version, which makes
-//! the CLI's own version the version of `topcoat` it can drive.
+//! Compatibility is based on the CLI version and the project's lockfile.
 
 use std::{
     fmt::{self, Display},
@@ -22,12 +20,10 @@ const LOCKFILE: &str = "Cargo.lock";
 /// The environment variable that silences the check.
 const OPT_OUT: &str = "TOPCOAT_NO_VERSION_CHECK";
 
-/// Warns when the project the CLI runs in depends on a `topcoat` version this
-/// CLI cannot drive.
+/// Warns if the project resolves an incompatible Topcoat version.
 ///
-/// The check is best effort and never fails a command. It stays quiet outside a
-/// cargo workspace, when the workspace has no lockfile yet or does not depend on
-/// `topcoat`, and when [`OPT_OUT`] is set.
+/// The check never fails a command. It is skipped without a workspace lockfile or
+/// Topcoat dependency, or when [`OPT_OUT`] is set.
 pub fn warn_on_mismatch() {
     if std::env::var_os(OPT_OUT).is_some() {
         return;
@@ -66,7 +62,7 @@ fn lockfile_path(dir: &Path) -> Option<PathBuf> {
         .find(|path| path.is_file())
 }
 
-/// A `topcoat` version a project depends on that a CLI on `cli` cannot drive.
+/// A resolved Topcoat version incompatible with the CLI.
 struct Mismatch {
     /// The version cargo resolved for the project.
     version: String,
@@ -74,12 +70,8 @@ struct Mismatch {
     compat: Compat,
 }
 
-/// Every [`Mismatch`] in `lockfile`.
-///
-/// Cargo unifies semver-compatible requirements, so a lockfile holds one entry
-/// per incompatible `topcoat` version a project pulls in. Each is reported on
-/// its own: a project spanning two incompatible versions has no CLI that drives
-/// all of it.
+/// Finds incompatible Topcoat versions in the lockfile. Reports each incompatible
+/// version separately.
 fn mismatches(lockfile: &str, cli: Compat) -> Vec<Mismatch> {
     let Ok(lockfile) = toml::from_str::<Lockfile>(lockfile) else {
         return Vec::new();
@@ -113,12 +105,10 @@ struct LockedPackage {
     version: String,
 }
 
-/// The versions a release can be swapped for, following cargo's semver
-/// compatibility rule: `1.2.0` and `1.5.0` share a compatibility, `0.5.0` and
-/// `0.5.1` do, `0.5.0` and `0.6.0` do not.
+/// A group of versions treated as compatible by Cargo's semver rules.
 ///
-/// Two versions are interchangeable exactly when their compatibilities are
-/// equal, and [`Display`] renders one as the requirement that selects it.
+/// Two versions are compatible when their groups match. [`Display`] formats the group
+/// as a version requirement.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 struct Compat {
     major: u64,

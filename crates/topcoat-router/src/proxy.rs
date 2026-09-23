@@ -15,16 +15,13 @@ pub(crate) struct ClientIp(pub(crate) Option<IpAddr>);
 
 /// Configures which reverse proxies can report the client's IP address.
 ///
-/// When your application is behind a reverse proxy, incoming connections
-/// come from the proxy's IP address. The proxy sends the client's IP address
-/// in an HTTP header. Clients can send these headers too, so Topcoat ignores
-/// them unless you configure it to trust the proxy.
+/// Behind a reverse proxy, the connection address belongs to the proxy.
+/// The proxy reports the client's address in a header. Topcoat reads that
+/// header only from trusted proxies because clients can also supply it.
 ///
-/// Use [`networks`](Self::networks) to identify proxies by their IP addresses
-/// or networks. If their addresses are not known, use [`nearest`](Self::nearest)
-/// to trust a fixed number of proxies in front of your application. Prefer
-/// networks when possible. Trusting a fixed number is only safe if clients
-/// cannot bypass any of those proxies.
+/// Prefer [`networks`](Self::networks) when the proxies' addresses are known.
+/// Otherwise, [`nearest`](Self::nearest) trusts a fixed number of proxy hops.
+/// Use a hop count only when clients cannot bypass any of those proxies.
 ///
 /// Register this configuration with
 /// [`RouterBuilder::trusted_proxies`](crate::RouterBuilder::trusted_proxies),
@@ -32,9 +29,9 @@ pub(crate) struct ClientIp(pub(crate) Option<IpAddr>);
 /// address. By default, Topcoat trusts no proxies and uses the address of
 /// the direct connection.
 ///
-/// Each trusted proxy must update the configured [header](Self::header)
-/// with the address it received the request from. If it passes along a
-/// client's header unchanged, the client can fake its IP address.
+/// Each trusted proxy must update the configured [header](Self::header) with
+/// its peer's address. Passing a client-supplied header through unchanged
+/// lets the client fake its address.
 ///
 /// # Examples
 ///
@@ -129,11 +126,10 @@ impl TrustedProxies {
     /// forwarding header. Use this when a proxy's IP address may change, or
     /// when it connects over a Unix socket and has no IP address.
     ///
-    /// Only use this when every request must pass through those `count`
-    /// proxies. For example, a CDN followed by a load balancer needs a count
-    /// of two. If a client can bypass the CDN and connect to the load balancer
-    /// directly, Topcoat will trust the client as the second proxy. The client
-    /// can then fake its address by sending a forwarding header.
+    /// Every request must pass through all `count` proxies. For example, a
+    /// CDN followed by a load balancer needs a count of two. If a client can
+    /// connect directly to the load balancer, it occupies the second trusted
+    /// hop and can fake its address through the header.
     ///
     /// Prefer [`networks`](Self::networks) when the proxies' addresses are known.
     #[must_use]
@@ -166,12 +162,10 @@ impl TrustedProxies {
     /// Resolves the client address of a request that arrived from `remote`
     /// with `headers`.
     ///
-    /// Walks from the peer outward through the addresses the forwarding
-    /// header lists, skipping every trusted proxy; the first untrusted
-    /// address is the client's. When every address is trusted, the farthest
-    /// one is returned. An entry that carries no readable address ends the
-    /// walk with no client address at all, unless its hop is trusted by
-    /// position and the walk goes on past it.
+    /// Walks outward from the direct connection and returns the first
+    /// untrusted address. If every address is trusted, returns the farthest.
+    /// An unreadable address stops resolution unless its position is trusted,
+    /// in which case the walk continues.
     pub(crate) fn client_ip(&self, remote: Option<IpAddr>, headers: &HeaderMap) -> Option<IpAddr> {
         let remote = remote.map(|ip| ip.to_canonical());
         if !self.is_trusted(remote, 0) {

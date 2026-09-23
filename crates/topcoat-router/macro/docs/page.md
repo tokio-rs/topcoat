@@ -1,16 +1,16 @@
 Declares a page handler.
 
-The page's URL is the path string given to the attribute (`#[page("/about")]`). When no path is given, the URL is derived from the function's enclosing module path, kebab-cased, provided the function is reachable from a [`module_router!`](macro.module_router.html). A path starting with `./` is joined onto that module-derived path: `#[page("./export")]` in `src/app/settings.rs` serves `/settings/export`. All forms register into the same router, so explicit and module-derived paths can be mixed freely in one app.
+Pass an absolute path, such as `#[page("/about")]`, to choose the URL directly. Under [`module_router!`](macro.module_router.html), omit the path to derive it from the enclosing module. A path starting with `./` extends that module path. For example, `#[page("./export")]` in `src/app/settings.rs` serves `/settings/export`.
 
 A page serves `GET` by default. To serve other methods, name them before the path, using the same forms as [`#[route]`](attr.route.html): a single method (`#[page(POST "/signup")]`), a bracketed list (`[GET, POST]`), or `*` for every method.
 
-Path strings are Topcoat [`Path`](struct.Path.html)s: literal segments (`users`), `{name}` for dynamic parameters, `{*name}` for wildcard tails, and `(name)` for groups (which participate in layout and layer matching but are stripped from the served URL).
+Path strings follow the [`Path`](struct.Path.html) syntax.
 
 A page registers like any other handler: pass the function name to [`RouterBuilder::page`](struct.RouterBuilder.html#method.page), or let [`discover`](trait.RouterBuilderDiscoverExt.html) or [`module_router!`](macro.module_router.html) collect it automatically.
 
 # Handler signature
 
-The function is `async` and returns a [`Result`](../type.Result.html) of a value implementing [`View`](../view/trait.View.html). It may take [`cx: &Cx`](../context/struct.Cx.html), one request body parameter implementing [`FromRequest`](request/trait.FromRequest.html), both, or neither. The body parameter may use a destructuring pattern such as `Json(input): Json<T>`. The parameters may appear in either order, but there can be at most one body parameter, because the body is a stream that can only be consumed once.
+The function must be `async` and return a [`Result`](../type.Result.html) containing a [`View`](../view/trait.View.html). It may take [`cx: &Cx`](../context/struct.Cx.html) and one body parameter implementing [`FromRequest`](request/trait.FromRequest.html). Both are optional and may appear in either order. The body parameter may use a pattern such as `Json(input): Json<T>`.
 
 # Examples
 

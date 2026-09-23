@@ -1,4 +1,4 @@
-Expands to one icon of a staged [Iconify] icon set as a const-evaluable [`IconData`] expression.
+Creates an [`IconData`] expression for one icon from a staged [Iconify] set. The result can be assigned to a constant.
 
 ```rust,ignore
 use topcoat::icon::IconData;
@@ -6,7 +6,7 @@ use topcoat::icon::IconData;
 const DELETE: IconData = iconify::iconify_icon!("mdi:delete");
 ```
 
-The argument is a `"set:icon"` reference; the icon name may also be one of the set's aliases. Because the expansion is an expression, it can sit right inside a view:
+Pass a `"set:icon"` reference. The icon name can be an alias. You can also use the macro directly in a view:
 
 ```rust,ignore
 view! {
@@ -14,11 +14,11 @@ view! {
 }
 ```
 
-The staged set is read at compile time, so the reference is checked while you build: an unknown set or icon name is a compile error with near-miss suggestions. Icons that carry a rotation or flip are not supported.
+Unknown sets or icons cause a compile error with suggestions for similar names. Icons with rotation or flip properties are not supported.
 
 # Staging
 
-Sets are staged by the crate's build script through [`BuildConfig`], which downloads them from Iconify or picks them up from a local cache directory:
+Stage the set from `build.rs` with [`BuildConfig`]. It downloads missing sets and reuses cached copies:
 
 ```rust,no_run
 # #![allow(clippy::needless_doctest_main)]
@@ -33,7 +33,7 @@ fn main() {
 
 # Whole sets
 
-To include many icons at once, reach for [`include!`], which expands a whole set, or a single icon, to named `const` items.
+Use [`include!`] to generate named constants for an icon set.
 
 [Iconify]: https://iconify.design/
 [`IconData`]: ../struct.IconData.html

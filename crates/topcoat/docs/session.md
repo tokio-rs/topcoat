@@ -1,14 +1,14 @@
-Topcoat sessions implement the *mechanics* of session authentication -- generating tokens, carrying them between client and server, and the login/logout lifecycle -- while **you own the storage**. The framework hands you a hash and an expiry to persist in your own database, with your own ORM and schema; it never dictates a session table or a user model. The API is deliberately minimal for now and will likely be expanded over time.
+Topcoat manages session tokens. Your application stores each token's hash and expiry, associates it with a user, and checks that record on later requests. You choose the database and schema.
 
 Sessions are part of the default feature set, and everything below is re-exported from `topcoat::session`.
 
 # The model
 
-A session is identified by a **token**: 32 bytes of cryptographically secure randomness that only the client holds. By default the token travels in a hardened session cookie (`__Host-` prefixed, `Secure`, `HttpOnly`, `SameSite=Lax`, scoped to `/`).
+A session token contains 32 bytes of cryptographically secure randomness. The client sends it with each request. By default, Topcoat carries it in a cookie with the `__Host-` prefix, `Secure`, `HttpOnly`, `SameSite=Lax`, and `Path=/`.
 
-Your application never stores the raw token. It persists the token's SHA-256 hash, a [`TokenHash`], next to whatever the session authenticates (typically a user id) and the session's expiry. Because the hash cannot be turned back into a token, a leaked session database contains nothing a client could present.
+Store the token's SHA-256 hash, a [`TokenHash`], alongside the user ID and expiry. Do not store the raw token. Someone who obtains the session records cannot use a hash as a session token.
 
-The lifecycle is a handful of functions taking `cx: &Cx`:
+Session functions take `cx: &Cx`:
 
 - [`start`] mints a fresh token, issues it to the client, and returns the [`Session`] (hash and expiry) for you to record. Call it on login.
 - [`token_hash`] returns the hash of the token the current request presented, for you to look up in your storage.
@@ -16,7 +16,7 @@ The lifecycle is a handful of functions taking `cx: &Cx`:
 - [`refresh`] re-issues the current token with a full lifetime ahead of it, for sliding expiration.
 - [`rotate`] replaces the current token with a fresh one, for privilege changes.
 
-Within a request the presented token is read once and cached, and [`start`], [`stop`], and [`rotate`] update that cached view, so a page rendered after a login sees the new session immediately.
+Topcoat reads the token once per request. Session changes update that cached value, so later code in the same request sees the new session.
 
 Changing the session involves setting cookies, which is only possible if the response body has not begun streaming yet. The [cookie guide](crate::cookie#writes-must-happen-before-the-response) explains this in more detail.
 
@@ -39,7 +39,7 @@ let router = Router::builder()
 
 # Logging in
 
-Authenticate the user however your application does, then call [`start`] and record the returned [`Session`] in your storage. [`start`] always generates a fresh token -- it never reuses one the request presented -- so it also protects against session fixation.
+After authenticating the user, call [`start`] and store the returned [`Session`]. It always generates a fresh token. This prevents session fixation, where an attacker tries to make a user log in with a token the attacker already knows.
 
 ```rust
 use topcoat::{
@@ -67,7 +67,7 @@ async fn login(cx: &Cx) -> Result<SeeOther> {
 
 # Resolving the current user
 
-[`token_hash`] gives you the hash for the request's token, or `None` when the request carries no (valid) token. Looking it up is your side of the contract, and the idiomatic shape is a `current_user` function in the spirit of [functions, not middlewares](crate::context#functions-not-middlewares). Treat a hash your storage does not contain, or whose record has expired, as not authenticated:
+[`token_hash`] returns the request token's hash, or `None` if the token is missing or malformed. Look up the hash in your storage and reject missing or expired records. A `current_user` helper keeps this check available wherever it is needed, as described in [functions, not middlewares](crate::context#functions-not-middlewares):
 
 ```rust
 use topcoat::{Result, context::Cx, session};
@@ -83,7 +83,7 @@ async fn current_user(cx: &Cx) -> Result<Option<User>> {
 }
 ```
 
-The token itself is only read once per request, but `current_user`'s database lookup runs on every call; wrap it with [`#[memoize]`](macro@crate::context::memoize) if pages call it repeatedly.
+The database lookup runs on every call to `current_user`. Use [`#[memoize]`](macro@crate::context::memoize) if several callers need the result during one request.
 
 Guard pages by combining it with the router's error helpers:
 
@@ -128,11 +128,11 @@ async fn logout(cx: &Cx) -> Result<SeeOther> {
 }
 ```
 
-Note that [`stop`] only ends the session the request presented. Revoking *other* sessions (a "sign out everywhere" button) is a matter of deleting their records from your storage; their tokens stop resolving the moment the records are gone.
+[`stop`] only clears the current session. To revoke other sessions, delete their records from your storage. Later lookups must reject those tokens.
 
 # Refreshing and rotating
 
-A session expires a fixed [`lifetime`](SessionConfigBuilder::lifetime) after it was started. For **sliding expiration** -- sessions that stay alive while they are used -- call [`refresh`] when you resolve a valid session and push the expiry of your record forward:
+A session expires after its configured [`lifetime`](SessionConfigBuilder::lifetime). To keep an active session alive, call [`refresh`] after validating it and save the new expiry:
 
 ```rust
 use topcoat::{Result, context::Cx, session};
@@ -147,7 +147,7 @@ async fn slide_expiration(cx: &Cx) -> Result<()> {
 }
 ```
 
-[`rotate`] keeps the session but swaps its token for a fresh one, so a token that leaked before the rotation stops working. Rotate when a session's privilege changes (for example after re-authenticating for a sensitive action). It returns a [`Rotation`]: revoke the record under `rotation.revoked` and record `rotation.session` in its place.
+[`rotate`] issues a fresh token and returns a [`Rotation`]. Delete the record identified by `rotation.revoked` and save `rotation.session` in its place. Once you delete the old record, the old token no longer authenticates. Rotate after a change in privileges, such as re-authentication for a sensitive action.
 
 ```rust
 use topcoat::{Result, context::Cx, session};
@@ -163,7 +163,7 @@ async fn escalate(cx: &Cx) -> Result<()> {
 
 # Configuration
 
-[`SessionConfig`] holds the token store and the session lifetime (30 days unless overridden), and is assembled with [`SessionConfig::builder`]. The default cookie store can be renamed if the `session` cookie name does not suit:
+Use [`SessionConfig::builder`] to choose a token store and lifetime. For example, this configuration changes the cookie name and sets a two-week lifetime:
 
 ```rust
 use std::time::Duration;
@@ -180,7 +180,7 @@ The lifetime becomes both the `Max-Age` of the issued cookie and the `expires_at
 
 # Custom token stores
 
-A [`TokenStore`] is the client-side transport for the token; it is *not* the session database. Implement it to carry the token somewhere other than the default cookie, for example an `Authorization` header for API clients:
+A [`TokenStore`] reads tokens from requests and sends token changes to the client. Session records remain in your application's storage. Implement this trait to use another transport, such as an `Authorization` header:
 
 ```rust
 use std::time::Duration;
@@ -228,6 +228,6 @@ Serialize the raw token with [`Token::encode`] and parse it back with [`Token::d
 
 # Security notes
 
-- The default cookie is as locked down as a session cookie can be: `__Host-` prefixed, `Secure`, `HttpOnly`, `SameSite=Lax`, and scoped to `/`. It is invisible to scripts and never sent cross-site on subresource or scripted requests.
-- `SameSite=Lax` still sends the cookie on top-level cross-site navigations, so keep every state-changing route on `POST` (or another non-`GET` method), as the examples above do. The router's [`OriginPolicy`](crate::router::OriginPolicy) then rejects any such request that does arrive cross-origin; safe methods are deliberately not checked, so a state-changing `GET` remains unprotected.
+- The default cookie requires HTTPS and cannot be read by client-side scripts. Its `__Host-` prefix restricts it to the issuing host.
+- `SameSite=Lax` permits cookies on top-level cross-site navigations. Use `POST` or another unsafe HTTP method for state changes. The router's default [`OriginPolicy`](crate::router::OriginPolicy) checks these requests, but does not protect a state-changing `GET`.
 - Compare sessions by looking the hash up in your storage; never store or log the raw token server-side.

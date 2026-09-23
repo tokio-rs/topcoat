@@ -1,10 +1,8 @@
-/// Builds a [`Cookie`](crate::Cookie) with optional attributes, in a syntax
-/// that mirrors the [`Set-Cookie`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie)
-/// header.
+/// Builds a [`Cookie`](crate::Cookie) using syntax similar to the
+/// [`Set-Cookie`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie) header.
 ///
-/// The name and value come first as `name = value`, followed by any number of
-/// `;`-separated attributes. Flag attributes (`Secure`, `HttpOnly`) stand
-/// alone; valued attributes take `Attribute = value`.
+/// Start with `name = value`, then separate attributes with `;`. Write a flag
+/// such as `Secure` on its own. Other attributes use `Attribute = value`.
 ///
 /// | Attribute  | Form                       | Maps to        |
 /// |------------|----------------------------|----------------|
@@ -16,14 +14,12 @@
 /// | `MaxAge`   | `MaxAge = duration`        | `Max-Age=...`  |
 /// | `Expires`  | `Expires = time`           | `Expires=...`  |
 ///
-/// The name is a single token (a string literal, an identifier, or a
-/// parenthesized expression); the value and valued attributes are expressions.
-/// `SameSite` accepts the bare variant names `Lax`, `Strict`, and `None` as
-/// sugar, or any expression (e.g. a `SameSite`-typed variable).
+/// Use a string literal, identifier, or parenthesized expression for the name.
+/// Values and attribute values accept expressions. `SameSite` also accepts
+/// the bare variant names `Lax`, `Strict`, and `None`.
 ///
-/// The flag attributes also accept a boolean expression, such as
-/// `Secure = is_prod`, to set them conditionally; a `false` value omits the
-/// attribute entirely.
+/// To set a flag conditionally, pass a boolean expression such as
+/// `Secure = is_prod`. A false value omits the attribute.
 ///
 /// # Examples
 ///

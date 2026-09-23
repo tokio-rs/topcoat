@@ -37,9 +37,8 @@ const HTTP_DATE_END_SECS: u64 = 253_402_300_800;
 
 /// A [`Route`] that serves files from a directory on disk.
 ///
-/// For application assets such as images and stylesheets, prefer Topcoat's
-/// `asset!` system. It generates content-hashed URLs for long-lived caching,
-/// and Rust asset handles help avoid typos in URL strings.
+/// Use directory serving for files that need fixed URLs or are created at
+/// runtime. For bundled application files, use `asset!` to get content-hashed URLs.
 ///
 /// For simpler registration, use
 /// [`serve_dir`](RouterBuilderDirectoryExt::serve_dir) on the router builder,
@@ -50,11 +49,10 @@ const HTTP_DATE_END_SECS: u64 = 253_402_300_800;
 /// relative to the directory. For example, `/public/{*file}` with directory
 /// `public` serves `/public/css/site.css` from `public/css/site.css`.
 ///
-/// Supports `GET` and `HEAD`. Responses include `Content-Length`, a
-/// `Content-Type` based on the file extension, and `Last-Modified` when the
-/// modification time is available and can be represented as an HTTP date.
+/// Supports `GET` and `HEAD` and streams files from disk without caching them
+/// in memory. Responses include `Content-Length` and a `Content-Type` based
+/// on the file extension. A valid modification time adds `Last-Modified`.
 /// Conditional requests can return `304 Not Modified` without a body.
-/// Files are streamed from disk and are not cached in memory.
 ///
 /// Missing files, unreadable files, directories, and paths containing `..`
 /// return `404 Not Found`. Dotfiles are served. Symbolic links are followed,
@@ -210,13 +208,11 @@ impl Route for DirectoryRoute {
 
 /// Adds directory-serving methods to [`RouterBuilder`].
 ///
-/// For application assets, prefer Topcoat's `asset!` system for content-hashed
-/// URLs and Rust asset handles. These methods are useful for files that need
-/// fixed URLs or are created at runtime.
+/// Use these methods for files that need fixed URLs or are created at runtime.
+/// Use `asset!` for bundled files with content-hashed URLs.
 ///
-/// Import this trait to use [`serve_dir`](Self::serve_dir) and
-/// [`public_dir`](Self::public_dir). Both methods register a [`DirectoryRoute`],
-/// so all behavior and restrictions documented there apply here as well.
+/// Import this trait to use its methods. See [`DirectoryRoute`] for file
+/// handling and path restrictions.
 pub trait RouterBuilderDirectoryExt {
     /// Serves files from `dir` at `path`.
     ///

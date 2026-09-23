@@ -8,9 +8,8 @@ use crate::{Js, Surrogate, Surrogated};
 
 /// A value with a JavaScript expression that can produce it in the browser.
 ///
-/// Expressions whose evaluation reads no signals can render without browser
-/// bindings or marker comments. Their JavaScript is still available for
-/// event handlers and shard arguments.
+/// Expressions that read no signals render as static content. Their
+/// JavaScript remains available when needed for browser execution.
 #[derive(Debug, Clone)]
 pub struct Expr<T> {
     pub(crate) evaluated: T,

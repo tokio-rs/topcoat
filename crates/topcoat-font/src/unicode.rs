@@ -7,10 +7,8 @@ use topcoat_core::fnv1a::Fnv1a;
 
 /// A Unicode code point: an integer in `U+0000..=U+10FFFF`.
 ///
-/// The upper bound is the Unicode code space, which is intentionally broader
-/// than [`char`]: surrogate code points (`U+D800..=U+DFFF`) are not valid
-/// [`char`]s, but are valid in a CSS `unicode-range`, which addresses code
-/// points rather than scalar values.
+/// Includes surrogate code points (`U+D800..=U+DFFF`). CSS `unicode-range`
+/// accepts these code points even though Rust's [`char`] does not.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UnicodeCodePoint(u32);
 

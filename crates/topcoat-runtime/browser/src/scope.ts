@@ -13,8 +13,7 @@ export class Scope {
 	/** The ids of the signals declared in this scope's content. */
 	readonly signalIds = new Set<SignalId>();
 	/**
-	 * The ids of the signals the content depends on: those the server read
-	 * while rendering it, so a change to one re-runs the enclosing unit.
+	 * Signals read on the server. A change re-renders the enclosing unit.
 	 */
 	readonly dependencies = new Set<SignalId>();
 	private readonly effects = new Set<Effect>();
@@ -44,8 +43,7 @@ export class Scope {
 	}
 
 	/**
-	 * Ends work attached to this scope when it is released: DOM listeners
-	 * and, for a render unit's lifetime scope, pending requests.
+	 * Aborts attached work when this scope is released.
 	 */
 	get abortSignal(): AbortSignal {
 		return this.listenerController.signal;

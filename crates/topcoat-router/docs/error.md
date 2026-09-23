@@ -1,10 +1,10 @@
 Turning handler errors into HTTP responses.
 
-Every page, layout, layer, and route handler returns a `Result`. An `Err` becomes the response: the router maps each of its own error types onto an HTTP status code and turns anything else into a 500.
+Handlers return a `Result`. An unhandled router error selects an HTTP error or redirect response. Other errors produce `500 Internal Server Error`.
 
 # Constructors
 
-Every error type in this module has a constructor function named after its response. For example, [`not_found()`](not_found) responds 404 with [`NotFoundError`], [`redirect(uri)`](redirect) responds 307 with [`RedirectError`], and [`bad_request(description)`](bad_request) responds 400 with [`BadRequestError`] and a client-safe description. [`too_many_requests(secs)`](too_many_requests) and [`service_unavailable(secs)`](service_unavailable) respond 429 and 503, each carrying a `Retry-After` header. [`see_other(uri)`](see_other) responds 303 with [`SeeOther`], which doubles as a successful response, so a route can also return it through `Ok`.
+Construct an error with the function named for the response you want. For example, [`not_found()`](not_found) returns a [`NotFoundError`] for a 404 response. [`bad_request(description)`](bad_request) returns a 400 response and exposes the description to the client, so use a client-safe message. See each constructor for its status code and headers.
 
 A constructor returns a concrete error type that converts into the handler's error, so bubble it up with `?` or return it directly:
 
@@ -25,7 +25,7 @@ The router raises some of these itself: a request that matches no route gets a [
 
 # From an `Option` or `Result`
 
-Usually the failing value is the condition. [`RouterErrorExt`] adds `ok_or_*` methods to [`Option`] and [`core::result::Result`] that replace `None` (or any `Err`) with a router error, ready for `?`:
+[`RouterErrorExt`] adds `ok_or_*` methods to [`Option`] and [`core::result::Result`]. They replace `None` or `Err` with a router error that you can propagate with `?`:
 
 ```rust
 # use topcoat::{Result, context::Cx, router::{error::RouterErrorExt, page}, view::{View, view}};
@@ -42,7 +42,7 @@ The methods mirror the constructors: [`ok_or_not_found`](RouterErrorExt::ok_or_n
 
 # Catching an error
 
-An error keeps its type on the way out, so an outer handler can pick it up with `downcast_ref` and respond with a view instead. Wrap the content that may fail in an [`error_boundary`](https://docs.rs/topcoat/latest/topcoat/view/struct.error_boundary.html): when it fails, the boundary hands the error to its fallback and shows the view the fallback returns in its place. For example, a layout can replace a [`ForbiddenError`] bubbling out of any page below it with a branded access-denied page:
+Wrap content in an [`error_boundary`](https://docs.rs/topcoat/latest/topcoat/view/struct.error_boundary.html) to render a fallback when it fails. The fallback receives the error and can inspect its type with `downcast_ref`. For example, a layout can catch a [`ForbiddenError`] from its page and render an access-denied view:
 
 ```rust
 use topcoat::{
@@ -76,7 +76,7 @@ async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
 }
 ```
 
-The [`StatusCode`](crate::StatusCode) in the view keeps the response a 403; without it the replacement page would be served as a 200. Returning an error from the fallback rethrows it; it will continue bubbling up the view tree.
+The [`StatusCode`](crate::StatusCode) keeps the response at 403. Without it, the fallback view would produce a 200 response. Return an error from the fallback to let an outer boundary or the router handle it.
 
 You may also use [`live!`](../view/macro.live.html) regions to handle errors instead of using the simpler `error_boundary` component.
 
@@ -93,7 +93,7 @@ This registers a page resolving every otherwise unmatched URL under its path to 
 
 # Rewrites
 
-A rewrite dispatches the request again at a different path, running the whole route stack as if that path had been requested in the first place. Unlike a redirect it is invisible to the client: the browser URL stays what was requested, and no extra round trip happens. Build one with [`rewrite(path, body)`](rewrite) and return it like any other router error:
+A rewrite handles the request again at another path. It runs the layers and handler for that path without changing the browser URL or making another client request. Return [`rewrite(path, body)`](rewrite) as an error:
 
 ```rust
 use topcoat::{Result, context::Cx, router::{Body, error::rewrite, page}, view::{View, view}};
@@ -107,7 +107,7 @@ async fn dashboard(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-The rewritten dispatch keeps the request's method and headers and reads `body` as its request body; the path may carry a query string. Everything else starts over: the response built so far is discarded along with the request context, so per-request state like memoized values or response cookies staged by the abandoned dispatch does not leak into the new one. Layers run again too, including pathless ones.
+The rewritten request keeps the method and headers, uses the supplied body, and may include a new query string. It gets a fresh request context and memoization cache. Pending response changes from the abandoned dispatch are discarded. All matching layers run again, including pathless layers.
 
 The returned [`RewriteError`] has more configuration options. [`method`](RewriteError::method) dispatches the rewritten request with a different HTTP method than the one it arrived with. [`with`](RewriteError::with) carries a value into the next dispatch and every later dispatch in the same chain, where it is available through [`request_context`](topcoat_core::context::request_context). Each dispatch still gets a fresh context and memoization cache. Calling `with` again, or on a later rewrite, replaces a carried value of the same type while keeping the other carried values. A form handler can combine both options to render its page as a `GET` with a value telling the page what happened:
 

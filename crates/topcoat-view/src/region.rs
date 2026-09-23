@@ -4,8 +4,7 @@ use topcoat_core::identity::{Identity, SiteKey};
 
 /// Identifies a region by its enclosing identity and source location.
 ///
-/// The same region has the same id across renders. Its wire form is the
-/// 128-bit hash written as fixed-width hex.
+/// The same region has the same id across renders.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RegionId(u128);
 

@@ -4,46 +4,29 @@ use topcoat::{
     view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
-/// The classes for the [`sheet`] overlay: a layer covering the viewport,
-/// veiling the page behind it and holding the panel against one edge.
-///
-/// It is the dialog's overlay without the padding and the centering, since a
-/// sheet lies flush against the side it comes from; which side that is, is
-/// the panel's business. As with the dialog, only the open state sets a
-/// display, so a closed sheet stays hidden by the browser's own rule.
+/// Classes for a viewport overlay with no edge padding. Set `display` only for the open
+/// state so the native closed state remains hidden.
 const OVERLAY: StaticClass = class!(
     "fixed inset-0 z-50 size-full max-h-none max-w-none overflow-hidden \
      bg-background/80 text-foreground backdrop-blur-sm open:flex",
 );
 
-/// The classes fading the veil in and out.
-///
-/// A sheet goes from not being rendered at all to covering the page, which
-/// takes two things beyond the fade itself. `display` is named in the
-/// transition with `allow-discrete`, which holds the layer on the page for as
-/// long as the fade out lasts instead of taking it away at once. And
-/// `@starting-style` gives the layer the value to come from: an element that
-/// was not rendered a moment ago has no previous style to leave behind, so
-/// without it the fade in has nothing to run from.
+/// Classes that fade the overlay in and out. `allow-discrete` keeps it displayed
+/// through the exit transition, and `@starting-style` supplies the entry opacity.
 const FADE: StaticClass = class!(
     "opacity-0 open:opacity-100 starting:open:opacity-0 \
      [transition:opacity_200ms_ease-out,display_200ms_allow-discrete]",
 );
 
-/// A sheet component: a panel that comes in from an edge of the page.
+/// A panel that slides in from an edge of the page.
 ///
-/// It is a [`dialog`](super::dialog::dialog) laid against a side rather than
-/// centered, for the things a dialog is too small for: filters, a form, a
-/// detail view of the row being read. Everything else is the dialog's: its
-/// open state is the `open` parameter, which accepts a boolean for a fixed
-/// state or a runtime expression to open and close it in the browser.
+/// Pass a boolean to `open` for a fixed state, or a runtime expression to control it in
+/// the browser. Like [`dialog`](super::dialog::dialog), it needs application scripting
+/// for focus trapping and Escape dismissal.
 ///
-/// Child nodes are the sheet's content, normally a single [`sheet_content`]
-/// panel, whose `side` decides which edge it lies against. Build the inside
-/// out of [`dialog_header`](super::dialog::dialog_header),
-/// [`dialog_title`](super::dialog::dialog_title) and the rest. The `attrs`
-/// are forwarded to the `<dialog>`; a `class` among them is appended to the
-/// computed classes.
+/// Pass a `sheet_content` panel as children and choose its edge with `side`. Use dialog
+/// components to arrange its contents. `attrs` are forwarded to the `<dialog>`, with
+/// extra classes added to its classes.
 ///
 /// ```ignore
 /// view! {
@@ -90,8 +73,7 @@ pub async fn sheet(
 pub enum SheetSide {
     /// Along the left edge, full height.
     Left,
-    /// Along the right edge, full height. This is where a sheet usually comes
-    /// from, since it leaves the start of every line on the page in view.
+    /// Along the right edge at full height.
     #[default]
     Right,
     /// Across the top edge, full width.
@@ -101,12 +83,7 @@ pub enum SheetSide {
 }
 
 impl SheetSide {
-    /// The Tailwind classes for this side.
-    ///
-    /// The panel takes the whole of one axis and is pushed against its edge
-    /// by an automatic margin on the other, which is what leaves the veil
-    /// showing on the remaining side. It is bordered only along the edge that
-    /// faces the page, the one edge of it that is not against the viewport.
+    /// Classes that position the panel at the selected edge.
     fn classes(self) -> StaticClass {
         match self {
             Self::Left => class!("mr-auto h-full w-full max-w-sm border-r"),
@@ -116,14 +93,7 @@ impl SheetSide {
         }
     }
 
-    /// The Tailwind classes sliding the panel in from this side.
-    ///
-    /// The panel rests off the edge it comes from and is brought in while the
-    /// sheet around it is open, which is what makes it slide both ways: in as
-    /// the sheet opens, and back out as it closes, for as long as the veil's
-    /// fade holds the sheet on the page. `@starting-style` gives it the place
-    /// to come from the first time, since a panel that was not rendered a
-    /// moment ago has no previous position to leave.
+    /// Classes that slide the panel in and out from the selected edge.
     fn motion(self) -> StaticClass {
         match self {
             Self::Left => class!(
@@ -146,23 +116,17 @@ impl SheetSide {
     }
 }
 
-/// The classes shared by every sheet panel, regardless of side.
-///
-/// The panel is the dialog's, squared off and stretched to its edge: it sets
-/// its own background and text color, stacks its sections in a column, and
-/// scrolls within itself once there is more in it than the edge it lies
-/// against is long.
+/// Classes for a sheet panel with vertically stacked content and internal scrolling.
 const CONTENT: StaticClass = class!(
     "flex flex-col gap-4 overflow-y-auto border-border bg-card p-6 \
      text-card-foreground shadow-sm [transition:translate_200ms_ease-out]",
 );
 
-/// The panel of a [`sheet`], holding its sections.
+/// The content panel inside a sheet.
 ///
-/// The `side` parameter decides which edge it lies against, defaulting to
-/// `Right`. The `attrs` (such as `class`) are forwarded to the underlying
-/// `<div>`; a `class` among them is appended to the computed classes, so a
-/// wider or narrower sheet is a `max-w-*` class among them.
+/// `side` chooses its edge and defaults to `Right`. `attrs` are forwarded to the
+/// `<div>`, with extra classes added to its classes. Use them to adjust the panel's
+/// dimensions.
 #[component]
 pub async fn sheet_content(
     /// The edge the panel lies against.

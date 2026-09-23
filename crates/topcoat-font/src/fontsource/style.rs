@@ -2,9 +2,7 @@ use crate::FontStyle;
 
 /// Whether a catalog face is upright or italic.
 ///
-/// Fontsource describes every face as either [`Normal`](Self::Normal) or
-/// [`Italic`](Self::Italic); this is the `style` axis of a
-/// [`Family`](crate::fontsource::Family).
+/// Represents the `style` axis in the Fontsource catalog.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Style {
     /// An upright face (`normal`).

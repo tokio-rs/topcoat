@@ -3,12 +3,7 @@ use topcoat::{
     view::{Attributes, StaticClass, View, class, component, view},
 };
 
-/// The classes for the native `<input type="checkbox">` serving as the
-/// [`switch`] track.
-///
-/// The native glyph is suppressed with `appearance-none` and the input is
-/// stretched into a pill-shaped track, which keeps the control looking the
-/// same across browsers. Checking it fills the track with the primary color.
+/// Classes for the checkbox input that forms the switch track.
 const SWITCH: StaticClass = class!(
     "peer h-4.5 w-8 shrink-0 appearance-none rounded-full \
      bg-foreground/20 shadow-xs transition-colors outline-none checked:bg-primary \
@@ -16,24 +11,18 @@ const SWITCH: StaticClass = class!(
      focus-visible:ring-offset-background disabled:pointer-events-none",
 );
 
-/// The classes for the thumb sliding along the track.
-///
-/// The thumb is two spacing units smaller than the track, inset by one unit
-/// at rest, and travels to the mirrored position when checked, so the rim
-/// around it is uniform at both ends of the track.
+/// Classes that position the thumb at either end of the track according to the checked
+/// state.
 const THUMB: StaticClass = class!(
     "pointer-events-none absolute top-1/2 left-0.5 size-3.5 -translate-y-1/2 \
      rounded-full bg-background shadow-xs transition-transform peer-checked:translate-x-3.5",
 );
 
-/// A switch component: an on/off toggle for a setting that applies
-/// immediately.
+/// An on/off control for a setting.
 ///
-/// The control is a native `<input type="checkbox">` carrying the `switch`
-/// role, so assistive technology announces it as a switch. The `attrs` (such
-/// as `name`, `checked`, `disabled`, or event handlers) are forwarded to the
-/// `<input>`; a `class` among them is appended to the wrapping element's
-/// classes. Set the on state with a plain `checked` attribute.
+/// Uses a native checkbox with the `switch` role. Pass `checked` in `attrs` for the
+/// initial state. Classes apply to the wrapper, while other attributes and event
+/// handlers go on the `<input>`.
 ///
 /// ```ignore
 /// view! {

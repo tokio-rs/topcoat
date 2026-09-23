@@ -11,11 +11,9 @@ use crate::{
 
 /// A boxed view part that writes its output at render time.
 ///
-/// Implement this for values whose output is only known when the view
-/// renders, such as resolved asset URLs. The writer passed to
-/// [`render`](Self::render) already carries the [`HtmlContext`] of the
-/// position the part was pushed into, so everything written through it is
-/// escaped or validated for that position.
+/// Implement this when output must be computed during rendering. The
+/// writer passed to [`render`](Self::render) escapes or validates output
+/// for the part's HTML position.
 pub trait DynViewPart: 'static + fmt::Debug + Send + Sync {
     /// Writes this part's output into `w`.
     #[track_caller]
@@ -46,28 +44,17 @@ macro_rules! impl_push_primitive {
     };
 }
 
-/// A context-carrying writer over an instruction buffer, created per
-/// position.
+/// Collects renderable parts for one HTML position.
 ///
-/// The `view!` macro creates a `PartsWriter` for each dynamic position it
-/// fills and hands it to the matching position trait:
-/// [`NodeViewParts`](crate::NodeViewParts),
-/// [`AttributeValueViewParts`](crate::AttributeValueViewParts),
-/// [`AttributeKeyViewParts`](crate::AttributeKeyViewParts),
-/// [`ElementNameViewParts`](crate::ElementNameViewParts), or
-/// [`AttributeViewParts`](crate::AttributeViewParts).
+/// Rendering traits receive this writer to append their output. Its
+/// [`HtmlContext`] determines how that output is escaped or validated.
 ///
-/// Implementations of those traits make a value renderable by pushing it
-/// through the `push_*` methods, which seal the pushed text with the
-/// [`HtmlContext`] of the position so rendering escapes or validates it
-/// correctly, or by delegating to another implementation of the same
-/// position trait. The `push_*_unescaped` methods are the only way to opt
-/// out of that protection.
+/// Use the `push_*` methods to append parts, or delegate to another
+/// implementation of the same rendering trait. Methods ending in
+/// `_unescaped` bypass escaping and require trusted input.
 ///
-/// The writer also accumulates a size hint: an estimate of the number of
-/// bytes everything pushed so far will write when rendered. The estimate
-/// becomes the built view's size hint, which pre-allocates the output buffer
-/// at render time.
+/// The writer estimates the total output size to help allocate the
+/// rendered string.
 pub struct PartsWriter<'a> {
     sink: Sink<'a>,
     context: HtmlContext,
@@ -109,12 +96,9 @@ impl<'a> PartsWriter<'a> {
     /// Runs `f` with this writer sealing for a different context, then
     /// restores the current context.
     ///
-    /// In-crate compositions that span more than one position use this to
-    /// transition between the positions they cover, such as
-    /// [`Attribute`](crate::Attribute) moving from a key to a value or
-    /// [`push_comment`](Self::push_comment) sealing a comment body.
+    /// Use this when writing a structure that spans HTML positions.
     ///
-    /// This method should remain private to avoid potential XSS footguns.
+    /// Keep this private so callers cannot bypass a position's escaping rules.
     #[inline]
     pub(crate) fn in_context<R>(
         &mut self,
@@ -155,10 +139,8 @@ impl<'a> PartsWriter<'a> {
     /// Appends a static string held by reference, sealed with this writer's
     /// context.
     ///
-    /// Pass `&"..."`, which Rust promotes to a reference into the binary's
-    /// read-only data. The string stays out of the buffer's constants, so
-    /// prefer this over [`push_static_str`](Self::push_static_str) whenever
-    /// the string is written as a literal.
+    /// Pass `&"..."` for a string literal. This avoids storing an extra
+    /// reference in the buffer's constants.
     #[inline]
     pub fn push_promoted_str(&mut self, value: &'static &'static str) -> &mut Self {
         self.size_hint += Self::str_size_hint(value, self.context);
@@ -201,11 +183,8 @@ impl<'a> PartsWriter<'a> {
     /// Appends a static string held by reference that renders verbatim,
     /// bypassing this writer's context.
     ///
-    /// Pass `&"..."`, which Rust promotes to a reference into the binary's
-    /// read-only data. The string stays out of the buffer's constants, so
-    /// prefer this over
-    /// [`push_static_str_unescaped`](Self::push_static_str_unescaped)
-    /// whenever the string is written as a literal.
+    /// Pass `&"..."` for a string literal. This avoids storing an extra
+    /// reference in the buffer's constants.
     ///
     /// Use this only for trusted markup. Passing untrusted input defeats the
     /// runtime's escaping and can lead to XSS vulnerabilities.
@@ -230,12 +209,9 @@ impl<'a> PartsWriter<'a> {
 
     /// Appends an HTML comment whose body is built through `build`.
     ///
-    /// The `<!-- ` and ` -->` delimiters are written verbatim, while the
-    /// writer handed to `build` seals everything pushed into it for the
-    /// [`Comment`](HtmlContext::Comment) context. Because that context
-    /// escapes `>`, the body can never contain `-->` and terminate the
-    /// comment, so a marker can be built from untrusted data with
-    /// [`push_str`](Self::push_str) and no separate escaping step.
+    /// The writer passed to `build` uses [`Comment`](HtmlContext::Comment)
+    /// escaping. Use its regular push methods for untrusted text so it
+    /// cannot close the comment.
     ///
     /// # Panics
     ///

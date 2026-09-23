@@ -14,8 +14,7 @@ export class SignalRegistry {
 	}
 
 	/**
-	 * Inserts a signal with the given id. If one already exists, the call is a
-	 * no-op (existing signal wins). Returns `true` iff a new signal was created.
+	 * Inserts a signal unless the id already exists. Returns whether it was added.
 	 */
 	insert(id: SignalId, value: unknown): boolean {
 		if (this.signals.has(id)) return false;

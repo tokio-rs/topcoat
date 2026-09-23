@@ -223,15 +223,10 @@ pub struct UnicodeCodePoint {
 
 impl Parse for UnicodeCodePoint {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        // After `U+`, a code point lexes as:
-        //   - an integer literal (starts with a digit, e.g. `0041`),
-        //   - a Rust hex literal with `0x` prefix, needed when the bare hex would be rejected by
-        //     Rust's tokenizer (e.g. `0x000E` — bare `000E` looks like a float exponent to the
-        //     tokenizer), or
-        //   - an identifier (starts with a hex letter, e.g. `D800`).
-        //
-        // Reconstruct the original text, strip any supported prefix, and
-        // read it as hexadecimal.
+        // Rust tokenizes code points as literals (`0041`) or identifiers
+        // (`D800`). A `0x` prefix allows values such as `000E` that Rust would
+        // otherwise read as a malformed exponent. Strip that prefix and parse
+        // the original text as hexadecimal.
         let (text, span) = input.step(|cursor| {
             if let Some((literal, rest)) = cursor.literal() {
                 let mut s = literal.to_string();

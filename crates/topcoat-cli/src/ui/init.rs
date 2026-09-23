@@ -94,10 +94,9 @@ impl InitCommand {
     }
 }
 
-/// Prompts the user to pick a theme from those the registry offers, navigating
-/// with the arrow keys and selecting with enter. A theme is mandatory, so this
-/// errors when there is no terminal to prompt on (non-interactive use must pass
-/// `--theme`) and when the prompt is cancelled (e.g. ctrl-c / esc).
+/// Asks the user to select a theme with the arrow keys and Enter. Returns an error if
+/// input is cancelled or no terminal is available. Non-interactive callers must select
+/// a theme with `--theme`.
 fn choose_theme(themes: &[String]) -> Result<String, String> {
     use std::io::IsTerminal;
 

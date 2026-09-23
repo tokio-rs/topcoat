@@ -79,9 +79,8 @@ impl topcoat_core_grammar::pretty::PrettyPrint for DisplayKey {
 
 /// A single display strategy, written as a bare variant name (`Swap`).
 ///
-/// Emits the [`FontDisplay`] variant's path, keeping the written ident's span
-/// so the compiler reports unknown strategies on it and editors autocomplete
-/// them.
+/// Emits a [`FontDisplay`] variant path while preserving the identifier's span
+/// for compiler errors and editor completion.
 ///
 /// [`FontDisplay`]: ../../../font/enum.FontDisplay.html
 pub struct DisplayValue(Ident);

@@ -38,8 +38,7 @@ impl Default for BuildConfig {
 }
 
 impl BuildConfig {
-    /// The default configuration, ready to be customized with the builder
-    /// methods and executed with [`render`](Self::render).
+    /// Creates the default configuration. Call [`render`](Self::render) to run it.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
@@ -48,10 +47,7 @@ impl BuildConfig {
     /// Where the Tailwind CLI executable comes from. Defaults to downloading
     /// [`DEFAULT_VERSION`](crate::build::DEFAULT_VERSION) from GitHub.
     ///
-    /// [`version`](Self::version), [`version_checksum`](Self::version_checksum),
-    /// [`executable`](Self::executable), and
-    /// [`executable_env`](Self::executable_env) are shorthands for the
-    /// individual variants; the most recent call wins.
+    /// Replaces any previously configured executable source.
     #[must_use]
     pub fn executable_source(mut self, executable_source: ExecutableSource) -> Self {
         self.executable_source = executable_source;
@@ -107,8 +103,8 @@ impl BuildConfig {
         self.executable_source(ExecutableSource::Env(name.into()))
     }
 
-    /// Input CSS file. Defaults to a generated `input.css` in `OUT_DIR` that
-    /// just contains `@import "tailwindcss";`.
+    /// Sets the input CSS file. By default, generates a file in `OUT_DIR`
+    /// containing `@import "tailwindcss";`.
     ///
     /// The Tailwind CLI resolves a relative path against [`cwd`](Self::cwd),
     /// which defaults to the package root.
@@ -118,8 +114,7 @@ impl BuildConfig {
         self
     }
 
-    /// Output CSS file. Defaults to `$OUT_DIR/tailwind.css`, which can be
-    /// loaded from source via `asset!(concat!(env!("OUT_DIR"), "/tailwind.css"))`.
+    /// Sets the output CSS file. Defaults to `$OUT_DIR/tailwind.css`.
     ///
     /// The Tailwind CLI resolves a relative path against [`cwd`](Self::cwd),
     /// which defaults to the package root.
@@ -129,20 +124,14 @@ impl BuildConfig {
         self
     }
 
-    /// Pass `--cwd` to the Tailwind CLI: the directory Tailwind scans for
-    /// class names, and the base for relative [`input`](Self::input) and
-    /// [`output`](Self::output) paths. Defaults to `$CARGO_MANIFEST_DIR`
-    /// (the package root).
+    /// Sets the directory Tailwind scans for class names. Relative
+    /// [`input`](Self::input) and [`output`](Self::output) paths also start here.
+    /// Defaults to `$CARGO_MANIFEST_DIR`, the package root.
     ///
-    /// Tailwind's automatic source detection walks every file under this
-    /// directory that is not matched by `.gitignore`. That makes the ignore
-    /// file load-bearing: Cargo's generated `.gitignore` excludes `target/`,
-    /// but in a checkout without one the walk descends into build artifacts,
-    /// which is slow and resurrects class names from previous builds. If the
-    /// build environment cannot guarantee an ignore file, scope the scan
-    /// down (e.g. `.cwd("src")`), or disable directory scanning entirely
-    /// with a custom [`input`](Self::input) that uses
-    /// `@import "tailwindcss" source(none)` and explicit `@source` globs.
+    /// Exclude build output with `.gitignore` to avoid scanning generated
+    /// files and stale classes. You can also narrow the scan with `.cwd("src")`
+    /// or a custom [`input`](Self::input) using `source(none)` and explicit
+    /// `@source` directives.
     #[must_use]
     pub fn cwd(mut self, cwd: impl Into<PathBuf>) -> Self {
         self.cwd = Some(cwd.into());
@@ -163,12 +152,10 @@ impl BuildConfig {
         self
     }
 
-    /// Resolve the Tailwind CLI executable from the configured
-    /// [`ExecutableSource`] and run it. Returns the path to the generated CSS
-    /// file.
+    /// Runs Tailwind and returns the generated CSS path.
     ///
-    /// `OUT_DIR` is only required when something depends on it: the CLI is
-    /// downloaded, or `input`/`output` is left at its default.
+    /// Cargo's `OUT_DIR` is required for downloads and default input or output
+    /// paths. The default working directory requires `CARGO_MANIFEST_DIR`.
     ///
     /// # Errors
     ///

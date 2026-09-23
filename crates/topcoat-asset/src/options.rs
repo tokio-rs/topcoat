@@ -6,10 +6,8 @@ use crate::{ConstReader, ConstWriter};
 
 /// Options that control how an asset is bundled.
 ///
-/// Usually set via the [`asset!`](crate::asset) or
-/// [`asset_options!`](crate::asset_options) macros rather than
-/// constructed directly. See the [`asset!`](crate::asset) docs for what
-/// each field does.
+/// Set these fields with [`asset!`](crate::asset) or
+/// [`asset_options!`](crate::asset_options).
 #[derive(Debug, Clone, PartialEq)]
 pub struct AssetOptions {
     /// Replace the file stem (everything before the final `.`) in the

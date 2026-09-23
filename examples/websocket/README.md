@@ -1,6 +1,6 @@
 # WebSocket
 
-An echo endpoint: a route upgrades the request to a WebSocket and sends every message it receives back to the browser.
+A WebSocket endpoint that sends received messages back to the browser.
 
 Run it with:
 

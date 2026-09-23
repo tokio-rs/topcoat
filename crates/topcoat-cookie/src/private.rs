@@ -5,15 +5,13 @@ use crate::Cookies;
 /// A [`Cookies`] adapter that encrypts cookies written through it and decrypts
 /// cookies read through it, using a [`Key`].
 ///
-/// Encryption (AES-256-GCM) makes a cookie's value both tamper-proof and
-/// unreadable by the client. Created by [`Cookies::private`] or
+/// The client cannot read the plaintext or change it without detection.
+/// Create a private jar with [`Cookies::private`] or
 /// [`private_cookies`](crate::private_cookies).
 ///
-/// The cookie's **name is bound into the ciphertext as associated data**, so
-/// the name seen at this layer must match on write and read. Because `get`
-/// mirrors `add` through the same adapter stack, that holds automatically
-/// regardless of how this layer is composed with prefixing. Reads return `None`
-/// when a cookie is missing or fails to decrypt.
+/// Read and write cookies with the same name, key, and adapter configuration.
+/// Reads return `None` for missing cookies or failed decryption. This adapter
+/// can be combined with prefixes and attribute defaults.
 #[derive(Debug, Clone, Copy)]
 pub struct PrivateJar<'key, J> {
     inner: J,

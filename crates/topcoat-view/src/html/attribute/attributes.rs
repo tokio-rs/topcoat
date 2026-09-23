@@ -9,14 +9,13 @@ use crate::{
 
 /// A runtime collection of HTML attributes with unique keys.
 ///
-/// `Attributes` is map-like: each key appears at most once, and inserting the
-/// same key again replaces the previous value. Do not rely on render order.
+/// Each key appears at most once. Inserting the same key again replaces its
+/// value. Attribute order is unspecified.
 /// Prefer constructing `Attributes` with the [`attributes!`](macro.attributes.html)
 /// macro.
 ///
-/// Each key and value is captured as an [`AttributeKey`] and an
-/// [`AttributeValue`] when it is inserted, so a collection can be built and
-/// rendered anywhere.
+/// Keys and values are captured when inserted. The collection can be built
+/// separately from the element that renders it.
 #[derive(Debug, Default, Clone)]
 pub struct Attributes {
     map: HashMap<AttributeKey, AttributeValue>,
@@ -37,12 +36,6 @@ impl Attributes {
 
     /// Creates an empty attribute collection with space for at least `capacity`
     /// attributes.
-    ///
-    /// Prefer the
-    /// [`attributes!`](https://docs.rs/topcoat/latest/topcoat/view/macro.attributes.html)
-    /// macro when writing attributes directly. This is mainly useful for
-    /// generated code or manual builders that already know how many attributes
-    /// they will insert.
     #[inline]
     #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
@@ -65,14 +58,10 @@ impl Attributes {
 
     /// Inserts or replaces an attribute.
     ///
-    /// The key is captured as an [`AttributeKey`] with
-    /// [`AttributeKeyViewParts`] and the value as an [`AttributeValue`] with
-    /// [`AttributeValueViewParts`]. If the key was already present, the
-    /// previous captured value is returned. If the implementation of
-    /// [`AttributeValueViewParts`] for `v` signals that the attribute should
-    /// not be present, an [absent](AttributeValue::Absent) value is stored
-    /// instead, which causes the previous value to be replaced and the
-    /// attribute not to be rendered in a `view!`.
+    /// Returns the previous value if the key was present. If `v` reports
+    /// that its attribute should be omitted, stores
+    /// [`AttributeValue::Absent`]. This still replaces the previous value
+    /// and retains the key, but renders no attribute.
     #[inline]
     pub fn insert(
         &mut self,

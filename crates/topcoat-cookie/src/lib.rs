@@ -29,10 +29,9 @@ use topcoat_core::context::{Cx, app_context, request_context};
 
 /// A request-scoped cookie jar.
 ///
-/// `Cookies` is implemented by the root [`CookieJar`] and by every adapter
-/// ([`SignedJar`], [`PrivateJar`], [`Prefixed`], [`Map`]). The three core
-/// methods read and write cookies; the combinators wrap the jar in further
-/// adapters, in the style of [`Iterator`].
+/// Read and write cookies through the root [`CookieJar`] or a configured
+/// adapter. Adapter methods return a jar that applies their configuration to
+/// subsequent operations.
 ///
 /// Bring this trait into scope to use the combinators.
 pub trait Cookies {
@@ -78,7 +77,7 @@ pub trait Cookies {
     }
 
     /// Wraps this jar so every added cookie is passed through `f` before being
-    /// stored. The general escape hatch behind the attribute combinators.
+    /// stored. Use this for custom attribute changes.
     fn map<F>(self, f: F) -> Map<Self, F>
     where
         Self: Sized,
@@ -314,7 +313,7 @@ pub fn cookies(cx: &Cx) -> &CookieJar {
 ///
 /// # Panics
 ///
-/// Panics if no [`Key`] was registered with `Router::app_context`.
+/// Panics if no [`Key`] was registered as app context.
 #[must_use]
 #[track_caller]
 pub fn signed_cookies(cx: &Cx) -> SignedJar<'_, &CookieJar> {
@@ -326,7 +325,7 @@ pub fn signed_cookies(cx: &Cx) -> SignedJar<'_, &CookieJar> {
 ///
 /// # Panics
 ///
-/// Panics if no [`Key`] was registered with `Router::app_context`.
+/// Panics if no [`Key`] was registered as app context.
 #[must_use]
 #[track_caller]
 pub fn private_cookies(cx: &Cx) -> PrivateJar<'_, &CookieJar> {

@@ -4,18 +4,13 @@ use crate::fnv1a::Fnv1a;
 
 /// A value that distinguishes identities at one source location.
 ///
-/// A key folds itself into the identity hash through the tagged writes on
-/// [`KeyHasher`]. Two keys derive the same identity exactly when they
-/// produce the same sequence of writes, so implementations must be
-/// deterministic: equal values write equal sequences, and values meant to
-/// be distinct at one site write distinct sequences.
+/// Write the key's identifying values through [`KeyHasher`]. Implementations
+/// must be deterministic. Equal keys write the same sequence, while keys that
+/// should distinguish invocations write different sequences.
 ///
-/// Implementations exist for the integer primitives, `bool`, `char`,
-/// strings, byte slices, references, source locations, unit, and tuples of
-/// keys. Integers hash by
-/// mathematical value, so the same id used at a different width stays the
-/// same key. A custom id type implements the trait by writing its
-/// identifying parts in order:
+/// Integer keys compare by mathematical value, so changing an integer's width
+/// does not change its key. To support a custom type, write its identifying
+/// parts in order:
 ///
 /// ```
 /// use topcoat_core::identity::{IdentityKey, KeyHasher};

@@ -24,22 +24,16 @@ use crate::{HtmlContext, RegionId};
 
 /// The instruction buffer of a build.
 ///
-/// The outermost view of a build creates a buffer and installs it in a
-/// [`ViewBufferScope`] for the duration of each of its polls. Every view
-/// built inside those polls appends its instructions here, and rendering a
-/// [`ViewHandle`] executes them. Once the outermost view resolves its
-/// content, the buffer is sealed into the handle, which then carries it
-/// wherever it renders.
+/// The outermost view creates a buffer and installs it through
+/// [`ViewBufferScope`] during each poll. Nested views append instructions
+/// to it. When the outer view resolves, its handle takes ownership of the
+/// buffer. Rendering a [`ViewHandle`] executes its instructions.
 ///
 /// # Contiguity
 ///
-/// A nested view is a `(buffer id, entry)` pair pointing into this shared,
-/// append-only sequence, so the instructions of one view must form a
-/// contiguous block terminated by a return instruction. Callers uphold
-/// this by pushing a whole block in one synchronous burst: no `await` may
-/// happen between a block's first push and its final return instruction.
-/// Futures interleave only at await points, so concurrently built sibling
-/// views each still land in one piece.
+/// A view's instructions must form a contiguous block ending in a return
+/// instruction. Push the whole block synchronously. Awaiting between
+/// instructions would let concurrent views append into the middle of it.
 #[derive(Debug)]
 pub(crate) struct ViewBuffer {
     id: ViewBufferId,

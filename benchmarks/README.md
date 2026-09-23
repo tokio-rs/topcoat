@@ -1,182 +1,108 @@
 # Benchmarks
 
-Server-rendering performance comparison between **Topcoat**, **Next.js**,
-**Leptos**, and a hand-written **Axum + Maud** app on a realistic storefront
-app, plus the harness to run it.
+Compare server rendering with equivalent storefront apps in Topcoat, Next.js, Leptos, and Axum + Maud.
 
 ## What is measured
 
-HTTP document requests against each framework's production server on loopback,
-over HTTP/1.1 keep-alive connections. Three routes are exercised:
+The harness sends HTTP document requests to each production server over local HTTP/1.1 keep-alive connections. It measures complete HTML responses. It does not run a browser or fetch stylesheets, scripts, or images.
 
-| Route | What it renders |
-|-------|-----------------|
-| `/` | shared layout, hero section, 12 featured product cards |
-| `/products?page=3&sort=price` | 24-card grid filtered/sorted via query params, filter chips, pagination |
-| `/products/42` | breadcrumbs, product detail, spec table, reviews, related products |
+| Route | Content |
+|-------|---------|
+| `/` | Home page with featured products |
+| `/products?page=3&sort=price` | Filtered and sorted product list with pagination |
+| `/products/42` | Product details, reviews, and related products |
 
-This is a server-rendering benchmark, not a browser benchmark: it measures
-time-to-full-HTML-document, not time-to-interactive, and no subresources
-(CSS, JS, images) are fetched during the load test.
-
-## The demo app
-
-The same storefront is implemented four times, in `topcoat/`, `nextjs/`,
-`leptos/`, and `axum-maud/`. All four:
-
-- render the identical component tree (nav, footer, product cards, rating
-  stars, pagination, spec table, review list, breadcrumbs) with identical
-  Tailwind v4 utility classes,
-- load the identical checked-in data set (`data/products.json`, 500 seeded
-  products; regenerate with `node data/generate.mjs > data/products.json`),
-- implement identical query semantics (page clamping, the four sort orders
-  with id tie-breaks, category filtering) and identical formatting rules
-  (integer-math prices and ratings, verbatim ISO dates).
-
-`scripts/verify_parity.sh` enforces this: it renders five routes in every
-framework, reduces the HTML to visible text, and diffs the results. Run it
-after touching any of the apps.
+The apps use the same checked-in product data, page content, query behavior, and formatting rules. Run `benchmarks/scripts/verify_parity.sh` after changing an app to compare rendered text across implementations. This check does not replace a visual review of layout changes.
 
 ## Prerequisites
 
-- Rust (the repo toolchain) and the `topcoat` CLI (`cargo install --path
-  crates/topcoat-cli`)
-- [oha](https://github.com/hatoo/oha): `brew install oha`
-- Node.js >= 20 and pnpm (Next.js app)
-- [cargo-leptos](https://github.com/leptos-rs/cargo-leptos):
-  `cargo install cargo-leptos --locked`, plus
-  `rustup target add wasm32-unknown-unknown`
-- `jq` and `curl`
+- The repository's Rust toolchain and the Topcoat CLI, installed with `cargo install --path crates/topcoat-cli`.
+- [oha](https://github.com/hatoo/oha) for load generation.
+- Node.js and pnpm for the Next.js app.
+- [cargo-leptos](https://github.com/leptos-rs/cargo-leptos) and the `wasm32-unknown-unknown` Rust target for Leptos.
+- `jq` and `curl`.
 
-The first Topcoat, Leptos, and Axum + Maud builds download the standalone
-Tailwind CLI and need network access. Topcoat and Axum + Maud pin 4.3.2;
-cargo-leptos prefers a `tailwindcss` found on `PATH` (e.g. from Homebrew) and
-only honors `LEPTOS_TAILWIND_VERSION=v4.3.2` when none is installed. Any Tailwind v4
-produces the same rules for the utility classes this app uses;
-`verify_parity.sh` plus a visual spot-check cover the difference.
+Initial Rust builds may need network access to download the standalone Tailwind CLI. Leptos uses `tailwindcss` from `PATH` when available. Otherwise, its build uses the version selected by `LEPTOS_TAILWIND_VERSION`.
 
-## Running
+## Running the benchmarks
+
+Run commands from the repository root:
 
 ```sh
-# Everything: builds each app, runs the full matrix, prints the table.
+# Build and measure all apps.
 benchmarks/scripts/bench.sh
 
-# One or two frameworks only:
-benchmarks/scripts/bench.sh topcoat
+# Measure selected apps.
 benchmarks/scripts/bench.sh topcoat leptos
 
-# Faster, noisier run while iterating:
+# Use shorter runs during development.
 DURATION=5s WARMUP=2s RUNS=1 benchmarks/scripts/bench.sh
 
-# One core each: the Rust servers run single-threaded, like next start.
+# Limit each Rust server to one Tokio worker thread.
 SINGLE_THREAD=1 benchmarks/scripts/bench.sh
 
-# Re-render the table for any saved results directory:
+# Render a comparison from saved results.
 benchmarks/scripts/compare.sh benchmarks/results/<timestamp>
 
-# Cross-framework rendered-content check:
+# Check that the apps render equivalent content.
 benchmarks/scripts/verify_parity.sh
 ```
 
-Raw oha JSON, server logs, and `summary.md` land in
-`benchmarks/results/<timestamp>/`.
+Results are written to `benchmarks/results/<timestamp>/`, including raw oha output, server logs, and `summary.md`.
 
-Each framework is measured in two modes per route:
+Each route is measured at an unrestricted request rate for throughput, then at a fixed rate for latency. Set `RATE` below the slowest server's capacity when comparing service latency. A higher rate introduces queueing, which can dominate the tail percentiles.
 
-- **throughput**: fixed connection count, unbounded rate; the `req/s` column.
-- **fixed rate** (`RATE`, default 200 req/s): below saturation for every
-  framework so the latency percentile columns mostly measure service time.
-  Note that 200 req/s is already a substantial fraction of Next.js's
-  capacity on the heaviest route, so its tail latencies include some
-  queueing; lower `RATE` for a pure service-time comparison.
+The summary takes the median of repeated runs for each route, then averages across routes. The harness script defines the default duration, run count, and connection count.
 
-Defaults: 3 runs x 20s per route and mode, 32 connections. The summary table
-reports one row per framework: the median across runs for each route, averaged
-over all routes.
+### Running an app manually
 
-### Running one app manually
-
-Prefix either Rust server with `TOKIO_WORKER_THREADS=1` to run it single-threaded
-(what `SINGLE_THREAD=1` does under the hood).
+For Topcoat, build the release binary and bundle its assets:
 
 ```sh
-# Topcoat (release binary + dev-mode asset bundle):
 cargo build --release -p storefront-topcoat
-topcoat asset bundle --package storefront-topcoat
+topcoat asset bundle --release --package storefront-topcoat
 PORT=8090 ./target/release/storefront-topcoat
-
-# Next.js:
-cd benchmarks/nextjs && pnpm install && pnpm build && pnpm start
-
-# Leptos:
-cd benchmarks/leptos && LEPTOS_TAILWIND_VERSION=v4.3.2 cargo leptos build --release
-cd benchmarks/leptos && LEPTOS_SITE_ADDR=127.0.0.1:8090 LEPTOS_SITE_ROOT=target/site \
-    ./target/release/storefront-leptos
-
-# Axum + Maud:
-cd benchmarks/axum-maud && cargo build --release
-cd benchmarks/axum-maud && PORT=8090 ./target/release/storefront-axum-maud
 ```
 
-## Fairness notes
+For Next.js, run these commands in `benchmarks/nextjs`:
 
-- **Compression is disabled in every server.** The benchmark measures raw
-  framework rendering and serving performance, not the throughput of a
-  compression codec: these servers render a page faster than any codec
-  compresses it, so with compression on the comparison mostly measures the
-  codec. Topcoat's default response compression is switched off
-  (`Compression::off()`), Next.js sets `compress: false` in `next.config.ts`
-  (`next start` gzips by default), and Leptos and Axum + Maud add no
-  compression middleware. Real deployments should leave compression on; the
-  per-response CPU cost buys a many-times-smaller transfer.
-- **Response sizes intentionally differ.** Topcoat and Axum + Maud ship plain
-  HTML with zero JavaScript. Next.js embeds its RSC payload and script tags;
-  Leptos runs in islands mode, so it ships the wasm loader but no serialized
-  page data. That is each framework's realistic
-  production output for this app, and the `bytes/resp` column keeps the
-  difference visible. Larger documents cost real time to render and transfer,
-  so this is part of the comparison, not noise in it.
-- **Next.js truly server-renders every request.** All pages set
-  `export const dynamic = "force-dynamic"`; the build output lists them as
-  dynamic and responses carry `Cache-Control: ... no-store` (asserted by
-  `verify_parity.sh`).
-- **Leptos runs in islands mode.** The storefront has no interactive islands,
-  so the page renders entirely on the server and ships no serialized hydration
-  data, only the wasm loader. Routes still use `SsrMode::Async`, so each response
-  is one complete document (comparable to the others), not an out-of-order stream.
-- **Axum + Maud is the hand-written baseline.** It renders the same component
-  tree as plain functions returning `maud` compile-time templates, with axum
-  doing the routing and query parsing; there is no framework layer on top.
-  Its stylesheet is generated at build time by the same pinned standalone
-  Tailwind CLI the Topcoat app uses (a build-script dependency only; nothing
-  from Topcoat is linked into the server binary).
-- **Stock release profiles.** Both Rust apps build with an untuned
-  `cargo --release` (no LTO or codegen tweaks); Next.js uses a plain
-  `next build`.
-- **Process models differ.** By default the Rust servers use every core, while
-  `next start` is a single Node process, so JS rendering is effectively
-  single-threaded. Real Node deployments scale by running multiple instances;
-  read the default Next.js rows as per-instance numbers. For an apples-to-apples
-  one-core comparison, run with `SINGLE_THREAD=1`: it pins the Rust servers to
-  a single Tokio worker thread (`TOKIO_WORKER_THREADS=1`), matching the one
-  Node process, and the rendered table is labelled `single-threaded`. (This
-  caps the async runtime's worker threads; the OS still schedules that thread
-  across cores rather than hard-pinning it.)
-- **Same machine, one server at a time.** The load generator shares the
-  machine with the server, so absolute numbers are pessimistic and only the
-  relative comparison is meaningful. Close other heavy processes before a
-  measured run.
-- If oha reports connection errors at high connection counts, raise the file
-  descriptor limit (`ulimit -n 4096`).
-
-## Layout
-
+```sh
+pnpm install
+pnpm build
+pnpm start
 ```
-data/       seeded product data set + generator (single source of truth)
-topcoat/    Topcoat app (workspace member `storefront-topcoat`)
-nextjs/     Next.js 15 App Router app
-leptos/     Leptos 0.8 + Axum app (own cargo workspace, excluded from the root)
-axum-maud/  Axum 0.8 + Maud app (own cargo workspace, excluded from the root)
-scripts/    bench.sh, compare.sh, verify_parity.sh, helpers
-results/    benchmark output (gitignored)
+
+For Leptos, run these commands in `benchmarks/leptos`:
+
+```sh
+LEPTOS_TAILWIND_VERSION=v4.3.2 cargo leptos build --release
+LEPTOS_SITE_ADDR=127.0.0.1:8090 LEPTOS_SITE_ROOT=target/site ./target/release/storefront-leptos
+```
+
+For Axum + Maud, run these commands in `benchmarks/axum-maud`:
+
+```sh
+cargo build --release
+PORT=8090 ./target/release/storefront-axum-maud
+```
+
+Set `TOKIO_WORKER_THREADS=1` when starting a Rust server to limit it to one runtime worker thread.
+
+## Interpreting results
+
+- **Compression is disabled.** The measurements focus on rendering and serving HTML. They do not include the CPU cost or transfer savings of response compression.
+- **Response sizes differ.** Each app produces the output required by its framework. The `bytes/resp` column makes this difference visible.
+- **Requests render fresh content.** Next.js pages force dynamic rendering. Leptos renders complete responses in islands mode without interactive islands. The Axum + Maud app provides a baseline built from handlers and templates.
+- **Builds use standard release settings.** Check the app manifests before comparing results from different revisions.
+- **Concurrency differs.** Rust servers use multiple runtime workers by default, while Next.js runs in one Node process. Use `SINGLE_THREAD=1` to compare with one Tokio worker per Rust server. This limits worker count but does not pin a process to a CPU core.
+- **The load generator shares the server's machine.** Run one server at a time and close other heavy processes. Treat results as local comparisons rather than production capacity estimates.
+
+If oha reports connection errors at high connection counts, check the file descriptor limit. For example, `ulimit -n 4096` raises it for the current shell.
+
+## Files
+
+The framework directories contain the app implementations. Shared input data lives in `data/`, the harness in `scripts/`, and generated output in the ignored `results/` directory. Regenerate the product data with:
+
+```sh
+node benchmarks/data/generate.mjs > benchmarks/data/products.json
 ```

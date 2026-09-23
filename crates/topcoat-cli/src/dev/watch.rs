@@ -16,9 +16,7 @@ use tokio::{
     time::{Duration, timeout},
 };
 
-/// How long a burst of filesystem events must stay quiet before it is
-/// reported as a single change. Editors typically emit several events per
-/// save, and operations like a branch switch touch many files at once.
+/// Quiet period used to combine a burst of file changes into one notification.
 const DEBOUNCE: Duration = Duration::from_millis(50);
 
 /// A change reported by [`SourceWatcher::changed`].
@@ -32,14 +30,11 @@ pub enum Change {
     Manifest,
 }
 
-/// Watches every local package in the dependency graph and coalesces bursts
-/// of filesystem events into single change notifications.
+/// Watches local packages and combines bursts of file changes into single
+/// notifications.
 ///
-/// "Local" covers the workspace members and every path dependency they pull
-/// in, wherever it lives on disk. Within each package directory everything
-/// except gitignored paths, hidden entries, editor temp files, and the cargo
-/// target directory is watched: manifests, build scripts, and files embedded
-/// with `asset!` or `include_str!` trigger rebuilds just like Rust sources.
+/// Includes workspace members and path dependencies. Ignores hidden paths, gitignored
+/// files, editor temporary files, and Cargo build output.
 pub struct SourceWatcher {
     watcher: notify::RecommendedWatcher,
     events: mpsc::UnboundedReceiver<Change>,
@@ -108,15 +103,11 @@ impl SourceWatcher {
         watcher
     }
 
-    /// Wait until a watched file changes.
+    /// Waits for a file change, combining events until the debounce interval passes
+    /// without another event.
     ///
-    /// A burst of events (a save producing several events, a branch switch
-    /// touching many files) is reported as a single change: the call returns
-    /// once the burst has been quiet for [`DEBOUNCE`]. A [`Change::Manifest`]
-    /// anywhere in the burst takes precedence over plain source changes.
-    ///
-    /// Cancel-safe: a change observed before cancellation is remembered and
-    /// reported by the next call.
+    /// A manifest change takes precedence over other changes in the same burst.
+    /// Cancellation preserves pending changes for the next call.
     pub async fn changed(&mut self) -> Change {
         if self.pending.is_none() {
             // The sender lives in the watcher's callback, so the channel
@@ -223,9 +214,8 @@ struct PathFilter {
     /// components below a root, since the root's own path may legitimately
     /// contain hidden components.
     roots: Vec<PathBuf>,
-    /// The cargo target directory. Cargo writes here throughout a build, so
-    /// reacting to it would have the watcher feeding on the very rebuilds it
-    /// triggers.
+    /// The Cargo target directory, excluded to prevent build output from triggering
+    /// another rebuild.
     target_dir: Option<PathBuf>,
     matchers: Vec<Gitignore>,
 }

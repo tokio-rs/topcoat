@@ -1,10 +1,10 @@
-Server-sent events for topcoat routes.
+Server-sent events for Topcoat routes.
 
-Server-sent events (SSE) push a one-way stream of events from the server to the client over a plain HTTP response. This module (behind the `sse` feature) provides the [`Sse`] response: it wraps a `Stream` of [`Event`]s, replies with `Content-Type: text/event-stream`, and sends each event as the stream yields it. On the client, the browser's built-in `EventSource` subscribes to the stream and reconnects on its own when the connection is lost.
+Server-sent events (SSE) send events from the server to a client over one HTTP response. Enable the `sse` feature and return an [`Sse`] response containing a stream of [`Event`]s. In a browser, use `EventSource` to subscribe and reconnect when the connection is lost.
 
 # Streaming events
 
-A route becomes an event stream by returning [`Sse`] wrapping the stream of events to send. An [`Event`] is assembled field by field: [`data`](Event::data) carries the payload ([`json_data`](Event::json_data) serializes a value to JSON), [`event`](Event::event) names the type an `EventSource` dispatches to its listeners, and [`id`](Event::id) and [`retry`](Event::retry) drive reconnection.
+Return [`Sse`] with the stream of events to send. Build each [`Event`] with [`data`](Event::data) for text or [`json_data`](Event::json_data) for a serialized value. Optional fields can name the event and control reconnection.
 
 ```rust
 use futures_core::Stream;
@@ -25,7 +25,7 @@ async fn events() -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
 }
 ```
 
-The `use<>` bound keeps the stream from borrowing the request context, which a route's response must not do. The connection stays open until the stream ends, an `Err` item occurs, or the client disconnects; a disconnect drops the stream, so tie cleanup to the stream's `Drop`.
+The `use<>` bound prevents the returned stream from borrowing the request context. The response ends when the stream finishes, yields an error, or the client disconnects. Put cleanup in the stream's `Drop` implementation so it also runs on disconnect.
 
 # Reading the request context
 
@@ -59,7 +59,7 @@ async fn greetings(cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + us
 
 # Keeping quiet streams alive
 
-Proxies and load balancers drop connections that look stale. [`keep_alive`](Sse::keep_alive) fills idle gaps with events the client ignores: [`KeepAlive::new`] sends an empty comment after 15 idle seconds, and [`interval`](KeepAlive::interval), [`text`](KeepAlive::text), and [`event`](KeepAlive::event) tune what is sent and when.
+Proxies and load balancers may close idle connections. Configure [`keep_alive`](Sse::keep_alive) to send comments while no events are ready. Use [`KeepAlive`] to choose the interval and content.
 
 # Resuming after a reconnect
 

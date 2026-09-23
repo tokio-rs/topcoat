@@ -182,8 +182,7 @@ impl SitemapUrl {
 
     /// Sets the time the page was last modified.
     ///
-    /// Accepts anything convertible into a [`SystemTime`], which covers the
-    /// timestamp types of the common date and time crates.
+    /// Accepts any value convertible into [`SystemTime`].
     pub fn last_modified(mut self, last_modified: impl Into<SystemTime>) -> Self {
         self.last_modified = Some(last_modified.into());
         self

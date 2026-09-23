@@ -8,10 +8,7 @@ pub const STAGE_DIR: &str = "topcoat-icon-iconify";
 
 /// An Iconify icon set in the [`IconifyJSON`] format.
 ///
-/// This is the format Iconify publishes through its `@iconify-json/*`
-/// packages, and the format icon sets are staged in for the `include!` and
-/// `iconify_icon!` macros. Only the icon data is modeled; metadata such as
-/// `info` or `categories` is ignored.
+/// Stores icon data and ignores catalog metadata such as categories.
 ///
 /// [`IconifyJSON`]: https://iconify.design/docs/types/iconify-json.html
 #[derive(Debug, Clone, Deserialize)]
@@ -99,9 +96,7 @@ pub struct Icon {
     /// the rest.
     #[serde(flatten)]
     pub properties: Properties,
-    /// Whether the set hides the icon from icon listings, usually because it
-    /// is deprecated. `include!` globs skip hidden entries; addressing one by
-    /// name still works.
+    /// Whether the icon is hidden from listings, usually because it is deprecated.
     #[serde(default)]
     pub hidden: bool,
 }
@@ -116,16 +111,14 @@ pub struct Alias {
     /// while transformations merge with them.
     #[serde(flatten)]
     pub properties: Properties,
-    /// Whether the set hides the alias from icon listings, usually because
-    /// it is deprecated. `include!` globs skip hidden entries; addressing one
-    /// by name still works.
+    /// Whether the alias is hidden from listings, usually because it is deprecated.
     #[serde(default)]
     pub hidden: bool,
 }
 
-/// The view box dimensions and transformations of an icon or alias:
-/// `IconifyJSON`'s `IconifyOptional`. At the root of a set they act as
-/// defaults for icons that do not set their own.
+/// An icon or alias's view box and transformations.
+///
+/// At the set level, these values supply defaults for individual icons.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct Properties {
     /// The `x` coordinate of the view box origin. Defaults to `0`.

@@ -1,18 +1,15 @@
-//! Guards that the theme and components vendored into this demo stay in sync
-//! with the built-in registry, which lives in the same workspace. When a
-//! registry source changes, these tests fail until the demo is refreshed with
-//! the `topcoat ui` commands named in the failure message.
+//! Checks that the demo's theme and installed components match the registry.
+//! Failure messages explain how to refresh files after registry changes.
 //!
-//! The demo vendors only the components it uses, so a component the registry
-//! offers but the demo never installed is not a failure. Every vendored file
-//! must still come from the registry, which is checked separately.
+//! The demo installs only the components it uses. Uninstalled registry
+//! components are allowed, but every installed component must come from the
+//! registry.
 
 use std::path::{Path, PathBuf};
 
 use topcoat_ui::Registry;
 
-/// This demo package's root, where `topcoat ui` installed the theme and
-/// components.
+/// The demo package's root directory.
 fn package_root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
 }

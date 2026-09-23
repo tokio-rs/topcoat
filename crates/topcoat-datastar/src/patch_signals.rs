@@ -12,14 +12,13 @@ use crate::common;
 /// A `datastar-patch-signals` event that patches signals into the browser's
 /// signal store.
 ///
-/// The payload is a JSON object merged into the existing signals; a signal set
-/// to `null` is removed. [`json`](Self::json) serializes the payload from any
-/// [`Serialize`] value, and [`new`](Self::new) takes an already encoded
-/// string.
+/// Merges a JSON object into the existing signals. A value of `null` removes
+/// the signal. Use [`json`](Self::json) to serialize a value or
+/// [`new`](Self::new) to pass encoded JSON.
 ///
-/// The event converts [`Into<Event>`](Event) for sending over an
-/// [`Sse`](topcoat_router::content::sse::Sse) stream. Returned from a handler
-/// on its own, it responds as a stream that sends this one event and ends.
+/// Convert it into an [`Event`] to send it over an
+/// [`Sse`](topcoat_router::content::sse::Sse) stream. Returning it directly
+/// from a handler sends one event and closes the stream.
 ///
 /// # Examples
 ///

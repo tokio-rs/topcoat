@@ -3,14 +3,10 @@ use topcoat::{
     view::{Attributes, Child, View, class, component, view},
 };
 
-/// A table component: rows and columns of related data.
+/// A table inside a horizontally scrollable container.
 ///
-/// The table is wrapped in a scrolling container, so a table wider than its
-/// surroundings scrolls sideways on its own instead of stretching the page.
-/// Child nodes are the table's sections: a [`table_header`], a
-/// [`table_body`], and optionally a [`table_footer`] and a [`table_caption`].
-/// The `attrs` (such as `class`) are forwarded to the `<table>` itself; a
-/// `class` among them is appended to the computed classes.
+/// Pass table sections as children. `attrs` are forwarded to the `<table>`, with extra
+/// classes added to its classes.
 ///
 /// ```ignore
 /// view! {
@@ -63,10 +59,7 @@ pub async fn table_header(
     })
 }
 
-/// The main section of a [`table`], holding its rows of data.
-///
-/// The last row's rule is dropped, so the table ends on its own edge rather
-/// than on a line.
+/// The body of a table, containing data rows.
 #[component]
 pub async fn table_body(
     #[default] mut attrs: Attributes,
@@ -101,10 +94,7 @@ pub async fn table_footer(
     })
 }
 
-/// One row of a [`table`], in any of its sections.
-///
-/// The row is ruled off from the next one and tints on hover, so the eye can
-/// follow it across wide tables.
+/// A table row with a separator and hover styling.
 #[component]
 pub async fn table_row(
     #[default] mut attrs: Attributes,
@@ -159,7 +149,7 @@ pub async fn table_cell(
     })
 }
 
-/// A line under a [`table`] saying what it holds.
+/// A caption describing the table.
 #[component]
 pub async fn table_caption(
     #[default] mut attrs: Attributes,

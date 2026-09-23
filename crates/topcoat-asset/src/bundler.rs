@@ -48,11 +48,9 @@ impl Bundler {
 
     /// Scan `binary` for embedded assets and sync them into `out_dir`.
     ///
-    /// If `out_dir` already contains a `manifest.toml`, it is loaded and used
-    /// to skip copying files whose content hash hasn't changed. Files that
-    /// were present in the old manifest but are no longer referenced by the
-    /// new one are removed. Remote (http/https) assets are downloaded into
-    /// the bundler's cache directory and then treated like local files.
+    /// Reuses unchanged files from the existing manifest and removes files
+    /// that are no longer referenced. Remote assets are downloaded into the
+    /// cache before bundling.
     ///
     /// Up to [`BundlerConfig::parallelism`] assets are processed at once.
     /// The manifest lists them in declaration order regardless.
@@ -63,16 +61,12 @@ impl Bundler {
     ///
     /// # Errors
     ///
-    /// Returns a [`BundleError`] for any I/O failure while creating or
-    /// reading `out_dir` and its manifest, downloading a remote asset, or
-    /// reading/writing a bundled file; and for a checksum mismatch between a
-    /// declared asset and its configured `checksum`. When several assets
-    /// fail, the one declared earliest is reported.
+    /// Returns a [`BundleError`] if an asset cannot be read, downloaded,
+    /// verified, or written, or if the manifest cannot be loaded or saved.
+    /// When several assets fail, the earliest declaration's error is reported.
     ///
-    /// Assets that resolve to the same output filename share one bundled
-    /// file and one route, so they must agree on how that file is served:
-    /// two of them declaring different content types is rejected with
-    /// [`BundleError::ConflictingContentTypes`].
+    /// Assets with the same output filename must have the same content type.
+    /// Otherwise, returns [`BundleError::ConflictingContentTypes`].
     pub fn bundle(&self, binary: &[u8], out_dir: impl AsRef<Path>) -> BundleResult {
         let out_dir = out_dir.as_ref();
         fs::create_dir_all(out_dir).map_err(|source| AssetError::ManifestIo {
@@ -166,10 +160,8 @@ impl Bundler {
     /// Run [`Bundler::prepare`] over every asset, returning the results in
     /// declaration order.
     ///
-    /// Workers pull the next asset off a shared cursor as they go free, so a
-    /// slow download only ever holds up its own worker. Each keeps its results
-    /// local, tagged with the asset's position, and the tags put them back in
-    /// order at the end.
+    /// Workers claim assets as they finish. Results are reordered by their
+    /// original positions before returning.
     fn prepare_all(
         &self,
         assets: &[RawAsset],

@@ -10,13 +10,13 @@ use crate::{
 /// How the router treats a request for the other trailing-slash form of a
 /// route's path.
 ///
-/// A route's path declares whether its URL ends in a slash: a page at
-/// `/users` is served at `/users`, one at `/users/` at `/users/`. The policy
-/// decides what a request for the form a route did not declare gets. It never
-/// affects the root `/`, a route ending in a catch-all parameter, or a pair of
-/// routes registered at both forms of one path. Set it with
-/// [`RouterBuilder::trailing_slash`](crate::RouterBuilder::trailing_slash);
-/// the default is [`Redirect`](Self::Redirect).
+/// A route declares whether its URL ends in `/`. This policy handles requests
+/// for the other form. For example, it decides how `/users/` is handled when
+/// the route is registered at `/users`.
+///
+/// Set it with [`RouterBuilder::trailing_slash`](crate::RouterBuilder::trailing_slash).
+/// The default is [`Redirect`](Self::Redirect). It does not affect the root,
+/// catch-all routes, or paths with both forms explicitly registered.
 ///
 /// # Examples
 ///
@@ -31,8 +31,8 @@ use crate::{
 pub enum TrailingSlash {
     /// Redirects to the declared form with a 308, keeping the query string.
     ///
-    /// The status code preserves the method and the body, so a form posted
-    /// to the other form of the URL is resubmitted to the declared one.
+    /// The client repeats the request at the declared URL with the same
+    /// method and body.
     #[default]
     Redirect,
     /// Serves the route under both forms. The client keeps the URL it asked

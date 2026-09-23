@@ -10,14 +10,13 @@ use crate::{ElementPatchMode, PatchElements, common};
 
 /// An event that executes JavaScript in the browser.
 ///
-/// Sugar for a [`PatchElements`] that appends a `<script>` element to the
-/// `body`. By default the element removes itself after running; disable that
-/// with [`auto_remove`](Self::auto_remove), and add attributes to the element
-/// with [`attributes`](Self::attributes).
+/// Appends a `<script>` element to the page's `body`. The element removes itself
+/// after running unless [`auto_remove`](Self::auto_remove) is disabled.
+/// Use [`attributes`](Self::attributes) to set script attributes.
 ///
-/// The event converts [`Into<Event>`](Event) for sending over an
-/// [`Sse`](topcoat_router::content::sse::Sse) stream. Returned from a handler
-/// on its own, it responds as a stream that sends this one event and ends.
+/// Convert it into an [`Event`] to send it over an
+/// [`Sse`](topcoat_router::content::sse::Sse) stream. Returning it directly
+/// from a handler sends one event and closes the stream.
 ///
 /// # Examples
 ///

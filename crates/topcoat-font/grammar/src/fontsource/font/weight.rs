@@ -9,8 +9,7 @@ use crate::fontsource::{
     font_face::{WeightKey, WeightValue},
 };
 
-/// A `weight:` argument for `fontsource_font!`: one weight or a bracketed list
-/// of weights to cross-product, e.g. `weight: [400, 700]`.
+/// A `weight:` argument containing one weight or a list, such as `[400, 700]`.
 pub struct Weight {
     pub key: WeightKey,
     pub colon_token: Token![:],

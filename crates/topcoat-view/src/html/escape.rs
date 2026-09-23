@@ -6,11 +6,9 @@ use crate::Formatter;
 
 /// The position in an HTML document that a dynamic value is written into.
 ///
-/// Writing through a context makes the value safe for that position. Contexts
-/// where HTML provides an escape mechanism rewrite the significant
-/// characters; ident contexts, where character references are never decoded,
-/// validate instead and panic on characters that could break out of the
-/// position:
+/// Text and values are escaped for their position. Names are validated
+/// because HTML does not decode character references there. Invalid name
+/// characters cause a panic:
 ///
 /// | Context          | `&`     | `<`    | `>`    | `"`      | Other        |
 /// |------------------|---------|--------|--------|----------|--------------|
@@ -31,18 +29,13 @@ use crate::Formatter;
 pub enum HtmlContext {
     /// Trusted markup written verbatim.
     Unescaped,
-    /// A text node between tags. Quotes are not significant here, so the
-    /// three escapable characters are found with a single search.
+    /// A text node between tags.
     Text,
-    /// A double-quoted attribute value. Only `&` and `"` can terminate or
-    /// alter the value, found with a single search.
+    /// A double-quoted attribute value.
     AttributeValue,
-    /// A machine-readable payload inside an HTML comment, such as the markers
-    /// the interactive runtime emits. Escaping `>` guarantees the payload
-    /// cannot contain `-->` and terminate the comment, while `&` and `"`
-    /// round-trip through entity decoding so double-quoted strings inside the
-    /// payload stay unambiguous. Comment data is never entity-decoded by the
-    /// browser, so the consumer of the payload must decode it.
+    /// A payload inside an HTML comment. Escaping prevents the payload
+    /// from closing the comment. Its consumer must decode character
+    /// references because the browser does not decode comment contents.
     Comment,
     /// An attribute name, validated as an identifier rather than escaped.
     AttributeKey,

@@ -5,8 +5,7 @@ use std::{
 
 use crate::{AssetCatalog, AssetId, BundledAsset, MANIFEST_NAME, Manifest};
 
-/// An asset bundle on disk: a directory of bundled files plus the
-/// [`AssetCatalog`] mapping [`AssetId`]s to them.
+/// A directory of bundled files and the catalog used to look them up.
 ///
 /// Built by the [`Bundler`](crate::Bundler) and loaded at runtime via
 /// [`AssetBundle::load`] or [`AssetBundle::load_dir`].
@@ -17,21 +16,16 @@ pub struct AssetBundle {
 }
 
 impl AssetBundle {
-    /// Load the bundle sitting next to the current executable.
+    /// Loads the `assets` directory next to the current executable.
     ///
-    /// The bundler writes to an `assets` directory beside the executable it
-    /// scanned, so `<exe_dir>/assets` is where a bundle belongs: `cargo run`
-    /// finds `target/<profile>/assets`, and a deployment ships the directory
-    /// alongside the binary.
-    ///
-    /// Use [`AssetBundle::load_dir`] when the bundle lives anywhere else, such
-    /// as a custom path passed to the asset bundler with `--out`.
+    /// Deploy this directory alongside the binary from the same build.
+    /// Use [`load_dir`](Self::load_dir) for a custom location.
     ///
     /// # Errors
     ///
-    /// Returns [`io::ErrorKind::NotFound`] if there is no readable manifest
-    /// next to the executable, or propagates any I/O or parse error from
-    /// reading it via [`AssetBundle::load_dir`].
+    /// Returns [`io::ErrorKind::NotFound`] if the bundle manifest is missing.
+    /// Other errors can occur when locating the executable or loading the
+    /// manifest through [`load_dir`](Self::load_dir).
     pub fn load() -> io::Result<Self> {
         let exe = std::env::current_exe()?;
         let dir = exe
@@ -56,15 +50,8 @@ impl AssetBundle {
 
     /// Load a bundle from a specific directory.
     ///
-    /// `dir` must be the asset bundle directory itself: the directory that
-    /// contains `manifest.toml` and the bundled asset files. The path is
-    /// resolved like any other filesystem path, so a relative path is relative
-    /// to the process working directory, not to the Cargo package or workspace.
-    ///
-    /// This is useful when your application controls where bundles are written,
-    /// for example `dist/assets` or another deployment-specific location. Use
-    /// [`AssetBundle::load`] instead when you want Topcoat to look for a
-    /// conventional `assets` directory near the current executable.
+    /// `dir` must contain `manifest.toml` and the bundled files. Relative paths
+    /// start from the process working directory.
     ///
     /// # Errors
     ///
@@ -93,8 +80,7 @@ impl AssetBundle {
 
     /// Look up the bundled file for an [`AssetId`].
     ///
-    /// The returned entry names the file; its on-disk location is that name
-    /// under [`dir`](AssetBundle::dir).
+    /// Join the returned filename to [`dir`](Self::dir) to locate it on disk.
     #[must_use]
     pub fn get(&self, id: AssetId) -> Option<&BundledAsset> {
         self.catalog.get(id)

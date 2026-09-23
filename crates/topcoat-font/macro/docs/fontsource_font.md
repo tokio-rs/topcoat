@@ -1,4 +1,4 @@
-Constructs a [`Font`] from the [Fontsource] catalog, which can be a whole family's worth of [`FontFace`]s, one for each combination of the weights, styles, and subsets you ask for.
+Creates a [`Font`] from the [Fontsource] catalog. The font contains a face for each requested combination of weight, style, and character subset.
 
 ```rust
 # use topcoat::font::*;
@@ -8,7 +8,7 @@ fontsource_font!(ROBOTO)
 # }
 ```
 
-With nothing but a family name you get every weight and style the [Fontsource] family ships, but only for its default subset. You can override which weights, styles, and subsets you want to include by specifying additional parameters:
+With only a family name, the font includes every available weight and style in the default subset. Use named arguments to select the combinations you need:
 
 ```rust
 # use topcoat::font::*;
@@ -23,23 +23,23 @@ fontsource_font!(
 # }
 ```
 
-The resulting font includes one font face per combination of parameters. Each combination is checked against the vendored catalog at compile time.
+Each combination is checked against the bundled catalog at compile time.
 
 # Arguments
 
 The **family** comes first, as the name of its [`families`] constant (e.g. `ROBOTO`).
 
-The remaining arguments each take either a single value or a bracketed list of them, `[a, b]`, to fan out across:
+The `weight`, `style`, and `subset` arguments accept one value or a bracketed list:
 
 **`weight`** is a number in `100..=900`. Omit it for every weight the family ships.
 
 **`style`** is [`Normal`] or [`Italic`]. Omit it for every style the family ships.
 
-**`subset`** is a block of characters such as [`Latin`] or [`Cyrillic`], and sets each face's `unicode-range`. Omit it for the family's default subset alone: unlike weight and style, leaving it out does *not* pull in everything.
+**`subset`** selects characters such as [`Latin`] or [`Cyrillic`] and sets each face's `unicode-range`. Omitting it includes only the family's default subset.
 
-**`host`** says where the files are loaded from, and takes a single value rather than a list. It defaults to [`JsDelivr`], which links the fonts on the [jsDelivr] CDN. Pass [`Asset`] instead to download them at build time and serve them from your own origin as content-hashed Topcoat [`Asset`][asset-type]s: this needs the `asset` feature.
+**`host`** selects where font files are loaded from. It takes one value and defaults to [`JsDelivr`]. Use [`Asset`] to bundle the files as Topcoat [assets][asset-type] and serve them yourself. This requires the `asset` feature.
 
-**`display`** sets the [`FontDisplay`] strategy applied to every face: how text is shown while the font downloads. It takes a single value rather than a list, and defaults to `Swap`.
+**`display`** sets how text appears while the font loads. It takes one [`FontDisplay`] value, applies to every face, and defaults to `Swap`.
 
 ```rust
 # use topcoat::font::*;
@@ -59,7 +59,7 @@ fontsource_font!(ROBOTO, host: Asset)
 
 # Single faces
 
-To manage individual font faces reach for [`fontsource_font_face!`], which takes a single weight, style, and subset and expands to a lone [`FontFace`].
+Use [`fontsource_font_face!`] to create a single [`FontFace`].
 
 [Fontsource]: https://fontsource.org/
 [jsDelivr]: https://www.jsdelivr.com/

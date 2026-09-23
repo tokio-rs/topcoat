@@ -18,18 +18,14 @@ type Frame = {
 };
 
 /**
- * Walks the DOM region `(from, to)` under `root`, hydrating signals, shards,
- * dependencies, and element bindings into the provided initial scope.
+ * Attaches runtime behavior to the DOM range `(from, to)` under `root`.
  *
- * - `from`: walker starts AFTER this node. Pass `null` to start at the
- *   beginning of `root`.
- * - `to`: walker stops BEFORE this node. Pass `null` to walk to the end.
- * - `initialScope`: the content scope new bindings, signals, and
- *   dependencies attach to until a shard start marker pushes a deeper one.
- * - `adoptable`: the ids of signals that stay registered from content being
- *   replaced. A declaration of one of them keeps the existing signal and
- *   moves it into the scanning scope, removing it from the set; whatever is
- *   left in the set afterwards was not declared again.
+ * - `from`: starts after this node, or at the beginning of `root` if `null`.
+ * - `to`: stops before this node, or at the end of `root` if `null`.
+ * - `initialScope`: owns resources until a nested shard starts its own scope.
+ * - `adoptable`: signal IDs retained from replaced content. A matching
+ *   declaration keeps the existing value, assigns ownership to the current
+ *   scope, and removes the ID from this set. Remaining IDs were not reused.
  */
 export function hydrate(
 	root: Node,

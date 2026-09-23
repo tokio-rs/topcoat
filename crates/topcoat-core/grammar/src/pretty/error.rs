@@ -1,7 +1,6 @@
 use proc_macro2::LineColumn;
 
-/// A failure encountered while formatting a macro body, carrying the location of
-/// the error in the coordinates of the original source file.
+/// A formatting error with a position in the original source file.
 #[derive(Debug, Clone)]
 pub struct FormatError {
     message: String,

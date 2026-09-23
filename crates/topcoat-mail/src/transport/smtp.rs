@@ -15,9 +15,8 @@ use crate::{
 
 /// A [`Transport`] that submits mail to an SMTP server.
 ///
-/// This is the production transport: point it at a mail provider's
-/// submission endpoint or your own mail server. Connections are pooled and
-/// reused across sends.
+/// Configure a mail provider's submission endpoint or your own server.
+/// Connections are pooled and reused across sends.
 ///
 /// ```no_run
 /// use topcoat_mail::SmtpTransport;
@@ -34,8 +33,7 @@ pub struct SmtpTransport {
 }
 
 impl SmtpTransport {
-    /// Connects to `host` over implicit TLS on port 465, the modern
-    /// submission setup most mail providers offer.
+    /// Configures a connection to `host` with implicit TLS on port 465.
     ///
     /// # Errors
     ///
@@ -47,8 +45,7 @@ impl SmtpTransport {
         })
     }
 
-    /// Connects to `host` on port 587, upgrading the connection with
-    /// STARTTLS, for providers that only offer the older submission setup.
+    /// Configures a connection to `host` on port 587 using STARTTLS.
     ///
     /// # Errors
     ///
@@ -60,10 +57,10 @@ impl SmtpTransport {
         })
     }
 
-    /// Connects to `host` on port 25 without encryption.
+    /// Configures an unencrypted connection to `host` on port 25.
     ///
-    /// Credentials and mail travel in clear text, so this belongs only in
-    /// development, against a local catch-all server like Mailpit:
+    /// Credentials and messages travel in clear text. Use this with a local
+    /// development server:
     ///
     /// ```no_run
     /// use topcoat_mail::SmtpTransport;
@@ -77,8 +74,7 @@ impl SmtpTransport {
         }
     }
 
-    /// Connects according to a connection URL, the form that fits a single
-    /// environment variable:
+    /// Configures a connection from a URL:
     ///
     /// - `smtps://user:pass@smtp.example.com:465` for implicit TLS.
     /// - `smtp://user:pass@smtp.example.com:587?tls=required` for STARTTLS.

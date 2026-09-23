@@ -7,9 +7,7 @@ use syn::{
 
 /// A bracketed list `[a, b, c]`, or a bare value treated as a one-element list.
 ///
-/// `fontsource_font!` wraps each axis's singular value (e.g.
-/// [`WeightValue`](crate::fontsource::font_face::WeightValue)) in this to cross-product
-/// the faces.
+/// Preserves whether the caller wrote a single value or a list.
 pub enum List<T> {
     One(T),
     Many {

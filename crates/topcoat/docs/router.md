@@ -1,6 +1,6 @@
-A [`Router`] handles incoming requests. Build one with [`Router::builder`] and register your pages, layouts, layers, and API routes on it. Call [`build`](RouterBuilder::build) when you are done, then pass the router to [`start`](crate::start).
+A [`Router`] matches requests to handlers. Create one with [`Router::builder`], register handlers, and call [`build`](RouterBuilder::build). Pass the finished router to [`start`](crate::start) to serve requests.
 
-Handlers register in two ways: **manually**, listing each item on the builder, or with **auto-discovery** (the `discover` feature collects annotated items at link time). For most apps, the recommended way to define routes is the [`module_router!`] macro, which builds on discovery and derives each URL from the module tree instead of a path string.
+Register handlers explicitly on the builder or enable the `discover` feature to collect annotated handlers automatically. Use [`module_router!`] to derive route paths from your module tree.
 
 # Paths
 
@@ -65,7 +65,7 @@ async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
 }
 ```
 
-A layout applies to every page whose path starts with the layout's path: a layout at `/` wraps all pages, while a layout at `/settings` wraps `/settings`, `/settings/profile`, `/settings/billing`, and so on. When multiple layouts match a page, they nest from least specific (outermost) to most specific (innermost). See [`#[layout]`](layout) for the handler signature, nested layouts, and using layouts as components.
+A layout matches a page by path segments. A layout at `/` wraps all pages. One at `/settings` wraps `/settings` and pages below it, such as `/settings/profile`. Matching layouts nest with the least specific path outside the most specific one. See [`#[layout]`](layout) for details.
 
 # Layers
 
@@ -126,11 +126,11 @@ async fn create_user(cx: &Cx, Json(input): Json<CreateUser>) -> Result<Json<User
 }
 ```
 
-The context and the body parameter are both optional and may appear in either order, but there can be at most one body parameter, because the body is a stream that can only be consumed once. Pages parse bodies the same way, but return a rendered view rather than a response value. See the [`content`](mod@content) module docs for the available extractors and response types, as well as multipart uploads, WebSockets, and server-sent events.
+Both parameters are optional and may appear in either order. A handler can take only one body parameter because the body can be consumed only once. Pages parse bodies the same way and return a view. See [`content`](mod@content) for request extractors and response types.
 
 # Path and query parameters
 
-Path and query values are read from [`Cx`](crate::context::Cx), not injected as handler arguments. This keeps the handler signature limited to request context and body parsing, while allowing helper functions and layouts to read the same parameters.
+Read path and query values from [`Cx`](crate::context::Cx). Any helper with access to the context can read them.
 
 ## Path parameters
 
@@ -138,7 +138,7 @@ Call [`path_param!`](macro@path_param) with the parameter name from the URL. The
 
 - After `path_param!(slug)`, `path_param::<Slug>(cx)` returns the percent-decoded segment as `&str`.
 - A type after `:` is parsed with [`FromStr`](std::str::FromStr). The default return type is `Result<&T, &<T as FromStr>::Err>`.
-- `error = bad_request`, `not_found`, `unauthorized`, `forbidden`, `redirect(...)`, or `redirect_permanent(...)` maps a parse failure to that router error.
+- An `error = ...` option maps parse failures to a router error. See [`path_param!`](macro@path_param) for the supported forms.
 
 ```rust
 use topcoat::{
@@ -195,7 +195,7 @@ Query parsing also occurs once per request and returns a reference to the memoiz
 
 # Errors
 
-Every page, layout, layer, and route handler returns a [`Result`](crate::Result). An `Err` becomes the response: the router maps its own error types onto HTTP status codes and turns anything else into a 500.
+Handlers return a [`Result`](crate::Result). The router converts an unhandled error into an HTTP response. Router errors select a status code, while other errors produce `500 Internal Server Error`.
 
 The [`error`](mod@error) module has a constructor for each response, like [`not_found()`](error::not_found) or [`redirect(uri)`](error::redirect), and the [`RouterErrorExt`](error::RouterErrorExt) methods that turn an `Option` or `Result` into one:
 
@@ -311,7 +311,7 @@ pub fn router() -> Router {
 
 This finds annotated items across your crate and dependencies. Discovered layers must have unique paths because link-time collection order is not stable; if you need to stack several layers on one path, register them explicitly with `.layer(...)`.
 
-Other features collect their own annotated items at link time, so `discover()` registers those too, such as the fonts declared with `font!` and the procedures and shards of the runtime. Values that are not annotated items are always registered by hand, including the asset bundle (`.assets(...)`), application context (`.app_context(...)`), and the runtime's own routes (`.runtime()`, see the [runtime guide](../runtime/index.html#setup)).
+Discovery also registers items collected by enabled integrations. It does not replace their setup steps. Follow each integration's guide to register any configuration or services it requires.
 
 [`module_router!`] registers module-derived handlers only. It returns a `RouterBuilder`, so call `discover()` on it, or register the remaining items by hand, exactly as above.
 
@@ -363,7 +363,7 @@ async fn main() {
 }
 ```
 
-[`start`](crate::start) binds to `HOST` and `PORT`, defaulting to `127.0.0.1:3000`. Use [`serve`](crate::serve) when you want to bind the listener yourself. It accepts any [`Listener`]: a `TcpListener` to serve HTTP directly, or on Unix a `UnixListener` to serve behind a reverse proxy (like nginx or Caddy) that forwards requests to a socket path:
+[`start`](crate::start) reads `HOST` and `PORT`, with `127.0.0.1:3000` as the default. Use [`serve`](crate::serve) to supply your own [`Listener`]. On Unix, a `UnixListener` can accept requests forwarded by a reverse proxy:
 
 ```rust,no_run
 # #[cfg(unix)]
@@ -377,7 +377,7 @@ topcoat::serve(listener, router).await
 
 The socket file of a previous run is not removed automatically, so remove any stale file before binding, as above.
 
-The HTTP server uses Tokio and Hyper and sits behind the `serve` Cargo feature, enabled by default. Routing, views, and request handling work without it: [`Router::handle`] turns a [`Request`](request::Request) into a [`Response`](response::Response) directly, with no listener involved. On a platform that receives HTTP requests for you, such as a serverless or WebAssembly runtime, build `topcoat` without default features, leave `serve` off, and call [`Router::handle`] from the platform's request handler.
+The HTTP server requires the `serve` feature, which is enabled by default. When another platform receives requests for you, call [`Router::handle`] to turn a [`Request`](request::Request) into a [`Response`](response::Response). This works without `serve`.
 
 # Tower services
 

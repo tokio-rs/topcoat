@@ -25,21 +25,15 @@ pub(crate) enum Host {
     External { base_url: String },
 }
 
-/// Asset configuration, registered on the router (with the router's `assets`
-/// extension method).
+/// The catalog and host used to resolve asset URLs.
 ///
-/// Built with [`AssetConfig::serve`], which serves a loaded
-/// [`AssetBundle`](crate::AssetBundle)'s files from the application, or
-/// [`AssetConfig::hosted_at`], which points asset URLs at an external host
-/// instead. An [`AssetBundle`](crate::AssetBundle) also converts directly
-/// into its serving configuration, so the common case registers as
-/// `.assets(bundle)`.
+/// Register it with the router's `assets` method. Use [`serve`](Self::serve)
+/// to serve files from the application or [`hosted_at`](Self::hosted_at) to
+/// resolve URLs on an external host. Passing a bundle directly as
+/// `.assets(bundle)` serves it from the application.
 ///
-/// Registering places the configuration in the app context, where
-/// [`asset_config`] reads it back: [`get`](Self::get) looks up an asset's
-/// bundled file, and [`resolve`](Self::resolve) forms the URL it is hosted
-/// at. [`Asset`] values rendered in a view resolve their URL through the same
-/// configuration.
+/// [`resolve`](Self::resolve) returns an asset's URL. Views use the same
+/// configuration when rendering [`Asset`] values.
 #[derive(Debug, Clone)]
 pub struct AssetConfig {
     pub(crate) catalog: AssetCatalog,
@@ -66,17 +60,13 @@ impl AssetConfig {
     /// Hosts the bundled assets externally at `base_url` instead of serving
     /// them from the application.
     ///
-    /// No asset routes are registered: the files described by `assets` must
-    /// be made available under `base_url` by other means, such as a CDN or
-    /// the reverse proxy in front of the application. Each asset's URL is
-    /// `{base_url}/{bundled-filename}`; a trailing `/` on `base_url` is
-    /// ignored. Bundled filenames are content-hashed, so the files can be
-    /// served with long-lived, immutable caching.
+    /// Upload the bundled files to `base_url` separately. This configuration
+    /// adds no asset routes. URLs are `{base_url}/{bundled-filename}`, with
+    /// trailing slashes removed from `base_url`. The filenames contain content
+    /// hashes, so the host can use long-lived, immutable caching.
     ///
-    /// `assets` is anything that converts into an [`AssetCatalog`]: a loaded
-    /// [`AssetBundle`](crate::AssetBundle), or a [`Manifest`](crate::Manifest)
-    /// embedded into the binary on targets without filesystem access, such as
-    /// WebAssembly:
+    /// `assets` must convert into an [`AssetCatalog`]. For example, pass a
+    /// loaded bundle or an embedded [`Manifest`](crate::Manifest):
     ///
     /// ```
     /// use topcoat::asset::{AssetConfig, Manifest};
@@ -109,9 +99,7 @@ impl AssetConfig {
         self.catalog.get(asset.id())
     }
 
-    /// The base URL asset URLs are formed against: the internal asset route
-    /// prefix for a serving configuration, or the base URL passed to
-    /// [`hosted_at`](Self::hosted_at). Never ends with a `/`.
+    /// The base URL used to resolve asset URLs, without a trailing `/`.
     #[must_use]
     pub fn base_url(&self) -> &str {
         match &self.host {

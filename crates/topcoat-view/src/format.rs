@@ -1,13 +1,12 @@
 #[cfg(feature = "http")]
 use http::{HeaderMap, StatusCode};
 
-/// A plain string writer that render output accumulates into.
+/// A string writer for rendered output.
 ///
-/// `Formatter` is escaping-agnostic: [`write_str`](Self::write_str) and
-/// [`write_char`](Self::write_char) append exactly what they are given. Text
-/// that needs to be made safe for an HTML position is written through an
-/// [`HtmlWriter`](crate::HtmlWriter) created for the matching
-/// [`HtmlContext`](crate::HtmlContext) instead.
+/// [`write_str`](Self::write_str) and [`write_char`](Self::write_char)
+/// append text without escaping. For escaped output, use an
+/// [`HtmlWriter`](crate::HtmlWriter) with the appropriate
+/// [`HtmlContext`](crate::HtmlContext).
 pub struct Formatter<'a> {
     buf: &'a mut String,
     #[cfg(feature = "http")]

@@ -1,14 +1,7 @@
-//! Running cargo: metadata queries and application builds.
+//! Queries workspace metadata and builds applications with Cargo.
 //!
-//! [`Metadata`] wraps `cargo metadata` queries. [`BuildOpts::build`] runs
-//! `cargo build` and interprets its output, with the plumbing split by
-//! concern:
-//!
-//! - [`messages`]: the JSON message stream cargo writes to stdout -- rustc's diagnostics and the
-//!   artifacts of every compiled crate.
-//! - [`artifacts`]: picking the final linked outputs out of those artifacts.
-//! - [`stderr`]: capturing cargo's stderr and extracting its error report.
-//! - [`progress`]: scanning the stderr stream for build progress.
+//! Use [`Metadata`] to inspect the workspace and [`BuildOpts::build`] to
+//! compile a target and locate its output.
 
 mod artifacts;
 mod build;

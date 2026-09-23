@@ -1,6 +1,6 @@
 # Tailwind
 
-A stylesheet generated from the utility classes in the Rust sources by a build script, then served as a Topcoat asset.
+A Tailwind stylesheet generated from Rust source by a build script and served as a Topcoat asset.
 
 Run it with:
 

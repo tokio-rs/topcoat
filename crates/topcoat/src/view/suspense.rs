@@ -8,13 +8,10 @@ use crate::{
     view::{Child, RegionId, View, component, internal::SuspenseView},
 };
 
-/// Streams child content in, showing a fallback until it is ready.
+/// Shows a fallback while child content loads, then streams the content in.
 ///
-/// The child is given the first chance to render. When its content is ready
-/// right away, it renders in place and the fallback never shows. Otherwise
-/// the fallback renders with the surrounding document, so a slow child does
-/// not hold the rest of the page back, and the child content replaces the
-/// fallback in place once it is ready.
+/// If the child is ready immediately, the fallback never appears. Otherwise,
+/// the fallback renders with the page and the child replaces it when ready.
 ///
 /// Set `mode: SuspenseMode::Wait` to wait for the child's initial content
 /// without showing the fallback. When `mode` is omitted,
@@ -48,9 +45,7 @@ use crate::{
 /// }
 /// ```
 ///
-/// Use [`live!`] and [`emit!`] directly for cases the component does not
-/// cover, like narrating a long-running task through a sequence of
-/// emissions.
+/// Use [`live!`] and [`emit!`] to control a sequence of updates directly.
 ///
 /// [`live!`]: macro@crate::view::live
 /// [`emit!`]: macro@crate::view::emit

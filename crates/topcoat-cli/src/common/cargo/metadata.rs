@@ -46,15 +46,13 @@ impl Metadata {
         self.0["target_directory"].as_str().map(PathBuf::from)
     }
 
-    /// The workspace root directory, which holds the root manifest and
-    /// lockfile; in a virtual workspace it is not a package of its own.
+    /// The directory containing the workspace manifest.
     pub fn workspace_root(&self) -> Option<PathBuf> {
         self.0["workspace_root"].as_str().map(PathBuf::from)
     }
 
-    /// The manifest directory of every local package: a package without a
-    /// `source` is local -- a workspace member or a path dependency, wherever
-    /// it lives on disk.
+    /// The manifest directories of local packages, including workspace members and path
+    /// dependencies.
     pub fn local_package_dirs(&self) -> Vec<PathBuf> {
         self.0["packages"]
             .as_array()

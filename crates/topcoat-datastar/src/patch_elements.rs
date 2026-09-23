@@ -10,13 +10,13 @@ use crate::{ElementPatchMode, common};
 
 /// A `datastar-patch-elements` event that patches HTML elements into the DOM.
 ///
-/// By default the elements are morphed into the existing DOM, matched by their
-/// `id` attribute. A [`selector`](Self::selector) targets other elements, and
-/// a [`mode`](Self::mode) changes how they are applied.
+/// By default, matches elements by `id` and morphs them to match the supplied
+/// HTML. Use [`selector`](Self::selector) to choose the target and
+/// [`mode`](Self::mode) to change how the update is applied.
 ///
-/// The event converts [`Into<Event>`](Event) for sending over an
-/// [`Sse`](topcoat_router::content::sse::Sse) stream. Returned from a handler
-/// on its own, it responds as a stream that sends this one event and ends.
+/// Convert it into an [`Event`] to send it over an
+/// [`Sse`](topcoat_router::content::sse::Sse) stream. Returning it directly
+/// from a handler sends one event and closes the stream.
 ///
 /// # Examples
 ///

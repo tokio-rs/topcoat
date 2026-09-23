@@ -25,14 +25,11 @@ use topcoat_core_grammar::{
 use topcoat_font::fontsource as runtime;
 pub use weight::*;
 
-/// One `fontsource_font_face!` invocation: a single Fontsource face served from
-/// the jsDelivr CDN, or, with `host: Asset`, a bundled copy.
+/// A `fontsource_font_face!` invocation selecting one face from the catalog.
 ///
-/// Holds the parsed descriptors; `weight` and `style` are required, `subset`
-/// defaults to the family's default subset, and `display` defaults to `swap`.
-/// Every descriptor is emitted verbatim so the compiler reports unknown names
-/// on the written tokens; combinations the catalog does not ship additionally
-/// emit a `compile_error!` alongside the construction.
+/// Requires a weight and style. Uses the family's default subset and `swap`
+/// display strategy when omitted. Preserves descriptor spans for compiler
+/// diagnostics and emits an error for combinations absent from the catalog.
 pub struct FontsourceFontFace {
     pub family: FamilyName,
     pub weight: Weight,
@@ -254,10 +251,8 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontsourceFontFace {
     }
 }
 
-/// Lays out a Fontsource macro invocation as a comma-separated argument list: the
-/// family name literal followed by each descriptor in written order. The list
-/// stays on one line when it fits and otherwise breaks with one argument per line
-/// and a trailing comma.
+/// Formats arguments in source order. Keeps them on one line when they fit,
+/// otherwise writes one argument per line with a trailing comma.
 #[cfg(feature = "pretty")]
 pub(crate) fn pretty_print_arguments(
     printer: &mut topcoat_core_grammar::pretty::Printer<'_>,

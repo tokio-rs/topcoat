@@ -18,19 +18,17 @@ pub type LayerFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send 
 /// A request-processing layer that wraps the routes nested under its path,
 /// similar to a tower middleware.
 ///
-/// A layer with a path wraps every matched route whose path begins with it
-/// (the same prefix rule as layouts), so a layer at `/admin` wraps only routes
-/// under `/admin`, and one at `/` wraps every matched route. A layer without a
-/// path wraps every request, including one that matches no route: the chain
-/// then resolves to the not-found or method-not-allowed error, which the layer
-/// receives as the `Err` returned by [`Next::run`]. Each layer receives the
-/// [`Cx`] and the request [`Body`], plus a [`Next`] representing the rest of
-/// the chain. A layer typically derives a child context carrying
-/// request-scoped values with [`Cx::with`], passes it to [`Next::run`] to
-/// invoke the inner layers and ultimately the route, then inspects or modifies
-/// the [`Response`]. Headers meant for the response of an error coming back
-/// up the chain go through [`response_headers`](crate::response::response_headers),
-/// since that response is only built once the error leaves the chain.
+/// A layer with a path wraps handlers whose registered path starts with it,
+/// compared segment by segment. A layer without a path wraps every request.
+/// If no route matches, [`Next::run`] returns the not-found or
+/// method-not-allowed error to pathless layers.
+///
+/// Call [`Next::run`] to run the remaining layers and handler, then inspect
+/// or modify their response. Pass a child context from [`Cx::with`] to make
+/// a value available to them. Use
+/// [`response_headers`](crate::response::response_headers) for headers that
+/// must also appear on error responses, which are built after the error
+/// leaves the layer chain.
 ///
 /// When several layers match a route they nest from least-specific (outermost)
 /// to most-specific (innermost), like layouts; a layer without a path runs

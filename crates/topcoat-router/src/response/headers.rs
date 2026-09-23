@@ -3,16 +3,11 @@ use std::sync::{Mutex, PoisonError};
 use http::{HeaderMap, HeaderName, HeaderValue};
 use topcoat_core::context::{Cx, request_context};
 
-/// Headers the router adds to the response it sends for the current request,
-/// whatever that response turns out to be.
+/// Headers to append to the current request's final response.
 ///
-/// A layer normally sets headers on the [`Response`](super::Response) it gets
-/// back from [`Next::run`](crate::Next). When the chain returns an error
-/// instead, the response is only built once the error leaves the last layer,
-/// so there is nothing to set them on yet. Appending them here defers them
-/// until then: the router applies every pending header after it has built the
-/// response, for a success and an error alike, and leaves the error itself
-/// untouched so outer layers can still inspect it.
+/// Queue headers here when they must also appear on error responses. The
+/// router adds them after converting the handler's result into a response.
+/// Errors keep their original type as they pass through outer layers.
 ///
 /// Get the request's slot with [`response_headers`].
 ///

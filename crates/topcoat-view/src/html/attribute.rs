@@ -31,8 +31,8 @@ impl<K, V> Attribute<K, V> {
 
 /// Converts one or more attributes into view parts.
 ///
-/// When this trait is implemented on a type, it can be used in the attribute position of an element
-/// in the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
+/// Implement this trait to spread a type's attributes into an element in
+/// [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html):
 ///
 /// ```rust
 /// # use topcoat::view::{Attributes, View, component, view};

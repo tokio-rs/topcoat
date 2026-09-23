@@ -1,4 +1,4 @@
-A procedure is an async server function that the browser can call from inside a runtime [expression](macro.expr.html). Use procedures to run more complex Rust code that runtime expressions do not support, or to reach server-only resources like the database. Procedures are exposed as HTTP API endpoints from your server; parameters can be spoofed and **must not be trusted**.
+A procedure is an async server function called from a runtime [expression](macro.expr.html). Use it when browser code needs server resources, such as a database. Each procedure has an HTTP endpoint. **Validate its arguments and authorize access inside the procedure**, since callers can send their own requests.
 
 ```rust
 use topcoat::{Result, runtime::procedure};
@@ -36,15 +36,15 @@ Ok(view! {
 # }
 ```
 
-The call sends the arguments to the server, runs the function there, and resolves to its return value. Since that takes a network round-trip, calls are only possible in an async position, such as the body of an `async` closure.
+The call sends its arguments to the server and waits for the function's result. Await it in an async context, such as an event handler's `async` closure.
 
-A procedure call only runs in the browser. The server type-checks the call, but calling it there panics, so a call has to sit somewhere that never runs during the server render, like the closure bodies above.
+A procedure call in a runtime expression must run only in the browser. The server type-checks the call but panics if it evaluates it during rendering. An event-handler closure, as above, defers the call until a browser event.
 
 # Arguments And Return Type
 
 Argument types and the `Ok` type of the returned [`Result`] must belong to the shared vocabulary of [`expr!`], since their values cross between Rust and JavaScript.
 
-A parameter named `cx` borrowing [`Cx`] is special: it is filled from the request context on the server and is not part of the call signature the client sees:
+A parameter named `cx` of type `&Cx` receives the server request context. Callers omit this argument:
 
 ```rust
 use topcoat::{Result, context::Cx, runtime::procedure};
@@ -59,7 +59,7 @@ async fn search(cx: &Cx, query: String) -> Result<String> {
 
 # Errors
 
-Awaiting a call yields the procedure's `Ok` value directly. An `Err` becomes an error response, and the expression awaiting the call fails in the browser without a value; the error itself is not observable from the expression. If the client needs to react to failures, return the outcome as data instead, for example with an `Ok` type of `Result<String, String>`.
+Awaiting a call yields the procedure's `Ok` value. If the procedure returns `Err`, the server sends an error response and the browser expression fails. The expression cannot inspect that error. To let the client handle a failure, return it as data, for example with an `Ok` type of `Result<String, String>`.
 
 # Registration
 

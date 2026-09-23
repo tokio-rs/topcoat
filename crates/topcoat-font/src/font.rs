@@ -4,8 +4,7 @@ use topcoat_core::fnv1a::Fnv1a;
 
 use crate::FontFaces;
 
-/// The owned data backing a [`Font`]: its family name, its faces, and the
-/// content hash derived from them.
+/// A font's family name, faces, and content hash.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FontData {
     family: String,
@@ -56,11 +55,8 @@ impl FontData {
 
 /// A lightweight, [`Copy`] handle to a font.
 ///
-/// It holds a reference to a lazily-initialized [`FontData`], so copying a
-/// `Font` is just copying a pointer; the underlying family name, faces, and
-/// hash are built once, on first access.
-///
-/// See the `font!` macro on how to construct a [`Font`] handle.
+/// Create a handle with `font!`. Its data is initialized on first access and
+/// shared by every copy.
 #[derive(Debug, Clone, Copy)]
 pub struct Font(&'static LazyLock<FontData>);
 
@@ -85,9 +81,7 @@ impl Font {
 
     /// The content hash of the family name and every face setting.
     ///
-    /// It is computed once when the font data is initialized, stable across
-    /// builds for identical settings, and distinct when they differ, so it can
-    /// drive a cache-busting, immutable font URL.
+    /// Identical settings produce the same hash across builds.
     #[must_use]
     pub fn hash(&self) -> u64 {
         self.0.hash()

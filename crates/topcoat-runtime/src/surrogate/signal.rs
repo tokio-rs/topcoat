@@ -108,10 +108,7 @@ numeric_signal!(
 impl SignalSurrogate<String> {
     /// Appends a string to the end of the value.
     ///
-    /// The argument is anything that dereferences to a string, so both a
-    /// borrowed `&str` and an owned `String` work. The owned form is what an
-    /// event field yields: `Event::target.value` is a `String`, so
-    /// `message.push_str(e.target.value)` is the common call.
+    /// Accepts borrowed or owned strings, including an event target's value.
     ///
     /// # Panics
     ///

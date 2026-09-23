@@ -39,14 +39,10 @@ impl Scope {
         }
     }
 
-    /// Emits a top-level `view!` invocation: a `ScopeView` around a
-    /// `MoveView` whose `async move` body builds the scope's view and drives
-    /// it in place.
+    /// Emits a top-level view with a buffer scope and an `async move` body.
     ///
-    /// The block captures every value the template uses, so the view owns its
-    /// data and the expressions inside borrow from the block. The built view
-    /// is driven inside the block that evaluates the template, so what its
-    /// expressions borrow from that block is still alive.
+    /// The body owns captured values and drives the view before dropping
+    /// them, keeping the view's borrows valid.
     ///
     /// With `owns_cx`, the block takes ownership of `__cx` and borrows it
     /// as `&Cx` inside. Otherwise it uses the enclosing body's `&Cx`.
@@ -63,15 +59,11 @@ impl Scope {
         }
     }
 
-    /// Emits an `emit!` invocation: the scope's view, built inline in a
-    /// `ScopeView` of its own.
+    /// Emits a view with its own buffer for an `emit!` invocation.
     ///
-    /// The view always owns a buffer, so its content renders anywhere even
-    /// when it is emitted inside another build. The body builds inside a
-    /// closure the scope evaluates with that buffer installed, so the blocks
-    /// it hoists land in the buffer its polls run against. Nothing is moved
-    /// into an async block: the caller awaits the view where it is emitted,
-    /// so the template borrows from the enclosing block as it stands.
+    /// Construction and polling use the same buffer, so emitted content
+    /// is self-contained. The caller awaits the view in place. Its
+    /// expressions can therefore borrow from the enclosing block.
     ///
     /// With `owns_cx`, an owned `__cx` context is in scope and the view
     /// borrows it.
@@ -86,14 +78,11 @@ impl Scope {
         }
     }
 
-    /// Emits this scope as an inert view value: a block expression that
-    /// evaluates the scope's expressions in source order and builds its
-    /// `JoinView`.
+    /// Emits a block that evaluates expressions in source order and
+    /// constructs a `JoinView` without polling it.
     ///
-    /// The view owns the evaluated values; whatever the expressions borrow
-    /// from the environment, it borrows. Nothing is moved into an async
-    /// block, so a scope nested in an enclosing one leaves that scope's
-    /// bindings borrowed rather than taking them.
+    /// The view owns the results but can borrow from the surrounding scope.
+    /// There is no `async move` block to capture that scope's bindings.
     pub(crate) fn emit_inert(&self) -> TokenStream {
         self.emit_inner(|view| view)
     }

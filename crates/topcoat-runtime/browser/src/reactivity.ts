@@ -42,9 +42,9 @@ export function untrack<T>(fn: () => T): T {
 }
 
 /**
- * A synchronous reaction with explicit ownership. Scope registers it before
- * its first run and disposes it when the content is released. There is no
- * implicit effect tree: creating another effect does not make it a child.
+ * A synchronous reaction that tracks its signal reads. Its owner must dispose
+ * it when no longer needed. Creating an effect inside another does not link
+ * their lifetimes.
  */
 export class Effect {
 	private readonly dependencies = new Set<Set<Effect>>();
@@ -60,8 +60,8 @@ export class Effect {
 	}
 
 	schedule(): void {
-		// Like the previous engine, writes during an effect do not schedule
-		// that same effect again. They still notify its other subscribers.
+		// Writes during an effect notify other subscribers but do not schedule
+		// the running effect again.
 		if (this.disposed || this.running) return;
 		pending.add(this);
 		if (!scheduled && !flushing) {

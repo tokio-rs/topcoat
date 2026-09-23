@@ -3,11 +3,7 @@ use topcoat::{
     view::{Attributes, StaticClass, View, class, component, view},
 };
 
-/// The classes for the [`input`] control.
-///
-/// The height, text size, radius, and focus ring match the `Md`
-/// button, so an input and a button sit flush in a row. File inputs restyle
-/// the browser's upload button into quiet, borderless text.
+/// Classes for the input's dimensions, border, and interaction states.
 const INPUT: StaticClass = class!(
     "h-9 w-full min-w-0 rounded-lg border border-border bg-transparent px-3 \
      text-sm transition-colors outline-none \
@@ -18,13 +14,11 @@ const INPUT: StaticClass = class!(
      focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
 );
 
-/// A text input component.
+/// A styled input.
 ///
-/// The `attrs` (such as `type`, `name`, `placeholder`, `disabled`, or event
-/// handlers) are forwarded to the underlying `<input>`; a `class` among them
-/// is appended to the computed classes. The input fills its container, so
-/// size it through the container or with a width class.
-/// Set `aria-invalid="true"` to use the error border and focus ring.
+/// Pass input attributes and event handlers through `attrs`. Extra classes are added to
+/// the input's classes. It fills its container by default. Set `aria-invalid="true"` to
+/// show the error border and focus ring.
 ///
 /// ```ignore
 /// view! {

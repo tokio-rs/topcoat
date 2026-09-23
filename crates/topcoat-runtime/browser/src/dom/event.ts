@@ -12,8 +12,8 @@ export function setupEventHandler(el: Element, attr: Attr, scope: Scope): void {
 	const name = attr.name.substring(EVENT_HANDLER_PREFIX.length);
 	const expression = compile<EventHandler>(attr.value, `event @${name}`);
 	const handler = expression(scope.runtime.context);
-	// The listener goes away with the scope, since the element may outlive
-	// it: a replacement morphs the element in place and scans it again.
+	// Dispose the listener with its scope. A DOM update may reuse the element
+	// and attach a new listener.
 	el.addEventListener(name, (event) => handler(new Event(event)), {
 		signal: scope.abortSignal,
 	});

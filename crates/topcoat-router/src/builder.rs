@@ -16,14 +16,10 @@ use crate::{
 
 /// Builds a [`Router`] for a Topcoat application.
 ///
-/// This is the common construction surface used by manual routing,
-/// auto-discovery, `module_router!`, and builder extension traits. Register
-/// [`page`](Self::page), [`layout`](Self::layout), [`layer`](Self::layer), and
-/// [`route`](Self::route) handlers directly, or let a discovery helper add
-/// them, then call [`build`](Self::build) once at the end.
+/// Register handlers directly or through discovery, configure the application,
+/// then call [`build`](Self::build).
 ///
-/// Builder extension traits add application-wide behavior before finalization,
-/// such as assets, cookies, or typed [`app_context`](Self::app_context) values.
+/// Integrations can provide extension traits with additional setup methods.
 ///
 /// # Examples
 ///
@@ -188,12 +184,9 @@ impl RouterBuilder {
     /// Registers every layer annotated with `#[layer]` and collected at link
     /// time.
     ///
-    /// Unlike [`layer`](Self::layer), at most one discovered layer is allowed
-    /// per path. Link-time collection order is non-deterministic, so two
-    /// discovered layers sharing a path would have an undefined run order; this
-    /// rejects that rather than pick an arbitrary one. To stack several layers
-    /// on one path, register them explicitly with [`layer`](Self::layer), whose
-    /// order is well-defined.
+    /// Discovered layers must have unique paths because discovery does not
+    /// define their order. To stack layers at one path, register them explicitly
+    /// with [`layer`](Self::layer).
     ///
     /// # Panics
     ///
@@ -295,13 +288,9 @@ impl RouterBuilder {
     /// Registers the base URL the application is publicly reachable at, like
     /// `https://example.com`.
     ///
-    /// Relative URLs work anywhere within the site, but rendered content
-    /// that leaves it (e.g. links and images in emails, feeds, or sitemaps)
-    /// needs the absolute form. The base URL is stored on the app context;
-    /// read it back with [`base_url`](topcoat_core::base_url::base_url) (or
-    /// [`try_base_url`](topcoat_core::base_url::try_base_url)) and resolve
-    /// paths against it with
-    /// [`BaseUrl::join`](topcoat_core::base_url::BaseUrl::join).
+    /// This base is used when rendering absolute URLs. Read it with
+    /// [`base_url`](topcoat_core::base_url::base_url) and resolve application
+    /// paths against it with [`BaseUrl::join`](topcoat_core::base_url::BaseUrl::join).
     ///
     /// Accepts anything convertible into a [`BaseUrl`]. A string is parsed,
     /// so it must be an absolute `http` or `https` URL without a query or
@@ -329,10 +318,9 @@ impl RouterBuilder {
         }
     }
 
-    /// Registers a unique value that is accessible to every request sent to
-    /// this router by its type `T`. The top-level
-    /// [`app_context`](topcoat_core::context::app_context) function can be used to
-    /// retrieve a reference to this value via a request context.
+    /// Shares a value of type `T` across this router's requests.
+    ///
+    /// Borrow it with [`app_context`](topcoat_core::context::app_context).
     ///
     /// # Panics
     ///
@@ -386,8 +374,7 @@ impl RouterBuilder {
     /// [`app_context`](Self::app_context), or `None` if none has been
     /// registered.
     ///
-    /// Lets code that registers a shared value lazily check for it first, rather
-    /// than tripping the duplicate-registration panic on a second call.
+    /// Use this to check for an existing value before registering one.
     #[must_use]
     pub fn get_app_context<T>(&self) -> Option<&T>
     where

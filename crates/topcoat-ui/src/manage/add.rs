@@ -11,7 +11,7 @@ use super::{
 };
 use crate::{DEFAULT_REGISTRY, Dependency, Registry, content_hash};
 
-/// What to add and from where.
+/// Options for installing components.
 pub struct AddOptions {
     /// Names of the components to add (e.g. `button`). Each is resolved and
     /// installed along with its transitive dependencies.
@@ -40,9 +40,7 @@ pub enum AddOutcome {
     Added(Vec<AddedComponent>),
 }
 
-/// A component still to be planned: which registry crate it lives in, its name,
-/// and whether it is the component the user explicitly asked for (the root)
-/// versus one pulled in as a dependency.
+/// A requested component or dependency awaiting installation planning.
 struct Pending {
     registry: String,
     component: String,
@@ -60,21 +58,20 @@ struct PlannedWrite {
     registry: String,
 }
 
-/// A previously installed component to remove (because it is being replaced by
-/// a component from a different registry that occupies the same file).
+/// An installed component to replace because another registry supplies the same
+/// destination file.
 struct PlannedRemoval {
     file: PathBuf,
     dir: PathBuf,
     file_name: String,
 }
 
-/// Adds a component (and its transitive dependencies) to the package.
+/// Installs the requested components and their dependencies.
 ///
-/// The operation is transactional: it walks the requested component and its
-/// dependencies, loading registries and reading sources without touching disk,
-/// and only commits the writes once everything resolves. Interactive decisions
-/// (pulling from a non-default registry, or replacing a file owned by another
-/// registry) are delegated to `confirm`.
+/// Resolves registries, reads sources, and obtains confirmations before writing files.
+/// The `confirm` callback decides whether to use another registry or replace a file
+/// owned by one. File writes begin only after planning succeeds, but a later I/O
+/// failure can leave a partial installation.
 ///
 /// # Errors
 ///
@@ -288,12 +285,11 @@ pub fn add(
     }
 }
 
-/// Determines which registry the requested component should be added from.
+/// Selects a registry for a component.
 ///
-/// With an explicit `--registry`, that registry crate is used and must offer the
-/// component. Otherwise the default registry is preferred; if it does not offer
-/// the component, the package's other dependency registries are searched and the
-/// user is asked to confirm pulling from a non-default registry.
+/// An explicit registry must provide the component. Otherwise, prefer the default
+/// registry. Ask for confirmation before using a component found in another dependency
+/// registry.
 fn resolve_root_registry(
     component: &str,
     registry: Option<&str>,
@@ -367,10 +363,8 @@ fn resolve_root_registry(
     }
 }
 
-/// Finds an installed component, other than the one being installed, whose file
-/// is the same package-relative path (a file collision). Same-named
-/// components from different registries that map to different files do not
-/// collide and are not reported.
+/// Finds another installed component using the same destination path. Components with
+/// the same name but different paths do not conflict.
 fn find_file_conflict(
     state: &InstallState,
     registry: &str,
@@ -389,8 +383,7 @@ fn find_file_conflict(
     None
 }
 
-/// Loads the registry crate `name`, caching it so each registry is resolved and
-/// read once. Resolving validates that the crate is a usable registry dependency.
+/// Resolves and caches a registry, validating that it is an allowed dependency.
 fn load_registry<'a>(
     cache: &'a mut HashMap<String, Registry>,
     workspace: &Workspace,

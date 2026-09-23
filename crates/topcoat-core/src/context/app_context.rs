@@ -8,8 +8,7 @@ use crate::context::Cx;
 /// Returns a reference to the app context value of type `T` registered on the
 /// router, or `None` if no such value has been registered.
 ///
-/// The lookup is keyed by `T`'s [`TypeId`](std::any::TypeId), so each type may
-/// have at most one registered value.
+/// The requested type must exactly match the registered type.
 ///
 /// # Examples
 ///
@@ -33,8 +32,7 @@ where
 /// Returns a reference to the app context value of type `T` registered on the
 /// router.
 ///
-/// The lookup is keyed by `T`'s [`TypeId`](std::any::TypeId), so each type may have at most one
-/// registered value.
+/// The requested type must exactly match the registered type.
 ///
 /// # Panics
 ///
@@ -73,11 +71,9 @@ where
 
 /// The type-keyed values shared by every request.
 ///
-/// Each registered value is stored under its [`TypeId`](std::any::TypeId), so a
-/// given type can only be registered once. An `AppContext` is assembled once at
-/// startup and then shared read-only across every request handled by the
-/// router; within a request, values are retrieved with [`app_context`] or
-/// [`try_app_context`].
+/// Stores one value per Rust type. Build it before serving requests, then
+/// share it across them. Within a request, read values with [`app_context`]
+/// or [`try_app_context`].
 #[derive(Default, Debug)]
 pub struct AppContext {
     entries: anymap3::Map<dyn Any + Send + Sync>,

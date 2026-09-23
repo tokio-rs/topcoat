@@ -13,10 +13,8 @@ import { RenderUnit } from "./unit";
 export const PAGE_ROUTE_PREFIX = "/_topcoat/runtime/pages";
 
 /**
- * The page: the outermost unit, whose content is the whole document and
- * whose inputs are its URL and its dependencies. A re-run is requested from
- * the pages route and arrives as a full document, whose body is morphed
- * into the children of `<body>`; the head is left alone.
+ * The outermost render unit. Requests use the current URL and signal values.
+ * Responses contain a full document, but only the body's children are updated.
  */
 export class PageUnit extends RenderUnit {
 	protected readonly label = "Page";
@@ -48,8 +46,7 @@ export class PageUnit extends RenderUnit {
 	}
 
 	protected request(signal: AbortSignal): Promise<Response> {
-		// The page owns every signal in the document, directly or through a
-		// shard, so its values are the complete set the re-run resumes from.
+		// Include descendant signals so the server can restore the whole page.
 		const signals = untrack(() => this.contentScope.collectSignalValues());
 		// The root page is served at the bare prefix, since the route below
 		// it needs at least one path segment.

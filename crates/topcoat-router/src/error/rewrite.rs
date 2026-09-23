@@ -11,21 +11,16 @@ pub(crate) const REWRITE_LIMIT: usize = 8;
 
 /// Builds an internal rewrite dispatching the request again at `path`.
 ///
-/// Returning it from a handler makes the router run the whole route stack
-/// again as if `path` had been requested in the first place, with `body` as
-/// the request body. The method and headers carry over unchanged, and `path`
-/// may include a query string. Unlike a redirect, the substitution is
-/// invisible to the client: the browser URL stays the URL that was requested.
-/// The handler at the rewritten path can read that original URL with
-/// [`original_uri`](crate::request::original_uri).
+/// Return this as an error to run the layers and handler at `path` with the
+/// supplied body. The method and headers are preserved unless overridden,
+/// and `path` may include a query string. The browser URL does not change.
+/// Read it with [`original_uri`](crate::request::original_uri).
 ///
 /// The router refuses a rewrite to a path the request was already dispatched
 /// under, and stops a chain after 8 rewrites; either case responds 500.
 ///
-/// The returned [`RewriteError`] has options for the rare cases where the
-/// rewritten dispatch should differ from the request in more than its path
-/// and body: another [`method`](RewriteError::method), or values carried on
-/// its [request context](RewriteError::with).
+/// Use [`RewriteError::method`] to change the method and
+/// [`RewriteError::with`] to carry values into the new request context.
 ///
 /// # Panics
 ///

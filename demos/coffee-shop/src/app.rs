@@ -37,7 +37,7 @@ const GEIST: Font = fontsource_font!(GEIST, host: Asset);
 pub fn router(db: Db) -> Router {
     module_router!()
         .runtime()
-        // The font, the shard, and the procedure are collected at link time.
+        // Register handlers declared elsewhere in the app.
         .discover()
         .assets(AssetBundle::load().unwrap())
         .app_context(db)
@@ -55,7 +55,7 @@ async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
                 <title>"Little Crema"</title>
                 topcoat::dev::script()
 
-                // Signals, shards, and procedures need the browser runtime.
+                // Enable browser interactions.
                 topcoat::runtime::script()
 
                 topcoat::font::link(font: GEIST)

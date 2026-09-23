@@ -8,22 +8,17 @@ use tokio::process::{Child, Command};
 
 use super::port::Address;
 
-/// A running instance of the application under development.
+/// A running development application.
 ///
-/// The process inherits the terminal's stdio and receives the broadcast
-/// server's URL through the `TOPCOAT_DEV_URL` environment variable, which
-/// the framework uses to report readiness and to inject the reload script.
+/// Inherits terminal input and output. Receives the dev server URL through
+/// `TOPCOAT_DEV_URL` for readiness notifications and page updates.
 pub struct AppServer {
     child: Child,
 }
 
 impl AppServer {
-    /// Run the built executable.
-    ///
-    /// On Windows the executable is copied to a shadow path and the copy is
-    /// run instead: a running process locks its image file, so launching the
-    /// original would make every subsequent rebuild fail at the link step
-    /// ("Access is denied") while the server keeps serving.
+    /// Starts the built executable. On Windows, runs a copy so the original file
+    /// remains available for rebuilding.
     pub fn spawn(exe: &Path, dev_url: &str, address: &Address) -> io::Result<Self> {
         let exe = shadow_copy_for_windows(exe)?;
         let child = Command::new(exe)
@@ -58,11 +53,9 @@ impl AppServer {
     }
 }
 
-/// On Windows, copy the executable next to itself (`app.exe` ->
-/// `app.topcoat-dev.exe`) and return the copy's path; other platforms return
-/// the path unchanged. The previous server has already been stopped when this
-/// runs, but Windows can hold the old image briefly after the process is
-/// reaped, so the copy is retried for a moment before giving up.
+/// Copies the executable to a separate path on Windows so a running process does not
+/// lock the build output. Retries briefly while Windows releases the previous copy.
+/// Other platforms use the original path.
 fn shadow_copy_for_windows(exe: &Path) -> io::Result<PathBuf> {
     if !cfg!(windows) {
         return Ok(exe.to_path_buf());

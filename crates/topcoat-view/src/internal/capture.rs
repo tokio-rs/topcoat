@@ -1,18 +1,13 @@
 /// Moves a control-flow body's pattern bindings into its nested view.
 ///
-/// A branch or iteration body expands to a [`MoveView`](super::MoveView)
-/// whose body borrows its environment, while the values its pattern binds
-/// die with the branch or iteration that produced them. The expansion packs
-/// those values into this wrapper where they are still alive and takes them
-/// back inside the view's body, which then owns them for as long as it
-/// lives.
+/// A nested view borrows its environment, but must own pattern bindings
+/// that would otherwise be dropped at the end of the branch or iteration.
+/// The expansion puts those bindings in this wrapper and moves it into
+/// the view's body.
 ///
-/// The wrapper is deliberately not `Copy`, and [`take`](Self::take) consumes
-/// it whole: a by-value use of a whole non-`Copy` place is captured by value
-/// even in a non-`move` async block. Reading the contents through the field
-/// instead would let capture analysis narrow to the possibly `Copy` values
-/// inside and downgrade the capture to a borrow, which would not live long
-/// enough.
+/// The wrapper is not `Copy`, and [`take`](Self::take) consumes it. This
+/// forces a move even in an async block without `move`. Accessing the field
+/// directly could instead borrow a `Copy` value for too short a lifetime.
 pub struct Capture<T>(pub T);
 
 impl<T> Capture<T> {

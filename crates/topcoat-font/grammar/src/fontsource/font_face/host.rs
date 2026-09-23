@@ -88,9 +88,8 @@ impl topcoat_core_grammar::pretty::PrettyPrint for HostKey {
 
 /// A single host, written as a bare variant name (`Asset`).
 ///
-/// Emits the [`Host`](runtime::Host) variant's path, keeping the written
-/// ident's span so the compiler reports unknown variants on it and editors
-/// autocomplete them.
+/// Emits a [`Host`](runtime::Host) variant path while preserving the identifier's
+/// span for compiler errors and editor completion.
 pub struct HostValue(syn::Ident);
 
 impl HostValue {
@@ -100,9 +99,8 @@ impl HostValue {
         &self.0
     }
 
-    /// The host the written variant names. Unknown names fall back to
-    /// [`JsDelivr`](runtime::Host::JsDelivr); the compiler reports them on the
-    /// emitted variant.
+    /// Resolves the host name, falling back to [`JsDelivr`](runtime::Host::JsDelivr)
+    /// for unknown names. The emitted variant still reports a compiler error.
     #[must_use]
     pub fn host(&self) -> runtime::Host {
         match self.0.to_string().as_str() {

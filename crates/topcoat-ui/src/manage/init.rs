@@ -8,13 +8,12 @@ use super::{
 };
 use crate::{DEFAULT_REGISTRY, Registry, content_hash};
 
-/// How to set up a package's install state.
+/// Options for initializing component installation in a package.
 pub struct InitOptions {
     /// Base directory for component install output (default `src/components`).
     pub components_dir: Option<PathBuf>,
-    /// The theme to install by name. When `None`, the sole registered theme is
-    /// installed, or the user is asked to choose when several are offered; a
-    /// theme is always installed, never skipped.
+    /// The theme to install. If omitted, use the sole available theme or ask the caller
+    /// to choose. A theme is required.
     pub theme: Option<String>,
 }
 
@@ -38,14 +37,11 @@ pub struct Initialized {
     pub theme: InstalledThemeInfo,
 }
 
-/// Sets up a package's initial install state, which the other commands (`add`,
-/// `remove`, `list`) require before they will run.
+/// Creates a package's install state and installs a theme.
 ///
-/// Besides fixing where components install, init always installs a theme: the
-/// chosen theme's CSS is copied into the package as its Tailwind input, and the
-/// theme is recorded in the install state. The theme is named by
-/// [`InitOptions::theme`], or chosen via `choose` when none is given. Errors if
-/// the package is already initialized rather than clobbering its state.
+/// Choose the component directory and theme through `InitOptions`. If no theme is named
+/// and several are available, `choose` selects one. The theme CSS becomes the package's
+/// Tailwind input. An initialized package cannot be initialized again.
 ///
 /// # Errors
 ///
@@ -116,11 +112,8 @@ struct ThemePlan {
     contents: String,
 }
 
-/// Resolves the package's theme without writing anything. A theme is mandatory,
-/// so this either produces a plan or fails: the default registry must be
-/// reachable and offer at least one theme, and an explicitly named theme must
-/// exist. When no theme was named, the sole offered theme is taken, or `choose`
-/// picks one when the registry offers several.
+/// Reads the selected theme and plans its destination without writing files. Uses the
+/// sole theme if none is named, or calls `choose` when several are available.
 #[track_caller]
 fn plan_theme(
     package: &Package,

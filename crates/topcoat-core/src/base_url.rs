@@ -8,13 +8,10 @@ use crate::context::{Cx, try_app_context};
 /// The absolute URL an application is publicly reachable at, like
 /// `https://example.com`.
 ///
-/// Relative URLs work anywhere within the site, but rendered content that
-/// leaves it (e.g. links and images in emails, feeds, or sitemaps) needs
-/// the absolute form, resolved against this base. A base URL is an `http` or
-/// `https` URL with a host and an optional path prefix (for applications
-/// mounted under one, like `https://example.com/app`), and no query or
-/// fragment. The string is parsed at construction, so every value of this
-/// type holds a well-formed base.
+/// Use it to build absolute URLs from application paths. It requires an
+/// `http` or `https` URL with a host and no query or fragment. An optional
+/// path prefix supports applications mounted below the host root, such as
+/// `https://example.com/app`.
 ///
 /// Register one on the router builder with `.base_url(...)`, read it back
 /// with [`base_url`] or [`try_base_url`], and resolve paths against it with

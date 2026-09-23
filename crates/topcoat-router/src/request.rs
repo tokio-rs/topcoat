@@ -20,15 +20,12 @@ pub type Request<T = Body> = http::Request<T>;
 
 /// A type that can be built from an incoming request.
 ///
-/// A page or route handler may take a single `FromRequest` value as its request
-/// body parameter, optionally alongside `cx: &Cx`. The built-in extractors
-/// ([`Json`](crate::content::Json), [`Form`](crate::content::Form), [`Bytes`],
-/// [`String`], [`Body`], and more) all implement this trait; implement it
-/// yourself for request-specific parsing the built-ins don't cover.
+/// A page or route may accept one `FromRequest` body parameter alongside an
+/// optional `cx: &Cx`. Use a built-in extractor or implement this trait for
+/// custom parsing.
 ///
-/// Because the body is a stream that can only be read once, a handler may have
-/// at most one `FromRequest` parameter. This is the request-side counterpart of
-/// [`IntoResponse`](crate::response::IntoResponse).
+/// A handler accepts only one body parameter because the body can be consumed
+/// only once.
 ///
 /// An implementation that buffers the body should delegate the buffering to
 /// [`Bytes`], which enforces the request's
@@ -156,9 +153,8 @@ where
 
 /// Returns the [`Parts`] of the current request.
 ///
-/// Use this when you need access to multiple components of the request at
-/// once. For individual fields, prefer the dedicated accessors
-/// ([`method`], [`uri`], [`version`], [`headers`], [`extensions`]).
+/// Use this to read several request fields at once. For one field, use its
+/// accessor, such as [`method`] or [`headers`].
 ///
 /// # Examples
 ///

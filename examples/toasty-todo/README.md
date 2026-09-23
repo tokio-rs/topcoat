@@ -1,6 +1,6 @@
 # Toasty todo
 
-A todo list backed by the Toasty ORM: a model, an in-memory SQLite database in app context, and create, toggle, and delete routes that redirect after each submission.
+A todo list backed by the Toasty ORM. Form submissions update the database and redirect to the list.
 
 Run it with:
 

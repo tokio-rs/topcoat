@@ -14,22 +14,13 @@ use crate::{
 
 /// The module-based router builder, created by the `module_router!` macro.
 ///
-/// Translates Rust module paths into route paths and builds a
-/// [`RouterBuilder`]. The module tree rooted at `root_module_path` becomes the
-/// route tree: each module maps to a path segment, with `_`-prefixed modules
-/// becoming groups and static names kebab-cased.
+/// Builds a [`RouterBuilder`] from the modules below `root_module_path`.
+/// Each module adds a route segment. Names starting with `_` become groups,
+/// and static segment names use kebab case.
 ///
-/// Segment overrides (kind, rename) registered via `segment!` are applied during
-/// the module-to-path translation. Overrides must be registered before any pages
-/// or layouts: this is enforced with a panic.
-///
-/// The translation pipeline for a given module path:
-/// 1. Strip the `root_module_path` prefix
-/// 2. Walk each `::`-separated component, checking for a [`Segment`] override
-/// 3. Apply default kind (`_` prefix -> `Group`, otherwise `Static`)
-/// 4. Kebab-case static segment names, leave others as-is
-/// 5. Collect into a [`PathBuf`]
-/// 6. Append the handler's relative path, if it declares one
+/// Register `segment!` overrides before handlers so their paths use the
+/// selected segment kinds and names. A handler's relative path is appended
+/// to its module-derived path.
 #[doc(hidden)]
 pub struct ModuleRouterBuilder {
     inner: RouterBuilder,
@@ -275,12 +266,9 @@ impl ModuleRouterBuilder {
     /// Registers every [`ModuleLayer`] annotated with `#[layer]` and collected
     /// at link time, deriving each path from the module tree.
     ///
-    /// At most one discovered layer is allowed per path. Link-time collection
-    /// order is non-deterministic, so two discovered layers sharing a path would
-    /// have an undefined run order; this rejects that rather than pick an
-    /// arbitrary one. To stack several layers on one path, register them
-    /// manually with [`RouterBuilder::layer`](crate::RouterBuilder::layer),
-    /// whose order is well-defined.
+    /// Discovered layers must have unique paths because discovery does not
+    /// define their order. To stack layers at one path, register them with
+    /// [`RouterBuilder::layer`](crate::RouterBuilder::layer).
     ///
     /// # Panics
     ///

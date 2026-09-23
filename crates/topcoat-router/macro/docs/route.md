@@ -6,17 +6,17 @@ A route always declares its HTTP methods as the first argument:
 - a bracketed list (`[GET, POST]`) responding to each listed method, or
 - `*`, responding to every method. A route declaring a specific method takes precedence over a `*` route at the same path.
 
-An optional path string follows the methods (`#[route(GET "/api/health")]`); when omitted, the URL is derived from the function's enclosing module path, kebab-cased, provided the function is reachable from a [`module_router!`](macro.module_router.html). A path starting with `./` is joined onto that module-derived path: `#[route(GET "./health")]` in `src/app/api.rs` serves `/api/health`. All forms register into the same router and can be mixed.
+Place an absolute path after the methods to choose the URL directly, as in `#[route(GET "/api/health")]`. Under [`module_router!`](macro.module_router.html), omit the path to derive it from the enclosing module. A path starting with `./` extends the module path. For example, `#[route(GET "./health")]` in `src/app/api.rs` serves `/api/health`.
 
 A route registers like any other handler: pass the function name to [`RouterBuilder::route`](struct.RouterBuilder.html#method.route), or let [`discover`](trait.RouterBuilderDiscoverExt.html) or [`module_router!`](macro.module_router.html) collect it automatically.
 
 # Handler signature
 
-The function is `async` and returns `Result<T>` where `T` implements [`AsyncIntoResponse`](response/trait.AsyncIntoResponse.html), which every [`IntoResponse`](response/trait.IntoResponse.html) type does. It may take [`cx: &Cx`](../context/struct.Cx.html), one request body parameter implementing [`FromRequest`](request/trait.FromRequest.html), both, or neither. The body parameter may use a destructuring pattern such as `Json(input): Json<T>`, and the parameters may appear in either order.
+The function must be `async` and return `Result<T>`, where `T` implements [`AsyncIntoResponse`](response/trait.AsyncIntoResponse.html). Every [`IntoResponse`](response/trait.IntoResponse.html) type meets this bound. The handler may take [`cx: &Cx`](../context/struct.Cx.html) and one body parameter implementing [`FromRequest`](request/trait.FromRequest.html). Both are optional and may appear in either order. The body parameter may use a pattern such as `Json(input): Json<T>`.
 
 # Response conversion
 
-The macro converts the success value via [`AsyncIntoResponse::async_into_response`](response/trait.AsyncIntoResponse.html#tymethod.async_into_response). Strings, status codes, byte buffers, `(headers, body)` tuples, and [`Json<T>`](content/struct.Json.html) all work. A success value is not serialized as JSON automatically; wrap it in [`Json<T>`](content/struct.Json.html) to opt in.
+The macro converts the success value into a response. See [`IntoResponse`](response/trait.IntoResponse.html) for supported types and tuples. Wrap a value in [`Json<T>`](content/struct.Json.html) to serialize it as JSON.
 
 # Examples
 

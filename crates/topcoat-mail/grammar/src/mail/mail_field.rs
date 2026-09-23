@@ -11,12 +11,10 @@ use crate::mail::FieldValue;
 
 /// A single `name: value` entry in a `mail!` body.
 ///
-/// The name is any identifier, not just the known field names: an
-/// unrecognized or partially typed name still lowers to a call on
-/// [`MailBuilder`](topcoat_mail::MailBuilder), so the compiler reports it as
-/// a missing method there and rust-analyzer can complete the builder's
-/// methods at the name. The colon and value are optional for the same
-/// reason; a field still being typed lowers to a bare builder access.
+/// Accepts unknown and partially typed names so rust-analyzer can complete
+/// [`MailBuilder`](topcoat_mail::MailBuilder) methods. The colon and value are
+/// optional during parsing. Incomplete fields emit a builder access, and
+/// unknown names produce compiler errors on the corresponding method.
 pub struct MailField {
     pub name: Ident,
     pub colon_token: Option<Token![:]>,

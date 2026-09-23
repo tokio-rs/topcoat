@@ -1,6 +1,6 @@
 # Module router
 
-Routes derived from the Rust module tree with `module_router!`, covering nested layouts, an underscore group that adds no URL segment, and a route.
+An app whose routes and nested layouts follow its Rust module tree through `module_router!`.
 
 Run it with:
 
