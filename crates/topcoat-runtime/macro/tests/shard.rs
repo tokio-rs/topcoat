@@ -92,7 +92,7 @@ async fn region_probe() -> Result<impl View> {
     Ok(view! { (first) })
 }
 
-/// The shard path and identity arguments of the scope start marker in `html`.
+/// Extracts the endpoint URL and invocation identity from a shard start marker.
 fn scope_marker(html: &str) -> (&str, &str) {
     let start = html.find("::topcoat::shard::start(").expect(html);
     // The marker's quoted arguments alternate with the separators between
@@ -112,8 +112,8 @@ fn last_signal_id(html: &str) -> &str {
     &html[start..end]
 }
 
-/// Sends a JSON request to the URL the browser would use through the router,
-/// which installs its identity.
+/// Requests a shard render at its served URL and supplies its invocation
+/// identity through the request header.
 async fn endpoint(shard: &'static impl Route, identity: &str, body: Body) -> Response {
     let request = http::Request::builder()
         .method("POST")

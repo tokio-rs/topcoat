@@ -8,19 +8,15 @@ use topcoat_router::{Path, PathSegment};
 
 use crate::common::random_hex;
 
-/// The path literal an endpoint attribute accepts, such as the `"/search"`
-/// in `#[shard("/search")]`.
+/// An absolute route path for a procedure or shard endpoint.
 ///
-/// The literal is the absolute path the endpoint is served at. Arguments
-/// travel in the request body, so the path cannot declare parameters.
+/// Accepts group segments but rejects dynamic and catch-all parameters.
 pub struct EndpointPath {
     pub lit: LitStr,
 }
 
 impl EndpointPath {
-    /// The literal of the path an endpoint is served at: `path` when the
-    /// attribute named one, and otherwise a random path below `prefix`,
-    /// drawn when the macro expands.
+    /// Returns the supplied path or generates a random path under `prefix`.
     #[must_use]
     pub fn resolve(path: Option<&Self>, prefix: &str) -> LitStr {
         path.map_or_else(
@@ -29,9 +25,12 @@ impl EndpointPath {
         )
     }
 
-    /// The literal of the URL the browser requests for an endpoint served at
-    /// `path`: the path without its group segments, which the router strips
-    /// before matching.
+    /// Converts a route path to its request URL, removing group segments.
+    /// Root and group-only paths produce `/`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `path` is not a valid route path.
     #[must_use]
     pub fn url(path: &LitStr) -> LitStr {
         LitStr::new(&Path::new(&path.value()).to_matchit_path(), path.span())

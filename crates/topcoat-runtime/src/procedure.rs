@@ -3,12 +3,10 @@ use topcoat_router::Route;
 
 use crate::{Surrogate, Surrogated};
 
-/// The argument and return types of a procedure, as seen by runtime
-/// expressions calling it.
+/// A procedure's argument and return types for calls in runtime expressions.
 ///
-/// A procedure is a [`Route`] serving calls at its path. Register it with
-/// [`RouterBuilder::route`](topcoat_router::RouterBuilder::route) to expose
-/// its HTTP endpoint.
+/// Procedures implement [`Route`] to handle calls over HTTP. Register one
+/// with [`RouterBuilder::route`](topcoat_router::RouterBuilder::route).
 pub trait TypedProcedure: Route {
     /// The arguments, as a tuple in declaration order.
     type Args: Surrogated;
@@ -17,18 +15,18 @@ pub trait TypedProcedure: Route {
     type Output: Surrogated;
 }
 
-/// The surrogate a procedure value turns into inside a runtime expression.
+/// A procedure captured by a runtime expression.
 ///
-/// Serializes as the URL of the procedure's endpoint and exposes a typed
-/// [`call`](Self::call) for browser expressions. A static reference lets
-/// closures capture it without borrowing a local variable.
+/// Serializes the endpoint URL for the browser and checks the argument and
+/// return types of [`call`](Self::call).
 pub struct ProcedureSurrogate<P> {
     procedure: P,
-    /// The URL of the procedure's endpoint, where the browser posts calls.
+    /// The request URL, with route groups removed and `/` for the root.
     url: &'static str,
 }
 
 impl<P: TypedProcedure> ProcedureSurrogate<P> {
+    /// Pairs a procedure with the URL that serves its calls.
     #[must_use]
     pub const fn new(procedure: P, url: &'static str) -> Self {
         Self { procedure, url }

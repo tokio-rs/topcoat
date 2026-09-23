@@ -8,9 +8,9 @@ import type { SignalId } from "../signal-registry";
 import { RenderUnit } from "./unit";
 
 /**
- * A shard: a region delimited by `<!-- ::topcoat::shard::start/end -->`
- * comments whose content is re-fetched from the shard's path with its
- * computed arguments whenever one of its inputs changes.
+ * A region bounded by shard start and end comments. When an input changes,
+ * it requests new content from the endpoint with the current arguments and
+ * signal values.
  */
 export class ShardUnit extends RenderUnit {
 	protected readonly label = "Shard";
@@ -25,7 +25,7 @@ export class ShardUnit extends RenderUnit {
 	constructor(
 		parent: Scope,
 		runtime: Runtime,
-		/** The path of the shard's endpoint, where re-renders are requested. */
+		/** The request URL for shard renders, with route groups removed. */
 		readonly path: string,
 		readonly identity: string,
 		exprs: string[],

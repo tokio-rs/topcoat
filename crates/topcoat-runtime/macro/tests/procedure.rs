@@ -29,7 +29,7 @@ async fn with_arguments(enabled: bool, label: String) -> Result<String> {
     Ok(if enabled { label } else { String::new() })
 }
 
-/// Posts `body` to the URL the browser would use for `procedure`.
+/// Calls a procedure through the router at its served URL.
 async fn call(procedure: &'static dyn Route, body: &'static str) -> Response {
     let request = http::Request::builder()
         .method("POST")

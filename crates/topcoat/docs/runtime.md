@@ -41,7 +41,7 @@ pub fn router() -> Router {
 
 The runtime reruns a page by sending its current signal values to the page's URL. The [`RuntimeLayer`] added by `.runtime()` converts this request into a `GET`, so the page and its layouts can render with those values. Registering your layers first lets them handle the rerun as a `GET`. See [`RuntimeLayer`] for the request format and rewrite behavior.
 
-[Procedures](#procedures) and [shards](#shards) are routes. The example's `.discover()` registers them along with the pages.
+The example's `.discover()` registers pages, [procedures](#procedures), and [shards](#shards) from your application. To register a procedure or shard explicitly, pass its name to `.route()`.
 
 # Runtime expressions
 

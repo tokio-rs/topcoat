@@ -8,8 +8,7 @@ pub struct ShardScope {
     /// markers and which the browser sends back with a re-render request so
     /// the shard body derives the same identities as the inline render.
     identity: Identity,
-    /// The URL of the shard's endpoint, where the browser posts re-render
-    /// requests.
+    /// The request URL, with route groups removed and `/` for the root.
     url: &'static str,
     exprs: Vec<Js>,
     placeholder: ViewHandle,

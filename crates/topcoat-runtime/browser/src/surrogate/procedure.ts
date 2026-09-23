@@ -5,7 +5,7 @@ import { Future } from "./future";
 export class Procedure<A extends unknown[] = unknown[], R = unknown> {
 	constructor(
 		private readonly cx: Context,
-		/** The path of the procedure's endpoint, where calls are posted. */
+		/** The request URL for procedure calls, with route groups removed. */
 		private readonly path: string,
 	) {}
 

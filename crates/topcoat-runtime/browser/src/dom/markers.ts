@@ -16,7 +16,7 @@ export type CommentMarker =
 	| { kind: "expr-end" }
 	| {
 			kind: "shard-start";
-			/** The path of the shard's endpoint, where re-renders are requested. */
+			/** The request URL for shard renders, with route groups removed. */
 			path: string;
 			/**
 			 * The identity of the shard invocation, which pairs the start

@@ -1,7 +1,4 @@
-/// Draws a random 128-bit value and formats it as 32 lowercase hex digits.
-///
-/// The value is drawn when a macro expands, so it names the expansion for
-/// the lifetime of the compiled binary.
+/// Returns 128 random bits as a string of 32 lowercase hexadecimal digits.
 ///
 /// # Panics
 ///

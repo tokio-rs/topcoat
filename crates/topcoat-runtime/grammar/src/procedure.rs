@@ -16,11 +16,10 @@ use topcoat_core_grammar::{
 
 use crate::common::EndpointPath;
 
-/// The prefix below which a procedure without a path of its own is served.
+/// The path prefix for procedures without an explicit path.
 const PROCEDURE_ROUTE_PREFIX: &str = "/_topcoat/runtime/procedures";
 
-/// Arguments to `#[procedure]`: an optional path the procedure is served
-/// at, as in `#[procedure("/api/double")]`.
+/// The optional endpoint path in `#[procedure("/api/double")]`.
 pub struct ProcedureAttr {
     pub path: Option<EndpointPath>,
 }

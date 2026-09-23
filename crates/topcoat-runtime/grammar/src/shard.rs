@@ -15,7 +15,7 @@ use crate::{
     shard::{ShardAttr, ShardItem},
 };
 
-/// The prefix below which a shard without a path of its own is served.
+/// The path prefix for shards without an explicit path.
 const SHARD_ROUTE_PREFIX: &str = "/_topcoat/runtime/shards";
 
 /// A parsed `#[shard] async fn ...`.

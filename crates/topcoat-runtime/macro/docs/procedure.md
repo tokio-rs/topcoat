@@ -63,7 +63,7 @@ Awaiting a call yields the procedure's `Ok` value. If the procedure returns `Err
 
 # Registration
 
-A procedure is a [`Route`] on the [`Router`], served at its path. `.discover()` registers every procedure linked into the binary; alternatively, register procedures individually:
+Register a procedure on the [`Router`] before calling it from the browser. It implements [`Route`], so pass its name to `.route()`:
 
 ```rust
 # use topcoat::{Result, router::Router, runtime::procedure};
@@ -72,9 +72,11 @@ A procedure is a [`Route`] on the [`Router`], served at its path. `.discover()` 
 let router = Router::builder().route(double).build();
 ```
 
+With the `discover` feature enabled, `.discover()` registers all procedures linked into the application.
+
 # Path
 
-By default, a procedure is served at an internal path that changes with every build. Pass an absolute path to serve it somewhere stable instead:
+Topcoat generates an internal path for each procedure. This path can change between builds. To choose a stable endpoint, pass an absolute path to `#[procedure]`:
 
 ```rust
 use topcoat::{Result, runtime::procedure};
@@ -85,7 +87,9 @@ async fn double(value: usize) -> Result<usize> {
 }
 ```
 
-The browser posts every call to that path. Arguments travel in the request body, so the path cannot declare parameters.
+The browser calls this procedure with a `POST` request to `/api/double`. Arguments are sent in the request body, so the path cannot contain dynamic or catch-all parameters.
+
+The path follows the router's [path syntax](../router/index.html#paths). Groups affect layer matching but are omitted from the URL. For example, `#[procedure("/(api)/double")]` serves calls at `/double`.
 
 [`Cx`]: ../context/struct.Cx.html
 [`Result`]: ../type.Result.html
