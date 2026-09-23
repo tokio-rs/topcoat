@@ -30,11 +30,11 @@
 [discord-badge]: https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=flat-square
 [discord-url]: https://discord.gg/tokio
 
-Topcoat is a Rust framework for building full-stack web apps. It ships with the parts most apps need, like routing, templating, client-side interactivity, assets, cookies, and sessions, and each part can be turned on or off with a Cargo feature. The goal is to keep building an app simple and productive. See [Learn Topcoat](#learn-topcoat) to get started, or the [Roadmap](#roadmap) for what is coming next.
+Topcoat is a modular, batteries-included Rust framework for building full-stack apps. It prioritizes simplicity and productivity. See [Learn Topcoat](#learn-topcoat) to get started, or the [Roadmap](#roadmap) for what's coming next.
 
-**Topcoat is early-stage and experimental. Expect breaking changes.**
+**Early-stage and experimental. Expect breaking changes.**
 
-```rust,no_run
+```rust,ignore
 use topcoat::{
     Result,
     router::{Router, RouterBuilderDiscoverExt, page},
@@ -237,7 +237,7 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 
 **Miscellaneous**
 - [Topcoat UI](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/ui.md): premade components vendored into your project for you to edit.
-- [Mail](https://docs.rs/topcoat/latest/topcoat/mail/index.html): declare mail with the `mail!` macro, deliver through SMTP, file, or in-memory transports.
+- [Mail](https://docs.rs/topcoat/latest/topcoat/mail/index.html): declare mail with the `mail!` macro and deliver it through a pluggable transport.
 
 **Third-party integrations**
 - [Tailwind](https://docs.rs/topcoat/latest/topcoat/tailwind/index.html): Tailwind CSS without Node, wired into the asset pipeline.
