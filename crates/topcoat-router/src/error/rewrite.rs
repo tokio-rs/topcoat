@@ -219,7 +219,7 @@ impl Dispatch {
     /// The dispatch `parts` describe.
     fn of(parts: &Parts) -> Self {
         let path_and_query = parts.uri.path_and_query().cloned().unwrap_or_else(|| {
-            PathAndQuery::from_maybe_shared(parts.uri.path().to_owned())
+            PathAndQuery::try_from(parts.uri.path())
                 .expect("the path of a valid request uri is a valid path and query")
         });
         Self {
