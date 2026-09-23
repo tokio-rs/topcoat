@@ -4,25 +4,26 @@ use topcoat_router::RouterBuilder;
 #[cfg(feature = "router")]
 use crate::PageRerunRoute;
 
-/// An app context value that marks a router as set up for the browser
+/// The app context value marking a router as set up for the browser
 /// runtime.
 ///
-/// `RouterBuilderRuntimeExt::runtime` registers it. Code that renders the
-/// runtime script can check for it, so that a router missing the runtime's
-/// routes fails on the server instead of breaking in the browser.
+/// [`RouterBuilderRuntimeExt::runtime`] registers it, and the script
+/// component checks for it, so a page that includes the runtime script on
+/// a router missing the runtime's routes fails loudly instead of breaking
+/// in the browser.
 #[derive(Debug, Clone, Copy)]
 pub struct RuntimeSetup;
 
 /// Sets up the browser runtime on a [`RouterBuilder`].
 #[cfg(feature = "router")]
 pub trait RouterBuilderRuntimeExt {
-    /// Mounts the routes the browser runtime calls on its own, such as the
-    /// route that re-runs a page, and marks the router as set up with
-    /// [`RuntimeSetup`].
+    /// Mounts the routes the browser runtime talks to on its own, such as
+    /// the route a page re-runs through, and marks the router as set up
+    /// with [`RuntimeSetup`].
     ///
-    /// Call this once on every router that serves pages using the runtime.
-    /// The routes for the application's own procedures and shards are
-    /// registered separately, by discovery or by hand.
+    /// Every application using the runtime calls this once. The routes
+    /// behind the application's own procedures and shards are registered
+    /// separately, by discovery or by hand.
     #[must_use]
     fn runtime(self) -> Self;
 }

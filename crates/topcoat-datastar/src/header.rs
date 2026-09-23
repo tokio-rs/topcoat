@@ -7,7 +7,7 @@ use http::HeaderName;
 
 // -- Request headers (sent by Datastar to the server) --
 
-/// `Datastar-Request`: set to `true` on requests sent by a Datastar action.
+/// `Datastar-Request`: always set on requests issued by a Datastar action.
 pub const DATASTAR_REQUEST: HeaderName = HeaderName::from_static("datastar-request");
 
 // -- Response headers (sent by the server to Datastar) --
@@ -31,6 +31,6 @@ pub const DATASTAR_ONLY_IF_MISSING: HeaderName =
     HeaderName::from_static("datastar-only-if-missing");
 
 /// `datastar-script-attributes`: a JSON object of attributes for the script
-/// element that runs a `text/javascript` response.
+/// element a `text/javascript` response executes.
 pub const DATASTAR_SCRIPT_ATTRIBUTES: HeaderName =
     HeaderName::from_static("datastar-script-attributes");

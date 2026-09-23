@@ -1,5 +1,3 @@
-//! The per-request cache behind the `#[memoize]` attribute.
-
 mod as_ref;
 mod cache;
 mod cell;

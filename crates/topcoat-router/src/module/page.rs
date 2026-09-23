@@ -9,30 +9,32 @@ use crate::{Body, Layout, Methods, Page, Path, PathBuf, RouteId, Slot, route};
 /// the URL path from the module tree and registers the page under it.
 #[doc(hidden)]
 pub trait ModulePage: Send + Sync + 'static {
-    /// Returns the id of this page's handler.
+    /// The identity of this page's handler.
     fn id(&self) -> RouteId;
 
-    /// Returns the HTTP methods this page responds to.
+    /// The HTTP methods this page responds to.
     fn methods(&self) -> Methods<'_>;
 
-    /// Returns the module path the page was declared in.
+    /// The module path where the page was declared, used to derive the URL.
     fn module_path(&self) -> &'static str;
 
-    /// Returns the path below the module path, as declared with a `./` path.
-    /// The root path stands for the module path with a trailing slash.
+    /// The path below the module path, joined onto it to form the URL, as
+    /// declared with a `./` path. The root path stands for the module path
+    /// with a trailing slash.
     ///
-    /// Defaults to `None`, which means the module path itself.
+    /// Defaults to `None`, so the handler is served at the module path
+    /// itself.
     fn relative_path(&self) -> Option<&Path> {
         None
     }
 
-    /// Renders the page for the request `cx` belongs to.
+    /// Renders the page [`View`] under `cx`.
     fn render<'a>(&'a self, cx: &'a Cx, body: Body) -> BoxView<'a>;
 
-    /// Returns whether this page is the one handling the current request.
+    /// Returns whether this page handles the current request.
     ///
-    /// Only the page's id is compared, so the result does not depend on the
-    /// values of path parameters or on the query string.
+    /// Only the handler is compared, so a page is current for every value its
+    /// path parameters take, whatever the request's query or fragment.
     ///
     /// # Panics
     ///
@@ -106,19 +108,21 @@ impl<P: ModulePage> Page for ResolvedPage<P> {
 /// the URL prefix from the module tree and registers the layout under it.
 #[doc(hidden)]
 pub trait ModuleLayout: Send + Sync + 'static {
-    /// Returns the module path the layout was declared in.
+    /// The module path where the layout was declared, used to derive the URL.
     fn module_path(&self) -> &'static str;
 
-    /// Returns the path below the module path, as declared with a `./` path.
-    /// The root path stands for the module path with a trailing slash.
+    /// The path below the module path, joined onto it to form the URL, as
+    /// declared with a `./` path. The root path stands for the module path
+    /// with a trailing slash.
     ///
-    /// Defaults to `None`, which means the module path itself.
+    /// Defaults to `None`, so the handler is served at the module path
+    /// itself.
     fn relative_path(&self) -> Option<&Path> {
         None
     }
 
-    /// Renders the layout around `slot`, the content it wraps, for the
-    /// request `cx` belongs to.
+    /// Renders the layout, embedding the given child content [`Slot`],
+    /// under `cx`.
     fn render<'a>(&'a self, cx: &'a Cx, slot: Slot<'a>) -> BoxView<'a>;
 }
 

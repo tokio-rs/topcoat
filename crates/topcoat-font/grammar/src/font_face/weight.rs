@@ -15,13 +15,9 @@ mod kw {
     custom_keyword!(bold);
 }
 
-/// A `font-weight: ...` descriptor in a `font_face!` body.
 pub struct FontWeight {
-    /// The `font-weight` name.
     pub key: FontWeightKey,
-    /// The `:` between the name and the value.
     pub colon_token: Token![:],
-    /// The descriptor's value.
     pub value: FontWeightValue,
 }
 
@@ -57,13 +53,9 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontWeight {
     }
 }
 
-/// The `font-weight` descriptor name.
 pub struct FontWeightKey {
-    /// The `font` keyword.
     pub font_kw: kw::font,
-    /// The `-` between the keywords.
     pub dash_token: Token![-],
-    /// The `weight` keyword.
     pub weight_kw: kw::weight,
 }
 
@@ -93,11 +85,8 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontWeightKey {
     }
 }
 
-/// The value of a `font-weight` descriptor: CSS syntax or a Rust expression.
 pub enum FontWeightValue {
-    /// A Rust expression that evaluates to a `FontWeightRange`.
     Expr(Box<Expr>),
-    /// A CSS weight or weight range such as `400` or `100 900`.
     Css(FontWeightRange),
 }
 
@@ -134,9 +123,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontWeightValue {
 /// carried by a variable font, written as two space-separated weights
 /// (`400 700`, `normal bold`).
 pub struct FontWeightRange {
-    /// The first weight.
     pub start: FontWeightLevel,
-    /// The second weight, if this is a range.
     pub end: Option<FontWeightLevel>,
 }
 
@@ -185,9 +172,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontWeightRange {
 /// A single absolute font weight, written as a bare number validated to be in
 /// `100..=900`, or one of the CSS keywords `normal` (`400`) or `bold` (`700`).
 pub struct FontWeightLevel {
-    /// The numeric weight.
     pub value: u16,
-    /// The span of the written token.
     pub span: Span,
 }
 

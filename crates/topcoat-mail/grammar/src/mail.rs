@@ -13,13 +13,10 @@ use syn::{
 use topcoat_core_grammar::paths::{topcoat_error, topcoat_mail};
 
 /// The parsed body of a `mail!` invocation: `name: value` fields in any
-/// order, each at most once.
-///
-/// Expands to an awaited `async` block that builds a
-/// [`Mail`](topcoat_mail::Mail) with [`MailBuilder`](topcoat_mail::MailBuilder)
-/// and evaluates to a `Result<Mail>`.
+/// order, at most once each. Lowers to an awaited `async` block that
+/// assembles a [`Mail`](topcoat_mail::Mail) through
+/// [`MailBuilder`](topcoat_mail::MailBuilder) and produces a `Result<Mail>`.
 pub struct Mail {
-    /// The fields, in the order they were written.
     pub fields: Punctuated<MailField, Token![,]>,
 }
 

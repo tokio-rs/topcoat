@@ -12,16 +12,11 @@ use crate::{
     view::hir::{LowerView, MatchArmsBuilder, ViewBuilder},
 };
 
-/// A `match expr { ... }` in a view or among attributes. `B` is the type of
-/// a single arm body.
+/// A `match expr { ... }` expression in view-body position.
 pub struct TemplateMatch<B> {
-    /// The `match` keyword.
     pub match_token: Token![match],
-    /// The matched expression.
     pub expr: Box<Expr>,
-    /// The braces around the arms.
     pub brace_token: Brace,
-    /// The arms, in source order.
     pub arms: Vec<TemplateMatchArm<B>>,
 }
 
@@ -97,28 +92,18 @@ where
     }
 }
 
-/// A single arm of a [`TemplateMatch`]: `pat => body`, with an optional
-/// `if guard` before the `=>`.
-///
-/// A body that is not a `{ ... }` block must be followed by a comma, unless
-/// it is the last arm.
+/// A single arm of a [`TemplateMatch`]: `pat (if guard)? => body`.
 pub struct TemplateMatchArm<B> {
-    /// The pattern.
     pub pat: Pat,
-    /// The `if` guard, if any.
     pub guard: Option<(Token![if], Box<Expr>)>,
-    /// The `=>` between pattern and body.
     pub fat_arrow_token: Token![=>],
-    /// The arm body.
     pub body: Box<B>,
-    /// The comma after the body, if any.
     pub comma: Option<Token![,]>,
 }
 
-/// A match arm body that knows whether it is a `{ ... }` block.
-///
-/// A block body ends at its closing brace, so it needs no trailing comma and
-/// is formatted without one. Other bodies need a comma before the next arm.
+/// A match-arm body that knows whether it is a `{ ... }` block. Block bodies are
+/// self-delimiting, so they neither require nor are formatted with a trailing
+/// comma, unlike single-node bodies.
 pub trait MatchArmBody {
     /// Returns whether this body is a `{ ... }` block.
     fn is_block_body(&self) -> bool;

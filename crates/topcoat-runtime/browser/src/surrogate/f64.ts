@@ -77,7 +77,6 @@ export function display(v: number): string {
 	return `${sign}${digits.slice(0, point)}.${digits.slice(point)}`;
 }
 
-/** A Rust `f64`. It renders like Rust's `Display`, through `display`. */
 export class F64 implements AttributeValueViewParts, NodeViewParts {
 	constructor(private readonly v: number) {}
 

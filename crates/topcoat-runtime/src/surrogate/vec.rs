@@ -16,7 +16,6 @@ impl<T> VecSurrogate<T> {
         Self(value)
     }
 
-    /// Borrows the vector as a slice.
     #[must_use]
     pub fn as_slice(&self) -> &SliceSurrogate<T> {
         SliceSurrogate::ref_cast(self.0.as_slice())

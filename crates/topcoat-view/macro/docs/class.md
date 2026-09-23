@@ -1,6 +1,6 @@
-The [`class!`] macro builds a [`Class`] value: a list of HTML classes, separated by spaces, put together from individual entries.
+The [`class!`] macro builds a [`topcoat::view::Class`] value: a space-separated list of HTML classes assembled from individual entries.
 
-Use it as the value of a `class` attribute when the list mixes fixed and conditional classes:
+Use it in the value position of a `class` attribute when the list mixes static and conditional parts:
 
 ```rust
 # #[topcoat::view::component]
@@ -17,9 +17,9 @@ Ok(view! {
 
 # Syntax
 
-The body is a comma-separated list of entries. Each entry is a Rust expression, optionally followed by a condition:
+The body is a comma-separated list of entries. Each entry is a Rust expression, optionally followed by a trailing condition:
 
-- `expr` always includes the entry.
+- `expr` includes the entry unconditionally.
 - `expr if cond` includes the entry only when `cond` is true.
 - `expr if cond else alt` includes `expr` when `cond` is true and `alt` otherwise.
 
@@ -43,11 +43,11 @@ Ok(view! {
 # }
 ```
 
-An entry can be any value implementing [`ClassViewParts`]. This includes strings, `Option`s of them, another [`Class`], and an [`AttributeValue`] taken from an [`Attributes`] collection. Implement the trait for your own types to use them as entries. An entry without a condition can also be a `Vec` or an array of entries, which adds each of its items.
+An entry can be any value implementing [`ClassViewParts`]: string types, `Option`s of them, a `Vec` or array of entries, another [`Class`], or a captured attribute value ([`AttributeValue`]) taken from an [`Attributes`] collection. Implement the trait for your own types to use them as entries.
 
-# Absent Entries
+# Absent entries
 
-Absent entries are skipped without leaving an extra space. `None`, empty strings, and entries whose condition is false add neither text nor a separator. When every entry is absent, the element leaves out the `class` attribute entirely:
+An absent entry is skipped without leaving a leftover space: `None`, empty strings, and entries whose condition is false contribute neither text nor a separator. When every entry is absent, the surrounding element omits the whole `class` attribute:
 
 ```rust
 # #[topcoat::view::component]
@@ -63,9 +63,9 @@ Ok(view! {
 # }
 ```
 
-# Static Class Lists
+# Static class lists
 
-`class!` is also useful for a class list that never changes. The macro escapes string literals at compile time, so the list renders faster than the same classes stored in a `&'static str` constant:
+Use `class!` for a class list that never changes too. It renders faster than the same string written as a `&'static str` constant:
 
 ```rust
 use topcoat::view::{StaticClass, class};
@@ -73,11 +73,12 @@ use topcoat::view::{StaticClass, class};
 const BUTTON: StaticClass = class!("btn btn-lg rounded");
 ```
 
-The type of a `class!` value depends on its entries. A list of only string literals always has the same type, named [`StaticClass`], so it can be stored in a constant. For any other list, the type is best left to inference in a `let` binding.
+A `class!` value takes its type from its entries. A list of literals always has the same one, named by [`StaticClass`]; anything else is only practical to hold in a `let` binding, whose type is inferred.
 
 [`Attributes`]: struct.Attributes.html
-[`AttributeValue`]: enum.AttributeValue.html
 [`Class`]: struct.Class.html
-[`ClassViewParts`]: trait.ClassViewParts.html
 [`StaticClass`]: type.StaticClass.html
+[`ClassViewParts`]: trait.ClassViewParts.html
+[`AttributeValue`]: enum.AttributeValue.html
 [`class!`]: macro.class.html
+[`topcoat::view::Class`]: struct.Class.html

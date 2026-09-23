@@ -16,11 +16,8 @@ mod kw {
 /// A `style:` argument carrying the single style one face ships, e.g.
 /// `style: Italic`.
 pub struct Style {
-    /// The `style` name.
     pub key: StyleKey,
-    /// The `:` between the name and the value.
     pub colon_token: Token![:],
-    /// The written value.
     pub value: StyleValue,
 }
 
@@ -50,9 +47,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for Style {
     }
 }
 
-/// The `style` argument name.
 pub struct StyleKey {
-    /// The `style` keyword.
     pub style_kw: kw::style,
 }
 

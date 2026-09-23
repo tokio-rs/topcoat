@@ -3,12 +3,8 @@ use topcoat_router::{Body, Layer, LayerFuture, Next, Path, RouterBuilder};
 
 use crate::{SessionConfig, SessionState};
 
-/// A router layer that makes the session functions, such as
-/// [`start`](crate::start) and [`token_hash`](crate::token_hash), available
-/// to every request.
-///
-/// Usually installed with [`RouterBuilderSessionExt::sessions`], which also
-/// registers the [`SessionConfig`].
+/// A router layer that makes the session state available for the current
+/// request.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SessionLayer;
 
@@ -31,13 +27,13 @@ impl Layer for SessionLayer {
     }
 }
 
-/// Extension trait that adds session support to a [`RouterBuilder`].
+/// Installs session support on a [`RouterBuilder`].
 pub trait RouterBuilderSessionExt {
-    /// Registers `config` as app context and adds a [`SessionLayer`] at the
-    /// root path.
+    /// Registers the session `config` on the app context and the root session
+    /// layer.
     ///
-    /// The default cookie token store also needs the cookie layer, which is
-    /// added with `.cookies()` on the router builder.
+    /// The default cookie token store also needs the cookie layer, registered
+    /// with the cookie crate's `cookies` extension method.
     #[must_use]
     fn sessions(self, config: SessionConfig) -> Self;
 }

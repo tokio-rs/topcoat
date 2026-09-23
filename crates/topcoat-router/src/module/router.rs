@@ -12,16 +12,18 @@ use crate::{
     Segment, SegmentKind, Segments,
 };
 
-/// A router builder that derives route paths from Rust module paths, created
-/// by the `module_router!` macro.
+/// The module-based router builder, created by the `module_router!` macro.
 ///
-/// The module tree under `root_module_path` becomes the route tree. Each
-/// module becomes one path segment: `_`-prefixed modules become groups, and
-/// other module names become kebab-cased static segments. A `segment!`
-/// declaration in a module overrides its kind or name. Convert the builder
-/// into a [`RouterBuilder`] with `From` when done.
+/// Translates Rust module paths into route paths and builds a
+/// [`RouterBuilder`]. The module tree rooted at `root_module_path` becomes the
+/// route tree: each module maps to a path segment, with `_`-prefixed modules
+/// becoming groups and static names kebab-cased.
 ///
-/// A module path becomes a route path in these steps:
+/// Segment overrides (kind, rename) registered via `segment!` are applied during
+/// the module-to-path translation. Overrides must be registered before any pages
+/// or layouts: this is enforced with a panic.
+///
+/// The translation pipeline for a given module path:
 /// 1. Strip the `root_module_path` prefix
 /// 2. Walk each `::`-separated component, checking for a [`Segment`] override
 /// 3. Apply default kind (`_` prefix -> `Group`, otherwise `Static`)
@@ -36,8 +38,10 @@ pub struct ModuleRouterBuilder {
 }
 
 impl ModuleRouterBuilder {
-    /// Creates a builder rooted at `root_module_path`, the `module_path!()` of
-    /// the module that calls `module_router!`.
+    /// Creates a new `ModuleRouterBuilder` rooted at the given module path.
+    ///
+    /// The `root_module_path` is the `module_path!()` of the module calling
+    /// `module_router!`.
     #[must_use]
     pub fn new(root_module_path: &'static str) -> Self {
         Self {
@@ -66,10 +70,8 @@ impl ModuleRouterBuilder {
     ///
     /// # Panics
     ///
-    /// Panics if a page, layout, or route is already registered, since
-    /// overrides change how their paths are computed. Also panics if the
-    /// module already has an override, or if it is not inside the root
-    /// module.
+    /// Panics if any pages or layouts have already been registered, since
+    /// segment overrides affect path computation and must come first.
     #[must_use]
     #[track_caller]
     pub fn segment(mut self, segment: Segment) -> Self {
@@ -163,12 +165,11 @@ impl ModuleRouterBuilder {
         path
     }
 
-    /// Registers a [`ModulePage`] at the path derived from its module path.
+    /// Registers a [`ModulePage`], computing its route path from the module path.
     ///
     /// # Panics
     ///
-    /// Panics if the page's module is not inside the root module, or if it
-    /// uses a `./` path in the root module.
+    /// Panics if a page has already been registered for the same path.
     #[must_use]
     pub fn page(mut self, page: impl ModulePage) -> Self {
         let path = self.resolve_path(page.module_path(), page.relative_path());
@@ -176,12 +177,11 @@ impl ModuleRouterBuilder {
         self
     }
 
-    /// Registers a [`ModuleLayout`] at the path derived from its module path.
+    /// Registers a [`ModuleLayout`], computing its route path from the module path.
     ///
     /// # Panics
     ///
-    /// Panics if the layout's module is not inside the root module, or if it
-    /// uses a `./` path in the root module.
+    /// Panics if a layout has already been registered for the same path.
     #[must_use]
     pub fn layout(mut self, layout: impl ModuleLayout) -> Self {
         let path = self.resolve_path(layout.module_path(), layout.relative_path());
@@ -189,12 +189,11 @@ impl ModuleRouterBuilder {
         self
     }
 
-    /// Registers a [`ModuleRoute`] at the path derived from its module path.
+    /// Registers a [`ModuleRoute`], computing its route path from the module path.
     ///
     /// # Panics
     ///
-    /// Panics if the route's module is not inside the root module, or if it
-    /// uses a `./` path in the root module.
+    /// Panics if a route has already been registered for the same path.
     #[must_use]
     pub fn route(mut self, route: impl ModuleRoute) -> Self {
         let path = self.resolve_path(route.module_path(), route.relative_path());
@@ -202,12 +201,7 @@ impl ModuleRouterBuilder {
         self
     }
 
-    /// Registers a [`ModuleLayer`] at the path derived from its module path.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the layer's module is not inside the root module, or if it
-    /// uses a `./` path in the root module.
+    /// Registers a [`ModuleLayer`], computing its path prefix from the module path.
     #[must_use]
     pub fn layer(mut self, layer: impl ModuleLayer) -> Self {
         let path = self.resolve_path(layer.module_path(), layer.relative_path());
@@ -215,11 +209,11 @@ impl ModuleRouterBuilder {
         self
     }
 
-    /// Registers every [`Segment`] override declared with `segment!` in the
-    /// program.
+    /// Registers every [`Segment`] override declared with `segment!` and
+    /// collected at link time.
     ///
-    /// Call this before registering any page, layout, or route, since
-    /// overrides change how their paths are computed.
+    /// Segments must be registered before any pages or layouts, since they
+    /// affect path computation.
     #[cfg(feature = "discover")]
     #[must_use]
     pub fn discover_segments(mut self) -> Self {
@@ -229,8 +223,8 @@ impl ModuleRouterBuilder {
         self
     }
 
-    /// Registers every [`ModulePage`] declared with `#[page]` in the program,
-    /// at the path derived from its module path.
+    /// Registers every [`ModulePage`] annotated with `#[page]` and collected
+    /// at link time, deriving each path from the module tree.
     #[cfg(feature = "discover")]
     #[must_use]
     pub fn discover_pages(mut self) -> Self {
@@ -240,13 +234,13 @@ impl ModuleRouterBuilder {
         self
     }
 
-    /// Registers every [`ModuleLayout`] declared with `#[layout]` in the
-    /// program, at the path derived from its module path.
+    /// Registers every [`ModuleLayout`] annotated with `#[layout]` and
+    /// collected at link time, deriving each path from the module tree.
     ///
-    /// Only one discovered layout is allowed per path. Layouts nest by path,
-    /// so two layouts at the same path would have no defined order. To wrap a
-    /// page in more than one layout, give the layouts different paths or
-    /// combine them into one layout component.
+    /// At most one discovered layout is allowed per path: a page's layouts nest
+    /// by path prefix, so two layouts resolving to the same path would have an
+    /// undefined nesting order. To attach more than one layout to a page, give
+    /// them distinct paths or compose them in a single layout component.
     ///
     /// # Panics
     ///
@@ -267,8 +261,8 @@ impl ModuleRouterBuilder {
         self
     }
 
-    /// Registers every [`ModuleRoute`] declared with `#[route]` in the
-    /// program, at the path derived from its module path.
+    /// Registers every [`ModuleRoute`] annotated with `#[route]` and collected
+    /// at link time, deriving each path from the module tree.
     #[cfg(feature = "discover")]
     #[must_use]
     pub fn discover_routes(mut self) -> Self {
@@ -278,14 +272,15 @@ impl ModuleRouterBuilder {
         self
     }
 
-    /// Registers every [`ModuleLayer`] declared with `#[layer]` in the
-    /// program, at the path derived from its module path.
+    /// Registers every [`ModuleLayer`] annotated with `#[layer]` and collected
+    /// at link time, deriving each path from the module tree.
     ///
-    /// Only one discovered layer is allowed per path. Discovered layers have
-    /// no defined order, so two layers at the same path would run in an
-    /// unpredictable order. To stack several layers on one path, register
-    /// them with [`RouterBuilder::layer`](crate::RouterBuilder::layer)
-    /// instead.
+    /// At most one discovered layer is allowed per path. Link-time collection
+    /// order is non-deterministic, so two discovered layers sharing a path would
+    /// have an undefined run order; this rejects that rather than pick an
+    /// arbitrary one. To stack several layers on one path, register them
+    /// manually with [`RouterBuilder::layer`](crate::RouterBuilder::layer),
+    /// whose order is well-defined.
     ///
     /// # Panics
     ///
@@ -306,17 +301,16 @@ impl ModuleRouterBuilder {
         self
     }
 
-    /// Registers every segment override, page, layout, route, and layer
-    /// declared in the program.
+    /// Discovers and registers all segments, pages, layouts, routes, and layers
+    /// collected at link time.
     ///
-    /// Segment overrides are registered first, since they change how the
-    /// other paths are computed.
+    /// Segments are registered first, since they must precede pages and
+    /// layouts.
     ///
     /// # Panics
     ///
-    /// Panics if two discovered layouts or two discovered layers resolve to
-    /// the same path, or for any reason the individual `discover_*` methods
-    /// list.
+    /// Panics if two discovered layers resolve to the same path; see
+    /// [`discover_layers`](Self::discover_layers).
     #[cfg(feature = "discover")]
     #[must_use]
     pub fn discover(self) -> Self {

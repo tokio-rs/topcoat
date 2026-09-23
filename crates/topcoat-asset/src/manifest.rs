@@ -4,48 +4,41 @@ use serde::{Deserialize, Serialize};
 
 use crate::AssetId;
 
-/// The filename of the manifest inside a bundle directory.
+/// Filename of the manifest within a bundle directory.
 pub const MANIFEST_NAME: &str = "manifest.toml";
-/// The manifest format version that this crate reads and writes.
+/// Current on-disk manifest format version.
 pub const MANIFEST_VERSION: u32 = 1;
 
-/// The index of a bundle directory, stored as TOML in
-/// [`MANIFEST_NAME`].
-///
-/// The manifest lists every bundled asset with its ID and file. Convert it
-/// into an [`AssetCatalog`](crate::AssetCatalog) to resolve asset URLs.
+/// On-disk index of a bundle directory, mapping [`AssetId`]s to files.
 #[derive(Serialize, Deserialize)]
 pub struct Manifest {
-    /// The format version, always [`MANIFEST_VERSION`] for a loaded
-    /// manifest.
     pub version: u32,
-    /// One entry per asset declaration, in declaration order.
     pub assets: Vec<ManifestEntry>,
 }
 
 impl Manifest {
-    /// Reads and parses the manifest file at `path`.
+    /// Read and parse a manifest, rejecting unsupported versions.
     ///
     /// # Errors
     ///
-    /// Returns an error of kind [`io::ErrorKind::InvalidData`] if the file is
-    /// not a valid manifest or its `version` is not [`MANIFEST_VERSION`].
-    /// Returns any I/O error from reading `path`.
+    /// Returns [`io::ErrorKind::InvalidData`] if the file is not valid TOML or
+    /// if its `version` field does not equal [`MANIFEST_VERSION`], and
+    /// propagates any I/O error from reading `path`.
     pub fn load(path: impl AsRef<Path>) -> io::Result<Self> {
         Self::parse(&fs::read_to_string(path)?)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
     }
 
-    /// Parses a manifest from its TOML source.
+    /// Parse a manifest from its TOML source, rejecting unsupported versions.
     ///
-    /// This is useful on targets without filesystem access, such as
-    /// WebAssembly, where you embed the manifest into the binary with
-    /// `include_str!`.
+    /// Useful on targets without filesystem access, such as WebAssembly,
+    /// where the manifest of a bundle built ahead of time is embedded into
+    /// the binary with `include_str!`.
     ///
     /// # Errors
     ///
-    /// Returns an error if the source is not a valid manifest or its
-    /// `version` is not [`MANIFEST_VERSION`].
+    /// Returns an error if the source is not valid TOML or if its `version`
+    /// field does not equal [`MANIFEST_VERSION`].
     pub fn parse(toml_str: &str) -> Result<Self, ParseManifestError> {
         let manifest: Manifest = toml::from_str(toml_str)?;
 
@@ -58,41 +51,35 @@ impl Manifest {
         Ok(manifest)
     }
 
-    /// Writes the manifest as TOML to `path`.
+    /// Serialize the manifest to TOML and write it to `path`.
     ///
     /// # Errors
     ///
-    /// Returns an error if the manifest cannot be serialized or the file
-    /// cannot be written.
+    /// Returns an error if serialization to TOML fails or if writing the file
+    /// fails.
     pub fn save(&self, path: impl AsRef<Path>) -> io::Result<()> {
         let toml_str = toml::to_string_pretty(self).map_err(io::Error::other)?;
         fs::write(path, toml_str)
     }
 }
 
-/// One asset in a [`Manifest`].
+/// One row in a [`Manifest`]: an asset ID, its bundled filename, the SHA-256
+/// hex digest of the file's contents, and the `Content-Type` it is served with.
 #[derive(Serialize, Deserialize)]
 pub struct ManifestEntry {
-    /// The ID of the asset.
     pub id: AssetId,
-    /// The bundled filename, relative to the bundle directory.
     pub file: String,
-    /// The SHA-256 hash of the file contents, as lowercase hex.
     pub hash: String,
-    /// The `Content-Type` the file is served with.
     pub content_type: String,
 }
 
-/// An error from [`Manifest::parse`].
+/// Errors from parsing a [`Manifest`] out of its TOML source.
 #[derive(Debug, thiserror::Error)]
 pub enum ParseManifestError {
     /// The source is not valid manifest TOML.
     #[error("invalid manifest TOML: {0}")]
     Toml(#[from] toml::de::Error),
-    /// The manifest has a format version other than [`MANIFEST_VERSION`].
+    /// The manifest reports a format version this build does not support.
     #[error("unsupported manifest version {found} (expected {})", MANIFEST_VERSION)]
-    UnsupportedVersion {
-        /// The version found in the manifest.
-        found: u32,
-    },
+    UnsupportedVersion { found: u32 },
 }

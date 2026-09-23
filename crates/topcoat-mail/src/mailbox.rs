@@ -3,15 +3,17 @@
 use core::fmt;
 use std::str::FromStr;
 
-/// An email address with an optional display name, such as
-/// `Ada Lovelace <ada@example.com>` or just `ada@example.com`.
+/// A validated email address with an optional display name -- renders as
+/// `Ada Lovelace <ada@example.com>` or bare `ada@example.com`.
 ///
-/// RFC 5322 calls an address together with its display name a "mailbox".
-/// The address is validated when the mailbox is created, so every `Mailbox`
-/// holds a valid address. Its `Display` output uses the same two forms.
+/// The pairing of an address with the human-readable name mail clients
+/// show next to it is what RFC 5322 calls a "mailbox". The address is
+/// parsed at construction, so every value of this type holds a well-formed
+/// address.
 ///
-/// Create one with [`Mailbox::new`] or [`Mailbox::named`], parse either form
-/// from a string, or convert a `(name, address)` pair with `TryInto`:
+/// Construct one with [`Mailbox::new`] or [`Mailbox::named`], parse the
+/// bare or display-name form, or convert a `(name, address)` pair with
+/// `TryInto`:
 ///
 /// ```
 /// use topcoat_mail::Mailbox;
@@ -28,10 +30,10 @@ pub struct Mailbox {
 }
 
 impl Mailbox {
-    /// Creates a mailbox with no display name.
+    /// A bare address with no display name.
     ///
-    /// `address` must be a plain `local@domain` address. To parse the
-    /// `Ada Lovelace <ada@example.com>` form, use [`str::parse`].
+    /// The string must be a plain `local@domain` address; use
+    /// [`str::parse`] for the `Ada Lovelace <ada@example.com>` form.
     ///
     /// # Errors
     ///
@@ -43,8 +45,7 @@ impl Mailbox {
         })
     }
 
-    /// Creates a mailbox with a display name, such as
-    /// `Ada Lovelace <ada@example.com>`.
+    /// An address with a display name -- `Ada Lovelace <ada@example.com>`.
     ///
     /// # Errors
     ///
@@ -65,7 +66,7 @@ impl Mailbox {
         self.name.as_deref()
     }
 
-    /// The address without the display name, such as `ada@example.com`.
+    /// The address itself (`local@domain`).
     #[must_use]
     pub fn address(&self) -> &str {
         self.address.as_ref()
@@ -126,8 +127,9 @@ impl TryFrom<&String> for Mailbox {
     }
 }
 
-/// Converts a `(name, address)` pair of any string types, such as
-/// `("Ada", "ada@example.com")` or `(&user.name, &user.email)`.
+/// Any `(name, address)` pair converts, whatever the string flavors --
+/// `("Ada", "ada@example.com")`, `(&user.name, &user.email)`, owned
+/// `String`s, or a mix.
 impl<N, A> TryFrom<(N, A)> for Mailbox
 where
     N: Into<String>,
@@ -146,12 +148,13 @@ impl From<&Mailbox> for Mailbox {
     }
 }
 
-/// Fallible conversion into a list of mailboxes.
+/// One or more mailboxes, converted fallibly from a single value or a
+/// collection.
 ///
-/// Implemented for a single [`Mailbox`], address string, or
-/// `(name, address)` pair, and for a `Vec`, array, or slice of such values.
-/// The recipient fields of the `mail!` macro accept any value of this trait.
-/// A collection can mix these forms:
+/// The `mail!` macro's recipient fields accept anything implementing this
+/// trait: a single [`Mailbox`], address string, or `(name, address)` pair,
+/// or a `Vec`, array, or slice of such values. Collection elements convert
+/// through `TryInto<Mailbox>`, so the flavors compose:
 ///
 /// ```
 /// use topcoat_mail::{Mailbox, TryIntoMailboxes};
@@ -164,7 +167,7 @@ impl From<&Mailbox> for Mailbox {
 /// # Ok::<(), topcoat_mail::AddressError>(())
 /// ```
 pub trait TryIntoMailboxes {
-    /// Converts into mailboxes, parsing address strings as needed.
+    /// Converts into mailboxes, parsing addresses as needed.
     ///
     /// # Errors
     ///
@@ -249,13 +252,13 @@ where
     }
 }
 
-/// The error returned when a string is not a valid email address.
+/// The reason a string was rejected as an email address.
 #[derive(Clone, Debug, thiserror::Error)]
 #[error("invalid email address: {0}")]
 pub struct AddressError(lettre::address::AddressError);
 
-/// Allows collections of [`Mailbox`] values, whose conversion cannot fail,
-/// to implement [`TryIntoMailboxes`].
+/// Lets infallible mailbox conversions (from a [`Mailbox`] itself) satisfy
+/// the fallible element bound of the [`TryIntoMailboxes`] collections.
 impl From<std::convert::Infallible> for AddressError {
     fn from(infallible: std::convert::Infallible) -> AddressError {
         match infallible {}

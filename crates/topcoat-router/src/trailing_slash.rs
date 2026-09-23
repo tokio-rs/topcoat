@@ -7,16 +7,16 @@ use crate::{
     RouteId, Routes, error::redirect_permanent, request::uri,
 };
 
-/// How the router handles a request whose path differs from a route's path
-/// only by a trailing slash.
+/// How the router treats a request for the other trailing-slash form of a
+/// route's path.
 ///
-/// A route's path says whether its URL ends in a slash: a page at `/users`
-/// is served at `/users`, and a page at `/users/` at `/users/`. This setting
-/// decides what happens to a request for the other form. It does not apply
-/// to the root `/`, to a route that ends in a catch-all parameter, or when
-/// routes are registered at both forms of a path. Set it with
-/// [`RouterBuilder::trailing_slash`](crate::RouterBuilder::trailing_slash).
-/// The default is [`Redirect`](Self::Redirect).
+/// A route's path declares whether its URL ends in a slash: a page at
+/// `/users` is served at `/users`, one at `/users/` at `/users/`. The policy
+/// decides what a request for the form a route did not declare gets. It never
+/// affects the root `/`, a route ending in a catch-all parameter, or a pair of
+/// routes registered at both forms of one path. Set it with
+/// [`RouterBuilder::trailing_slash`](crate::RouterBuilder::trailing_slash);
+/// the default is [`Redirect`](Self::Redirect).
 ///
 /// # Examples
 ///
@@ -29,19 +29,17 @@ use crate::{
 /// ```
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum TrailingSlash {
-    /// Redirects to the route's path with `308 Permanent Redirect`, keeping
-    /// the query string.
+    /// Redirects to the declared form with a 308, keeping the query string.
     ///
-    /// This status code keeps the method and the body, so a form posted to
-    /// the other form of the URL is sent again to the route's path.
+    /// The status code preserves the method and the body, so a form posted
+    /// to the other form of the URL is resubmitted to the declared one.
     #[default]
     Redirect,
-    /// Serves the route at both forms of the path. The URL the client asked
-    /// for is kept, and the handler can read it with
-    /// [`uri`](crate::request::uri).
+    /// Serves the route under both forms. The client keeps the URL it asked
+    /// for, and the handler reads it through [`uri`](crate::request::uri).
     Serve,
-    /// Serves the route only at its own path. The other form matches no route
-    /// and gets `404 Not Found`.
+    /// Serves the route under its declared form only; the other form matches
+    /// nothing and responds 404.
     Strict,
 }
 

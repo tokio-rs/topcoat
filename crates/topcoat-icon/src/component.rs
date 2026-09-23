@@ -6,12 +6,8 @@ use crate::IconData;
 
 /// Renders an [`IconData`] as an inline `<svg>` element.
 ///
-/// The icon is `1em` square by default, so it scales with the font size of the
-/// surrounding text. It is shifted down slightly to line up with the text.
-///
-/// Without a `label`, the icon is marked `aria-hidden` so assistive technology
-/// skips it. With a `label`, it gets `role="img"` and the label as its
-/// `aria-label`.
+/// The icon is `1em` square by default, so it scales with the surrounding
+/// text, and carries `aria-hidden` unless a `label` is passed.
 #[component]
 pub async fn icon(
     /// The icon to render.
@@ -20,8 +16,8 @@ pub async fn icon(
     #[into]
     #[default(Length::em(1.0))]
     size: Length,
-    /// The accessible name of the icon. When empty, the icon is hidden from
-    /// assistive technology.
+    /// An accessible label. When omitted, the icon is hidden from assistive
+    /// technology.
     #[default]
     #[into]
     label: String,

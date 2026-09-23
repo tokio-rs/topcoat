@@ -2,17 +2,19 @@ use std::panic::Location;
 
 use crate::fnv1a::Fnv1a;
 
-/// A value that tells apart identities derived at one source location.
+/// A value that distinguishes identities at one source location.
 ///
-/// A key adds itself to the identity hash through the methods on
-/// [`KeyHasher`]. Two keys derive the same identity exactly when they make
-/// the same sequence of writes, so an implementation must be deterministic:
-/// equal values write equal sequences, and values that should be distinct
-/// write distinct sequences.
+/// A key folds itself into the identity hash through the tagged writes on
+/// [`KeyHasher`]. Two keys derive the same identity exactly when they
+/// produce the same sequence of writes, so implementations must be
+/// deterministic: equal values write equal sequences, and values meant to
+/// be distinct at one site write distinct sequences.
 ///
-/// The trait is implemented for primitives, strings, byte slices, and tuples
-/// of keys. Integers hash by value, so the same number is the same key at any
-/// integer width. A custom id type implements the trait by writing its
+/// Implementations exist for the integer primitives, `bool`, `char`,
+/// strings, byte slices, references, source locations, unit, and tuples of
+/// keys. Integers hash by
+/// mathematical value, so the same id used at a different width stays the
+/// same key. A custom id type implements the trait by writing its
 /// identifying parts in order:
 ///
 /// ```
@@ -27,7 +29,7 @@ use crate::fnv1a::Fnv1a;
 /// }
 /// ```
 pub trait IdentityKey {
-    /// Adds this key to the identity hash.
+    /// Folds this key into the running identity hash.
     #[must_use]
     fn write(&self, hasher: KeyHasher) -> KeyHasher;
 }
@@ -55,38 +57,40 @@ const TAG_LOCATION: u8 = b'l';
 /// string without escaping.
 const STR_END: u8 = 0xFF;
 
-/// The hasher an [`IdentityKey`] writes itself into.
+/// The hasher a [`IdentityKey`] folds itself into.
 ///
-/// Every write records the kind of data written and where it ends, so keys of
-/// different kinds, or writes split at different boundaries, do not collide.
-/// Each write takes the hasher by value and returns it, so the calls form a
-/// chain.
+/// Wraps the running identity hash during key derivation. Every write is
+/// tagged with the kind of data written and is self-delimiting, so keys of
+/// different kinds, and sequences of writes with different boundaries,
+/// cannot collide by concatenation. The hasher moves through every write,
+/// threading through a chain of calls, and only the derivation that created
+/// it can take the final value out.
 #[derive(Default)]
 pub struct KeyHasher(Fnv1a<u128>);
 
 impl KeyHasher {
-    /// Creates a hasher that continues from `hash`.
+    /// Wraps the running hash of a keyed derivation.
     #[doc(hidden)]
     #[must_use]
     pub fn new(hash: Fnv1a<u128>) -> Self {
         Self(hash)
     }
 
-    /// Returns the final hash value.
+    /// Takes the derived hash value out.
     #[doc(hidden)]
     #[must_use]
     pub fn finish(self) -> u128 {
         self.0.finish()
     }
 
-    /// Writes an unsigned integer.
+    /// Writes an unsigned integer by value.
     #[must_use]
     pub fn write_u128(self, value: u128) -> Self {
         Self(self.0.write(&[TAG_UNSIGNED]).write(&value.to_le_bytes()))
     }
 
-    /// Writes a signed integer. A non-negative value writes the same as the
-    /// equal unsigned value.
+    /// Writes a signed integer by mathematical value: a non-negative value
+    /// writes exactly like the equal unsigned value.
     #[must_use]
     pub fn write_i128(self, value: i128) -> Self {
         if value >= 0 {
@@ -123,7 +127,8 @@ impl KeyHasher {
         )
     }
 
-    /// Writes a byte slice.
+    /// Writes raw bytes, length-prefixed since any byte value can occur in
+    /// them.
     #[must_use]
     pub fn write_bytes(self, value: &[u8]) -> Self {
         Self(

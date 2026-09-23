@@ -14,9 +14,10 @@ use topcoat_view::{AttributeValueViewParts, NodeViewParts, PartsWriter};
 
 use crate::{Path, PathSegment, PathSegments, request::uri};
 
-/// A value an [`href`] can point at, like a page, a route, or a path.
+/// The destination an [`href`] points at, resolved to the route [`Path`] the
+/// URL is built from.
 pub trait HrefTarget {
-    /// Returns the path pattern the URL is built from.
+    /// Returns the route path the URL is built from.
     fn path<'cx>(&self, cx: &'cx Cx) -> &'cx Path;
 }
 
@@ -26,7 +27,7 @@ impl HrefTarget for &'static Path {
     }
 }
 
-/// A path string, parsed with [`Path::new`].
+/// A path literal, parsed with [`Path::new`].
 ///
 /// # Panics
 ///
@@ -46,24 +47,26 @@ where
     }
 }
 
-/// A value for one path parameter of an [`href`].
+/// A value for one path parameter, named after the parameter it fills.
 ///
 /// The `path_param!` macro implements this trait for the types it declares.
-/// The [`name`](Self::name) says which parameter of the path the value fills.
-/// [`segments`](Self::segments) pushes the URL segments for it: one for a
-/// regular parameter, and one or more for a catch-all.
+/// An [`href`] hands each provided value the [`HrefSegments`] of the path
+/// parameter carrying the same name, and the value pushes what it fills that
+/// parameter with: one segment for a regular parameter, one per element for a
+/// catch-all.
 ///
-/// Building a URL requires the [`Segment`](Self::Segment) type to implement
-/// [`Display`]. A `path_param!` type whose segments do not implement it still
-/// compiles, but cannot be passed to [`href`].
+/// Pushing a segment does not render it. A URL renders its segments with
+/// [`Display`], so that is what [`HrefParams`] requires of the
+/// [`Segment`](Self::Segment) type. A parameter whose type cannot be rendered
+/// still declares; only building a URL from it is rejected.
 pub trait HrefParam {
-    /// The type of one URL segment this value pushes.
+    /// The type of one segment this value fills its parameter with.
     type Segment: ?Sized;
 
-    /// Returns the name of the path parameter this value fills.
+    /// The name of the path parameter this value fills.
     fn name(&self) -> &str;
 
-    /// Pushes the URL segments for this value onto `segments`.
+    /// Pushes the segments this value fills its parameter with.
     fn segments(&self, segments: &mut HrefSegments<'_, Self::Segment>);
 }
 
@@ -82,26 +85,29 @@ where
     }
 }
 
-/// The URL segments an [`HrefParam`] pushes for its path parameter.
+/// The segments an [`HrefParam`] fills its path parameter with.
 ///
-/// [`push`](Self::push) adds one segment. The `/` separators and the
-/// percent-encoding are added for you.
+/// [`push`](Self::push) appends one segment; a catch-all pushes one per
+/// element it spans. The separating `/` and the escaping are written here, so
+/// a value never spells out either itself.
 pub struct HrefSegments<'out, S: ?Sized> {
     write: &'out mut dyn FnMut(&S),
     count: usize,
 }
 
 impl<S: ?Sized> HrefSegments<'_, S> {
-    /// Adds one path segment.
+    /// Appends one path segment, percent-encoded.
     ///
-    /// The segment is written with [`Display`] and percent-encoded, so a value
-    /// that contains `/`, `?`, or `#` stays inside this one segment.
+    /// The segment is written with [`Display`] and lands in the URL escaped,
+    /// so a value that contains `/`, `?`, or `#` fills exactly this one
+    /// segment instead of reshaping the URL around it.
     ///
     /// # Panics
     ///
-    /// Panics if the segment renders to an empty string, `.`, or `..`. A
-    /// browser treats these as references to other paths, even when encoded,
-    /// so they cannot be used as a segment.
+    /// Panics if the segment's [`Display`] implementation fails, or if it
+    /// renders to nothing, `.`, or `..`. A browser resolves those against the
+    /// rest of the path instead of reading them as one segment, and encoding
+    /// them does not take that meaning away, so they are rejected.
     pub fn push(&mut self, segment: &S) {
         self.count += 1;
         (self.write)(segment);
@@ -140,18 +146,19 @@ impl Write for PercentEncoded<'_> {
 /// The path parameters of an [`href`]: a tuple of up to eight [`HrefParam`]
 /// values, in the order the path declares its parameters.
 ///
-/// The [`Segment`](HrefParam::Segment) type of each value must implement
-/// [`Display`].
+/// Every value renders the segments it pushes, so each one's
+/// [`Segment`](HrefParam::Segment) type must implement [`Display`].
 pub trait HrefParams {
-    /// Writes `path` into `out` with every parameter filled in.
+    /// Writes `path` into `out` with every parameter filled in, each segment
+    /// percent-encoded.
     ///
     /// # Panics
     ///
-    /// Panics if the values do not match the path's parameters: a value has
-    /// the wrong name or position, a value has no parameter to fill, a
-    /// parameter has no value, or a value pushes the wrong number of
-    /// segments. Also panics if a segment renders to an empty string, `.`,
-    /// or `..`.
+    /// Panics if the values do not line up with the path's parameters: a name
+    /// mismatch, a value the path declares no parameter for, a parameter no
+    /// value fills, or a value that fills its parameter with the wrong number
+    /// of segments. Panics as well if a segment renders to nothing, `.`, or
+    /// `..`, which address another path instead of filling a segment.
     fn assign(&self, path: &Path, out: &mut String);
 }
 
@@ -309,14 +316,14 @@ fn write_remaining(segments: PathSegments<'_>, path: &Path, out: &mut String) {
 }
 
 /// The query of an [`href`]: a tuple of up to eight [`Serialize`] items,
-/// added with [`Href::query`].
+/// collected by [`Href::query`].
 pub trait HrefQueries {
-    /// Whether a query was added: `true` when the tuple holds at least one
-    /// item, even one that serializes to nothing.
+    /// Whether a query was specified: `true` when the tuple holds at least
+    /// one item, even one that serializes to nothing.
     const SPECIFIED: bool;
 
-    /// Serializes the items into one query string and appends it to the URL
-    /// in `out`.
+    /// Appends the items, serialized and concatenated into one query string,
+    /// to the URL in `out`.
     ///
     /// # Panics
     ///
@@ -384,30 +391,30 @@ fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bo
     true
 }
 
-/// Builds the URL of a page or route.
+/// Turns a page or route into an URL string.
 ///
-/// `target` is the page or route handler the URL points to. The URL is built
-/// from the path the handler is registered at, so it stays correct when the
-/// route moves. A [`Path`] or a path string works as well.
+/// The first parameter, `target`, is the route handler the URL should be
+/// pointing to. The URL is built from the path the handler is mounted at, so
+/// it stays in sync when the route moves. A [`Path`] or a plain path string
+/// works as well.
 ///
-/// Inside a handler's own body, its name refers to the handler function. To
-/// link a handler to itself, write its name as a struct, like `posts {}`, or
-/// use the [`href!`](macro@crate::href) macro, which does this for you.
+/// Inside a handler's own body its name refers to the handler function, so a
+/// handler linking to itself names its marker as a type, e.g. `posts {}`, or
+/// uses the [`href!`](macro@crate::href) macro, which does that on its own.
 ///
-/// `params` fills in the path's parameters. Pass a tuple with one
-/// `path_param!` value per parameter, in the order the path declares them,
-/// or `()` for a path without parameters. Each value is written with
-/// [`Display`] and percent-encoded, so a parameter declared with a type,
-/// like `path_param!(post_id: u64)`, needs that type to implement
-/// [`Display`].
+/// `params` fills in the path's parameters: one `path_param!` value per
+/// parameter, in the order the path declares them, passed as a tuple. A path
+/// without parameters takes `()`. Each value is written with [`Display`] and
+/// percent-encoded, so a parameter declared with a type, like
+/// `path_param!(post_id: u64)`, needs that type to implement [`Display`].
 ///
-/// Add a [`query`](Href::query) string or a [`fragment`](Href::fragment) to
-/// the result, or choose the [`absolute`](Href::absolute) or
-/// [`relative`](Href::relative) form. Use the result in a view to render the
-/// URL, or call [`resolve`](Href::resolve) to get it as a string, for
-/// example for a redirect. [`is_current`](Href::is_current) tells whether the
-/// URL points at the current page, for example to highlight a link in a
-/// navigation bar.
+/// The result can be extended with a [`query`](Href::query) string, a
+/// [`fragment`](Href::fragment), and an [`absolute`](Href::absolute) or
+/// [`relative`](Href::relative) form. Use it directly in a view to render
+/// the URL, or call [`resolve`](Href::resolve) to get the string, e.g. for
+/// a redirect. [`is_current`](Href::is_current) tells whether the URL points
+/// at the page the current request is serving, e.g. to mark the link to it in
+/// a nav.
 ///
 /// ```
 /// use serde::Serialize;
@@ -453,29 +460,29 @@ where
     }
 }
 
-/// Builds the URL of a page or route.
+/// Turns a page or route into an URL string.
 ///
-/// The first argument is the page or route handler the URL points to. The
-/// URL is built from the path the handler is registered at, so it stays
-/// correct when the route moves. A handler can also link to itself. A path
-/// string works as well. A bare name like `ROOT` is always treated as a
-/// handler, so pass a [`Path`] stored in a constant to the [`href`] function
-/// instead.
+/// The first argument is the route handler the URL should be pointing to.
+/// The URL is built from the path the handler is mounted at, so it stays in
+/// sync when the route moves. A handler links to itself as well, so a page
+/// can point at its own path. A [`Path`] or a plain path string works too,
+/// but a bare path always names a handler, so a [`Path`] held in a constant
+/// goes through the [`href`] function instead.
 ///
-/// Every further argument fills in one of the path's parameters. Pass one
-/// `path_param!` value per parameter, in the order the path declares them,
-/// like `href!(post, PostId(post.id))`. Each value is written with
-/// [`Display`] and percent-encoded, so a parameter declared with a type,
-/// like `path_param!(post_id: u64)`, needs that type to implement
+/// Every further argument fills in one of the path's parameters, with one
+/// `path_param!` value per parameter in the order the path declares them, so
+/// a link to a post reads as `href!(post, PostId(post.id))`. Each value is
+/// written with [`Display`] and percent-encoded, so a parameter declared with
+/// a type, like `path_param!(post_id: u64)`, needs that type to implement
 /// [`Display`].
 ///
-/// Add a [`query`](Href::query) string or a [`fragment`](Href::fragment) to
-/// the result, or choose the [`absolute`](Href::absolute) or
-/// [`relative`](Href::relative) form. Use the result in a view to render the
-/// URL, or call [`resolve`](Href::resolve) to get it as a string, for
-/// example for a redirect. [`is_current`](Href::is_current) tells whether the
-/// URL points at the current page, for example to highlight a link in a
-/// navigation bar.
+/// The result can be extended with a [`query`](Href::query) string, a
+/// [`fragment`](Href::fragment), and an [`absolute`](Href::absolute) or
+/// [`relative`](Href::relative) form. Use it directly in a view to render
+/// the URL, or call [`resolve`](Href::resolve) to get the string, e.g. for
+/// a redirect. [`is_current`](Href::is_current) tells whether the URL points
+/// at the page the current request is serving, e.g. to mark the link to it in
+/// a nav.
 ///
 /// ```
 /// use serde::Serialize;
@@ -524,8 +531,8 @@ where
 /// }
 /// ```
 ///
-/// The macro calls the [`href`] function, which takes the parameters as a
-/// tuple instead.
+/// The macro is a thin wrapper around the [`href`] function, which takes the
+/// parameters as a tuple instead.
 #[macro_export]
 macro_rules! href {
     // A bare path names the marker a `#[page]` or `#[route]` expands to, and is
@@ -543,15 +550,14 @@ macro_rules! href {
     };
 }
 
-/// A URL built by [`href`].
+/// A URL being built by [`href`].
 ///
 /// [`query`](Self::query) adds query items, [`fragment`](Self::fragment) sets
-/// the fragment, and [`relative`](Self::relative),
-/// [`absolute`](Self::absolute), and [`form`](Self::form) choose the URL's
-/// form. Use the value in a view to render the URL, or call
-/// [`resolve`](Self::resolve) to get it as a string.
-/// [`is_current`](Self::is_current) tells whether the URL points at the
-/// current page.
+/// the fragment, and [`relative`](Self::relative), [`absolute`](Self::absolute),
+/// and [`form`](Self::form) choose the URL's form. The URL renders by using
+/// the value in a view, or by calling [`resolve`](Self::resolve).
+/// [`is_current`](Self::is_current) tells whether the URL points at the page
+/// the current request is serving.
 pub struct Href<T, P, Q, F> {
     target: T,
     params: P,
@@ -567,10 +573,6 @@ macro_rules! impl_href_query_methods {
         #[allow(non_snake_case)]
         impl<T, P, $($ty,)* F> Href<T, P, ($($ty,)*), F> {
             /// Adds one item to the URL's query string.
-            ///
-            /// The item is serialized like a form, so a struct or a list of
-            /// key-value pairs works. Items are joined with `&` in the order
-            /// they are added. Up to eight items can be added.
             #[must_use]
             pub fn query<Q>(self, query: Q) -> Href<T, P, ($($ty,)* Q,), F>
             where
@@ -600,9 +602,6 @@ impl_href_query_methods!(Q1, Q2, Q3, Q4, Q5, Q6, Q7);
 
 impl<T, P, Q, F> Href<T, P, Q, F> {
     /// Sets the URL's fragment, replacing any fragment set before.
-    ///
-    /// The fragment is written with [`Display`] after a `#`, without
-    /// percent-encoding.
     #[must_use]
     pub fn fragment<G>(self, fragment: G) -> Href<T, P, Q, G>
     where
@@ -636,11 +635,12 @@ impl<T, P, Q, F> Href<T, P, Q, F> {
         self.form(UrlForm::Absolute)
     }
 
-    /// Sets the [`UrlForm`] of the URL, replacing any form set before.
+    /// Sets the [`UrlForm`] the URL renders in, replacing any form set
+    /// before.
     ///
-    /// Without a form, the URL uses the [form of the context](url_form) it
-    /// is resolved in. That form is relative unless the surrounding code, like
-    /// a mail renderer, sets the absolute form.
+    /// Without a form set, the URL renders in the form [registered on the
+    /// context](url_form) it resolves against: relative unless an enclosing
+    /// scope, like a mail renderer, registered the absolute form.
     #[must_use]
     pub fn form(mut self, url_form: UrlForm) -> Self {
         self.url_form = Some(url_form);
@@ -655,16 +655,15 @@ where
     Q: HrefQueries,
     F: Display,
 {
-    /// Returns the URL as a string.
+    /// Resolves the URL into its final string.
     ///
-    /// The URL uses the [`UrlForm`] set on this href, or the form of `cx`
-    /// when none is set.
+    /// The URL renders in the [`UrlForm`] set on this href, or the form
+    /// registered on `cx` when none is set.
     ///
     /// # Panics
     ///
-    /// Panics if the parameters do not match the target's path, if a query
-    /// item does not serialize to a query string, or if the URL is absolute
-    /// and no base URL is registered on the router.
+    /// Panics if the parameters do not line up with the target's path, or a
+    /// query item does not serialize to a URL query string.
     #[must_use]
     pub fn resolve(&self, cx: &Cx) -> String {
         let mut buf = String::new();
@@ -683,21 +682,24 @@ where
         buf
     }
 
-    /// Returns whether this URL points at the current page.
+    /// Returns whether this href points at the page the current request is
+    /// serving.
     ///
-    /// The URL is current when its path, with every parameter filled in,
+    /// The href is current when its path, with every parameter filled in,
     /// equals the request's path, and its query matches the request's query.
     ///
-    /// Without a [`query`](Self::query), the request's query is ignored, so a
-    /// link to a page stays current while the page is filtered or paginated.
-    /// With a query, the request's query must have exactly the same key-value
-    /// pairs, compared after decoding and in any order. A query whose items
-    /// serialize to nothing only matches a request without a query.
+    /// An href built without [`query`](Self::query) leaves the request's
+    /// query out of the comparison, so a bare link to a page stays current
+    /// while that page is filtered or paginated. Once a query is specified,
+    /// the request's query must hold exactly the same key-value pairs,
+    /// compared decoded and in any order. A specified query whose items
+    /// serialize to nothing demands a request without any query.
     ///
-    /// The fragment and the [`UrlForm`] are ignored. Browsers do not send the
-    /// fragment with a request.
+    /// The fragment never takes part in the comparison, because a browser
+    /// does not send it with a request. The [`UrlForm`] plays no role
+    /// either, as only the path and the query are compared.
     ///
-    /// Use it to mark the link to the page being rendered:
+    /// Use it to mark the link pointing at the page being rendered:
     ///
     /// ```
     /// use topcoat::{
@@ -719,8 +721,8 @@ where
     ///
     /// # Panics
     ///
-    /// Panics if the parameters do not match the target's path, or if a query
-    /// item does not serialize to a query string.
+    /// Panics if the parameters do not line up with the target's path, or a
+    /// query item does not serialize to a URL query string.
     #[must_use]
     pub fn is_current(&self, cx: &Cx) -> bool {
         /// Parses a query string into its decoded key-value pairs, sorted so

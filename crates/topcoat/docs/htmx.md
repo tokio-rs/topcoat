@@ -1,6 +1,6 @@
-[htmx](https://htmx.org) is a small client-side library that lets HTML update itself. Attributes like `hx-get` and `hx-post` make an element send an HTTP request on an event (a click, a submit, an input) and swap the returned HTML fragment into the page. There is no full page reload and no JavaScript to write. The server answers with the markup for the part of the page that changed.
+[htmx](https://htmx.org) is a small client-side library that lets HTML drive its own updates. Attributes like `hx-get` and `hx-post` make any element issue an HTTP request on an event (a click, a submit, an input) and swap the returned HTML fragment into the page, without a full reload and without writing JavaScript. The server just answers with the markup for the piece of the page that changed.
 
-The browser and the server coordinate through `HX-*` HTTP headers. The request carries headers that describe what triggered it and where the response will go. The response can carry headers that tell htmx how to apply the result. This module gives you functions to read the request headers and types to set the response headers.
+The browser and server coordinate this through a set of `HX-*` HTTP headers: the request carries headers describing what triggered it and where the response is headed, and the response can carry headers telling htmx how to apply the result. Topcoat helps you work with those request and response headers.
 
 Everything below is re-exported from `topcoat::htmx` and gated behind the `htmx` feature.
 
@@ -12,7 +12,7 @@ topcoat = { version = "0.8.1", features = ["htmx"] }
 
 # Loading the htmx script
 
-The browser must load the htmx script before any `hx-*` attribute does anything. You can point a `<script>` tag at a CDN, or declare the script as a Topcoat asset so that your app serves it itself:
+htmx is a client-side script the browser must load before any `hx-*` attribute does anything. You can point a `<script>` straight at a CDN, or vendor it as a Topcoat asset so it is self-hosted:
 
 ```rust
 use topcoat::{
@@ -36,11 +36,11 @@ async fn root(slot: Slot<'_>) -> Result<impl View> {
 }
 ```
 
-See the [assets guide](crate::asset) for how to load the asset bundle on your router.
+See the [assets guide](crate::asset) for loading the asset bundle on your router.
 
 # Reading request headers
 
-htmx sends [request headers](https://htmx.org/reference/#request_headers) that describe what triggered the request and where the response should go. Each header has a function that reads it from the request context:
+When htmx makes a request it sends a set of [request headers](https://htmx.org/reference/#request_headers) describing what triggered it and where the response should go. Each one has a matching accessor that reads it from the request context.
 
 ```rust
 use topcoat::{
@@ -55,11 +55,11 @@ use topcoat::{
 async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         if hx_request(cx) {
-            // htmx only swaps out the target element, so the layout shell is
-            // not needed. The page content alone is enough.
+            // htmx only swaps out the target element, so we do not need to
+            // render the full layout shell. Just the page's content is enough.
             (slot)
         } else {
-            // A normal browser request needs the full page, shell included.
+            // Non-htmx requests require a full page render including the shell.
             <html>
                 <body>
                     <nav> /* persistent navigation */ </nav>
@@ -71,25 +71,23 @@ async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
 }
 ```
 
-These functions return `true` when the header is set to `true`, and `false` otherwise:
+The boolean headers have boolean accessors:
 
-- [`hx_request`]: the request was sent by htmx.
-- [`hx_boosted`]: the request came from an element using `hx-boost`.
-- [`hx_history_restore_request`]: the request restores history after a miss in the local history cache.
+- [`hx_request`]: was this request issued by htmx?
+- [`hx_boosted`]: did it come from an `hx-boost` element?
+- [`hx_history_restore_request`]: is it restoring history after a cache miss?
 
-These functions return the header value as an `Option<&str>`, borrowed from the request:
+The rest return the header as `Option<&str>`, borrowed straight from the request:
 
-- [`hx_current_url`]: the current URL of the browser.
+- [`hx_current_url`]: the browser's current URL.
 - [`hx_prompt`]: the user's response to an `hx-prompt`.
 - [`hx_target`]: the `id` of the target element.
-- [`hx_trigger`]: the `id` of the element that triggered the request.
-- [`hx_trigger_name`]: the `name` of the element that triggered the request.
-
-All of these functions panic when called outside a router request.
+- [`hx_trigger`]: the `id` of the triggering element.
+- [`hx_trigger_name`]: the `name` of the triggering element.
 
 # Setting response headers
 
-htmx reads [response headers](https://htmx.org/reference/#response_headers) that can redirect the browser, change where the response is swapped in, refresh the page, or trigger client-side events. Each header has a type that implements [`IntoResponseParts`]. Put it before the body in a handler's response tuple, the same way you would put a `StatusCode` or a header array there:
+htmx also reads a set of [response headers](https://htmx.org/reference/#response_headers) to redirect the browser, retarget the swap, refresh the page, or fire client-side events. Each one is a responder type implementing [`IntoResponseParts`], so you place it before the body in a handler's response tuple, exactly like a header array or a `StatusCode`.
 
 ```rust
 use topcoat::{
@@ -111,20 +109,19 @@ async fn save(cx: &Cx) -> Result<(HxRetarget, HxReswap, ViewHandle)> {
 }
 ```
 
-The available types:
+The available responders:
 
-- [`HxLocation`]: redirects on the client without a full page reload. It can also say how to fetch and swap the new content.
-- [`HxPushUrl`] and [`HxReplaceUrl`]: push a URL onto the browser history, or replace the URL in the location bar. Their `prevent()` constructor stops htmx from changing it.
-- [`HxRedirect`]: redirects on the client to a new location.
-- [`HxRefresh`]: makes the browser do a full page refresh.
-- [`HxReswap`]: changes how the response is swapped in, using a [`SwapOption`].
-- [`HxRetarget`]: changes which element the response is swapped into.
-- [`HxReselect`]: chooses which part of the response is swapped in.
-- [`HxResponseTrigger`]: triggers client-side events, either right away or after the swap or settle step.
+- [`HxLocation`]: client-side redirect without a full reload, optionally with a fetch/swap context.
+- [`HxPushUrl`] / [`HxReplaceUrl`]: update the browser history or location bar (or `prevent()` it).
+- [`HxRedirect`]: client-side redirect to a new location.
+- [`HxRefresh`]: force a full page refresh.
+- [`HxReswap`]: override how the response is swapped in, via a [`SwapOption`].
+- [`HxRetarget`] / [`HxReselect`]: retarget the swap, or reselect which part of the response is used.
+- [`HxResponseTrigger`]: trigger client-side events, immediately or after the settle/swap step.
 
 ## Triggering client-side events
 
-[`HxResponseTrigger`] triggers named events on the client. When no event carries data, the header is a comma-separated list of names. When at least one event carries data, the header becomes the JSON object that htmx expects, with `null` for events without data.
+[`HxResponseTrigger`] fires named events on the client. With names alone it emits a comma-separated list; attach data to any event and it switches to the JSON form htmx expects.
 
 ```rust
 use topcoat::htmx::{HxEvent, HxResponseTrigger};
@@ -143,6 +140,6 @@ let trigger = HxResponseTrigger::after_swap([
 
 # Header constants
 
-The raw `HX-*` header names are available as `HeaderName` constants in [`topcoat::htmx::header`](crate::htmx::header). Use them when you want to read or write a header yourself.
+The raw `HX-*` header names are available as `HeaderName` constants in [`topcoat::htmx::header`](crate::htmx::header), for when you want to read or write a header directly.
 
 [`IntoResponseParts`]: crate::router::response::IntoResponseParts

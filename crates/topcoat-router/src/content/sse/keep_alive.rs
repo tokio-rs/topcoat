@@ -11,13 +11,12 @@ use topcoat_core::error::Result;
 
 use crate::content::sse::Event;
 
-/// Configures the keep-alive events that [`Sse`](crate::content::sse::Sse)
-/// sends while its stream is idle.
+/// Configures the keep-alive events [`Sse`](crate::content::sse::Sse) sends while its
+/// stream is idle.
 ///
-/// Proxies and load balancers drop connections that look idle. A keep-alive
-/// event is sent whenever nothing was sent for the
-/// [`interval`](Self::interval), which keeps a quiet stream open. By default
-/// it sends an empty comment every 15 seconds.
+/// Proxies and load balancers drop connections that look stale; a keep-alive
+/// event whenever nothing was sent for [`interval`](Self::interval) keeps a
+/// quiet stream open. The default sends an empty comment every 15 seconds.
 #[derive(Clone, Debug)]
 #[must_use]
 pub struct KeepAlive {
@@ -37,8 +36,7 @@ impl KeepAlive {
         }
     }
 
-    /// Sets how long the stream must be idle before a keep-alive event is
-    /// sent.
+    /// Sets the idle time after which a keep-alive event is sent.
     pub fn interval(mut self, interval: Duration) -> Self {
         self.interval = interval;
         self
@@ -49,7 +47,7 @@ impl KeepAlive {
         self.event(Event::new().comment(text))
     }
 
-    /// Sends `event` as the keep-alive event instead of a comment.
+    /// Sends `event` as the keep-alive instead of a comment.
     pub fn event(mut self, event: Event) -> Self {
         self.event = event;
         self

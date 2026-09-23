@@ -20,16 +20,10 @@ struct PrintFrame {
     group_break: bool,
 }
 
-/// The pretty-printing engine.
-///
-/// This is an Oppen-style printer. Callers feed it a stream of text, breaks,
-/// and group boundaries with the `scan_*` methods, and the printer decides
-/// which breaks become line breaks based on the available width. Call
-/// [`eof`](Self::eof) to get the output.
-///
-/// The printer also tracks a cursor in the original source. Moving the
-/// cursor past comments and blank lines lets the `scan_*trivia` methods
-/// reproduce them in the output.
+/// The pretty-printing engine. Implements a Wadler/Oppen-style two-pass
+/// algorithm: callers feed in a stream of tokens (text, breaks, group
+/// boundaries) via the `scan_*` methods, and the printer decides which breaks
+/// to render based on the available width.
 pub struct Printer<'a> {
     registry: &'a Registry,
     trivia: &'a [Trivia<'a>],
@@ -44,11 +38,6 @@ pub struct Printer<'a> {
 }
 
 impl<'a> Printer<'a> {
-    /// Creates a printer.
-    ///
-    /// `trivia` holds the comments and whitespace of the source being
-    /// printed, in order. `initial_space` is the width available on the first
-    /// line, and `initial_indent` the indentation level the output starts at.
     #[must_use]
     pub fn new(
         registry: &'a Registry,
@@ -70,26 +59,20 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Returns the registry of macro pretty-printers, for printing nested
-    /// macro invocations.
     #[must_use]
     pub fn registry(&self) -> &'a Registry {
         self.registry
     }
 
-    /// Returns the current position of the cursor in the source.
     #[must_use]
     pub fn cursor(&self) -> LineColumn {
         self.cursor
     }
 
-    /// Moves the cursor to `cursor` in the source.
     pub fn move_cursor(&mut self, cursor: LineColumn) {
         self.cursor = cursor;
     }
 
-    /// Moves the cursor forward over `string`, as if it had been read from
-    /// the source.
     pub fn advance_cursor(&mut self, string: &str) {
         for char in string.chars() {
             match char {
@@ -102,7 +85,7 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Adds text to the output, printed or not depending on `mode`.
+    /// Pushes a text token onto the buffer.
     ///
     /// # Panics
     ///
@@ -117,45 +100,35 @@ impl<'a> Printer<'a> {
         self.tokens.push_back(token);
     }
 
-    /// Adds a break, which becomes a line break or prints nothing, depending
-    /// on the enclosing group's [`BreakMode`] and the available width.
     pub fn scan_break(&mut self) {
         self.tokens
             .push_back(Token::Break(BreakToken::new(0, self.scan_indent)));
     }
 
-    /// Adds a line break that is always taken. It also counts as too wide to
-    /// fit, so the enclosing consistent groups break as well.
     pub fn scan_force_break(&mut self) {
         let len = MARGIN;
         self.tokens.push_back(Token::ForceBreak);
         self.tokens.push_len(len);
     }
 
-    /// Changes the indentation level of the breaks added after this call by
-    /// `indent` levels.
     pub fn scan_indent(&mut self, indent: isize) {
         self.scan_indent += indent;
     }
 
-    /// Returns the current indentation level.
     #[must_use]
     pub fn current_indent(&self) -> isize {
         self.scan_indent
     }
 
-    /// Starts a group with the given break mode. End it with
-    /// [`scan_end`](Self::scan_end).
     pub fn scan_begin(&mut self, mode: BreakMode) {
         self.tokens
             .push_back(Token::Begin(BeginToken::new(mode, 0)));
     }
 
-    /// Ends the group started by the matching [`scan_begin`](Self::scan_begin).
-    ///
     /// # Panics
     ///
-    /// Panics if there is no open group.
+    /// Panics if there was no matching call to [`scan_begin`](Self::scan_begin) prior to running
+    /// this function.
     pub fn scan_end(&mut self) {
         let len = self
             .tokens
@@ -169,9 +142,6 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Prints the block comments before the cursor for a place where no line
-    /// break may be added. Stops at a line comment, which needs a line break
-    /// after it.
     pub fn scan_no_break_trivia(&mut self) {
         while let Some(trivia) = self.ready_trivia() {
             match trivia.kind {
@@ -191,8 +161,6 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Prints the first comment before the cursor if it sits on the current
-    /// source line, like a trailing `// comment` after a statement.
     pub fn scan_same_line_trivia(&mut self) {
         while let Some(trivia) = self.ready_trivia() {
             match trivia.kind {
@@ -219,12 +187,6 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Prints the comments before the cursor, each on its own line, and keeps
-    /// blank lines between them.
-    ///
-    /// `leading_whitespace` keeps a blank line and a separating space before
-    /// the first comment, and `trailing_whitespace` keeps a blank line after
-    /// the last one.
     pub fn scan_trivia(&mut self, leading_whitespace: bool, trailing_whitespace: bool) {
         // let break_mode = self.tokens.current_begin_mut().unwrap().mode();
         let mut encountered_comment = false;
@@ -274,9 +236,10 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Drops the trivia that starts before the cursor without printing it,
-    /// for callers that copied a stretch of source text as it is. Trivia that
-    /// starts exactly at the cursor lies outside the copied text and is kept.
+    /// Drops the trivia that began before the cursor without emitting it, for
+    /// callers that have copied a stretch of source text through verbatim.
+    /// Trivia starting exactly at the cursor lies outside the copied text and
+    /// is kept.
     pub fn skip_trivia(&mut self) {
         while let Some(trivia) = self.trivia.first() {
             if trivia.span.start() < self.cursor {
@@ -287,11 +250,10 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Returns whether a comment that was not printed yet starts before `pos`
-    /// in the source.
-    ///
-    /// This lets an otherwise empty construct tell a comment inside it apart
-    /// from plain whitespace.
+    /// Whether an as-yet-unemitted comment (line or block) begins before the
+    /// given source position. Lets an otherwise-empty construct tell an interior
+    /// comment apart from plain whitespace and decide whether it still needs to
+    /// break its content onto separate lines.
     #[must_use]
     pub fn has_comment_before(&self, pos: LineColumn) -> bool {
         for trivia in self.trivia {
@@ -406,7 +368,6 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Prints everything that was added and returns the output.
     #[must_use]
     pub fn eof(mut self) -> String {
         while !self.tokens.is_empty() {

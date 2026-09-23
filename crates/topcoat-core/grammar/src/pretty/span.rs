@@ -1,9 +1,17 @@
 use proc_macro2::LineColumn;
 
-/// A range of source text, from a start position to an end position.
+/// A source code span representing a range of text from start to end position.
 ///
-/// Unlike [`proc_macro2::Span`], a `Span` can be created from any pair of
-/// line and column positions. It holds only the two positions.
+/// This type exists because [`proc_macro2::Span`] cannot be constructed from arbitrary
+/// line/column positions outside of macro expansion contexts. For pretty printing and
+/// testing, we need to create spans from known positions, which `proc_macro2::Span`
+/// does not support.
+///
+/// Unlike [`proc_macro2::Span`], this type stores only position information (start and end
+/// [`LineColumn`]) without any hygiene or source file metadata.
+///
+/// This type is primarily used by the trivia lexer in `trivia.rs` to track the source
+/// positions of comments and whitespace during pretty printing.
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub struct Span {
     start: LineColumn,
@@ -17,13 +25,19 @@ impl Span {
         Self { start, end }
     }
 
-    /// Returns whether this span starts exactly where `other` ends.
+    /// Returns `true` if this span immediately follows another span with no gap between them.
+    ///
+    /// Two spans are considered adjacent when this span's start position matches exactly
+    /// the other span's end position (same line and column).
     #[must_use]
     pub fn immediately_follows(&self, other: &Span) -> bool {
         self.start.line == other.end.line && self.start.column == other.end.column
     }
 
-    /// Returns whether this span ends at or before the start of `other`.
+    /// Returns `true` if this span comes entirely before the given span.
+    ///
+    /// This span is considered to come before another if its end position is at or before
+    /// the other span's start position.
     #[must_use]
     pub fn comes_before(&self, other: &Span) -> bool {
         self.end.line < other.start.line
@@ -43,7 +57,10 @@ impl Span {
     }
 }
 
-/// Keeps only the start and end positions of a [`proc_macro2::Span`].
+/// Converts a [`proc_macro2::Span`] to our custom [`Span`] type.
+///
+/// This conversion extracts only the position information (start and end [`LineColumn`])
+/// from the `proc_macro2::Span`, discarding hygiene and source file metadata.
 impl From<proc_macro2::Span> for Span {
     fn from(span: proc_macro2::Span) -> Self {
         Span {

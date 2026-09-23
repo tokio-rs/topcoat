@@ -9,7 +9,6 @@ export interface AttributeValueViewParts {
 	toAttributeValue(): string;
 }
 
-/** Whether a value implements `AttributeValueViewParts`. */
 export function isAttributeValueViewParts(
 	value: unknown,
 ): value is AttributeValueViewParts {
@@ -32,7 +31,6 @@ export interface NodeViewParts {
 	toNodeText(): string;
 }
 
-/** Whether a value implements `NodeViewParts`. */
 export function isNodeViewParts(value: unknown): value is NodeViewParts {
 	return (
 		value !== null &&

@@ -5,19 +5,14 @@ use super::db;
 /// A drink on the menu.
 #[derive(Debug, toasty::Model)]
 pub struct Drink {
-    /// The URL segment of the drink's page, like `flat-white`.
     #[key]
     pub slug: String,
-    /// The display name.
     pub name: String,
-    /// A one-line description of how the drink tastes.
     pub tasting_notes: String,
     /// The price in dollars, as `f64` so runtime expressions in the browser
     /// can multiply it by a quantity signal.
     pub price: f64,
-    /// The roast profile of the beans.
     pub roast: Roast,
-    /// The position of the drink on the menu.
     pub(super) menu_order: i64,
 }
 
@@ -42,10 +37,6 @@ async fn query_drinks(cx: &Cx) -> topcoat::Result<Vec<Drink>> {
     Ok(result)
 }
 
-/// Returns the menu in display order.
-///
-/// The query runs at most once per request, so layouts, pages, and components
-/// can all call this without extra database round-trips.
 pub async fn drinks(cx: &Cx) -> topcoat::Result<&Vec<Drink>> {
     query_drinks(cx)
         .await

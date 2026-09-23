@@ -8,63 +8,56 @@ use super::{
 };
 use crate::{DEFAULT_REGISTRY, Registry, content_hash};
 
-/// Options for [`init`].
+/// How to set up a package's install state.
 pub struct InitOptions {
-    /// The directory components are installed into, relative to the package
-    /// root. Defaults to `src/components`.
+    /// Base directory for component install output (default `src/components`).
     pub components_dir: Option<PathBuf>,
-    /// The name of the theme to install. When `None` and the built-in registry
-    /// offers only one theme, that theme is installed. When it offers several,
-    /// the [`ChooseTheme`] callback picks one. A theme is always installed.
+    /// The theme to install by name. When `None`, the sole registered theme is
+    /// installed, or the user is asked to choose when several are offered; a
+    /// theme is always installed, never skipped.
     pub theme: Option<String>,
 }
 
 /// The theme installed by [`init`].
 pub struct InstalledThemeInfo {
-    /// The name of the theme, such as `neutral`.
+    /// The theme's name, e.g. `neutral`.
     pub name: String,
-    /// The name of the registry it came from.
+    /// The registry crate it came from.
     pub registry: String,
-    /// The path of the written stylesheet, relative to the package root.
+    /// The package-relative path of the written stylesheet.
     pub file: PathBuf,
 }
 
 /// The result of [`init`].
 pub struct Initialized {
-    /// The path of the created `components.toml`, relative to the package
-    /// root.
+    /// The package-relative path of the created install-state file.
     pub state_file: PathBuf,
-    /// The directory components are installed into, relative to the package
-    /// root.
+    /// The base directory recorded for component install output.
     pub components_dir: PathBuf,
     /// The theme that was installed.
     pub theme: InstalledThemeInfo,
 }
 
-/// Sets up a package for `topcoat ui`: implements `topcoat ui init`.
+/// Sets up a package's initial install state, which the other commands (`add`,
+/// `remove`, `list`) require before they will run.
 ///
-/// This creates `components.toml` at the package root, which [`add`](super::add()),
-/// [`list`](super::list()), and [`remove`](super::remove()) require. It records
-/// the directory components are installed into.
-///
-/// It also installs a theme from the built-in registry: the theme's CSS is
-/// written to `styles.css` at the package root, to be used as the Tailwind
-/// input, and the theme is recorded in `components.toml`. The theme is the one
-/// named in [`InitOptions::theme`], or the only one on offer, or the one that
-/// `choose` picks.
-///
-/// Nothing is written if the theme cannot be resolved.
+/// Besides fixing where components install, init always installs a theme: the
+/// chosen theme's CSS is copied into the package as its Tailwind input, and the
+/// theme is recorded in the install state. The theme is named by
+/// [`InitOptions::theme`], or chosen via `choose` when none is given. Errors if
+/// the package is already initialized rather than clobbering its state.
 ///
 /// # Errors
 ///
-/// Returns an error if the package already has a `components.toml`, if the
-/// built-in registry cannot be loaded or has no themes, if the named theme
-/// does not exist, if `choose` returns an error, or if a file cannot be
-/// written.
+/// Returns an error if the package is already initialized, the default
+/// registry cannot be loaded or offers no themes, a named theme is unknown,
+/// a theme selection prompt is declined, or writing the stylesheet or install
+/// state fails.
 ///
 /// # Panics
 ///
-/// Panics if `choose` returns a name that was not offered to it.
+/// Panics if `choose` returns a name that was not among the ones it was
+/// offered.
 #[track_caller]
 pub fn init(
     package: &Package,
@@ -123,11 +116,11 @@ struct ThemePlan {
     contents: String,
 }
 
-/// Resolves the package's theme without writing anything. A theme is required,
-/// so this either returns a plan or fails: the default registry must load and
-/// offer at least one theme, and a named theme must exist. When no theme was
-/// named, the only offered theme is taken, or `choose` picks one when the
-/// registry offers several.
+/// Resolves the package's theme without writing anything. A theme is mandatory,
+/// so this either produces a plan or fails: the default registry must be
+/// reachable and offer at least one theme, and an explicitly named theme must
+/// exist. When no theme was named, the sole offered theme is taken, or `choose`
+/// picks one when the registry offers several.
 #[track_caller]
 fn plan_theme(
     package: &Package,

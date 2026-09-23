@@ -4,18 +4,17 @@ use topcoat::{
     view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
-/// Several panels that show one at a time, selected by a row of triggers
-/// above them.
+/// A tabs component: one panel at a time out of several, picked by the row of
+/// triggers above it.
 ///
-/// A trigger can link to a page that renders its panel on the server, or
-/// update a signal in a click handler. To switch panels in the browser, bind
-/// each trigger's `active` prop and each panel's `hidden` attribute to a
-/// signal that holds the selected tab. Triggers are plain links and do not
-/// support the arrow key navigation of the ARIA tab pattern.
+/// Triggers can navigate to a server-rendered panel or update a signal in a
+/// click handler. For browser-side switching, bind each trigger's `active`
+/// prop and each panel's `hidden` attribute to the selected-tab signal.
+/// Triggers are ordinary links, without the ARIA tab pattern's arrow-key
+/// navigation.
 ///
-/// The `attrs` (such as `class`) are forwarded to the `<div>`. A `class`
-/// among them is appended to the component's classes. The same holds for the
-/// other tabs components.
+/// The `attrs` (such as `class`) are forwarded to the underlying `<div>`; a
+/// `class` among them is appended to the computed classes.
 ///
 /// ```ignore
 /// view! {
@@ -47,8 +46,8 @@ pub async fn tabs(
 
 /// The row of triggers at the top of a [`tabs`].
 ///
-/// The triggers sit in a bordered box, like the toggles in a toggle group,
-/// so the tabs look like one control.
+/// The triggers sit in a rail, the same one a toggle group uses, so a set of
+/// tabs reads as one control rather than as loose links.
 #[component]
 pub async fn tabs_list(
     #[default] mut attrs: Attributes,
@@ -69,8 +68,9 @@ pub async fn tabs_list(
 
 /// The classes for a [`tabs_trigger`].
 ///
-/// The active trigger is tinted and uses the foreground color. The other
-/// triggers are muted and change color on hover.
+/// The trigger for the panel on show is tinted and takes the full foreground
+/// color, which is what tells it apart from the rest; the others light up on
+/// hover.
 const TRIGGER: StaticClass = class!(
     "inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 \
      rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors outline-none \
@@ -81,15 +81,15 @@ const TRIGGER: StaticClass = class!(
      aria-[current=page]:hover:bg-foreground/10",
 );
 
-/// A trigger in a [`tabs_list`]: a link to the page that shows its panel.
+/// One trigger of a [`tabs_list`]: a link to the page showing its panel.
 ///
-/// `active` accepts a boolean or a runtime expression. It controls the
-/// active style and `aria-current="page"`, and defaults to `false`. Pass the
-/// `href` in `attrs`. A click handler in the browser can prevent the
-/// navigation and select the panel by updating a signal instead.
+/// `active` accepts a boolean or a runtime expression and controls the
+/// selected styling and `aria-current="page"`. Pass the `href` among the
+/// `attrs`. A client-side click handler can prevent navigation and select a
+/// panel by updating a signal instead.
 #[component]
 pub async fn tabs_trigger(
-    /// Whether this trigger's panel is the one shown.
+    /// Whether this trigger's panel is the one on show.
     #[into]
     #[default(false.into())]
     active: Expr<bool>,
@@ -111,10 +111,10 @@ pub async fn tabs_trigger(
     })
 }
 
-/// The panel of the active [`tabs_trigger`].
+/// The panel of the [`tabs_trigger`] on show.
 ///
 /// Render only the selected panel on the server, or render all panels with
-/// `:hidden` bindings to switch them in the browser.
+/// `:hidden` bindings for browser-side switching.
 #[component]
 pub async fn tabs_content(
     #[default] mut attrs: Attributes,

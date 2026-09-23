@@ -1,13 +1,12 @@
 //! Files carried by a mail.
 
-/// A file sent with a mail, either as a regular attachment or as inline
-/// content of the HTML body.
+/// A file carried by a mail, either as a downloadable attachment or as
+/// inline content referenced from the HTML body.
 ///
-/// A regular attachment ([`Attachment::new`]) is shown to the recipient as a
-/// file to download. An inline attachment ([`Attachment::inline`]) is shown
-/// inside the HTML body, which references it by content id. For example,
-/// `<img src="cid:logo">` displays the inline attachment with the content id
-/// `logo`.
+/// Downloadable attachments ([`Attachment::new`]) are presented to the
+/// recipient as files. Inline attachments ([`Attachment::inline`]) are
+/// addressed from the HTML body by content id -- `<img src="cid:logo">`
+/// displays the inline attachment with content id `logo`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Attachment {
     disposition: Disposition,
@@ -16,9 +15,7 @@ pub struct Attachment {
 }
 
 impl Attachment {
-    /// Creates a regular attachment that the recipient sees as a file named
-    /// `filename`. `content_type` is a MIME type, such as
-    /// `"application/pdf"`.
+    /// A downloadable attachment presented with the given filename.
     #[must_use]
     pub fn new(
         filename: impl Into<String>,
@@ -34,9 +31,7 @@ impl Attachment {
         }
     }
 
-    /// Creates an inline attachment that the HTML body references with the
-    /// URL `cid:{content_id}`. `content_type` is a MIME type, such as
-    /// `"image/png"`.
+    /// An inline attachment the HTML body references as `cid:{content_id}`.
     #[must_use]
     pub fn inline(
         content_id: impl Into<String>,
@@ -52,7 +47,8 @@ impl Attachment {
         }
     }
 
-    /// The file name of a regular attachment, or `None` for an inline one.
+    /// The filename of a downloadable attachment, or `None` for an inline
+    /// one.
     #[must_use]
     pub fn filename(&self) -> Option<&str> {
         match &self.disposition {
@@ -61,7 +57,8 @@ impl Attachment {
         }
     }
 
-    /// The content id of an inline attachment, or `None` for a regular one.
+    /// The content id the HTML body references an inline attachment by, or
+    /// `None` for a downloadable one.
     #[must_use]
     pub fn content_id(&self) -> Option<&str> {
         match &self.disposition {
@@ -70,7 +67,7 @@ impl Attachment {
         }
     }
 
-    /// The MIME type of the content.
+    /// The declared MIME type of the content.
     #[must_use]
     pub fn content_type(&self) -> &str {
         &self.content_type
@@ -92,11 +89,9 @@ enum Disposition {
     Inline { content_id: String },
 }
 
-/// Conversion into a list of attachments.
-///
-/// Implemented for a single [`Attachment`] and for collections of them. The
-/// `attachments` field of the `mail!` macro accepts any value of this
-/// trait.
+/// One or more attachments, converted from a single [`Attachment`] or a
+/// collection. The `mail!` macro's `attachments` field accepts anything
+/// implementing this trait.
 pub trait IntoAttachments {
     /// Converts into attachments.
     fn into_attachments(self) -> Vec<Attachment>;

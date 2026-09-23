@@ -6,16 +6,14 @@ use topcoat::{
 
 use super::button::{ButtonSize, ButtonVariant, button_variants};
 
-/// Links to the pages of a list that is too long for one page.
+/// A pagination component: the links stepping through a list too long for one
+/// page.
 ///
-/// Every part of it is a link, so the current page is part of the URL and
-/// the server decides what each page shows. The pagination is a `<nav>`
-/// labeled for assistive technology. It holds a [`pagination_content`] list
-/// of [`pagination_item`]s.
-///
-/// The `attrs` (such as `class`) are forwarded to the `<nav>`. A `class`
-/// among them is appended to the component's classes. The same holds for the
-/// other pagination components.
+/// Every part of it is a link, so which page the reader is on is a matter of
+/// the URL and the server decides what a page holds. The trail is a `<nav>`
+/// labelled for assistive technology, holding a [`pagination_content`] list of
+/// [`pagination_item`]s. The `attrs` (such as `class`) are forwarded to the
+/// `<nav>`; a `class` among them is appended to the computed classes.
 ///
 /// ```ignore
 /// view! {
@@ -55,8 +53,8 @@ pub async fn pagination(
 
 /// The list of steps in a [`pagination`].
 ///
-/// When the items do not fit in their container, they wrap onto the next
-/// line.
+/// The steps wrap onto another line rather than overflowing when more of them
+/// are listed than the container has room for.
 #[component]
 pub async fn pagination_content(
     #[default] mut attrs: Attributes,
@@ -75,7 +73,7 @@ pub async fn pagination_content(
     })
 }
 
-/// One entry of a [`pagination_content`], holding a link or an ellipsis.
+/// One step of a [`pagination_content`], holding a link or an ellipsis.
 #[component]
 pub async fn pagination_item(
     #[default] mut attrs: Attributes,
@@ -84,14 +82,15 @@ pub async fn pagination_item(
     Ok(view! { <li class=(attrs.remove("class")) (attrs)>(child)</li> })
 }
 
-/// A link to one page of the list, usually labeled with its number.
+/// A link to one page of the list, usually labelled with its number.
 ///
-/// The link looks like a square button: an outline button for the current
-/// page and a ghost button for the others. Set `active` for the current page,
-/// which also adds `aria-current="page"`. Pass the `href` in `attrs`.
+/// The link is dressed as a button: an outlined one for the page being read
+/// and a ghost one for the rest, which is also what tells the two apart at a
+/// glance. The current page carries `aria-current="page"`. Pass the `href`
+/// among the `attrs`.
 #[component]
 pub async fn pagination_link(
-    /// Whether this link points at the current page.
+    /// Whether this link points at the page being read.
     #[default]
     active: bool,
     /// Extra attributes for the `<a>` element.
@@ -124,17 +123,14 @@ pub async fn pagination_link(
 /// The classes for the label of [`pagination_previous`] and
 /// [`pagination_next`].
 ///
-/// The label is always in the markup, so it names the link for assistive
-/// technology. It is only visible when the [`pagination`] itself is wide
-/// enough. This uses a container query, so the width of the pagination
-/// counts, not the width of the window.
+/// The label is always in the markup, so it is what names the link to
+/// assistive technology and a translated one needs nothing set alongside it.
+/// It is only shown once the [`pagination`] is wide enough for it, which is
+/// measured against the pagination itself rather than the window: the same
+/// pagination is roomy on a page of its own and cramped in a card column.
 const LABEL: StaticClass = class!("sr-only @xs:not-sr-only");
 
-/// A link to the previous page.
-///
-/// It shows a chevron and `label`, which defaults to `"Previous"`. The label
-/// is only visible when the pagination is wide enough. Pass the `href` in
-/// `attrs`.
+/// The link to the page before the one being read.
 #[component]
 pub async fn pagination_previous(
     /// The link's label.
@@ -159,11 +155,7 @@ pub async fn pagination_previous(
     })
 }
 
-/// A link to the next page.
-///
-/// It shows `label`, which defaults to `"Next"`, and a chevron. The label is
-/// only visible when the pagination is wide enough. Pass the `href` in
-/// `attrs`.
+/// The link to the page after the one being read.
 #[component]
 pub async fn pagination_next(
     /// The link's label.
@@ -188,9 +180,11 @@ pub async fn pagination_next(
     })
 }
 
-/// An ellipsis that stands for page links left out of a long pagination.
+/// A stand-in for the page links left out of a long pagination.
 ///
-/// Assistive technology reads it as "More pages".
+/// It shows an ellipsis in place of the skipped pages. The glyph itself says
+/// nothing to assistive technology, so a phrase standing in for it is read out
+/// instead.
 #[component]
 pub async fn pagination_ellipsis(#[default] mut attrs: Attributes) -> Result<impl View> {
     Ok(view! {

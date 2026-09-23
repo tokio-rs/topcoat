@@ -12,7 +12,6 @@ use topcoat_core_grammar::{
 
 use super::common::HandlerPath;
 
-/// The arguments of `#[layout(...)]`: an optional path.
 pub struct LayoutAttr {
     path: Option<HandlerPath>,
 }
@@ -80,11 +79,9 @@ impl Parse for LayoutItem {
     }
 }
 
-/// A parsed `#[layout]` declaration, which expands to the generated code.
 pub struct Layout(LayoutAttr, LayoutItem);
 
 impl Layout {
-    /// Combines a parsed attribute and item.
     #[must_use]
     pub fn new(attr: LayoutAttr, item: LayoutItem) -> Self {
         Self(attr, item)

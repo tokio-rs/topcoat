@@ -10,15 +10,11 @@ use crate::{
     view::hir::{LowerView, ViewBuilder},
 };
 
-/// A group of nodes in braces: `{ ... }`.
-///
-/// It is the body of an `if` branch, a `for` loop, or a `match` arm. `T` is
-/// the node collection it holds: [`Nodes`](crate::view::Nodes) in a view, or
-/// [`AttributeNodes`](crate::attributes::AttributeNodes) among attributes.
+/// A brace-delimited group of template nodes: `{ ...nodes... }`. Used as the
+/// body of `if`, `for` and `match` arms, generic over the collection it
+/// contains (`Nodes` or `AttributeNodes`).
 pub struct TemplateBlock<T> {
-    /// The braces.
     pub brace: Brace,
-    /// The nodes inside the braces.
     pub children: T,
 }
 

@@ -14,9 +14,9 @@ export const PAGE_ROUTE_PREFIX = "/_topcoat/runtime/pages";
 
 /**
  * The page: the outermost unit, whose content is the whole document and
- * whose inputs are its dependencies. A re-run requests the current URL from
- * the pages route and receives a full document. Its body is morphed into the
- * children of `<body>`, and the head is left alone.
+ * whose inputs are its URL and its dependencies. A re-run is requested from
+ * the pages route and arrives as a full document, whose body is morphed
+ * into the children of `<body>`; the head is left alone.
  */
 export class PageUnit extends RenderUnit {
 	protected readonly label = "Page";

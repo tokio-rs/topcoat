@@ -22,15 +22,9 @@ pub async fn page() -> Result<impl View> {
                         </p>
                     },
                 ),
-            suspense(
-                fallback: view! { <p>"Loading the first section..."</p> },
-                failing()
-            )
+            suspense(fallback: view! { <p>"Loading the first section..."</p> }, failing())
         )
-        suspense(
-            fallback: view! { <p>"Loading the second section..."</p> },
-            succeeding()
-        )
+        suspense(fallback: view! { <p>"Loading the second section..."</p> }, succeeding())
     })
 }
 

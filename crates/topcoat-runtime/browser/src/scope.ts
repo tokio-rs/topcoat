@@ -90,12 +90,10 @@ export class Scope {
 		return into;
 	}
 
-	/** Releases this scope and deletes every signal it and its descendants own. */
 	dispose(): void {
 		for (const id of this.release()) this.runtime.registry.delete(id);
 	}
 
-	/** Whether this scope has been released. */
 	get isDisposed(): boolean {
 		return this.disposed;
 	}

@@ -3,38 +3,38 @@ use web_time::SystemTime;
 
 use crate::{TokenHash, config, state, token::Token, token_store};
 
-/// The data the application saves for a session.
-///
-/// Returned by [`start`], [`refresh`], and [`rotate`].
+/// A session as the application should record it, returned by [`start`],
+/// [`refresh`], and [`rotate`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Session {
-    /// The hash that identifies the session. Save it together with the user
-    /// the session authenticates.
+    /// The hash identifying the session. Persist it next to the user it
+    /// authenticates; the raw token never needs to be stored server-side.
     pub token_hash: TokenHash,
-    /// When the session expires. Save it with the hash and treat the session
-    /// as invalid after this time.
+    /// When the session expires. Persist it with the hash and reject the
+    /// session once the moment has passed.
     pub expires_at: SystemTime,
 }
 
-/// The result of [`rotate`]: the hash of the old token and the new session.
+/// The outcome of [`rotate`]: the replacement session and the hash it
+/// replaces.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rotation {
-    /// The hash of the replaced token. Delete its record, or move the record
-    /// to the hash of the new session.
+    /// The hash of the replaced token. Delete its record, or re-key the
+    /// record under the new session's hash.
     pub revoked: TokenHash,
-    /// The new session to save.
+    /// The replacement session to record.
     pub session: Session,
 }
 
-/// Starts a new session and sends its token to the client.
+/// Starts a new session, issuing a fresh token to the client.
 ///
-/// Always creates a new token and never reuses the one the request carried,
-/// so calling this on login protects against session fixation. Save the
+/// Always generates a new token (never reuses one the request presented), so
+/// calling this on login also protects against session fixation. Record the
 /// returned [`Session`] in the application's session storage.
 ///
 /// # Errors
 ///
-/// Returns an error when the token store fails to send the token.
+/// Returns an error when the token store fails to issue the token.
 pub async fn start(cx: &Cx) -> Result<Session> {
     let token = Token::random();
     let session = Session {
@@ -48,10 +48,10 @@ pub async fn start(cx: &Cx) -> Result<Session> {
     Ok(session)
 }
 
-/// Stops the current session and tells the client to discard its token.
+/// Stops the current session, instructing the client to discard its token.
 ///
 /// Returns the hash of the stopped session so the application can delete its
-/// record, or `None` when the request carried no token.
+/// record, or `None` when the request carried no session.
 ///
 /// # Errors
 ///
@@ -63,17 +63,16 @@ pub async fn stop(cx: &Cx) -> Result<Option<TokenHash>> {
     Ok(hash)
 }
 
-/// Extends the current session by a full
-/// [`lifetime`](crate::SessionConfigBuilder::lifetime) without changing its
-/// token.
+/// Extends the current session's lifetime without changing its token.
 ///
-/// Call this on use for sliding expiration. Returns the session with its new
-/// expiry time so the application can update its record, or `None` when the
-/// request carried no token.
+/// Re-issues the presented token with a full [`lifetime`](crate::SessionConfigBuilder::lifetime)
+/// ahead of it, implementing sliding expiration. Returns the session with its
+/// new expiry so the application can update its record, or `None` when the
+/// request carried no session.
 ///
 /// # Errors
 ///
-/// Returns an error when the token store fails to read or send the token.
+/// Returns an error when the token store fails to read or re-issue the token.
 pub async fn refresh(cx: &Cx) -> Result<Option<Session>> {
     let Some(token) = state(cx).token(cx).await? else {
         return Ok(None);
@@ -88,16 +87,16 @@ pub async fn refresh(cx: &Cx) -> Result<Option<Session>> {
     Ok(Some(session))
 }
 
-/// Replaces the current session's token with a new one.
+/// Replaces the current session's token with a fresh one.
 ///
-/// Rotate after a privilege change, or periodically, so a token that leaked
-/// earlier stops working. Returns a [`Rotation`] with the hash of the old
-/// token and the new session to save, or `None` when the request carried no
-/// token.
+/// Rotate after a privilege change (or periodically) so a previously leaked
+/// token stops working. Returns the [`Rotation`] describing the record to
+/// revoke and the session to record in its place, or `None` when the request
+/// carried no session.
 ///
 /// # Errors
 ///
-/// Returns an error when the token store fails to read or send a token.
+/// Returns an error when the token store fails to read or issue a token.
 pub async fn rotate(cx: &Cx) -> Result<Option<Rotation>> {
     let Some(old) = state(cx).token(cx).await? else {
         return Ok(None);
@@ -117,11 +116,12 @@ pub async fn rotate(cx: &Cx) -> Result<Option<Rotation>> {
     Ok(Some(rotation))
 }
 
-/// Returns the hash of the current request's token, or `None` when the request
-/// carries no valid token.
+/// Returns the hash identifying the current request's session, or `None`
+/// when the request carries no (valid) token.
 ///
-/// Look up the hash in the application's session storage. A hash the storage
-/// does not contain, or whose record has expired, is not a valid session.
+/// Look the hash up in the application's session storage to resolve the
+/// session; a hash the storage does not contain (or whose record has
+/// expired) is not an authenticated session.
 ///
 /// # Errors
 ///

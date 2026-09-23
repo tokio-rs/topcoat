@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{AssetBundle, AssetId, Manifest};
 
-/// One bundled file in an [`AssetCatalog`].
+/// A single entry inside an [`AssetCatalog`].
 #[derive(Debug, Clone)]
 pub struct BundledAsset {
     file: String,
@@ -10,57 +10,57 @@ pub struct BundledAsset {
 }
 
 impl BundledAsset {
-    /// Returns the bundled filename, usually `stem-<hash>.ext`.
+    /// Bundled filename (typically `stem-<short-hash>.ext`).
     #[must_use]
     pub fn name(&self) -> &str {
         &self.file
     }
 
-    /// Returns the `Content-Type` the file is served with.
-    ///
-    /// The bundler decides this when it builds the bundle.
+    /// `Content-Type` the asset is served with, resolved when the bundle was
+    /// built.
     #[must_use]
     pub fn content_type(&self) -> &str {
         &self.content_type
     }
 }
 
-/// A map from [`AssetId`]s to their bundled files.
+/// The mapping from [`AssetId`]s to their bundled filenames and content
+/// types.
 ///
-/// A catalog is all that is needed to build asset URLs. It does not need the
-/// bundled files themselves. Get one from a loaded
-/// [`AssetBundle`](crate::AssetBundle), or convert a [`Manifest`] into one
-/// when only the manifest is available, for example when it is embedded
-/// into a WebAssembly binary that has no filesystem access.
+/// This is the part of an asset bundle needed to resolve asset URLs, without
+/// the bundled files themselves. An [`AssetConfig`](crate::AssetConfig)
+/// carries the catalog its asset URLs resolve through.
+///
+/// An [`AssetBundle`](crate::AssetBundle) carries the catalog of the bundle
+/// directory it loaded, and a [`Manifest`] converts into the catalog it
+/// describes, for setups where only the manifest is available (e.g. embedded
+/// into the binary on targets without filesystem access, like WebAssembly).
 #[derive(Debug, Default, Clone)]
 pub struct AssetCatalog {
     bundled_assets: HashMap<AssetId, BundledAsset>,
 }
 
 impl AssetCatalog {
-    /// Looks up the bundled file for an [`AssetId`].
+    /// Look up the bundled asset for an [`AssetId`].
     #[must_use]
     pub fn get(&self, id: AssetId) -> Option<&BundledAsset> {
         self.bundled_assets.get(&id)
     }
 
-    /// Returns an iterator over all entries, in no particular order.
-    ///
-    /// Several IDs can map to the same bundled file, so a file can appear
-    /// more than once.
+    /// Iterate over every bundled asset in arbitrary order.
     pub fn assets(&self) -> impl Iterator<Item = &BundledAsset> {
         self.bundled_assets.values()
     }
 }
 
-/// Takes the catalog of a bundle and drops the bundle directory.
+/// A bundle's catalog, dropping the bundle directory.
 impl From<AssetBundle> for AssetCatalog {
     fn from(bundle: AssetBundle) -> Self {
         bundle.catalog
     }
 }
 
-/// Builds the catalog that a manifest describes.
+/// Builds the catalog a manifest describes.
 impl From<Manifest> for AssetCatalog {
     fn from(manifest: Manifest) -> Self {
         Self {

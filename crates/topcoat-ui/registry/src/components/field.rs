@@ -6,23 +6,19 @@ use topcoat::{
 use super::label::label;
 
 /// The layout of a [`field`].
-///
-/// The default is `FieldOrientation::Vertical`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum FieldOrientation {
-    /// Stacks the label, the control, and the text below them.
+    /// Stack the label, control, and supporting text.
     #[default]
     Vertical,
-    /// Places the control next to its label or [`field_content`].
+    /// Place a control beside its label or [`field_content`].
     Horizontal,
-    /// Stacks vertically, and switches to a row when the surrounding
-    /// [`field_group`] is wide enough.
+    /// Switch to a row when the enclosing [`field_group`] is wide enough.
     Responsive,
 }
 
 impl FieldOrientation {
-    /// The Tailwind classes for this orientation.
     fn classes(self) -> StaticClass {
         match self {
             Self::Vertical => class!("flex-col gap-2"),
@@ -39,20 +35,17 @@ impl FieldOrientation {
 }
 
 /// The text size of a [`field_legend`].
-///
-/// The default is `FieldLegendVariant::Legend`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum FieldLegendVariant {
-    /// A heading for a section of a form.
+    /// A heading for a section of the form.
     #[default]
     Legend,
-    /// A smaller heading that matches a field label.
+    /// A smaller heading matching a field label.
     Label,
 }
 
 impl FieldLegendVariant {
-    /// The Tailwind classes for this variant.
     fn classes(self) -> StaticClass {
         match self {
             Self::Legend => class!("text-base font-semibold"),
@@ -61,12 +54,11 @@ impl FieldLegendVariant {
     }
 }
 
-/// A group of related controls, rendered as a `<fieldset>` and named by a
-/// [`field_legend`].
+/// A semantic group of related controls, named by a [`field_legend`].
 ///
-/// The `attrs` are forwarded to the `<fieldset>`. Pass `disabled` to disable
-/// all of its controls. A `class` among the `attrs` is appended to the
-/// component's classes. The same holds for the other field components.
+/// Attributes are forwarded to the `<fieldset>`. Pass `disabled` to disable
+/// its controls together. Classes are appended to the component's classes,
+/// as with the other field components.
 #[component]
 pub async fn field_set(
     #[default] mut attrs: Attributes,
@@ -82,10 +74,7 @@ pub async fn field_set(
     })
 }
 
-/// The heading of a [`field_set`], rendered as a `<legend>`.
-///
-/// Place it first in the set. `variant` sets the text size and defaults to
-/// `Legend`.
+/// The accessible heading of a [`field_set`]. Place it first in the set.
 #[component]
 pub async fn field_legend(
     #[default] variant: FieldLegendVariant,
@@ -102,10 +91,7 @@ pub async fn field_legend(
     })
 }
 
-/// A vertical stack of fields.
-///
-/// It is a container query container, which a [`field`] with the
-/// `Responsive` orientation uses to pick its layout.
+/// A stack of fields, with a container for responsive field layouts.
 #[component]
 pub async fn field_group(
     #[default] mut attrs: Attributes,
@@ -124,18 +110,15 @@ pub async fn field_group(
     })
 }
 
-/// A control together with its label, description, and error message.
+/// A control and its label, description, and optional error message.
 ///
-/// Put any control inside it, such as an input, a select, or a checkbox. Set
-/// `for` on the [`field_label`] to the control's `id`, and point the
-/// control's `aria-describedby` at the ids of the description and the error.
-/// When the control has `aria-invalid="true"`, the label turns the
-/// destructive color too. A `data-invalid="true"` attribute on the field has
-/// the same effect. The field does not validate anything or decide when to
-/// show errors. That is up to you.
-///
-/// `orientation` sets the layout and defaults to `Vertical`. The `attrs` are
-/// forwarded to the wrapping `<div>`, which has `role="group"`.
+/// Compose it with existing inputs, selects, checkboxes, or other controls.
+/// Set `for` on [`field_label`] to the control's `id`, and connect descriptions
+/// and errors through the control's `aria-describedby`. Set `aria-invalid`
+/// to `"true"` on an invalid control; the field then colors its label too.
+/// A `data-invalid="true"` attribute on the field also colors its label.
+/// Validation and the visibility of error messages belong to the caller.
+/// Attributes are forwarded to the wrapper and classes are appended.
 #[component]
 pub async fn field(
     #[default] orientation: FieldOrientation,
@@ -158,8 +141,7 @@ pub async fn field(
     })
 }
 
-/// A column that groups a field's label, control, or description, for
-/// example next to a control in a horizontal [`field`].
+/// A flexible column grouping a field's label, control, or supporting text.
 #[component]
 pub async fn field_content(
     #[default] mut attrs: Attributes,
@@ -175,9 +157,9 @@ pub async fn field_content(
     })
 }
 
-/// A [`label`] that follows the disabled and invalid states of its [`field`].
+/// A [`label`] that follows its field's disabled and invalid states.
 ///
-/// Set `for` to the control's `id` to connect the label to it.
+/// Pass `for` to associate the label with a control's `id`.
 #[component]
 pub async fn field_label(
     #[default] mut attrs: Attributes,
@@ -200,9 +182,7 @@ pub async fn field_label(
     })
 }
 
-/// Text styled like a label that does not label a control.
-///
-/// To label a control, use [`field_label`] instead.
+/// Label-sized text that does not label a control. Use [`field_label`] for that.
 #[component]
 pub async fn field_title(
     #[default] mut attrs: Attributes,
@@ -218,9 +198,7 @@ pub async fn field_title(
     })
 }
 
-/// Muted text that describes a control, rendered as a `<p>`.
-///
-/// Give it an `id` and add that id to the control's `aria-describedby`.
+/// Supporting text. Give it an `id` referenced by the control's `aria-describedby`.
 #[component]
 pub async fn field_description(
     #[default] mut attrs: Attributes,
@@ -239,10 +217,7 @@ pub async fn field_description(
     })
 }
 
-/// A horizontal line between sections of a form, with optional text in the
-/// middle.
-///
-/// Child nodes become the text. Without children, the line is unbroken.
+/// A decorative divider with optional text between sections of a form.
 #[component]
 pub async fn field_separator(
     #[default] mut attrs: Attributes,
@@ -261,13 +236,11 @@ pub async fn field_separator(
     })
 }
 
-/// An error message for a field, announced by screen readers when it
-/// appears.
+/// An error message for a field, announced when it appears.
 ///
-/// Render it only when there is an error. Give it an `id` and add that id to
-/// the control's `aria-describedby`, and set `aria-invalid="true"` on the
-/// control. Child nodes become the content, such as one message or a list of
-/// messages.
+/// Render it only when there is an error. Give it an `id` referenced by the
+/// control's `aria-describedby`, and set `aria-invalid="true"` on the control.
+/// Child content can be a message or a list of messages.
 #[component]
 pub async fn field_error(
     #[default] mut attrs: Attributes,

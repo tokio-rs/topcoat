@@ -13,14 +13,9 @@ mod kw {
     custom_keyword!(host);
 }
 
-/// A `host:` argument choosing where the font file is loaded from, e.g.
-/// `host: Asset`. Defaults to `JsDelivr` when omitted.
 pub struct Host {
-    /// The `host` name.
     pub key: HostKey,
-    /// The `:` between the name and the value.
     pub colon_token: Token![:],
-    /// The written value.
     pub value: HostValue,
 }
 
@@ -63,9 +58,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for Host {
     }
 }
 
-/// The `host` argument name.
 pub struct HostKey {
-    /// The `host` keyword.
     pub host_kw: kw::host,
 }
 

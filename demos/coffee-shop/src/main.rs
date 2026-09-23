@@ -1,6 +1,3 @@
-//! A small coffee shop storefront that shows many Topcoat features working
-//! together. See the README for a map of which file shows which feature.
-
 mod app;
 mod components;
 mod customer;

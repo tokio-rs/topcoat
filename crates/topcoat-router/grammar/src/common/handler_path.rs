@@ -14,7 +14,6 @@ use topcoat_core_grammar::{ParseOption, paths::topcoat_router};
 /// handler's module path, which the module router joins onto it. The bare
 /// `./` serves the module path itself with a trailing slash.
 pub struct HandlerPath {
-    /// The path literal as written.
     pub lit: LitStr,
 }
 

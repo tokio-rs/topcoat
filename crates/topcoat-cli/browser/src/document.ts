@@ -1,10 +1,6 @@
 import { morph } from "../../../topcoat-core/browser/morph";
 
-/**
- * Returns whether `next` can be morphed into the current document.
- *
- * Changes to the scripts, the base URL, or the doctype need a full reload.
- */
+/** Script, base URL and doctype changes need a fresh document. */
 export function canMorph(next: Document): boolean {
 	const scripts = (doc: Document) =>
 		JSON.stringify(Array.from(doc.scripts, (script) => script.outerHTML));
@@ -20,10 +16,7 @@ export function canMorph(next: Document): boolean {
 	);
 }
 
-/**
- * Morphs `next` into the current document, keeping matching elements, form
- * state, and the scroll position.
- */
+/** Updates the full document, retaining matching elements and form state. */
 export function morphDocument(next: Document): void {
 	const root = document.documentElement;
 	const fresh = next.documentElement;

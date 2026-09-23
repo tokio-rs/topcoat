@@ -10,8 +10,8 @@ use crate::{
     mime::{self, BccHeader},
 };
 
-/// A [`Transport`] that writes each mail to an `.eml` file instead of
-/// delivering it, so you can read the mail during development.
+/// A [`Transport`] that writes each mail as an `.eml` file instead of
+/// delivering it, for inspecting mail during development.
 ///
 /// ```no_run
 /// use topcoat_mail::FileTransport;
@@ -19,22 +19,23 @@ use crate::{
 /// let transport = FileTransport::new("target/mail");
 /// ```
 ///
-/// Files are written to the given directory, which is created if needed.
-/// Each file name contains the UTC send time and the start of the
-/// `Message-ID`, such as `20260726-143502-1a2b3c4d.eml`, so a directory
-/// listing shows mail in the order it was sent. Mail clients and text editors
-/// can open these files. Unlike a sent mail, the file keeps the `Bcc` header,
-/// so you can see every recipient.
+/// Files land in the given directory (created on first send). The name
+/// carries the UTC send time and the start of the `Message-ID`, like
+/// `20260726-143502-1a2b3c4d.eml`, so a directory listing shows sends
+/// in order. Any mail client or editor opens the format. Unlike the wire
+/// form a delivering transport produces, the file keeps the `Bcc` header,
+/// so the full recipient list stays inspectable.
 ///
-/// Files are written with blocking I/O on the current task, so this transport
-/// is not suited for production.
+/// The file is written with blocking I/O on the calling task, which is fine
+/// for development but makes this transport unsuited for production
+/// serving.
 #[derive(Clone, Debug)]
 pub struct FileTransport {
     directory: PathBuf,
 }
 
 impl FileTransport {
-    /// Creates a transport that writes into `directory`.
+    /// Creates a transport writing into `directory`.
     #[must_use]
     pub fn new(directory: impl Into<PathBuf>) -> FileTransport {
         FileTransport {

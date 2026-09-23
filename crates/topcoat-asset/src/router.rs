@@ -11,26 +11,30 @@ use topcoat_router::RouterBuilder;
 use crate::AssetRoute;
 use crate::{AssetConfig, config::Host};
 
-/// Adds the [`assets`](Self::assets) method to [`RouterBuilder`].
+/// Registers assets on a [`RouterBuilder`].
 ///
-/// Import this trait to register assets while building a router.
+/// Implemented for [`RouterBuilder`] so it is in scope wherever a router is
+/// being built, enabling the [`assets`](Self::assets) method.
 pub trait RouterBuilderAssetExt {
     /// Registers an [`AssetConfig`] on the router.
     ///
-    /// The configuration is stored in the app context. After that,
-    /// [`Asset`](crate::Asset) handles in `view!` render as their URL, and
+    /// The configuration is registered with the app context, where
     /// [`asset_config`](crate::asset_config) and
-    /// [`bundled_asset`](crate::bundled_asset) can read the configuration.
+    /// [`bundled_asset`](crate::bundled_asset) read it back, and
+    /// [`Asset`](crate::Asset) handles used as attribute values in the `view!`
+    /// macro get rendered as the URL the asset is hosted at.
     ///
-    /// A configuration created with
-    /// [`AssetConfig::serve`](crate::AssetConfig::serve) also adds a route
-    /// for each bundled file, so the application serves the files itself.
-    /// Assets that share a bundled file share one route. A configuration
-    /// created with [`AssetConfig::hosted_at`](crate::AssetConfig::hosted_at)
-    /// adds no routes.
+    /// A serving configuration ([`AssetConfig::serve`](crate::AssetConfig::serve))
+    /// also adds an HTTP route for each bundled file, served by the
+    /// application itself. Several assets can resolve to the same bundled
+    /// file, in which case they share one route. A configuration hosted
+    /// externally ([`AssetConfig::hosted_at`](crate::AssetConfig::hosted_at))
+    /// adds no routes; the bundled files must be hosted at the configured
+    /// base URL by other means.
     ///
-    /// `config` is anything that converts into an [`AssetConfig`]. Passing an
-    /// [`AssetBundle`](crate::AssetBundle) serves it from the application.
+    /// Anything convertible into an [`AssetConfig`] is accepted: an
+    /// [`AssetBundle`](crate::AssetBundle) registers as the configuration
+    /// serving it.
     ///
     /// # Examples
     ///
@@ -47,7 +51,7 @@ pub trait RouterBuilderAssetExt {
     /// }
     /// ```
     ///
-    /// Point asset URLs at a CDN instead of serving the files:
+    /// Hosting the bundled files on a CDN instead of serving them:
     ///
     /// ```rust
     /// use topcoat::{

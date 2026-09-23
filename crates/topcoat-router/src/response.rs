@@ -1,9 +1,3 @@
-//! Building responses: the [`IntoResponse`] conversion that handlers return
-//! through, and headers the router adds to every response.
-//!
-//! See the [`content`](crate::content) module for the typed response bodies,
-//! such as JSON and HTML.
-
 mod headers;
 
 use std::{borrow::Cow, convert::Infallible, future::ready};
@@ -22,7 +16,6 @@ use topcoat_core::{
 
 use crate::{Body, BoxError};
 
-/// An HTTP response. The body is a [`Body`] unless set otherwise.
 pub type Response<T = Body> = http::Response<T>;
 
 const TEXT_PLAIN: HeaderValue = HeaderValue::from_static("text/plain; charset=utf-8");
@@ -30,26 +23,22 @@ const APPLICATION_OCTET_STREAM: HeaderValue = HeaderValue::from_static("applicat
 
 /// Converts a value into an HTTP [`Response`].
 ///
-/// Route handlers can return any type that implements this trait. Every
-/// `IntoResponse` type also implements [`AsyncIntoResponse`]. The conversion
-/// receives the request [`Cx`], so a response can depend on request-scoped
-/// state.
+/// Route handlers return any type that implements this trait; the router
+/// converts it through [`AsyncIntoResponse`], which every implementation
+/// gets for free. The conversion receives the request [`Cx`], so a response
+/// can depend on request-scoped state.
 ///
-/// Text types reply with `Content-Type: text/plain; charset=utf-8`, and byte
-/// types with `Content-Type: application/octet-stream`. A `Result` renders its
-/// `Ok` value, or the error response for its `Err` value.
-///
-/// A response can also be built from a tuple. The last element becomes the
-/// body and is converted with `IntoResponse`. The elements before it change
-/// the response. A first element of type [`StatusCode`] sets the status, and a
-/// first element of type [`Parts`] or [`Response<()>`] sets the status,
-/// version, headers, and extensions. Every other element is applied in order
-/// with [`IntoResponseParts`]. For example, `(StatusCode::CREATED, headers,
-/// body)` builds a `201 Created` response with `headers` and `body`.
+/// A response can also be assembled from a tuple. The last element is converted
+/// with `IntoResponse` and becomes the body, while the earlier elements modify
+/// the response: a leading [`StatusCode`], [`Parts`], or [`Response<()>`] sets
+/// the status line, and every other element is applied with
+/// [`IntoResponseParts`]. For example `(StatusCode::CREATED, headers, body)`
+/// builds a `201` response carrying `headers` and `body`.
 ///
 /// # Examples
 ///
-/// Implement it for a type that sets its own status, headers, or body:
+/// Implement it for a domain type that should control its own status, headers,
+/// or body:
 ///
 /// ```rust
 /// use topcoat::{
@@ -78,27 +67,30 @@ const APPLICATION_OCTET_STREAM: HeaderValue = HeaderValue::from_static("applicat
 /// }
 /// ```
 pub trait IntoResponse {
-    /// Converts `self` into an HTTP [`Response`].
+    /// Converts `self` into an HTTP [`Response`], using the request [`Cx`] for any
+    /// request-scoped data.
     ///
     /// # Errors
     ///
-    /// Returns an error if the response cannot be built, for example because
-    /// a header value is invalid.
+    /// Returns an error if the response cannot be assembled (for example, a
+    /// header value is invalid).
     fn into_response(self, cx: &Cx) -> Result<Response>;
 }
 
-/// Converts a value into an HTTP [`Response`] asynchronously.
+/// Converts a value into an HTTP [`Response`], awaiting whatever the
+/// conversion needs.
 ///
-/// Route and layer handlers can return any type that implements this trait.
-/// Every [`IntoResponse`] type implements it, so implement it directly only
-/// for a response that must await something before it can be built, such as a
-/// view that loads its content first.
+/// Route and layer handlers return any type that implements this trait.
+/// Every [`IntoResponse`] type implements it, so a handler only needs it by
+/// name when its response cannot be built without awaiting, such as a view
+/// that resolves its content first.
 pub trait AsyncIntoResponse {
-    /// Converts `self` into an HTTP [`Response`].
+    /// Converts `self` into an HTTP [`Response`], using the request [`Cx`] for any
+    /// request-scoped data.
     ///
     /// # Errors
     ///
-    /// Returns an error if the response cannot be built.
+    /// Returns an error if the response cannot be assembled.
     fn async_into_response(self, cx: &Cx) -> impl Future<Output = Result<Response>> + Send;
 }
 
@@ -108,44 +100,21 @@ impl<T: IntoResponse> AsyncIntoResponse for T {
     }
 }
 
-/// Changes the [`Parts`] of a [`Response`] without setting its body.
+/// Modifies a [`Response`]'s [`Parts`] without supplying a body.
 ///
-/// Types that implement this trait, such as an array of header pairs or a
-/// [`HeaderMap`], can appear before the last element of an [`IntoResponse`]
-/// tuple to add headers or extensions to the response. An [`Option`] of such a
-/// type applies its value only when it is `Some`. The conversion receives the
-/// request [`Cx`], so a part can depend on request-scoped state.
-///
-/// # Examples
-///
-/// ```rust
-/// use topcoat::{
-///     Result,
-///     router::{StatusCode, header, route},
-/// };
-///
-/// type Created = (
-///     StatusCode,
-///     [(header::HeaderName, &'static str); 1],
-///     &'static str,
-/// );
-///
-/// #[route(POST "/api/items")]
-/// async fn create_item() -> Result<Created> {
-///     Ok((
-///         StatusCode::CREATED,
-///         [(header::LOCATION, "/api/items/1")],
-///         "created",
-///     ))
-/// }
-/// ```
+/// Types that implement this trait (header arrays, [`HeaderMap`],
+/// [`Extensions`], and their [`Option`] wrappers) can appear before the final
+/// body element of an [`IntoResponse`] tuple to attach headers or extensions to
+/// the response. The conversion receives the request [`Cx`] so a part can
+/// depend on request-scoped state.
 pub trait IntoResponseParts {
-    /// Applies `self` to the response `parts`.
+    /// Applies `self` to the response `parts`, using the request [`Cx`] for any
+    /// request-scoped data.
     ///
     /// # Errors
     ///
-    /// Returns an error if the part cannot be applied, for example because a
-    /// header value is invalid.
+    /// Returns an error if a part cannot be applied (for example, a header
+    /// value is invalid).
     fn into_response_parts(self, cx: &Cx, parts: &mut Parts) -> Result<()>;
 }
 
@@ -301,8 +270,8 @@ where
     }
 }
 
-/// Converts any [`http::Response`] whose body yields [`Bytes`], keeping its
-/// status and headers and wrapping its body in a [`Body`].
+/// Re-bodies any [`http::Response`] whose body is a [`Bytes`] stream into the
+/// framework's [`Body`], leaving the parts untouched.
 impl<B> IntoResponse for http::Response<B>
 where
     B: http_body::Body<Data = Bytes> + Send + 'static,
@@ -348,9 +317,8 @@ impl IntoResponseParts for Extensions {
     }
 }
 
-/// Inserts each `(name, value)` pair as a response header, replacing any
-/// earlier value under that name. Fails if a name or value is not a valid
-/// header.
+/// Inserts each `(name, value)` pair as a response header, failing if a name or
+/// value is not a valid header.
 impl<K, V, const N: usize> IntoResponseParts for [(K, V); N]
 where
     K: TryInto<HeaderName>,

@@ -10,25 +10,20 @@ use syn::{
 };
 use topcoat_core_grammar::ParseOption;
 
-/// An HTML identifier: identifier segments joined by `-`, `:`, or `.`, with
-/// no whitespace in between.
-///
-/// It covers names like `data-foo`, `aria-label`, `xmlns:xlink`, or
-/// `class.active` that are valid in HTML but not in Rust. Rust keywords are
-/// accepted as segments.
+/// An HTML identifier: a sequence of identifier segments joined by `-`, `:`,
+/// or `.` with no intervening whitespace. Covers names like `data-foo`,
+/// `aria-label`, `xmlns:xlink`, or `class.active` that are valid in HTML but
+/// not valid Rust identifiers.
 #[derive(Debug, PartialEq)]
 pub struct HtmlIdent {
-    /// The first segment.
     pub first: Ident,
-    /// The segments after the first, each with its separator.
     pub rest: Vec<HtmlIdentSegment>,
 }
 
 impl HtmlIdent {
-    /// Returns the source span of the whole identifier.
-    ///
-    /// Falls back to the first segment's span when spans cannot be joined,
-    /// which is the case on stable Rust inside a procedural macro.
+    /// The source span covering the identifier. Falls back to the first
+    /// segment's span when the underlying [`Span::join`] is unavailable (i.e.
+    /// on stable Rust outside of `proc_macro2`'s fallback mode).
     #[must_use]
     pub fn span(&self) -> Span {
         let first = self.first.span();
@@ -38,10 +33,9 @@ impl HtmlIdent {
         }
     }
 
-    /// Parses an [`HtmlIdent`] that only allows `-` as a separator.
-    ///
-    /// Element names use this, so that a `:` or `.` after the name starts the
-    /// next attribute, as in `<input :value=...>`.
+    /// Parses an [`HtmlIdent`] that only allows `-` as a separator. Used for
+    /// HTML element names, where `:` and `.` would tear apart adjacent
+    /// attribute syntax like `:value` or `class.active`.
     ///
     /// # Errors
     ///
@@ -101,25 +95,19 @@ impl HtmlIdent {
 /// A trailing `<sep><part>` segment of an [`HtmlIdent`].
 #[derive(Debug, PartialEq)]
 pub struct HtmlIdentSegment {
-    /// The separator before the part.
     pub separator: HtmlIdentSeparator,
-    /// The part after the separator.
     pub part: HtmlIdentPart,
 }
 
 /// The character joining two segments of an [`HtmlIdent`].
 #[derive(Debug, PartialEq)]
 pub enum HtmlIdentSeparator {
-    /// A `-`.
     Dash(Token![-]),
-    /// A `:`.
     Colon(Token![:]),
-    /// A `.`.
     Dot(Token![.]),
 }
 
 impl HtmlIdentSeparator {
-    /// Returns the source span of the separator.
     #[must_use]
     pub fn span(&self) -> Span {
         match self {
@@ -138,16 +126,13 @@ impl HtmlIdentSeparator {
     }
 }
 
-/// The part of an [`HtmlIdentSegment`] after its separator.
-///
-/// Usually a Rust identifier. A part can also start with a digit, as in the
-/// `x-target.422` and `x-target.4xx` status code modifiers of Alpine AJAX.
-/// Rust reads such a part as an integer literal.
+/// The identifier portion of an [`HtmlIdentSegment`]. Usually a Rust-style
+/// identifier, but HTML attribute names may also carry a bare number such as
+/// Alpine AJAX's `x-target.422` status-code modifiers -- including wildcard
+/// forms like `4xx` -- which are not valid Rust identifiers.
 #[derive(Debug, PartialEq)]
 pub enum HtmlIdentPart {
-    /// An identifier, including Rust keywords.
     Ident(Ident),
-    /// A part that starts with a digit, like `422` or `4xx`.
     Int(LitInt),
 }
 
@@ -167,7 +152,6 @@ impl HtmlIdentPart {
         }
     }
 
-    /// Returns the source span of the part.
     #[must_use]
     pub fn span(&self) -> Span {
         match self {

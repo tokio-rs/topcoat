@@ -8,19 +8,21 @@ use crate::{Body, Methods, Path, PathBuf, Route, RouteFuture, RouteId};
 /// the URL path from the module tree and registers the route under it.
 #[doc(hidden)]
 pub trait ModuleRoute: Send + Sync + 'static {
-    /// Returns the id of this route's handler.
+    /// The identity of this route's handler.
     fn id(&self) -> RouteId;
 
-    /// Returns the HTTP methods this route responds to.
+    /// The HTTP methods this route responds to.
     fn methods(&self) -> Methods<'_>;
 
-    /// Returns the module path the route was declared in.
+    /// The module path where the route was declared, used to derive the URL.
     fn module_path(&self) -> &'static str;
 
-    /// Returns the path below the module path, as declared with a `./` path.
-    /// The root path stands for the module path with a trailing slash.
+    /// The path below the module path, joined onto it to form the URL, as
+    /// declared with a `./` path. The root path stands for the module path
+    /// with a trailing slash.
     ///
-    /// Defaults to `None`, which means the module path itself.
+    /// Defaults to `None`, so the handler is served at the module path
+    /// itself.
     fn relative_path(&self) -> Option<&Path> {
         None
     }

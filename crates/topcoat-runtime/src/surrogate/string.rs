@@ -3,9 +3,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{StrSurrogate, impl_surrogate, impl_surrogate_mut, impl_surrogate_ref};
 
-/// A `String` in a runtime expression.
-///
-/// It dereferences to [`StrSurrogate`], which provides its methods.
 #[derive(Debug, Clone, RefCast, Serialize, Deserialize)]
 #[repr(transparent)]
 #[serde(transparent)]

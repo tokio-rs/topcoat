@@ -16,14 +16,14 @@ use crate::{
 
 /// Builds a [`Router`] for a Topcoat application.
 ///
-/// Create one with [`Router::builder`]. Register handlers with
+/// This is the common construction surface used by manual routing,
+/// auto-discovery, `module_router!`, and builder extension traits. Register
 /// [`page`](Self::page), [`layout`](Self::layout), [`layer`](Self::layer), and
-/// [`route`](Self::route), or let a discovery method register them for you.
-/// Then call [`build`](Self::build) once at the end.
+/// [`route`](Self::route) handlers directly, or let a discovery helper add
+/// them, then call [`build`](Self::build) once at the end.
 ///
-/// Other crates add features to the builder through extension traits, like
-/// serving assets or reading cookies. Shared values for every request are
-/// registered with [`app_context`](Self::app_context).
+/// Builder extension traits add application-wide behavior before finalization,
+/// such as assets, cookies, or typed [`app_context`](Self::app_context) values.
 ///
 /// # Examples
 ///
@@ -80,29 +80,26 @@ impl RouterBuilder {
     }
 
     /// Returns `true` if no routes, pages, or layouts have been registered.
-    ///
-    /// Layers and app context values are not counted.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.routes.is_empty() && self.pages.is_empty() && self.layouts.is_empty()
     }
 
-    /// Registers a [`Route`], a request handler for a path and a set of HTTP
-    /// methods.
+    /// Registers a [`Route`], an HTTP handler bound to a set of methods and a
+    /// path.
     ///
-    /// A route responds to the methods its [`Route::methods`] returns: one or
-    /// more specific methods, or every method with [`Methods::Any`]. Several
-    /// routes can share a path as long as their methods differ. One
-    /// any-method route can share a path with specific-method routes, and the
-    /// specific-method routes win for their methods. A `HEAD` request runs
-    /// the `GET` route when no route handles `HEAD` itself.
+    /// A route responds to the methods its [`Route::methods`] declares: one or
+    /// more specific methods, or every method via [`Methods::Any`]. Specific-
+    /// method routes and one any-method route can share a path; the specific
+    /// method wins at dispatch.
     #[must_use]
     pub fn route(mut self, route: impl Route) -> Self {
         self.routes.push(Box::new(route));
         self
     }
 
-    /// Registers every route declared with `#[route]` in the program.
+    /// Registers every route annotated with `#[route]` and collected at link
+    /// time.
     #[cfg(feature = "discover")]
     #[must_use]
     pub fn discover_routes(mut self) -> Self {
@@ -112,18 +109,20 @@ impl RouterBuilder {
         self
     }
 
-    /// Registers a [`Page`], like the one `#[page]` generates.
+    /// Registers a [`Page`], like the marker `#[page]` generates. Order
+    /// doesn't matter: layout matching is based on path prefixes, not
+    /// registration order.
     ///
-    /// The page is wrapped by every [`Layout`] whose path is a prefix of the
-    /// page's path, so the order of registration does not matter. A page
-    /// responds to the methods its [`Page::methods`] returns.
+    /// A page serves the methods its [`Page::methods`] declares (`GET` unless
+    /// the page opts into others).
     #[must_use]
     pub fn page(mut self, page: impl Page) -> Self {
         self.pages.push(Box::new(page));
         self
     }
 
-    /// Registers every [`Page`] declared with `#[page]` in the program.
+    /// Registers every [`Page`] annotated with `#[page]` and collected at
+    /// link time.
     #[cfg(feature = "discover")]
     #[must_use]
     pub fn discover_pages(mut self) -> Self {
@@ -133,21 +132,22 @@ impl RouterBuilder {
         self
     }
 
-    /// Registers a [`Layout`], like the one `#[layout]` generates.
-    ///
-    /// The layout wraps every page whose path starts with the layout's path.
+    /// Registers a [`Layout`], like the marker `#[layout]` generates. A
+    /// layout applies to every page whose path starts with the layout's path
+    /// prefix.
     #[must_use]
     pub fn layout(mut self, layout: impl Layout) -> Self {
         self.layouts.push(Arc::new(layout));
         self
     }
 
-    /// Registers every [`Layout`] declared with `#[layout]` in the program.
+    /// Registers every [`Layout`] annotated with `#[layout]` and collected at
+    /// link time.
     ///
-    /// Only one discovered layout is allowed per path. Layouts nest by path,
-    /// so two layouts at the same path would have no defined order. To wrap a
-    /// page in more than one layout, give the layouts different paths or
-    /// combine them into one layout component.
+    /// At most one discovered layout is allowed per path: a page's layouts nest
+    /// by path prefix, so two layouts sharing a path would have an undefined
+    /// nesting order. To attach more than one layout to a page, give them
+    /// distinct paths or compose them in a single layout component.
     ///
     /// # Panics
     ///
@@ -168,30 +168,32 @@ impl RouterBuilder {
         self
     }
 
-    /// Registers a [`Layer`].
+    /// Registers a [`Layer`] that wraps every matched route whose path begins
+    /// with the layer's path, like a layout. A layer without a path
+    /// ([`Layer::path`] returns `None`) wraps every request, including one
+    /// that matches no route (a 404 or 405).
     ///
-    /// A layer with a path wraps every route whose path starts with the
-    /// layer's path, like a layout. A layer without a path ([`Layer::path`]
-    /// returns `None`) wraps every request, including one that matches no
-    /// route (a 404 or 405).
-    ///
-    /// When layers at different paths match a route, the shorter path runs
-    /// outside the longer one, and layers without a path run outside them
-    /// all. Several layers can share a path. Among those, the one registered
-    /// last runs outermost, so `.layer(a).layer(b)` runs `b` around `a`.
+    /// When layers at *different* paths match a route they nest from
+    /// least-specific (outermost) to most-specific (innermost), with pathless
+    /// layers outside them all. Multiple layers may share the same path; among
+    /// those, the most recently registered runs first (outermost), so
+    /// `.layer(a).layer(b)` runs `b` around `a` when both sit at the same
+    /// path.
     #[must_use]
     pub fn layer(mut self, layer: impl Layer) -> Self {
         self.layers.push(Arc::new(layer));
         self
     }
 
-    /// Registers every [`Layer`] declared with `#[layer]` in the program.
+    /// Registers every layer annotated with `#[layer]` and collected at link
+    /// time.
     ///
-    /// Unlike with [`layer`](Self::layer), only one discovered layer is
-    /// allowed per path. Discovered layers have no defined order, so two
-    /// layers at the same path would run in an unpredictable order. To stack
-    /// several layers on one path, register them with [`layer`](Self::layer)
-    /// instead.
+    /// Unlike [`layer`](Self::layer), at most one discovered layer is allowed
+    /// per path. Link-time collection order is non-deterministic, so two
+    /// discovered layers sharing a path would have an undefined run order; this
+    /// rejects that rather than pick an arbitrary one. To stack several layers
+    /// on one path, register them explicitly with [`layer`](Self::layer), whose
+    /// order is well-defined.
     ///
     /// # Panics
     ///
@@ -212,11 +214,11 @@ impl RouterBuilder {
         self
     }
 
-    /// Sets the [`OriginPolicy`] the router applies to every request.
+    /// Registers the [`OriginPolicy`] the router applies to every request.
     ///
-    /// The default policy rejects state-changing cross-origin requests from
-    /// browsers and cross-origin WebSocket handshakes. Pass a policy to trust
-    /// other origins, exempt some routes, or turn the check off.
+    /// The default policy denies state-changing cross-origin browser requests
+    /// and cross-origin WebSocket handshakes; pass a policy to trust
+    /// cross-origin peers, exempt individual routes, or opt out entirely.
     #[must_use]
     pub fn origin_policy(mut self, origin_policy: OriginPolicy) -> Self {
         self.origin_policy = origin_policy;
@@ -225,11 +227,11 @@ impl RouterBuilder {
 
     /// Configures which reverse proxies can report the client's IP address.
     ///
-    /// By default, [`client_ip`](crate::request::client_ip) returns the IP
-    /// address of the direct connection. Behind a reverse proxy, that is the
-    /// proxy's address. Use this method to trust your proxies, so Topcoat
-    /// reads the client's address from the headers they send. See
-    /// [`TrustedProxies`] for how to choose the proxies and the header.
+    /// By default, [`client_ip`](crate::request::client_ip) returns the IP address of
+    /// the direct connection. Behind a reverse proxy, that is the proxy's
+    /// address. Use this method to trust your proxies so Topcoat can read the
+    /// client's address from their HTTP headers. See [`TrustedProxies`] for
+    /// how to choose the proxies and header to use.
     ///
     /// # Examples
     ///
@@ -248,11 +250,11 @@ impl RouterBuilder {
 
     /// Configures the compression applied to responses.
     ///
-    /// By default, the router compresses each response with an algorithm the
-    /// request's `Accept-Encoding` header allows. Pass
-    /// [`Compression::off`](crate::Compression::off) to turn compression off,
-    /// for example behind a reverse proxy that already compresses. Pass a
-    /// configured [`Compression`](crate::Compression) value to adjust it.
+    /// By default the router compresses each response with the algorithm
+    /// negotiated from the request's `Accept-Encoding` header. Pass
+    /// [`Compression::off`](crate::Compression::off) to disable compression
+    /// (say, behind a reverse proxy that compresses already), or a tuned
+    /// [`Compression`](crate::Compression) value to adjust it.
     ///
     /// # Examples
     ///
@@ -268,12 +270,12 @@ impl RouterBuilder {
         self
     }
 
-    /// Configures how the router handles a request whose path differs from a
-    /// route's path only by a trailing slash.
+    /// Configures how a request for the other trailing-slash form of a
+    /// route's path is handled.
     ///
-    /// By default, such a request is redirected to the route's path: `/users/`
-    /// redirects to a page at `/users`, and `/users` to a page at `/users/`.
-    /// See [`TrailingSlash`] for the other options.
+    /// By default such a request is redirected to the form the route
+    /// declares: `/users/` to a page at `/users`, and `/users` to a page at
+    /// `/users/`. See [`TrailingSlash`] for the other policies.
     ///
     /// # Examples
     ///
@@ -293,17 +295,18 @@ impl RouterBuilder {
     /// Registers the base URL the application is publicly reachable at, like
     /// `https://example.com`.
     ///
-    /// Relative URLs work inside the site, but content that is read
-    /// elsewhere, like links and images in emails, feeds, or sitemaps, needs
-    /// absolute URLs. The base URL is stored in the app context. Read it with
-    /// [`base_url`](topcoat_core::base_url::base_url) or
-    /// [`try_base_url`](topcoat_core::base_url::try_base_url), and build
-    /// absolute URLs with
+    /// Relative URLs work anywhere within the site, but rendered content
+    /// that leaves it (e.g. links and images in emails, feeds, or sitemaps)
+    /// needs the absolute form. The base URL is stored on the app context;
+    /// read it back with [`base_url`](topcoat_core::base_url::base_url) (or
+    /// [`try_base_url`](topcoat_core::base_url::try_base_url)) and resolve
+    /// paths against it with
     /// [`BaseUrl::join`](topcoat_core::base_url::BaseUrl::join).
     ///
-    /// Accepts anything that converts into a [`BaseUrl`]. A string must be an
-    /// absolute `http` or `https` URL without a query or fragment. It may end
-    /// in a path prefix for an application served under one.
+    /// Accepts anything convertible into a [`BaseUrl`]. A string is parsed,
+    /// so it must be an absolute `http` or `https` URL without a query or
+    /// fragment, with an optional path prefix for applications mounted
+    /// under one.
     ///
     /// # Panics
     ///
@@ -326,11 +329,10 @@ impl RouterBuilder {
         }
     }
 
-    /// Registers a value that every request handled by this router can read.
-    ///
-    /// Values are stored by type, so there is at most one value of each type
-    /// `T`. Read it with the
-    /// [`app_context`](topcoat_core::context::app_context) function.
+    /// Registers a unique value that is accessible to every request sent to
+    /// this router by its type `T`. The top-level
+    /// [`app_context`](topcoat_core::context::app_context) function can be used to
+    /// retrieve a reference to this value via a request context.
     ///
     /// # Panics
     ///
@@ -380,11 +382,12 @@ impl RouterBuilder {
         self
     }
 
-    /// Returns the app context value of type `T` registered with
-    /// [`app_context`](Self::app_context), or `None` if there is none.
+    /// Returns a reference to the app context value of type `T` registered with
+    /// [`app_context`](Self::app_context), or `None` if none has been
+    /// registered.
     ///
-    /// Use it to check for a value before registering it, since registering a
-    /// second value of the same type panics.
+    /// Lets code that registers a shared value lazily check for it first, rather
+    /// than tripping the duplicate-registration panic on a second call.
     #[must_use]
     pub fn get_app_context<T>(&self) -> Option<&T>
     where
@@ -394,8 +397,8 @@ impl RouterBuilder {
     }
 
     /// Returns a mutable reference to the app context value of type `T`
-    /// registered with [`app_context`](Self::app_context), or `None` if there
-    /// is none.
+    /// registered with [`app_context`](Self::app_context), or `None` if none
+    /// has been registered.
     #[must_use]
     pub fn get_app_context_mut<T>(&mut self) -> Option<&mut T>
     where
@@ -404,18 +407,14 @@ impl RouterBuilder {
         self.context.get_mut::<T>()
     }
 
-    /// Builds the [`Router`] from everything registered on this builder.
+    /// Finalizes the registered routes, pages, and layouts into a [`Router`].
     ///
     /// # Panics
     ///
-    /// Panics if the registrations are inconsistent:
-    ///
-    /// - Two routes handle the same method at the same path, or both handle every method at the
-    ///   same path.
-    /// - A route handles no methods at all.
-    /// - Two route paths conflict, for example two parameters with different names at the same
-    ///   position.
-    /// - A layer's path matches no route. A layer at the root `/` is allowed to match nothing.
+    /// Panics if two routes resolve to the same path and HTTP method (or both
+    /// respond to every method at the same path), since the router would have
+    /// no way to choose between them, and if a route declares an empty method
+    /// set, since it could never be dispatched to.
     #[must_use]
     #[track_caller]
     pub fn build(self) -> Router {

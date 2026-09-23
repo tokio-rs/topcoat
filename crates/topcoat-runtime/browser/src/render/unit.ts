@@ -33,12 +33,10 @@ export abstract class RenderUnit {
 		);
 	}
 
-	/** Whether the unit has been removed. */
 	get isDisposed(): boolean {
 		return this.lifetime.isDisposed;
 	}
 
-	/** Removes the unit, cancelling its requests and releasing its content. */
 	dispose(): void {
 		this.lifetime.dispose();
 	}

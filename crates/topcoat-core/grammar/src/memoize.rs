@@ -15,7 +15,6 @@ mod kw {
     custom_keyword!(as_ref);
 }
 
-/// The arguments of a `#[memoize]` attribute: empty, or `as_ref`.
 pub struct MemoizeAttr {
     as_ref: Option<kw::as_ref>,
 }
@@ -40,10 +39,6 @@ impl Parse for MemoizeAttr {
     }
 }
 
-/// The function a `#[memoize]` attribute is placed on.
-///
-/// Parsing fails if the function takes a `self` receiver or has no `cx`
-/// parameter.
 pub struct MemoizeItem {
     item: ItemFn,
 }
@@ -79,13 +74,9 @@ impl Parse for MemoizeItem {
     }
 }
 
-/// A parsed `#[memoize]` attribute together with its function.
-///
-/// Its [`ToTokens`] impl generates the memoized function.
 pub struct Memoize(MemoizeAttr, MemoizeItem);
 
 impl Memoize {
-    /// Combines a parsed attribute and function.
     #[must_use]
     pub fn new(attr: MemoizeAttr, item: MemoizeItem) -> Self {
         Self(attr, item)
@@ -95,8 +86,8 @@ impl Memoize {
     ///
     /// # Errors
     ///
-    /// Returns an error if `attr` is not a valid attribute argument list, or
-    /// if `item` is not a function that `#[memoize]` accepts.
+    /// Returns an error if either stream fails to parse as a valid memoize
+    /// attribute or memoized function item.
     pub fn parse(attr: TokenStream, item: TokenStream) -> syn::Result<Self> {
         Ok(Self::new(syn::parse2(attr)?, syn::parse2(item)?))
     }

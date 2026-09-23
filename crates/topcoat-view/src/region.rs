@@ -2,11 +2,10 @@ use std::fmt;
 
 use topcoat_core::identity::{Identity, SiteKey};
 
-/// The id of a live region, derived from its enclosing identity and its
-/// source location.
+/// Identifies a region by its enclosing identity and source location.
 ///
-/// The same region gets the same id across renders. The id displays as 32
-/// lowercase hex digits, the form used in the rendered HTML.
+/// The same region has the same id across renders. Its wire form is the
+/// 128-bit hash written as fixed-width hex.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RegionId(u128);
 

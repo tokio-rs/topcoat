@@ -10,15 +10,14 @@ use crate::{ElementPatchMode, PatchElements, common};
 
 /// An event that executes JavaScript in the browser.
 ///
-/// It sends a [`PatchElements`] event that appends a `<script>` element to the
-/// `body`. By default the element removes itself after it runs. Call
-/// [`auto_remove`](Self::auto_remove) to keep it, and
-/// [`attributes`](Self::attributes) to add attributes to it.
+/// Sugar for a [`PatchElements`] that appends a `<script>` element to the
+/// `body`. By default the element removes itself after running; disable that
+/// with [`auto_remove`](Self::auto_remove), and add attributes to the element
+/// with [`attributes`](Self::attributes).
 ///
-/// It converts into an [`Event`] with [`Into`] for sending over an
-/// [`Sse`](topcoat_router::content::sse::Sse) stream. When a handler returns
-/// it on its own, the response is a stream that sends this one event and then
-/// ends.
+/// The event converts [`Into<Event>`](Event) for sending over an
+/// [`Sse`](topcoat_router::content::sse::Sse) stream. Returned from a handler
+/// on its own, it responds as a stream that sends this one event and ends.
 ///
 /// # Examples
 ///
@@ -49,31 +48,27 @@ impl ExecuteScript {
         }
     }
 
-    /// Sets whether the script element removes itself after it runs.
-    ///
-    /// Defaults to `true`.
+    /// Sets whether the script element removes itself after running.
     pub fn auto_remove(mut self, auto_remove: bool) -> Self {
         self.auto_remove = auto_remove;
         self
     }
 
-    /// Sets the attributes of the script element, replacing any set before.
-    ///
-    /// Each entry is a complete attribute, such as `type="module"`. The
-    /// entries are inserted into the HTML as they are, without escaping.
+    /// Adds attributes to the script element. Each entry is a complete
+    /// attribute, such as `type="module"`.
     pub fn attributes(mut self, attributes: impl IntoIterator<Item = impl Into<String>>) -> Self {
         self.attributes = attributes.into_iter().map(Into::into).collect();
         self
     }
 
-    /// Sets the event `id`. The browser sends the last `id` it received in the
-    /// `Last-Event-ID` header when it reconnects to a lost stream.
+    /// Sets the event `id`, echoed back in `Last-Event-ID` when a lost stream
+    /// reconnects.
     pub fn id(mut self, id: impl Into<String>) -> Self {
         self.id = Some(id.into());
         self
     }
 
-    /// Sets how long the browser waits before it reconnects to a lost stream.
+    /// Sets the reconnection time the browser waits after losing the stream.
     pub fn retry(mut self, retry: Duration) -> Self {
         self.retry = Some(retry);
         self

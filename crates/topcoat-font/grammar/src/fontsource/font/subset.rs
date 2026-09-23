@@ -10,13 +10,10 @@ use crate::fontsource::{
 };
 
 /// A `subset:` argument for `fontsource_font!`: one subset or a bracketed list of
-/// subsets to cross-product, e.g. `subset: [Latin, Cyrillic]`.
+/// subsets to cross-product, e.g. `subset: [Subset::Latin, Subset::Cyrillic]`.
 pub struct Subset {
-    /// The `subset` name.
     pub key: SubsetKey,
-    /// The `:` between the name and the value.
     pub colon_token: Token![:],
-    /// The written value or list of values.
     pub value: List<SubsetValue>,
 }
 

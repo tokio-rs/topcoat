@@ -1,10 +1,10 @@
-[Tailwind CSS](https://tailwindcss.com) is a utility-first CSS framework. Instead of writing your own stylesheets, you put small single-purpose classes (like `flex`, `pt-4`, or `text-center`) directly in your markup, and Tailwind generates CSS for only the classes you use.
+[Tailwind CSS](https://tailwindcss.com) is a utility-first CSS framework: instead of writing custom stylesheets, you compose small single-purpose classes (like `flex`, `pt-4`, or `text-center`) directly in your markup, and Tailwind generates only the CSS for the classes you actually use.
 
-Topcoat's Tailwind integration is a small Rust wrapper around the [standalone Tailwind CLI](https://tailwindcss.com/blog/standalone-cli). It does not need Node.js or a JavaScript toolchain. A Cargo build script runs Tailwind and writes a CSS file into `OUT_DIR`. That file is an ordinary Topcoat [asset](crate::asset), so it is bundled and served with a content-hashed URL like any other asset.
+Topcoat's Tailwind integration is a thin Rust wrapper around the standalone Tailwind CSS CLI. It does not run Node, `PostCSS`, or a Vite-style asset pipeline. Instead, a Cargo build script runs Tailwind, writes a CSS file into `OUT_DIR`, and the normal Topcoat asset bundler serves that CSS file with a content-hashed URL.
 
 # Setup
 
-Enable the `tailwind` feature in both your normal dependency and your build dependency:
+Enable the `tailwind` feature for both your runtime dependency and your build dependency:
 
 ```toml
 [dependencies]
@@ -23,7 +23,7 @@ fn main() {
 }
 ```
 
-Then link the generated stylesheet from your layout with [`stylesheet!`](crate::tailwind::stylesheet). This example is not compiled here, because the macro only works in a crate with a build script:
+Then link the generated stylesheet from your layout:
 
 ```rust,ignore
 use topcoat::{
@@ -55,7 +55,7 @@ async fn layout(slot: Slot<'_>) -> Result<impl View> {
 topcoat::asset::asset!(concat!(env!("OUT_DIR"), "/tailwind.css"))
 ```
 
-So the generated CSS is a normal Topcoat asset, and the [asset guide](crate::asset) applies to it. During development, `topcoat dev` builds the app (which runs the build script), bundles the assets, and serves the CSS from `/_topcoat/assets/...`. Without the dev server, bundle the assets yourself:
+That means the generated CSS is just a Topcoat asset. During development, `topcoat dev` builds the app, runs the build script, bundles assets, and then serves the bundled CSS from `/_topcoat/assets/...`. For manual builds, bundle assets the same way as any other Topcoat app:
 
 ```sh
 topcoat asset bundle
@@ -71,47 +71,47 @@ use topcoat::{
 
 let router = Router::builder()
     .discover()
-    .assets(AssetBundle::load().unwrap())
+    .assets(AssetBundle::load_dir("target/assets").unwrap())
     .build();
 ```
 
 # Build flow
 
-[`BuildConfig::render`](crate::tailwind::BuildConfig::render) is meant to run in `build.rs`. Some of its defaults read Cargo's `OUT_DIR` and `CARGO_MANIFEST_DIR` environment variables. A config that sets the executable, input, output, and cwd itself does not need either.
+`BuildConfig::render()` is intended to run from `build.rs`. It reads Cargo's `OUT_DIR` and `CARGO_MANIFEST_DIR` environment variables where a default depends on them; a fully custom configuration (executable, input, output, and cwd) runs without either.
 
-With the default config, `render` does the following:
+The default build does this:
 
-1. Downloads the standalone Tailwind CLI, unless a cached copy exists.
-2. Writes an input CSS file, `tailwind-input.css`, to `OUT_DIR`. It contains:
+1. Downloads the standalone Tailwind CLI release into `OUT_DIR` if it is not already present.
+2. Generates an input CSS file in `OUT_DIR` containing:
 
    ```css
    @import "tailwindcss";
    ```
 
-3. Runs Tailwind:
+3. Runs Tailwind with:
 
    ```sh
    tailwindcss -i <input> -o <output> --cwd <cwd> --minify
    ```
 
-4. Tailwind writes the stylesheet to `$OUT_DIR/tailwind.css`.
+4. Writes the output to `$OUT_DIR/tailwind.css`.
 
-Topcoat downloads Tailwind CLI version `4.3.2` by default ([`DEFAULT_VERSION`](crate::tailwind::DEFAULT_VERSION)). The download is cached in Cargo's target directory at `topcoat/cache/tailwind`, so every package in the workspace shares one copy, and later builds reuse it.
+The default Tailwind CLI version is pinned by Topcoat to `4.3.2`. The downloaded binary is cached under Cargo's target directory, in the shared Topcoat cache at `topcoat/cache/tailwind`, so every package in the workspace reuses one copy across builds.
 
 # CLI executable
 
-By default, Topcoat downloads the Tailwind CLI from GitHub. [`BuildConfig`](crate::tailwind::BuildConfig) has methods to change this:
+By default, Topcoat downloads the Tailwind CLI from GitHub. `BuildConfig` offers alternatives:
 
-- `version("4.3.2")`: sets the release to download.
-- `version_checksum("4.3.2", "sha256:b800b065...")`: also checks the hash of the download. The only supported algorithm is `sha256`.
-- `executable("tailwindcss")`: uses an installed CLI instead of downloading one. A plain name is looked up in `PATH`. A relative path is relative to the package root.
-- `executable_env("TAILWIND_CLI")`: like `executable`, but reads the path from an environment variable when the build script runs.
+- `version("4.3.2")`: pin the release to download.
+- `version_checksum("4.3.2", "sha256:b800b065...")`: additionally verify the downloaded binary's hash. The prefix selects the algorithm; only `sha256` is supported.
+- `executable("tailwindcss")`: use a preinstalled CLI instead of downloading. A bare name is resolved through `PATH`; relative paths resolve against the package root.
+- `executable_env("TAILWIND_CLI")`: like `executable`, with the value read from an environment variable at build time.
 
-An installed executable is used as it is. Nothing is downloaded and no network access is needed, which is useful for offline and sandboxed builds.
+A user-provided executable is used as-is: no download happens and no network access is needed, which suits offline and sandboxed builds.
 
 # Class scanning
 
-Topcoat does not look at `view!` macros or collect class names itself. The Tailwind CLI finds the classes.
+Topcoat does not inspect `view!` macros or extract class names itself. Class detection is delegated to the Tailwind CLI.
 
 By default, Topcoat passes:
 
@@ -119,11 +119,11 @@ By default, Topcoat passes:
 --cwd $CARGO_MANIFEST_DIR
 ```
 
-So Tailwind scans your package, starting at its root. It finds classes in Rust source files, including literal `class="..."` values in `view!` markup. Tailwind cannot see class names that are built at runtime, so write each class name out in full somewhere in your source.
+So Tailwind scans from your package root: classes are found in Rust source files, including literal `class="..."` values in `view!` markup. Classes assembled dynamically at runtime are invisible to Tailwind.
 
-Tailwind skips files that `.gitignore` excludes, and that is what keeps it out of `target/`. Without a `.gitignore`, it also scans build output, which is slow and can bring back classes from earlier builds. In that case, scan a smaller directory with `.cwd("src")`.
+The scan skips files matched by `.gitignore`: that is what keeps it out of `target/`. In a checkout without an ignore file it reads build artifacts, which is slow and can resurrect classes from previous builds; scope the scan down with `.cwd("src")` in that case.
 
-For full control, use a custom input CSS with Tailwind's own source directives. For example, to scan only Rust files:
+For precise control, use a custom input CSS with Tailwind's own source directives, e.g. to scan only Rust files:
 
 ```css
 @import "tailwindcss" source(none);
@@ -133,7 +133,7 @@ For full control, use a custom input CSS with Tailwind's own source directives. 
 
 # Custom input CSS
 
-The generated input is enough for the default Tailwind output. Use `input(...)` when you need your own CSS, theme values, plugins that the standalone CLI supports, or source directives:
+The generated input is enough for default Tailwind output. Use `input(...)` when you need custom CSS, theme values, plugins supported by the standalone CLI, or Tailwind source directives:
 
 ```rust,no_run
 # #[allow(clippy::needless_doctest_main)]
@@ -145,7 +145,7 @@ fn main() {
 }
 ```
 
-An example input file:
+Example input:
 
 ```css
 @import "tailwindcss";
@@ -157,13 +157,13 @@ An example input file:
 
 # Rebuild behavior
 
-`render` prints no Cargo `rerun-if-*` directives, so Cargo uses its default: it reruns the build script whenever a file in the package changes. This default skips files that `.gitignore` excludes, always skips `target/`, and notices new and deleted files. So a class change anywhere in the package, even in a new file, regenerates the Tailwind output.
+`BuildConfig::render()` prints no Cargo `rerun-if-*` directives. Cargo therefore applies its default: the build script reruns whenever any non-ignored file in the package changes. That default respects `.gitignore`, always excludes `target/`, and notices created and deleted files, so class changes anywhere in the package, including in new files, regenerate the Tailwind output.
 
-If your build script prints any `rerun-if-*` directive, Cargo replaces the default with exactly the paths and variables you list. Keep this in mind when you add your own directives next to the Tailwind build.
+Printing any `rerun-if-*` directive from your build script replaces that default with exactly the paths and variables you list. Keep that in mind when combining the Tailwind build with your own directives.
 
-Do not point a directory directive at a directory that contains `target/`. Cargo scans such directories recursively and does not respect `.gitignore` there, so the build script would rerun because of its own output.
+Never point a directory directive at a directory that contains `target/`. Cargo scans directories recursively and ignores `.gitignore` when it does, so the build script would rerun on its own output.
 
-Two setups need directives of your own:
+Two situations require directives of your own:
 
-- `executable_env(name)`: print `cargo:rerun-if-env-changed=<name>` if a change to the variable should rerun the build script.
-- A `cwd` or `input` outside the package: Cargo's default only watches files in the package, so print `cargo:rerun-if-changed` for the outside paths.
+- `executable_env(name)`: print `cargo:rerun-if-env-changed=<name>` if changing the variable should rerun the build script.
+- A `cwd` or `input` outside the package: Cargo's default only tracks package files, so print `cargo:rerun-if-changed` for the external paths.

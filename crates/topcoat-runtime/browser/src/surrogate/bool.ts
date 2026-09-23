@@ -1,7 +1,6 @@
 import type { AttributeValueViewParts, NodeViewParts } from "../dom/view";
 import { Option } from "./option";
 
-/** A Rust `bool`. */
 export class Bool implements AttributeValueViewParts, NodeViewParts {
 	constructor(private readonly v: boolean) {}
 

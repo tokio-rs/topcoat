@@ -1,6 +1,6 @@
-`topcoat fmt` formats the bodies of Topcoat macros, like the HTML inside a `view!` invocation. `rustfmt` leaves macro bodies alone, so run both: `rustfmt` formats the Rust code, and `topcoat fmt` formats the code inside Topcoat macros.
+Topcoat includes a source formatter for macro bodies in Rust files. It is intended to run alongside normal Rust formatting: `rustfmt` formats Rust syntax, while `topcoat fmt` formats the syntax inside Topcoat-aware macro invocations.
 
-# The CLI command
+# The CLI Command
 
 Run the formatter with:
 
@@ -8,31 +8,35 @@ Run the formatter with:
 topcoat fmt
 ```
 
-`cargo topcoat fmt` works too, but Cargo's command dispatch makes it start more slowly. Prefer `topcoat fmt`, especially in editors and other tools that run it often.
+Prefer the direct `topcoat fmt` command, especially from editors and other frequently-run integrations. `cargo topcoat fmt` also works, but it goes through Cargo's command dispatch path and adds unnecessary startup overhead.
 
-Without file arguments, the command formats every Rust file under the current directory and writes the changes in place. You can also pass files and directories. Directories are searched recursively for Rust files.
+With no file arguments, the command scans Rust files under the current directory and writes changes in place.
 
 ```sh
 topcoat fmt src/main.rs src/app
 ```
 
-For editors and other tools, use `--stdin`. The command then reads source code from standard input and writes the formatted code to standard output instead of changing files on disk.
+File arguments can point at individual files or directories. Directories are expanded recursively to Rust files.
+
+For editor integrations and other tools, use stdin/stdout mode:
 
 ```sh
 topcoat fmt --stdin < src/main.rs > /tmp/main.rs
 ```
 
-By default the formatter handles every macro it supports. Pass `--macros` with a comma-separated list of macro names to format only those macros and leave the rest as they are. An unknown name is an error, and the error message lists the supported names.
+In stdin mode, the formatted source is written to stdout instead of updating files on disk.
+
+By default the formatter handles every macro it knows about. Pass `--macros` with a comma-separated list to restrict it to a subset, leaving the rest untouched:
 
 ```sh
 topcoat fmt --macros view,class
 ```
 
-# What it formats
+# What It Formats
 
-The formatter parses the Rust source, finds the invocations of macros it supports, and rewrites only their bodies. The Rust code around them is left as it is.
+The formatter parses Rust source, finds macro invocations it knows how to format, and replaces only those macro bodies. The surrounding Rust code is left as-is.
 
-In most Topcoat code, this means the HTML inside `view!` invocations gets formatted:
+In normal Topcoat code, this most notably means the HTML inside of a `view!` macro invocation is formatted:
 
 ```rust
 use topcoat::{router::page, view::{View, view}};
@@ -47,15 +51,15 @@ async fn page() -> topcoat::Result<impl View> {
 }
 ```
 
-Many other Topcoat macros, such as `class!` and `font!`, are formatted as well.
+Many other macros such as `font!` also work.
 
-The formatter recognizes a macro by the name used at the call site. If you import or re-export a macro under a different name, its invocations are no longer formatted.
+The `topcoat fmt` command decides what source snippets to format based on the macro name at the call site. If you reexport the macro with a different name, it will no longer be formatted.
 
 # Editor integration
 
 ## Neovim
 
-This Neovim config uses [`conform.nvim`](https://github.com/stevearc/conform.nvim). It runs `topcoat fmt` on Rust buffers, but only when a `Topcoat.toml` file exists at the project root.
+This Neovim config uses `conform.nvim` and enables `topcoat fmt` for Rust buffers only when a `Topcoat.toml` marker exists in the project root.
 
 ```lua
 require("conform").setup({
@@ -75,7 +79,7 @@ require("conform").setup({
 })
 ```
 
-To opt a project in, create an empty `Topcoat.toml` file at its root:
+Create a `Topcoat.toml` marker at the root of a Topcoat project to opt in:
 
 ```sh
 touch Topcoat.toml

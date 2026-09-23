@@ -2,22 +2,22 @@ use std::{path::PathBuf, sync::mpsc, time::Duration};
 
 use super::{BundleEvent, BundleEvents, BundleSubscriber};
 
-/// The number of assets processed at once when
-/// [`parallelism`](BundlerConfig::parallelism) is not set.
+/// Number of assets processed at once when
+/// [`parallelism`](BundlerConfig::parallelism) is unset.
 pub const DEFAULT_PARALLELISM: usize = 8;
 
-/// The time limit for one download when [`timeout`](BundlerConfig::timeout)
-/// is not set.
+/// Wall-clock limit for a single download when
+/// [`timeout`](BundlerConfig::timeout) is unset.
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_mins(1);
 
-/// The time limit for opening a connection when
-/// [`connect_timeout`](BundlerConfig::connect_timeout) is not set.
+/// Limit for establishing a connection when
+/// [`connect_timeout`](BundlerConfig::connect_timeout) is unset.
 pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// Settings for a [`Bundler`](super::Bundler).
+/// Tuning knobs for a [`Bundler`](super::Bundler).
 ///
-/// [`BundlerConfig::new`] starts with every setting at its default. Each
-/// builder method changes one setting.
+/// Every field is optional; [`BundlerConfig::new`] leaves them all at
+/// their defaults, and each builder method overrides one of them.
 ///
 /// ```no_run
 /// # use std::time::Duration;
@@ -41,87 +41,80 @@ pub struct BundlerConfig {
 }
 
 impl BundlerConfig {
-    /// Creates a config with every setting at its default.
+    /// A config with every knob at its default.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Sets the directory that remote assets are downloaded into.
-    ///
-    /// A downloaded file stays in this directory and is reused by later
-    /// runs. When no directory is set, the bundler uses
-    /// `<target>/topcoat/cache/asset` of the Cargo build that runs it, which
-    /// only works inside a build script. Outside a build script, set the
-    /// directory explicitly, or [`Bundler::new`](super::Bundler::new) panics.
     #[must_use]
     pub fn cache_dir(mut self, cache_dir: PathBuf) -> Self {
         self.cache_dir = Some(cache_dir);
         self
     }
 
-    /// Sets how many assets are processed at the same time.
+    /// How many assets to process concurrently.
     ///
-    /// Each worker thread reads or downloads one asset at a time, hashes it,
-    /// and writes it into the bundle. So this is also the maximum number of
-    /// downloads in flight. Defaults to [`DEFAULT_PARALLELISM`]. A value of
-    /// `0` is treated as `1`.
+    /// Each worker handles one asset at a time -- reading or downloading
+    /// it, hashing it, and writing it into the bundle -- so this is
+    /// effectively the number of downloads in flight. Defaults to
+    /// [`DEFAULT_PARALLELISM`]; a value of `0` is treated as `1`.
     #[must_use]
     pub fn parallelism(mut self, parallelism: usize) -> Self {
         self.parallelism = Some(parallelism);
         self
     }
 
-    /// Sets the time limit for downloading one remote asset, including
-    /// opening the connection. Defaults to [`DEFAULT_TIMEOUT`].
+    /// Wall-clock limit for downloading a single remote asset,
+    /// connection included. Defaults to [`DEFAULT_TIMEOUT`].
     ///
-    /// Ignored when you set an [`agent`](Self::agent), which has its own
-    /// timeouts.
+    /// Ignored when a custom [`agent`](Self::agent) is supplied, since
+    /// that agent carries its own timeouts.
     #[must_use]
     pub fn timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
     }
 
-    /// Sets the time limit for opening the connection to a remote asset.
-    /// Defaults to [`DEFAULT_CONNECT_TIMEOUT`].
+    /// Limit for establishing the connection to a remote asset.
     ///
-    /// Ignored when you set an [`agent`](Self::agent), which has its own
-    /// timeouts.
+    /// Behaves like [`timeout`](Self::timeout), defaulting to
+    /// [`DEFAULT_CONNECT_TIMEOUT`].
     #[must_use]
     pub fn connect_timeout(mut self, timeout: Duration) -> Self {
         self.connect_timeout = Some(timeout);
         self
     }
 
-    /// Downloads remote assets with your own [`ureq::Agent`], for example to
-    /// use a proxy, authentication, or custom TLS settings.
+    /// Download remote assets through a caller-supplied [`ureq::Agent`]
+    /// (for proxies, auth, custom TLS, etc.).
     ///
-    /// The agent is used as it is, so [`timeout`](Self::timeout) and
-    /// [`connect_timeout`](Self::connect_timeout) have no effect. Configure
-    /// timeouts on the agent instead.
+    /// The agent is used as-is, so it supersedes
+    /// [`timeout`](Self::timeout) and
+    /// [`connect_timeout`](Self::connect_timeout); configure those on
+    /// the agent instead.
     #[must_use]
     pub fn agent(mut self, agent: ureq::Agent) -> Self {
         self.agent = Some(agent);
         self
     }
 
-    /// Sends every [`BundleEvent`] to `subscriber`.
+    /// Report [`BundleEvent`]s to `subscriber`.
     ///
-    /// Call this several times to send the events to several subscribers.
-    /// Subscribers run on the bundler's worker threads, so keep them cheap.
+    /// Call this more than once to fan the same events out to several
+    /// consumers. Subscribers run on the bundler's worker threads, so
+    /// keep them cheap.
     #[must_use]
     pub fn subscribe(mut self, subscriber: impl BundleSubscriber) -> Self {
         self.events.push(subscriber);
         self
     }
 
-    /// Sends every [`BundleEvent`] to a channel and returns its receiver.
+    /// Report [`BundleEvent`]s to a channel, returning its receiver.
     ///
-    /// Use this instead of [`subscribe`](Self::subscribe) to pull events
-    /// rather than receive callbacks. The config and every bundler created
-    /// from it hold a sender, so the receiver disconnects once all of them
-    /// are dropped.
+    /// A [`subscribe`](Self::subscribe) shorthand for consumers that
+    /// would rather pull events than be called back. The receiver
+    /// disconnects once the bundler is dropped.
     ///
     /// ```no_run
     /// use topcoat_asset::{Bundler, BundlerConfig};
@@ -155,10 +148,11 @@ impl BundlerConfig {
         self.parallelism.unwrap_or(DEFAULT_PARALLELISM).max(1)
     }
 
-    /// Returns the configured agent, or builds one with this crate's user
-    /// agent and the configured timeouts.
+    /// The configured agent, or one built with this crate's user agent
+    /// and the configured timeouts.
     ///
-    /// Cloning a [`ureq::Agent`] is cheap and shares its connection pool.
+    /// Cloning a [`ureq::Agent`] is cheap and shares its connection
+    /// pool, so callers get the agent they supplied.
     pub(super) fn resolve_agent(&self) -> ureq::Agent {
         if let Some(agent) = &self.agent {
             return agent.clone();

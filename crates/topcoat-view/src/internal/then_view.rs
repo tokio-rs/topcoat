@@ -12,13 +12,11 @@ pin_project! {
     /// A [`View`] built from a [`Future`] that resolves to one.
     ///
     /// The view awaits the future first and then polls the view it resolved
-    /// to in place. A component invocation expands to one, since the
-    /// component's body is a future returning its view.
+    /// to in place. A component invocation becomes one: the component's
+    /// body is a future returning its view.
     #[project = ThenViewProj]
     pub enum ThenView<F, V> {
-        /// The future has not resolved yet.
         Future { #[pin] future: F },
-        /// The future resolved to this view.
         View { #[pin] view: V },
     }
 }
@@ -27,7 +25,6 @@ impl<F, V> ThenView<F, V>
 where
     F: Future<Output = Result<V>>,
 {
-    /// Wraps a future that resolves to a view.
     #[must_use]
     pub fn new(future: F) -> Self {
         Self::Future { future }

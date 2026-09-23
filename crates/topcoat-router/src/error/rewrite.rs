@@ -9,23 +9,23 @@ use crate::Body;
 /// responds 500.
 pub(crate) const REWRITE_LIMIT: usize = 8;
 
-/// Creates an internal rewrite that handles the request again at `path`.
+/// Builds an internal rewrite dispatching the request again at `path`.
 ///
-/// When a handler returns the rewrite as an error, the router discards the
-/// current response and routes the request again, as if the client had
-/// requested `path`. `body` becomes the new request body. The method and
-/// headers stay the same, and `path` may include a query string. Unlike a
-/// redirect, the client does not see the rewrite: the browser keeps showing
-/// the URL it requested. The handler at the new path can read that URL with
+/// Returning it from a handler makes the router run the whole route stack
+/// again as if `path` had been requested in the first place, with `body` as
+/// the request body. The method and headers carry over unchanged, and `path`
+/// may include a query string. Unlike a redirect, the substitution is
+/// invisible to the client: the browser URL stays the URL that was requested.
+/// The handler at the rewritten path can read that original URL with
 /// [`original_uri`](crate::request::original_uri).
 ///
-/// A rewrite to a path and query the request was already routed to, or more
-/// than 8 rewrites in a row, ends the request with a
-/// `500 Internal Server Error`.
+/// The router refuses a rewrite to a path the request was already dispatched
+/// under, and stops a chain after 8 rewrites; either case responds 500.
 ///
-/// The returned [`RewriteError`] can also change the
-/// [`method`](RewriteError::method) and pass values to the new
-/// [request context](RewriteError::with).
+/// The returned [`RewriteError`] has options for the rare cases where the
+/// rewritten dispatch should differ from the request in more than its path
+/// and body: another [`method`](RewriteError::method), or values carried on
+/// its [request context](RewriteError::with).
 ///
 /// # Panics
 ///
@@ -62,10 +62,10 @@ pub fn rewrite(path: impl AsRef<str>, body: impl Into<Body>) -> RewriteError {
     }
 }
 
-/// An internal rewrite, returned as the error of a handler.
+/// An internal rewrite carried as the `Err` variant of a handler `Result`.
 ///
-/// Create one with [`rewrite`]. The router catches it and routes the request
-/// again at the new path instead of sending a response.
+/// Construct one with [`rewrite`]. The router intercepts it and dispatches
+/// the request again at the carried path instead of sending a response.
 #[derive(Debug)]
 pub struct RewriteError {
     path_and_query: PathAndQuery,
@@ -78,23 +78,23 @@ pub struct RewriteError {
 }
 
 impl RewriteError {
-    /// Sets the method of the rewritten request. By default the method stays
-    /// the same.
+    /// Dispatches the rewritten request with `method` instead of the method
+    /// the request arrived with.
     #[must_use]
     pub fn method(mut self, method: Method) -> Self {
         self.method = Some(method);
         self
     }
 
-    /// Passes `value` to the rewritten request and to any later rewrites of
-    /// it. Read it with
+    /// Carries `value` into the rewritten dispatch and every dispatch after
+    /// it in the same chain, available through
     /// [`request_context`](topcoat_core::context::request_context).
     ///
-    /// Each rewrite starts with a new request context and an empty
-    /// memoization cache, so only values passed with this method survive it.
-    /// Passing a value of the same type again, on this rewrite or a later
-    /// one, replaces the earlier value. Values that the router itself sets,
-    /// such as the request parts and path parameters, win over passed values.
+    /// Each dispatch starts with a fresh context and memoization cache.
+    /// Only explicitly carried values survive a rewrite. Calling this
+    /// again, or on a later rewrite, replaces a carried value of the same
+    /// type. Values installed by the router, such as the request parts and
+    /// path parameters, take precedence over carried values.
     #[must_use]
     pub fn with<T>(mut self, value: T) -> Self
     where

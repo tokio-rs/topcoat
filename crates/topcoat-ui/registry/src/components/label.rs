@@ -6,13 +6,12 @@ use topcoat::{
 /// The classes for the [`label`] element.
 ///
 /// The label lays out its content in a centered row, so an inline icon or a
-/// wrapped control lines up with the text. The label dims and ignores the
-/// pointer when its control is disabled. These selectors find the control:
-///
-/// - `has-[:disabled]`: a control inside the label.
-/// - `peer-disabled`: a preceding sibling control marked `peer`.
-/// - `peer-has-[:disabled]`: a control inside a preceding `peer` wrapper.
-/// - `has-[+:disabled]`: a control right after the label.
+/// wrapped control lines up with the text. It dims and stops receiving
+/// pointer events when its control is disabled: a wrapped control is matched
+/// with `has-[:disabled]`, a preceding sibling control marked `peer` with
+/// `peer-disabled`, and a control inside a preceding `peer` wrapper with
+/// `peer-has-[:disabled]`. A control immediately after the label is matched
+/// with `has-[+:disabled]`.
 const LABEL: StaticClass = class!(
     "flex items-center gap-2 text-sm leading-none font-medium select-none \
      peer-disabled:pointer-events-none peer-disabled:opacity-50 \
@@ -23,10 +22,10 @@ const LABEL: StaticClass = class!(
 
 /// A caption for a form control, rendered as a `<label>`.
 ///
-/// Connect it to a control by putting the control inside the label, or by
-/// setting `for` to the control's `id`. The `attrs` (such as `class` or
-/// `for`) are forwarded to the `<label>`. A `class` among them is appended to
-/// the component's classes. Child nodes become the label's content.
+/// Associate it with a control either by wrapping the control or by pointing
+/// a `for` attribute at the control's `id`. The `attrs` (such as `class` or
+/// `for`) are forwarded to the underlying `<label>`; a `class` among them is
+/// appended to the computed classes. Child nodes become the label's content.
 ///
 /// ```ignore
 /// view! {

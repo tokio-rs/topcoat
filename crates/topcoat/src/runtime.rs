@@ -3,10 +3,7 @@
 pub use topcoat_runtime::*;
 pub use topcoat_runtime_macro::*;
 
-/// Renders the `<script>` tag that loads the browser runtime.
-///
-/// Place it in the `<head>` of every page that uses signals, event handlers,
-/// bind attributes, procedures, or shards.
+/// The `<script>` tag loading the browser runtime.
 ///
 /// # Panics
 ///

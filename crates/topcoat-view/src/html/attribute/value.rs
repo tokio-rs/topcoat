@@ -6,10 +6,10 @@ use crate::{
     Captured, ClassViewParts, HtmlContext, PartsWriter, PromotedStr, StaticStr, Unescaped,
 };
 
-/// A value that can be used as an attribute value in a template.
+/// Converts a value used as an attribute value into view parts.
 ///
-/// A type that implements this trait can be used in the attribute value
-/// position of the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
+/// When this trait is implemented on a type, it can be used in the attribute value position of an
+/// element in the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
 ///
 /// ```rust
 /// # use topcoat::view::{View, component, view};
@@ -22,23 +22,21 @@ use crate::{
 /// # }
 /// ```
 ///
-/// A value can also decide that the whole attribute is left out, through
-/// [`attribute_present`](Self::attribute_present). This is how
-/// [boolean HTML attributes] work. `false` and `None` leave out the
-/// attribute, while `true` renders it with an empty value (`disabled=""`).
-/// Text pushed by a value is escaped for a double-quoted attribute value.
+/// For [boolean HTML attributes], a false value must be omitted from the markup entirely.
+/// [`attribute_present`](Self::attribute_present) is the hook that makes that decision.
+/// The built-in `bool` and `Option<T>` implementations use this so `false` and `None` omit the
+/// whole attribute, while `true` renders the attribute with an empty value (`disabled=""`).
 ///
 /// [boolean HTML attributes]: https://developer.mozilla.org/en-US/docs/Glossary/Boolean/HTML
 pub trait AttributeValueViewParts {
-    /// Returns whether the attribute holding this value is rendered at all.
+    /// Returns whether the containing attribute should be rendered.
     ///
-    /// Return `false` to leave out the whole attribute, key included, as for
-    /// a `false` [boolean HTML attribute].
+    /// For [boolean HTML attributes], a false value must be omitted from the markup entirely.
     ///
-    /// [boolean HTML attribute]: https://developer.mozilla.org/en-US/docs/Glossary/Boolean/HTML
+    /// [boolean HTML attributes]: https://developer.mozilla.org/en-US/docs/Glossary/Boolean/HTML
     fn attribute_present(&self) -> bool;
 
-    /// Pushes this attribute value into `parts`.
+    /// Appends this attribute value to the view being built.
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>);
 }
 
@@ -295,60 +293,51 @@ impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
 impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11);
 impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
 
-/// An attribute value captured from an [`AttributeValueViewParts`] value.
+/// An attribute value captured from any [`AttributeValueViewParts`] value.
 ///
-/// An [`Attributes`](crate::Attributes) collection stores its values in this
-/// form. A value made of a single string keeps that string. Any other value
-/// is rendered into a `String` when it is captured. Each string variant also
-/// keeps the context the string was pushed with, so the value is escaped when
-/// it is written into a view. A captured value can be used as an attribute
-/// value or a class list entry, and renders the same as the original value.
+/// Produced by the [`Attributes`](crate::Attributes) collection. A value
+/// that pushes a single string is kept as that string, so it costs nothing
+/// beyond the string itself; anything else is rendered into a `String` when
+/// it is captured. A string variant carries the context it was pushed with,
+/// so escaping happens when the value is finally written into a view. Using
+/// a captured value as an attribute value or a class list entry writes it
+/// back exactly as it was captured.
 #[non_exhaustive]
 #[derive(Debug, Default, Clone)]
 pub enum AttributeValue {
-    /// The attribute is not rendered.
+    /// Marks the attribute as not rendered.
     ///
     /// An absent value keeps its key in an [`Attributes`](crate::Attributes)
-    /// collection, so it still replaces an earlier value for the same key,
-    /// but the attribute is left out when the collection renders.
+    /// collection, so it still replaces an earlier value when collections
+    /// are merged, but the attribute is not rendered.
     #[default]
     Absent,
-    /// The attribute is rendered with an empty value, like a `true` boolean
+    /// A present value that renders nothing, like a `true` boolean
     /// attribute (`disabled=""`).
     Empty,
-    /// A string literal held by reference, as in [`PromotedStr`].
+    /// A static string held by reference.
     PromotedStr {
-        /// The value's text.
         value: &'static &'static str,
-        /// The context the text renders in.
         context: HtmlContext,
     },
     /// A static string.
     StaticStr {
-        /// The value's text.
         value: &'static str,
-        /// The context the text renders in.
         context: HtmlContext,
     },
     /// An owned string.
-    String {
-        /// The value's text.
-        value: String,
-        /// The context the text renders in.
-        context: HtmlContext,
-    },
+    String { value: String, context: HtmlContext },
 }
 
 impl AttributeValue {
-    /// Returns an [`Absent`](Self::Absent) value.
+    /// Returns the value that marks its attribute as absent.
     #[inline]
     #[must_use]
     pub fn absent() -> Self {
         Self::Absent
     }
 
-    /// Returns whether the attribute holding this value is rendered, which
-    /// is the case for every value except [`Absent`](Self::Absent).
+    /// Returns whether the attribute holding this value should be rendered.
     #[inline]
     #[must_use]
     pub fn is_present(&self) -> bool {
@@ -428,9 +417,8 @@ impl AttributeValueViewParts for &AttributeValue {
     }
 }
 
-/// A captured attribute value can be used as a single class list entry, for
-/// example a `class` value taken out of an
-/// [`Attributes`](crate::Attributes) collection with
+/// A captured attribute value spliced in as a single class list entry, such
+/// as one taken from an [`Attributes`](crate::Attributes) collection with
 /// [`remove`](crate::Attributes::remove). An absent value is skipped.
 impl ClassViewParts for AttributeValue {
     #[inline]

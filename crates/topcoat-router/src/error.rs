@@ -84,7 +84,7 @@ fn into_response_or_500(cx: &Cx, value: impl IntoResponse) -> Response {
         .unwrap_or_else(|_| internal_server_response())
 }
 
-/// Renders the `Ok` value, or the error response for the `Err` value.
+/// Renders the contained value, or the framework error response on `Err`.
 impl<T> IntoResponse for Result<T>
 where
     T: IntoResponse,
@@ -97,21 +97,20 @@ where
     }
 }
 
-/// Renders an error as the response of its router error type, such as a
-/// `404 Not Found` for a [`NotFoundError`]. Any other error renders as a
-/// `500 Internal Server Error`.
+/// Renders an error by mapping it onto its HTTP status code.
 impl IntoResponse for Error {
     fn into_response(self, cx: &Cx) -> Result<Response> {
         Ok(error_into_response(cx, self))
     }
 }
 
-/// Turns a missing or failed value into a router error.
+/// Converts an absent or failed value into a router error response.
 ///
-/// For an [`Option`], `None` becomes the chosen error. For a
-/// [`Result`](core::result::Result), any `Err` becomes the chosen error and the
-/// original error is discarded. Use these methods with `?` to return a
-/// redirect or an error status when a value a handler needs is missing.
+/// Implemented for [`Option`] (where `None` becomes the configured error)
+/// and [`core::result::Result`] (where any `Err` is replaced, discarding the
+/// original error). Designed to be combined with `?` so a handler can return a
+/// redirect, not-found, unauthorized, forbidden, or bad-request response when
+/// required state is missing or invalid.
 ///
 /// # Examples
 ///
@@ -126,52 +125,52 @@ impl IntoResponse for Error {
 /// }
 /// ```
 pub trait RouterErrorExt {
-    /// The type of the value when it is present.
+    /// The success type produced when the value is present.
     type T;
 
-    /// Returns the value if present, otherwise a temporary redirect to `uri`.
+    /// Returns `Ok(value)` if present, otherwise a temporary redirect to `uri`.
     ///
     /// # Errors
     ///
-    /// Returns a [`RedirectError`] with status `307 Temporary Redirect` when
-    /// the value is missing.
+    /// Returns a [`RedirectError`] performing a temporary redirect to `uri`
+    /// when the value is absent.
     fn ok_or_redirect(self, uri: impl AsRef<str>) -> Result<Self::T, RedirectError>;
 
-    /// Returns the value if present, otherwise a permanent redirect to `uri`.
+    /// Returns `Ok(value)` if present, otherwise a permanent redirect to `uri`.
     ///
     /// # Errors
     ///
-    /// Returns a [`RedirectError`] with status `308 Permanent Redirect` when
-    /// the value is missing.
+    /// Returns a [`RedirectError`] performing a permanent redirect to `uri`
+    /// when the value is absent.
     fn ok_or_redirect_permanent(self, uri: impl AsRef<str>) -> Result<Self::T, RedirectError>;
 
-    /// Returns the value if present, otherwise a `404 Not Found` error.
+    /// Returns `Ok(value)` if present, otherwise a not-found response.
     ///
     /// # Errors
     ///
-    /// Returns a [`NotFoundError`] when the value is missing.
+    /// Returns a [`NotFoundError`] when the value is absent.
     fn ok_or_not_found(self) -> Result<Self::T, NotFoundError>;
 
-    /// Returns the value if present, otherwise a `401 Unauthorized` error.
+    /// Returns `Ok(value)` if present, otherwise an unauthorized response.
     ///
     /// # Errors
     ///
-    /// Returns an [`UnauthorizedError`] when the value is missing.
+    /// Returns an [`UnauthorizedError`] when the value is absent.
     fn ok_or_unauthorized(self) -> Result<Self::T, UnauthorizedError>;
 
-    /// Returns the value if present, otherwise a `403 Forbidden` error.
+    /// Returns `Ok(value)` if present, otherwise a forbidden response.
     ///
     /// # Errors
     ///
-    /// Returns a [`ForbiddenError`] when the value is missing.
+    /// Returns a [`ForbiddenError`] when the value is absent.
     fn ok_or_forbidden(self) -> Result<Self::T, ForbiddenError>;
 
-    /// Returns the value if present, otherwise a `400 Bad Request` error.
+    /// Returns `Ok(value)` if present, otherwise a bad-request response.
     ///
     /// # Errors
     ///
-    /// Returns a [`BadRequestError`] with `description` when the value is
-    /// missing.
+    /// Returns a [`BadRequestError`] carrying `description` when the value is
+    /// absent.
     fn ok_or_bad_request(self, description: impl Into<String>) -> Result<Self::T, BadRequestError>;
 }
 

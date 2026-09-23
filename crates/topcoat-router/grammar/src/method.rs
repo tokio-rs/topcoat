@@ -8,17 +8,14 @@ use syn::{
 };
 use topcoat_core_grammar::{ParseOption, paths::topcoat_router};
 
-/// The HTTP methods at the start of a `#[page]` or `#[route]` attribute. This
-/// is one method (`GET`), a bracketed list (`[GET, POST]`), or `*` for every
-/// method.
+/// The HTTP methods opening a route-like macro attribute: a single method
+/// (`GET`), a bracketed list (`[GET, POST]`), or `*` for every method.
 pub enum Methods {
     /// A single method (`#[route(GET)]`).
     One(Ident),
     /// A bracketed list of methods (`#[route([GET, POST])]`).
     Set {
-        /// The brackets around the list.
         bracket: Bracket,
-        /// The listed methods.
         items: Punctuated<Ident, Token![,]>,
     },
     /// Every method (`#[route(*)]`).

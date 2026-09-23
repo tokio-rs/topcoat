@@ -2,41 +2,34 @@ use proc_macro2::LineColumn;
 
 use super::Span;
 
-/// The kind of a [`Trivia`].
+/// The kind of source-text trivia captured by [`Lexer`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum TriviaKind {
-    /// A `//` comment, up to the end of its line.
     LineComment,
-    /// A `/* */` comment, which may be nested.
     BlockComment,
-    /// A run of whitespace.
     Whitespace,
 }
 
-/// A comment or run of whitespace, with its position in the source.
+/// A single chunk of comment or whitespace, with its original source span.
 ///
-/// The pretty-printer uses these to keep the comments and blank lines of the
-/// source in the formatted output.
+/// The pretty printer threads these through so that comments and significant
+/// blank lines from the source are reproduced in the formatted output.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Trivia<'a> {
-    /// The position in the source.
     pub span: Span,
-    /// The source text.
     pub content: &'a str,
-    /// Whether this is a comment or whitespace.
     pub kind: TriviaKind,
 }
 
 impl Trivia<'_> {
-    /// Returns the number of line breaks in the source text.
+    /// The number of `\n` characters contained in the trivia's source text.
     #[must_use]
     pub fn newlines(&self) -> usize {
         self.content.chars().filter(|item| *item == '\n').count()
     }
 }
 
-/// An iterator over the comments and whitespace of Rust source text, in
-/// order. Everything else is skipped.
+/// A lexer that skips code tokens but captures comments and whitespace.
 pub struct Lexer<'a> {
     input: &'a str,
     // Current byte offset in the input string
@@ -48,7 +41,6 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    /// Creates a lexer over `input`.
     #[must_use]
     pub fn new(input: &'a str) -> Self {
         Self {

@@ -1,12 +1,12 @@
 # App context
 
-Most apps need values that live longer than a single request, like a database pool, an HTTP client, or configuration loaded at startup. Topcoat stores these values in the **app context**. You register each value once on the router, and any code with access to the request context `Cx` can read it with `app_context(cx)`.
+Most apps need values that outlive any single request: a database pool, an HTTP client, a config struct loaded at startup. Topcoat exposes these through **app context**: register a value once on the router, then read it from any handler with `app_context(cx)`.
 
-The app context is keyed by Rust type. Each type can be registered at most once, and lookups are typed: ask for a `&Database` and you get a `&Database`.
+App context is keyed by Rust type. Each type can be registered at most once, and lookups are typed: ask for `&Database` and you get a `&Database`.
 
 ## Registering values
 
-Call `.app_context(value)` on the router builder for every value you want to share:
+Build the router and chain `.app_context(value)` for every value you want to share:
 
 ```rust
 use topcoat::router::{Router, RouterBuilderDiscoverExt};
@@ -20,7 +20,7 @@ pub fn router() -> Router {
 }
 ```
 
-Each value is stored under its concrete type. Registering a second value of the same type panics. If you need more than one value of the same type, wrap each one in its own newtype:
+The value is stored under its concrete type. Registering two values of the same type panics: wrap them in newtypes if you need more than one of the same underlying type:
 
 ```rust
 struct PrimaryDb(Database);
@@ -32,46 +32,34 @@ Router::builder()
     .build();
 ```
 
-To check whether a value is already registered before adding one, call `get_app_context::<T>()` on the builder. It returns `None` when there is no value of that type yet.
-
 ## Reading values
 
-In any page, layout, component, route, or helper function that has a `cx: &Cx`, call `app_context::<T>(cx)` to borrow the registered value:
+Inside any handler that has access to a `Cx`, call `app_context::<T>(cx)` to borrow the registered value:
 
 ```rust
 use topcoat::{
-    Result,
     context::{Cx, app_context},
+    Result,
     router::page,
     view::{View, view},
 };
 
-#[page("/profile")]
+#[page]
 async fn user_profile(cx: &Cx) -> Result<impl View> {
     let db: &Database = app_context(cx);
     let user = db.fetch_user(42).await;
-    Ok(view! { <h1>"Hello, " (user.name)</h1> })
+    Ok(view! { <h1>"Hello, " (user.name) </h1> })
 }
 ```
 
-The type you ask for must be exactly the type you registered. `app_context` panics when no value of that type was registered, which usually means the router setup is missing a line.
+The lookup is keyed by `T`'s `TypeId`, so the type you ask for must exactly match the type you registered. Asking `app_context` for a type that wasn't registered panics: this is usually a startup-time bug.
 
-A common pattern is to wrap the lookup in a small helper, so the rest of the app calls `db(cx)` instead of repeating the type:
-
-```rust
-use topcoat::context::{Cx, app_context};
-
-fn db(cx: &Cx) -> &Database {
-    app_context(cx)
-}
-```
-
-When a value is optional, use `try_app_context::<T>(cx)` instead. It returns `None` when no value of that type was registered:
+When an app context value is intentionally optional, use `try_app_context::<T>(cx)` instead. It returns `None` when the type was not registered:
 
 ```rust
 use topcoat::context::{Cx, try_app_context};
-
-struct FeatureConfig;
+#
+# struct FeatureConfig;
 
 fn feature_config(cx: &Cx) -> Option<&FeatureConfig> {
     try_app_context(cx)
@@ -80,20 +68,6 @@ fn feature_config(cx: &Cx) -> Option<&FeatureConfig> {
 
 ## Requirements
 
-The value type `T` must be `Any + Send + Sync`. You do not need to write a `'static` bound yourself, because `Any` implies it.
+The value type `T` must be `Any + Send + Sync`. There's no `'static` bound to write yourself: `Any` implies it.
 
-Every request handled by the router borrows the same value, so app context values are read-only. To share state that changes, put the mutable part behind an atomic or a lock:
-
-```rust
-use std::sync::atomic::{AtomicU64, Ordering};
-
-use topcoat::context::{Cx, app_context};
-
-struct PageViews(AtomicU64);
-
-fn count_page_view(cx: &Cx) -> u64 {
-    app_context::<PageViews>(cx).0.fetch_add(1, Ordering::Relaxed) + 1
-}
-```
-
-If a handler needs an owned copy of a value, for example to move it into a spawned task, the value should be cheap to clone. Database pools and HTTP clients usually are, because they keep their state behind an `Arc`.
+App context is shared by reference across every request handled by the router, so values should be cheap to share (typically already wrapped in `Arc` internally, like a database pool or HTTP client) or trivially clonable.

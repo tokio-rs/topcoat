@@ -1,10 +1,3 @@
-//! Web fonts for Topcoat: CSS `@font-face` rules declared in Rust, served as
-//! stylesheets from the router, and an optional integration with the
-//! [Fontsource](https://fontsource.org/) catalog.
-//!
-//! Use this crate through the `topcoat::font` module, which also re-exports the
-//! `font!` and `font_face!` macros.
-
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[cfg(feature = "view")]

@@ -1,12 +1,12 @@
-Declares a [`Font`] from a family name and its faces.
+Declares a [`Font`] from a family name and its faces, and registers it for discovery.
 
-The family name is a string literal or any expression that converts into a `String`. The macro expands to a [`Font`] that can be stored in a `const`. The faces are built the first time the font is used. With the `discover` feature, the font is also registered for discovery, so [`discover_fonts`] finds it. Without that feature, register the font yourself with [`RouterBuilder::font`].
+Expands to a `const` [`Font`]. With the `discover` feature, it is also registered so [`discover_fonts`] finds it; without it, register the returned font manually with [`RouterBuilder::font`].
 
-The faces can be written in one of two forms.
+The faces can be given in one of two forms.
 
 # CSS-like form
 
-Follow the family name with one or more [`@font-face`] blocks, like in a CSS stylesheet. You write the family name once, and the macro adds it to every block. The body of each `@font-face { ... }` block is a [`font_face!`] body without the `font-family` descriptor.
+Follow the family name with one or more CSS [`@font-face`]-like blocks. The family name is given once and injected into every block, so the faces read like a CSS stylesheet without repeating it. Each `@font-face { ... }` block is a [`font_face!`] body (minus its `font-family`).
 
 ```rust
 # use topcoat::font::{Font, font};
@@ -26,7 +26,7 @@ const INTER: Font = font! {
 
 # Expression form
 
-Instead of blocks, you can follow the family name with a single expression for the faces. It can be anything that converts into [`FontFaces`], such as a `Vec<FontFace>`. This is useful when you build the faces in code or share them between fonts:
+Alternatively, follow the family name with a single expression that evaluates to the faces: anything convertible into [`FontFaces`], such as a `Vec<FontFace>`. This uses ordinary Rust syntax instead of the CSS-like blocks, which is handy when the faces are built up programmatically or shared between fonts:
 
 ```rust
 # use topcoat::font::{Font, FontFace, FontFormat, FontSource, font};
@@ -40,7 +40,7 @@ fn inter_faces() -> Vec<FontFace> {
 const INTER: Font = font!("Inter", inter_faces());
 ```
 
-In this form the macro does not add the family name to the faces, so each [`FontFace`] must already use the same family.
+Unlike the CSS-like form, the family name is not injected into the faces, so each [`FontFace`] must already carry the matching family.
 
 [`@font-face`]: https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face
 [`font_face!`]: macro.font_face.html

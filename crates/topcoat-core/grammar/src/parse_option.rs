@@ -1,11 +1,9 @@
 use syn::parse::{Parse, ParseStream};
 
-/// A type that may or may not be present at the current position of a
-/// `ParseStream`.
+/// A trait for types that can be optionally parsed from a `ParseStream`.
 ///
-/// Implement [`peek`](Self::peek) to tell whether the type starts at the
-/// current position. [`parse_option`](Self::parse_option) then parses it only
-/// when it is there.
+/// This trait provides a default implementation of `parse_option` that
+/// uses the `peek` method to check if the type should be parsed.
 ///
 /// # Example
 ///
@@ -35,12 +33,20 @@ use syn::parse::{Parse, ParseStream};
 /// }
 /// ```
 pub trait ParseOption: Parse + Sized {
-    /// Returns whether the input starts with this type, without consuming
-    /// any tokens.
+    /// Check if the input stream has the expected token(s) for this type.
+    ///
+    /// This method should peek at the input without consuming any tokens.
+    ///
+    /// Note: `ParseStream` is actually `&ParseBuffer`, so implementations
+    /// may use either type signature.
     fn peek(input: ParseStream) -> bool;
 
-    /// Parses this type if [`peek`](Self::peek) returns `true`, and returns
-    /// `Ok(None)` otherwise.
+    /// Optionally parse this type from the input stream.
+    ///
+    /// If `peek` returns `true`, this method will attempt to parse the type.
+    /// Otherwise, it returns `Ok(None)`.
+    ///
+    /// This method has a default implementation that uses `peek` and `Parse::parse`.
     ///
     /// # Errors
     ///

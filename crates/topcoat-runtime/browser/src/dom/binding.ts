@@ -2,7 +2,6 @@ import { compile } from "../expression/compile";
 import type { Scope } from "../scope";
 import { isAttributeValueViewParts } from "./view";
 
-/** The attribute name prefix of a bind attribute's expression. */
 export const BIND_PREFIX = "data-topcoat-bind:";
 
 /**
@@ -17,10 +16,6 @@ const PROPERTY_NAMES = new Set([
 	"indeterminate",
 ]);
 
-/**
- * Keeps the attribute named by a `data-topcoat-bind:<name>` attribute in
- * sync with the expression it holds.
- */
 export function setupBinding(el: Element, attr: Attr, scope: Scope): void {
 	if (!attr.name.startsWith(BIND_PREFIX)) return;
 

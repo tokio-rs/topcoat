@@ -6,14 +6,6 @@ use topcoat_view::{
 
 use crate::Expr;
 
-/// A bind attribute, written `:name=$(...)` in a `view!` body.
-///
-/// It renders the attribute with the expression's value from the server. If
-/// the expression reads signals, it also renders the expression's JavaScript
-/// into a `data-topcoat-bind:<name>` attribute, and the browser runtime keeps
-/// the attribute in sync whenever those signals change. For `value`,
-/// `checked`, `selected`, and `indeterminate`, the browser also sets the DOM
-/// property of the same name.
 #[derive(Debug, Clone)]
 pub struct BindAttribute<K, V> {
     key: K,
@@ -21,7 +13,6 @@ pub struct BindAttribute<K, V> {
 }
 
 impl<K, V> BindAttribute<K, V> {
-    /// Creates a binding of the attribute named by `key` to an expression.
     #[inline]
     pub fn new(key: K, value: Expr<V>) -> Self {
         Self { key, value }

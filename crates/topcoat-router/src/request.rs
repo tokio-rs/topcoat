@@ -1,16 +1,10 @@
-//! Reading requests: the [`FromRequest`] extractor trait and accessors for
-//! the parts of the current request, such as its [`uri`] and [`headers`].
-//!
-//! See the [`content`](crate::content) module for the typed request bodies,
-//! such as JSON and forms.
-
 use std::{
     net::{IpAddr, SocketAddr},
     sync::Arc,
 };
 
-/// Byte buffers from the [`bytes`](https://docs.rs/bytes) crate. Both work as
-/// request body extractors and as response bodies.
+/// Byte-buffer types re-exported for use as request body extractors and as
+/// response bodies.
 pub use bytes::{Bytes, BytesMut};
 use http::request::Parts;
 use topcoat_core::{
@@ -21,29 +15,31 @@ use topcoat_core::{
 
 use crate::{Body, RemoteAddr, body_limit, error::bad_request, proxy::ClientIp, to_bytes};
 
-/// An incoming HTTP request. The body is a [`Body`] unless set otherwise.
+/// An incoming HTTP request, carrying a [`Body`] by default.
 pub type Request<T = Body> = http::Request<T>;
 
 /// A type that can be built from an incoming request.
 ///
-/// A page or route handler can take one `FromRequest` value as a parameter,
-/// next to an optional `cx: &Cx`. The body is a stream that can only be read
-/// once, so a handler can have at most one `FromRequest` parameter. The
-/// built-in extractors include [`Json`](crate::content::Json),
-/// [`Form`](crate::content::Form), [`Bytes`], [`String`], and [`Body`].
-/// Implement the trait yourself for parsing the built-ins do not cover.
+/// A page or route handler may take a single `FromRequest` value as its request
+/// body parameter, optionally alongside `cx: &Cx`. The built-in extractors
+/// ([`Json`](crate::content::Json), [`Form`](crate::content::Form), [`Bytes`],
+/// [`String`], [`Body`], and more) all implement this trait; implement it
+/// yourself for request-specific parsing the built-ins don't cover.
 ///
-/// Wrap an extractor that implements [`OptionalFromRequest`] in [`Option`] to
-/// make it optional.
+/// Because the body is a stream that can only be read once, a handler may have
+/// at most one `FromRequest` parameter. This is the request-side counterpart of
+/// [`IntoResponse`](crate::response::IntoResponse).
 ///
-/// An implementation that buffers the body should read it through [`Bytes`],
-/// which enforces the request's [`body_limit`]. Reading the body by hand skips
-/// that limit unless you pass it to [`to_bytes`].
+/// An implementation that buffers the body should delegate the buffering to
+/// [`Bytes`], which enforces the request's
+/// [`body_limit`]; reading the body by hand bypasses that
+/// limit.
 ///
 /// # Examples
 ///
-/// This extractor checks the JSON body against an `x-signature` header before
-/// it deserializes it:
+/// Implement it to parse a request in a way the built-ins don't cover. Here,
+/// JSON whose body is verified against an `x-signature` header before it is
+/// deserialized:
 ///
 /// ```rust
 /// # #[derive(serde::Deserialize)]
@@ -91,31 +87,29 @@ pub type Request<T = Body> = http::Request<T>;
 pub trait FromRequest: Sized {
     /// Builds `Self` from the request context and body.
     ///
-    /// # Errors
-    ///
-    /// Returns an error, usually a [`bad_request`], when the request cannot be
-    /// parsed into `Self`. The router turns the error into the response sent
-    /// to the client.
+    /// Returns an error (typically [`bad_request`])
+    /// when the request cannot be parsed into `Self`; the error is converted
+    /// into the response sent to the client.
     fn from_request(cx: &Cx, body: Body) -> impl Future<Output = Result<Self>> + Send;
 }
 
-/// Returns the request body as is, so the handler can stream or forward it.
-/// The body limit does not apply.
+/// Yields the request body unchanged, leaving it unbuffered for the handler to
+/// read or forward itself.
 impl FromRequest for Body {
     fn from_request(_cx: &Cx, body: Body) -> impl Future<Output = Result<Self>> {
         core::future::ready(Ok(body))
     }
 }
 
-/// Reads the whole request body into memory. A body longer than the request's
-/// [`body_limit`] is rejected with `413 Content Too Large`.
+/// Buffers the entire request body into memory, rejecting a body larger than
+/// the request's [`body_limit`] with `413 Content Too Large`.
 impl FromRequest for Bytes {
     async fn from_request(cx: &Cx, body: Body) -> Result<Self> {
         to_bytes(body, body_limit(cx)).await
     }
 }
 
-/// Reads the whole request body into a mutable buffer, like [`Bytes`] does.
+/// Buffers the entire request body into a mutable buffer.
 impl FromRequest for BytesMut {
     async fn from_request(cx: &Cx, body: Body) -> Result<Self> {
         let bytes = Bytes::from_request(cx, body).await?;
@@ -123,8 +117,8 @@ impl FromRequest for BytesMut {
     }
 }
 
-/// Reads the whole request body as UTF-8 text, like [`Bytes`] does. A body that
-/// is not valid UTF-8 is rejected with `400 Bad Request`.
+/// Buffers the request body and decodes it as UTF-8, rejecting a non-UTF-8 body
+/// with `400 Bad Request`.
 impl FromRequest for String {
     async fn from_request(cx: &Cx, body: Body) -> Result<Self> {
         let bytes = Bytes::from_request(cx, body).await?;
@@ -134,24 +128,23 @@ impl FromRequest for String {
     }
 }
 
-/// An extractor that can be made optional by wrapping it in [`Option`].
+/// Customizes the behavior of `Option<Self>` as a [`FromRequest`] extractor.
 ///
-/// Implementing this trait makes `Option<Self>` a [`FromRequest`] extractor.
-/// It yields `None` when the request has no value for the extractor, for
-/// example when a body is missing. It still returns an error for a value that
-/// is present but malformed.
+/// Implementing this trait lets `Option<Self>` be extracted from a request,
+/// yielding `None` when the request carries no value for the extractor (for
+/// example, a missing body) while still surfacing an error for values that are
+/// present but malformed.
 pub trait OptionalFromRequest: Sized {
-    /// Builds `Some(Self)` from the request, or returns `None` when the request
-    /// has no value for this extractor.
+    /// Builds `Some(Self)` from the request, or `None` when the request carries
+    /// no value for this extractor.
     ///
-    /// # Errors
-    ///
-    /// Returns an error when a value is present but malformed.
+    /// Returns an error only when a value is present but malformed.
     fn from_request(cx: &Cx, body: Body) -> impl Future<Output = Result<Option<Self>>> + Send;
 }
 
-/// Makes any [`OptionalFromRequest`] extractor optional. See
-/// [`OptionalFromRequest`] for when it yields `None`.
+/// Makes any [`OptionalFromRequest`] extractor optional, yielding `None` when
+/// the request carries no value of that kind while still surfacing an error for
+/// a value that is present but malformed.
 impl<T> FromRequest for Option<T>
 where
     T: OptionalFromRequest,
@@ -163,17 +156,9 @@ where
 
 /// Returns the [`Parts`] of the current request.
 ///
-/// Use it to read several parts of the request at once. For a single part,
-/// the accessors such as [`method`], [`uri`], and [`headers`] are shorter.
-///
-/// These are the parts of the request as the router currently handles it. A
-/// [`rewrite`](crate::error::rewrite) or a layer can change them. Use
-/// [`original_parts`] for the request as the client sent it.
-///
-/// # Panics
-///
-/// Panics if the context does not belong to a request, for example outside
-/// the router.
+/// Use this when you need access to multiple components of the request at
+/// once. For individual fields, prefer the dedicated accessors
+/// ([`method`], [`uri`], [`version`], [`headers`], [`extensions`]).
 ///
 /// # Examples
 ///
@@ -196,10 +181,6 @@ pub fn parts(cx: &Cx) -> &Parts {
 ///
 /// [`Method`]: http::Method
 ///
-/// # Panics
-///
-/// Panics if the context does not belong to a request, like [`parts`].
-///
 /// # Examples
 ///
 /// ```rust
@@ -219,10 +200,6 @@ pub fn method(cx: &Cx) -> &http::Method {
 /// Returns the [`Uri`] of the current request.
 ///
 /// [`Uri`]: http::Uri
-///
-/// # Panics
-///
-/// Panics if the context does not belong to a request, like [`parts`].
 ///
 /// # Examples
 ///
@@ -244,10 +221,6 @@ pub fn uri(cx: &Cx) -> &http::Uri {
 ///
 /// [`Version`]: http::Version
 ///
-/// # Panics
-///
-/// Panics if the context does not belong to a request, like [`parts`].
-///
 /// # Examples
 ///
 /// ```rust
@@ -268,10 +241,6 @@ pub fn version(cx: &Cx) -> &http::Version {
 ///
 /// [`HeaderMap`]: http::HeaderMap
 ///
-/// # Panics
-///
-/// Panics if the context does not belong to a request, like [`parts`].
-///
 /// # Examples
 ///
 /// ```rust
@@ -291,10 +260,6 @@ pub fn headers(cx: &Cx) -> &http::HeaderMap {
 /// Returns the `Content-Type` header of the current request as a string slice,
 /// or [`None`] when it is absent or not valid UTF-8.
 ///
-/// # Panics
-///
-/// Panics if the context does not belong to a request, like [`parts`].
-///
 /// # Examples
 ///
 /// ```rust
@@ -313,14 +278,10 @@ pub fn content_type(cx: &Cx) -> Option<&str> {
 
 /// Returns the [`Extensions`] of the current request.
 ///
-/// Extensions hold typed values attached to the request, usually by the server
-/// or by middleware that runs before the handler.
+/// Extensions carry typed values attached to the request, typically by
+/// middleware running before the handler.
 ///
 /// [`Extensions`]: http::Extensions
-///
-/// # Panics
-///
-/// Panics if the context does not belong to a request, like [`parts`].
 ///
 /// # Examples
 ///
@@ -343,12 +304,11 @@ pub fn extensions(cx: &Cx) -> &http::Extensions {
 /// Returns the IP address and port of the direct connection for this request,
 /// or `None` when they are unknown.
 ///
-/// Behind a reverse proxy, this is the address of the proxy. Use [`client_ip`]
-/// to read the address of the client instead.
-///
-/// Returns `None` if the request has no [`RemoteAddr`] in its extensions, as
-/// is usual for Unix socket connections, or if the router is not handling the
-/// current request.
+/// Behind a reverse proxy, this returns the proxy's address. Use
+/// [`client_ip`] to read the client's IP address instead.
+/// Returns `None` if the request has no [`RemoteAddr`] in its extensions,
+/// as is normally the case for Unix socket connections, or if the context
+/// was not created by a router.
 ///
 /// # Examples
 ///
@@ -366,30 +326,30 @@ pub fn remote_addr(cx: &Cx) -> Option<SocketAddr> {
     parts.extensions.get::<RemoteAddr>().map(|remote| remote.0)
 }
 
-/// Returns the IP address of the client for this request, or `None` when it
-/// cannot be determined.
+/// Returns the client's IP address for this request, or `None`
+/// when it cannot be determined.
 ///
-/// By default, this is the IP address from [`remote_addr`]. Behind a reverse
-/// proxy, that is the address of the proxy. Configure
+/// By default, this returns the IP address from [`remote_addr`]. Behind a
+/// reverse proxy, that is the proxy's address. Configure
 /// [`TrustedProxies`](crate::TrustedProxies) on the router to read the
-/// address of the client from a header that the proxy sets.
+/// client's address from the proxy's header.
 ///
-/// For a header that lists several addresses, Topcoat starts with the direct
+/// For a header that lists multiple addresses, Topcoat starts with the direct
 /// connection and reads the list from right to left. It skips trusted proxies
 /// and returns the first address it does not trust. If every address is
 /// trusted, it returns the leftmost address. If the list is empty or missing,
-/// it uses the address of the direct connection.
+/// it uses the direct connection's address.
 ///
-/// Returns `None` if the address of the direct connection is unknown and not
+/// Returns `None` if the direct connection's address is unknown and it is not
 /// trusted through [`TrustedProxies::nearest`](crate::TrustedProxies::nearest),
-/// or if an address needed from the header cannot be parsed. Headers that hold
-/// a single address follow the rules in
+/// or if an address needed from the header cannot be parsed. Headers
+/// containing a single address follow the rules in
 /// [`ForwardedHeader::Single`](crate::ForwardedHeader::Single). IPv4-mapped
 /// IPv6 addresses are returned as IPv4.
 ///
-/// The router determines the address before it runs any layers, so later
-/// changes to the request headers do not change the result. Returns `None` if
-/// the router is not handling the current request.
+/// The router determines the address before running any layers. Later changes
+/// to request headers do not change this result. Returns `None` if the context
+/// was not created by a router.
 ///
 /// # Examples
 ///
@@ -419,16 +379,14 @@ pub fn client_ip(cx: &Cx) -> Option<IpAddr> {
 pub(crate) struct OriginalParts(pub(crate) Arc<Parts>);
 
 /// Returns the [`Parts`] of the request as the client sent it, before any
-/// rewrite or change made by a layer.
+/// rewrite or changes made by layers.
 ///
 /// A handler reached through a [`rewrite`](crate::error::rewrite) sees the
-/// rewritten request in [`parts`], which can have a different URI and method.
-/// This function returns the parts the request arrived with. Layers can also
-/// change the current parts without a rewrite. For example,
-/// [`StripPrefixLayer`](crate::StripPrefixLayer) changes the current URI but
-/// not the original one.
-///
-/// Outside the router, this is the same as [`parts`].
+/// rewritten request in [`parts`], which may differ in its URI and method;
+/// this accessor returns the parts the request arrived with. Layers can
+/// also change the current parts without a rewrite. For example,
+/// [`StripPrefixLayer`](crate::StripPrefixLayer) changes the current URI
+/// while leaving the original URI intact.
 ///
 /// # Examples
 ///
@@ -449,12 +407,12 @@ pub fn original_parts(cx: &Cx) -> &Parts {
     }
 }
 
-/// Returns the HTTP [`Method`] of the request as the client sent it, before
+/// Returns the HTTP [`Method`] the client actually requested with, before
 /// any rewrite.
 ///
-/// A rewrite can change the method of the request. This function returns the
-/// method the request arrived with. For a request that was never rewritten,
-/// it is the same as [`method`].
+/// A rewrite may dispatch the request with another method; this accessor
+/// returns the one the request arrived with. For a request that was never
+/// rewritten it is the same as [`method`].
 ///
 /// [`Method`]: http::Method
 ///
@@ -474,15 +432,13 @@ pub fn original_method(cx: &Cx) -> &http::Method {
     &original_parts(cx).method
 }
 
-/// Returns the [`Uri`] of the request as the client sent it, before any
-/// rewrite or change made by a layer.
+/// Returns the [`Uri`] the client actually requested, before any rewrite.
 ///
 /// A handler reached through a [`rewrite`](crate::error::rewrite) sees the
-/// rewritten URI in [`uri`]. This function returns the URI the request
-/// arrived with, which is the URL the browser shows. Use it, for example, to
-/// render a form that posts back to that URL. Layers such as
-/// [`StripPrefixLayer`](crate::StripPrefixLayer) can also change the current
-/// URI without changing the original one.
+/// rewritten URI in [`uri`]; this accessor returns the URI the request
+/// arrived with, for example to render a form that posts back to the visible
+/// URL. Layers such as [`StripPrefixLayer`](crate::StripPrefixLayer) can
+/// also change the current URI without changing this original URI.
 ///
 /// [`Uri`]: http::Uri
 ///
@@ -502,10 +458,11 @@ pub fn original_uri(cx: &Cx) -> &http::Uri {
     &original_parts(cx).uri
 }
 
-/// Returns the HTTP [`Version`] of the request as the client sent it.
+/// Returns the HTTP [`Version`] of the request as the client sent it, before
+/// any rewrite.
 ///
-/// See [`original_parts`] for how the current request can differ from the
-/// one that arrived.
+/// See [`original_parts`] for how a rewritten request differs from the one
+/// that arrived.
 ///
 /// [`Version`]: http::Version
 #[inline]
@@ -515,10 +472,11 @@ pub fn original_version(cx: &Cx) -> &http::Version {
     &original_parts(cx).version
 }
 
-/// Returns the [`HeaderMap`] of the request as the client sent it.
+/// Returns the [`HeaderMap`] of the request as the client sent it, before
+/// any rewrite.
 ///
-/// See [`original_parts`] for how the current request can differ from the
-/// one that arrived.
+/// See [`original_parts`] for how a rewritten request differs from the one
+/// that arrived.
 ///
 /// [`HeaderMap`]: http::HeaderMap
 #[inline]
@@ -528,11 +486,12 @@ pub fn original_headers(cx: &Cx) -> &http::HeaderMap {
     &original_parts(cx).headers
 }
 
-/// Returns the `Content-Type` header of the request as the client sent it, or
-/// [`None`] when it is absent or not valid UTF-8.
+/// Returns the `Content-Type` header of the request as the client sent it,
+/// before any rewrite, as a string slice, or [`None`] when it is absent or
+/// not valid UTF-8.
 ///
-/// See [`original_parts`] for how the current request can differ from the
-/// one that arrived.
+/// See [`original_parts`] for how a rewritten request differs from the one
+/// that arrived.
 #[inline]
 #[must_use]
 #[track_caller]
@@ -543,10 +502,11 @@ pub fn original_content_type(cx: &Cx) -> Option<&str> {
         .ok()
 }
 
-/// Returns the [`Extensions`] of the request as the client sent it.
+/// Returns the [`Extensions`] of the request as the client sent it, before
+/// any rewrite.
 ///
-/// See [`original_parts`] for how the current request can differ from the
-/// one that arrived.
+/// See [`original_parts`] for how a rewritten request differs from the one
+/// that arrived.
 ///
 /// [`Extensions`]: http::Extensions
 #[inline]
@@ -556,22 +516,20 @@ pub fn original_extensions(cx: &Cx) -> &http::Extensions {
     &original_parts(cx).extensions
 }
 
-/// The name of the request header that holds the starting identity of a
-/// request. See [`initial_identity`].
+/// The header naming the identity the router installs on a request's context.
 pub const IDENTITY_HEADER: &str = "x-topcoat-identity";
 
-/// Returns the identity that rendering starts at for the current request.
+/// Returns the identity the current request's build starts at.
 ///
-/// When a client renders part of a page again, it sends the identity of that
-/// part in the [`IDENTITY_HEADER`]. The server then derives the same
-/// identities inside that part as in the page the client already has. A
-/// request without the header starts at [`Identity::ROOT`], like a page
-/// request.
+/// A client re-running part of a page names the identity of that part in
+/// the [`IDENTITY_HEADER`], so the server derives the same identities inside
+/// it as the render the client holds. A request without the header starts at
+/// [`Identity::ROOT`], like a page request.
 ///
 /// # Errors
 ///
-/// Returns a `400 Bad Request` error if the header is present but does not
-/// hold a valid identity.
+/// Errors with a `400 Bad Request` if the header is present but not an
+/// identity.
 ///
 /// # Examples
 ///

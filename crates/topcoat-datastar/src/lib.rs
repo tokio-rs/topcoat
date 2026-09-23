@@ -1,19 +1,21 @@
 //! [Datastar](https://data-star.dev) support for Topcoat.
 //!
-//! In Datastar, `data-*` attributes bind signals in the browser, actions like
-//! `@get` and `@post` call the server, and the server answers with events that
-//! patch elements and signals into the page. This crate is the server side:
+//! Datastar drives page updates from the backend: `data-*` attributes bind
+//! reactive signals in the browser, actions like `@get` and `@post` call the
+//! server, and the server answers with events that patch elements and signals
+//! into the page. This crate provides the backend half, built on Topcoat's
+//! request context, response conventions, and server-sent events:
 //!
-//! - [`Signals`] extracts the signals that a Datastar action sends with a request, and
-//!   [`datastar_request`] checks whether a request came from Datastar.
-//! - [`PatchElements`], [`PatchSignals`], and [`ExecuteScript`] are the events that Datastar
-//!   applies. Each converts into a server-sent [`Event`](topcoat_router::content::sse::Event) for
-//!   an [`Sse`](topcoat_router::content::sse::Sse) stream. Returned from a handler on its own, each
-//!   responds with a stream of just that event.
-//! - Types like [`DatastarSelector`] and [`DatastarMode`] implement
-//!   [`IntoResponseParts`](topcoat_router::response::IntoResponseParts). They set the headers that
-//!   control how Datastar applies a plain `text/html`, `application/json`, or `text/javascript`
-//!   response.
+//! - **Signal reading**: [`Signals`] extracts the signals a Datastar action sends with every
+//!   request, and [`datastar_request`] detects those requests from a `cx: &Cx`.
+//! - **Events**: [`PatchElements`], [`PatchSignals`], and [`ExecuteScript`] build the events
+//!   Datastar consumes. Each converts into a server-sent
+//!   [`Event`](topcoat_router::content::sse::Event) for streaming over an
+//!   [`Sse`](topcoat_router::content::sse::Sse) response, and returned on its own from a handler it
+//!   becomes a single-event stream.
+//! - **Responders** ([`DatastarSelector`], [`DatastarMode`], ...) implement
+//!   [`IntoResponseParts`](topcoat_router::response::IntoResponseParts) to set the headers Datastar
+//!   reads on plain `text/html`, `application/json`, and `text/javascript` responses.
 //!
 //! The raw header names are available as constants in the [`header`] module.
 

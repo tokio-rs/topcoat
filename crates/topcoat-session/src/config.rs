@@ -4,20 +4,19 @@ use topcoat_core::context::{Cx, app_context};
 
 use crate::TokenStore;
 
-/// Session configuration: the [`TokenStore`] and the session lifetime.
+/// Session configuration, registered on the app context (with the router's
+/// `sessions` extension method).
 ///
-/// Build one with [`SessionConfig::builder`]. With the `cookie` feature,
-/// `SessionConfig::default()` returns the default configuration, which
-/// carries the token in a [`CookieTokenStore`](crate::cookie::CookieTokenStore).
-/// Register it on the router with `.sessions(config)`.
+/// Assemble one with [`SessionConfig::builder`]; `SessionConfig::default()` is the
+/// all-defaults configuration, carrying the token in the default cookie
+/// store.
 pub struct SessionConfig {
     pub(crate) token_store: Box<dyn TokenStore>,
     pub(crate) lifetime: Duration,
 }
 
-/// The default session lifetime: 30 days.
-///
-/// Change it with [`SessionConfigBuilder::lifetime`].
+/// How long a session lives without being refreshed, unless overridden with
+/// [`SessionConfigBuilder::lifetime`]: 30 days.
 pub const DEFAULT_LIFETIME: Duration = Duration::from_hours(24 * 30);
 
 impl SessionConfig {
@@ -28,8 +27,8 @@ impl SessionConfig {
     }
 }
 
-/// Returns the default configuration, the same as calling
-/// [`build`](SessionConfigBuilder::build) on a new [`SessionConfig::builder`].
+/// Builds the all-defaults configuration, like [`SessionConfig::builder`] with an
+/// immediate [`build`](SessionConfigBuilder::build).
 #[cfg(feature = "cookie")]
 impl Default for SessionConfig {
     fn default() -> Self {
@@ -37,14 +36,14 @@ impl Default for SessionConfig {
     }
 }
 
-/// Builder for a [`SessionConfig`], created with [`SessionConfig::builder`].
+/// Assembles a [`SessionConfig`]. Created with [`SessionConfig::builder`].
 pub struct SessionConfigBuilder {
     token_store: Option<Box<dyn TokenStore>>,
     lifetime: Duration,
 }
 
 impl SessionConfigBuilder {
-    /// Sets the [`TokenStore`] that carries the session token between the
+    /// Overrides the [`TokenStore`] carrying the session token between the
     /// client and the server.
     #[must_use]
     pub fn token_store(mut self, token_store: impl TokenStore + 'static) -> Self {
@@ -52,28 +51,23 @@ impl SessionConfigBuilder {
         self
     }
 
-    /// Sets how long a session lives without being refreshed. Defaults to
-    /// [`DEFAULT_LIFETIME`].
+    /// Overrides how long a session lives without being refreshed.
     ///
-    /// The lifetime is the time to live of every token sent to the client, and
-    /// the `expires_at` returned by [`start`](crate::start),
-    /// [`refresh`](crate::refresh), and [`rotate`](crate::rotate) is the
-    /// current time plus the lifetime.
+    /// The lifetime becomes the time to live of every issued token, and
+    /// [`start`](crate::start), [`refresh`](crate::refresh), and
+    /// [`rotate`](crate::rotate) derive the session's `expires_at` from it.
     #[must_use]
     pub fn lifetime(mut self, lifetime: Duration) -> Self {
         self.lifetime = lifetime;
         self
     }
 
-    /// Returns the finished [`SessionConfig`].
-    ///
-    /// Uses a [`CookieTokenStore`](crate::cookie::CookieTokenStore) when no
-    /// token store was set.
+    /// Consumes the builder, returning the finished [`SessionConfig`].
     ///
     /// # Panics
     ///
-    /// Panics when no token store was set and the `cookie` feature, which
-    /// provides the default cookie store, is disabled.
+    /// Panics when no token store was set and the default cookie store is
+    /// unavailable because the `cookie` feature is disabled.
     #[must_use]
     #[track_caller]
     pub fn build(self) -> SessionConfig {

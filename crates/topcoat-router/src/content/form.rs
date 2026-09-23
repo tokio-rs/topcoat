@@ -17,19 +17,15 @@ use crate::{
 /// `application/x-www-form-urlencoded` request extractor and response wrapper.
 ///
 /// As a [`FromRequest`] extractor, `Form<T>` deserializes URL-encoded form data
-/// into `T`. For `GET` and `HEAD` requests it reads the query string of the
-/// URI. For other methods it reads the request body and requires a
-/// `Content-Type: application/x-www-form-urlencoded` header. An empty value,
-/// as a browser sends for a blank input, deserializes to `None` for an
-/// `Option<T>` field.
+/// into `T`. For `GET` and `HEAD` requests it reads the URI query string; for
+/// other methods it reads the request body and requires a
+/// `Content-Type: application/x-www-form-urlencoded` header. As an
+/// [`IntoResponse`] wrapper, it serializes `T` back to a URL-encoded body and
+/// sets the response `Content-Type`.
 ///
-/// As an [`IntoResponse`] wrapper, `Form<T>` serializes `T` to a URL-encoded
-/// body and replies with `Content-Type: application/x-www-form-urlencoded`.
-///
-/// Wrap it in [`Option`] to make the form optional. For `GET` and `HEAD`
-/// requests the extractor then yields [`None`] when the URI has no query
-/// string. For other methods it yields [`None`] when the request has no
-/// `Content-Type` header.
+/// Wrap it in [`Option`] to make the body optional. For `GET` and `HEAD`
+/// requests the extractor yields [`None`] only when there is no query string;
+/// for other methods it yields [`None`] when there is no `Content-Type` header.
 ///
 /// # Examples
 ///
@@ -114,12 +110,14 @@ where
 {
     /// Deserializes URL-encoded form bytes into `Form<T>`.
     ///
-    /// Unlike the [`FromRequest`] extractor, this does not check the request
-    /// method or `Content-Type` header. It parses `bytes` directly.
+    /// Unlike the [`FromRequest`] extractor, this does not inspect the request
+    /// method or `Content-Type`; it parses `bytes` directly.
     ///
     /// # Errors
     ///
-    /// Returns a bad request error when `bytes` do not deserialize into `T`.
+    /// Returns a bad-request error when `bytes` are not valid URL-encoded form
+    /// data matching `T`. An empty value, as a browser sends for a blank input,
+    /// deserializes to `None` for an `Option<T>` field.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         let deserializer = crate::urlencoded::Deserializer::new(form_urlencoded::parse(bytes));
         let value = serde_path_to_error::deserialize(deserializer).map_err(|error| {
@@ -152,10 +150,10 @@ where
 /// Extractor for the raw bytes of an `application/x-www-form-urlencoded`
 /// request.
 ///
-/// For `GET` and `HEAD` requests it yields the query string of the URI, or
-/// empty bytes when there is none. For other methods it yields the request
-/// body and requires a `Content-Type: application/x-www-form-urlencoded`
-/// header. Unlike [`Form`], it does not deserialize the bytes.
+/// For `GET` and `HEAD` requests it yields the raw query string; for other
+/// methods it yields the raw request body and requires a
+/// `Content-Type: application/x-www-form-urlencoded` header. Unlike [`Form`],
+/// the bytes are returned without deserialization.
 #[derive(Debug, Clone, Default)]
 #[must_use]
 pub struct RawForm(pub Bytes);

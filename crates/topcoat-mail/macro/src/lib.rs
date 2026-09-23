@@ -1,5 +1,3 @@
-//! The `mail!` macro for Topcoat. Use it through `topcoat::mail::mail`.
-
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 use proc_macro::TokenStream;

@@ -5,19 +5,18 @@ use syn::{
 };
 use topcoat_view_grammar::view::View;
 
-/// The value of a [`MailField`](super::MailField). Its form depends on the
-/// field name.
+/// The value of a [`MailField`](super::MailField), shaped by the field's
+/// name.
 pub enum FieldValue {
     /// A braced `view!` body: the value of the `html` field.
     Html(HtmlValue),
-    /// An expression: the value of every other field, and of an `html`
-    /// field without braces.
+    /// An expression: every other value.
     Expr(Box<Expr>),
 }
 
 impl FieldValue {
-    /// Parses the value of the field named `name`: a braced `view!` body for
-    /// `html`, and an expression otherwise.
+    /// Parses the value shape the field named `name` expects: a braced
+    /// `view!` body for `html`, and a single expression otherwise.
     ///
     /// # Errors
     ///
@@ -31,12 +30,10 @@ impl FieldValue {
     }
 }
 
-/// A braced `view!` body, including the optional leading `cx =>` that names
-/// the request context.
+/// A braced `view!` body, including the optional leading `cx =>` argument
+/// that names the request context dynamic parts render against.
 pub struct HtmlValue {
-    /// The braces around the body.
     pub brace_token: Brace,
-    /// The `view!` body inside the braces.
     pub view: View,
 }
 

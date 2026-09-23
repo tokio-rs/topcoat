@@ -12,15 +12,14 @@ use crate::common;
 /// A `datastar-patch-signals` event that patches signals into the browser's
 /// signal store.
 ///
-/// The payload is a JSON object that is merged into the existing signals. A
-/// signal set to `null` is removed. [`json`](Self::json) serializes the
-/// payload from any [`Serialize`] value, and [`new`](Self::new) takes a string
-/// that already holds JSON.
+/// The payload is a JSON object merged into the existing signals; a signal set
+/// to `null` is removed. [`json`](Self::json) serializes the payload from any
+/// [`Serialize`] value, and [`new`](Self::new) takes an already encoded
+/// string.
 ///
-/// It converts into an [`Event`] with [`Into`] for sending over an
-/// [`Sse`](topcoat_router::content::sse::Sse) stream. When a handler returns
-/// it on its own, the response is a stream that sends this one event and then
-/// ends.
+/// The event converts [`Into<Event>`](Event) for sending over an
+/// [`Sse`](topcoat_router::content::sse::Sse) stream. Returned from a handler
+/// on its own, it responds as a stream that sends this one event and ends.
 ///
 /// # Examples
 ///
@@ -49,7 +48,7 @@ pub struct PatchSignals {
 }
 
 impl PatchSignals {
-    /// Creates a patch from a string that holds a JSON object of `signals`.
+    /// Creates a patch from an already JSON-encoded `signals` object.
     pub fn new(signals: impl Into<String>) -> Self {
         Self {
             signals: signals.into(),
@@ -71,23 +70,21 @@ impl PatchSignals {
         Ok(Self::new(serde_json::to_string(signals)?))
     }
 
-    /// Sets whether the patch only sets signals that do not exist yet, leaving
-    /// existing values as they are.
-    ///
-    /// Defaults to `false`.
+    /// Only patches signals that do not exist yet, leaving present values
+    /// untouched.
     pub fn only_if_missing(mut self, only_if_missing: bool) -> Self {
         self.only_if_missing = only_if_missing;
         self
     }
 
-    /// Sets the event `id`. The browser sends the last `id` it received in the
-    /// `Last-Event-ID` header when it reconnects to a lost stream.
+    /// Sets the event `id`, echoed back in `Last-Event-ID` when a lost stream
+    /// reconnects.
     pub fn id(mut self, id: impl Into<String>) -> Self {
         self.id = Some(id.into());
         self
     }
 
-    /// Sets how long the browser waits before it reconnects to a lost stream.
+    /// Sets the reconnection time the browser waits after losing the stream.
     pub fn retry(mut self, retry: Duration) -> Self {
         self.retry = Some(retry);
         self

@@ -16,11 +16,11 @@ use tokio::sync::watch;
 
 use crate::{Body, Listener, RemoteAddr, Router, request::Request, response::Response};
 
-/// A [`Router`] together with the settings used to serve it.
+/// A [`Router`] together with the configuration it is served with.
 ///
 /// The serve functions accept any `impl Into<RouterService>`, so passing a
-/// [`Router`] serves it with the default settings. Create a service yourself
-/// to change them, like the graceful shutdown timeout:
+/// [`Router`] serves it with the defaults. Construct the service explicitly
+/// to change how the router is served, like the graceful shutdown timeout:
 ///
 /// ```
 /// use std::time::Duration;
@@ -31,9 +31,9 @@ use crate::{Body, Listener, RemoteAddr, Router, request::Request, response::Resp
 ///     RouterService::new(Router::builder().build()).shutdown_timeout(Duration::from_secs(5));
 /// ```
 ///
-/// The service is cheap to clone, since it shares the [`Router`]. Each
-/// request it serves over a connection carries the connection's
-/// [`RemoteAddr`].
+/// The wrapped [`Router`] is shared behind an [`Arc`], so the service is cheap
+/// to clone. The serve functions derive a clone for each accepted connection
+/// that stamps the connection's [`RemoteAddr`] on every request it serves.
 #[derive(Clone)]
 pub struct RouterService {
     router: Arc<Router>,
@@ -44,7 +44,7 @@ pub struct RouterService {
 }
 
 impl RouterService {
-    /// Creates a service that serves `router` with the default settings.
+    /// Wraps `router` in a cloneable service with the default configuration.
     #[must_use]
     pub fn new(router: Router) -> Self {
         /// How long in-flight requests get to finish by default.
@@ -65,13 +65,13 @@ impl RouterService {
         }
     }
 
-    /// Sets how long running requests may take to finish during a graceful
+    /// Sets how long in-flight requests get to finish during a graceful
     /// shutdown before their connections are closed.
     ///
     /// After the shutdown signal, the server stops accepting connections and
-    /// waits up to this long for open connections to finish their current
-    /// request. The default is 30 seconds. [`Duration::ZERO`] closes all
-    /// connections right away.
+    /// waits up to this long for open connections to complete their current
+    /// request. The default is 30 seconds; [`Duration::ZERO`] closes all
+    /// connections immediately.
     #[must_use]
     pub fn shutdown_timeout(mut self, timeout: Duration) -> Self {
         self.shutdown_timeout = timeout;
@@ -99,21 +99,21 @@ impl Service<Request<Incoming>> for RouterService {
     }
 }
 
-/// Serves a [`RouterService`] on a bound [`Listener`] until `shutdown`
-/// completes.
+/// Serves a [`RouterService`] on an already-bound [`Listener`] until
+/// `shutdown` completes.
 ///
-/// It accepts connections in a loop and serves each one on its own task.
-/// When `shutdown` completes, it stops listening and gives every open
-/// connection up to the service's
-/// [shutdown timeout](RouterService::shutdown_timeout) to finish its current
-/// request before it returns. Applications usually call `topcoat::serve` or
-/// `topcoat::start` instead, which add a default shutdown signal and work
-/// with the `topcoat dev` server.
+/// This is the low-level accept loop, with no dev-server integration: it
+/// accepts connections in a loop, serving each on its own task. When the
+/// `shutdown` future completes, the listener is dropped and every open
+/// connection finishes its in-flight request (up to the service's shutdown
+/// timeout) before the call returns. Applications typically use the facade's
+/// `serve`/`start` helpers, which layer a default shutdown signal and
+/// dev-server readiness notification on top of this.
 ///
 /// # Errors
 ///
-/// Returns an I/O error if accepting a connection fails. Connections that are
-/// already open keep running on their tasks.
+/// Returns an I/O error if accepting a connection fails. Connections already
+/// being served are left running on their tasks.
 pub async fn internal_serve(
     mut listener: impl Listener,
     service: RouterService,

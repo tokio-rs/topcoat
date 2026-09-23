@@ -36,12 +36,6 @@ pub(crate) struct ClientIp(pub(crate) Option<IpAddr>);
 /// with the address it received the request from. If it passes along a
 /// client's header unchanged, the client can fake its IP address.
 ///
-/// Topcoat reads the addresses in the header starting from the proxy closest
-/// to the application, skips every trusted proxy, and uses the first address
-/// that is not trusted. If every address is trusted, it uses the farthest
-/// one. If an entry it needs to check is not a valid address, there is no
-/// client address.
-///
 /// # Examples
 ///
 /// Trust proxies on a private network:
@@ -328,9 +322,10 @@ impl ForwardedHeader {
 
 /// A value that can be passed to [`TrustedProxies::networks`].
 ///
-/// A string holds a network in CIDR notation, like `"10.0.0.0/8"`, or a
-/// single IP address, like `"10.0.0.1"`. An IP address becomes a network
-/// that contains only that address. Network values are used as they are.
+/// Strings can contain a network in CIDR notation (`"10.0.0.0/8"`) or a
+/// single IP address (`"10.0.0.1"`). Invalid strings cause a panic. An IP
+/// address becomes a network containing only that address. Network values
+/// are used as they are.
 pub trait IntoIpNet {
     /// Converts the value into a network.
     ///
@@ -382,8 +377,8 @@ impl IntoIpNet for IpAddr {
     }
 }
 
-/// A reference to any accepted value, so a stored list can be passed without
-/// giving it up.
+/// A reference to any accepted value, so a stored list can be passed by
+/// reference.
 impl<T> IntoIpNet for &T
 where
     T: IntoIpNet + Clone,

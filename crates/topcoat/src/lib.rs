@@ -11,10 +11,6 @@ mod serve;
 
 pub use topcoat_core::error::Error;
 
-/// A [`Result`](std::result::Result) whose error type defaults to [`Error`].
-///
-/// Pages, layouts, components, and routes return this type, so `?` works on
-/// any error that converts into [`Error`].
 pub type Result<T, E = topcoat_core::error::Error> = topcoat_core::error::Result<T, E>;
 
 #[cfg(feature = "alpine-ajax")]

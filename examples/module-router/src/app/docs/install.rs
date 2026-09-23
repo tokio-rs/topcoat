@@ -4,8 +4,7 @@ use topcoat::{
     view::{View, view},
 };
 
-// Each child module appends its kebab-cased name as a segment:
-// docs/install.rs -> /docs/install.
+// Child modules append their segment: docs/install.rs -> /docs/install.
 #[page]
 pub async fn page() -> Result<impl View> {
     Ok(view! {

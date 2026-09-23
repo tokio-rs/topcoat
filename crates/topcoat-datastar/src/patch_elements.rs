@@ -10,14 +10,13 @@ use crate::{ElementPatchMode, common};
 
 /// A `datastar-patch-elements` event that patches HTML elements into the DOM.
 ///
-/// By default, Datastar morphs each element into the existing element with the
-/// same `id`. Call [`selector`](Self::selector) to target other elements, and
-/// [`mode`](Self::mode) to change how the elements are applied.
+/// By default the elements are morphed into the existing DOM, matched by their
+/// `id` attribute. A [`selector`](Self::selector) targets other elements, and
+/// a [`mode`](Self::mode) changes how they are applied.
 ///
-/// It converts into an [`Event`] with [`Into`] for sending over an
-/// [`Sse`](topcoat_router::content::sse::Sse) stream. When a handler returns
-/// it on its own, the response is a stream that sends this one event and then
-/// ends.
+/// The event converts [`Into<Event>`](Event) for sending over an
+/// [`Sse`](topcoat_router::content::sse::Sse) stream. Returned from a handler
+/// on its own, it responds as a stream that sends this one event and ends.
 ///
 /// # Examples
 ///
@@ -41,9 +40,6 @@ pub struct PatchElements {
 
 impl PatchElements {
     /// Creates a patch that applies the given HTML `elements`.
-    ///
-    /// Without a [`selector`](Self::selector), each top-level element needs an
-    /// `id` so Datastar can find the element to patch.
     pub fn new(elements: impl Into<String>) -> Self {
         Self {
             elements: Some(elements.into()),
@@ -76,8 +72,8 @@ impl PatchElements {
         }
     }
 
-    /// Targets the elements matching this CSS selector, instead of matching
-    /// by `id`.
+    /// Targets the elements matching this CSS selector instead of matching by
+    /// `id`.
     ///
     /// # Panics
     ///
@@ -96,22 +92,20 @@ impl PatchElements {
         self
     }
 
-    /// Sets whether the elements are patched in using the View Transition API.
-    ///
-    /// Defaults to `false`.
+    /// Patches the elements using the View Transition API.
     pub fn use_view_transition(mut self, use_view_transition: bool) -> Self {
         self.use_view_transition = use_view_transition;
         self
     }
 
-    /// Sets the event `id`. The browser sends the last `id` it received in the
-    /// `Last-Event-ID` header when it reconnects to a lost stream.
+    /// Sets the event `id`, echoed back in `Last-Event-ID` when a lost stream
+    /// reconnects.
     pub fn id(mut self, id: impl Into<String>) -> Self {
         self.id = Some(id.into());
         self
     }
 
-    /// Sets how long the browser waits before it reconnects to a lost stream.
+    /// Sets the reconnection time the browser waits after losing the stream.
     pub fn retry(mut self, retry: Duration) -> Self {
         self.retry = Some(retry);
         self
