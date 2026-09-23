@@ -69,7 +69,7 @@ export function hydrate(value: DehydratedSurrogate, cx: Context): unknown {
 				case "Signal":
 					return cx.signal(value.id);
 				case "Procedure":
-					return new Procedure(cx, value.id);
+					return new Procedure(cx, value.path);
 				default:
 					throw new Error(
 						`Unknown surrogate type: ${(value as { t: unknown }).t}`,

@@ -38,4 +38,4 @@ export type DehydratedSurrogate =
 	| { t: "Result"; ok: DehydratedSurrogate }
 	| { t: "Result"; err: DehydratedSurrogate }
 	| { t: "Signal"; id: SignalId; v?: DehydratedSurrogate }
-	| { t: "Procedure"; id: string };
+	| { t: "Procedure"; path: string };

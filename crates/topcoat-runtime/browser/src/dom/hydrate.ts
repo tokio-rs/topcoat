@@ -123,7 +123,7 @@ function processMarker(
 			const shard = new ShardUnit(
 				current,
 				current.runtime,
-				marker.shard,
+				marker.path,
 				marker.identity,
 				marker.exprs,
 				node,

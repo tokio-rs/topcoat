@@ -11,7 +11,10 @@ afterEach(() => vi.unstubAllGlobals());
 it("sends argument arrays for empty, unit, and multiple arguments", async () => {
 	const fetch = vi.fn(async () => new Response("true"));
 	vi.stubGlobal("fetch", fetch);
-	const procedure = new Procedure(new Context(new SignalRegistry()), "example");
+	const procedure = new Procedure(
+		new Context(new SignalRegistry()),
+		"/api/example",
+	);
 
 	for (const [args, body] of [
 		[[], "[]"],
@@ -20,7 +23,7 @@ it("sends argument arrays for empty, unit, and multiple arguments", async () => 
 	] as const) {
 		await procedure.call(...args);
 		expect(fetch).toHaveBeenLastCalledWith(
-			"/_topcoat/runtime/procedures/example",
+			"/api/example",
 			expect.objectContaining({ method: "POST", body }),
 		);
 	}

@@ -3482,7 +3482,6 @@ dependencies = [
 name = "topcoat-runtime"
 version = "0.8.1"
 dependencies = [
- "inventory",
  "ref-cast",
  "serde",
  "serde_json",
@@ -3510,14 +3509,15 @@ dependencies = [
 name = "topcoat-runtime-grammar"
 version = "0.8.1"
 dependencies = [
+ "getrandom 0.4.2",
  "proc-macro2",
  "quote",
  "serde",
  "serde_json",
  "syn 3.0.6",
  "topcoat-core-grammar",
+ "topcoat-router",
  "topcoat-runtime",
- "uuid",
 ]
 
 [[package]]
@@ -3526,6 +3526,7 @@ version = "0.8.1"
 dependencies = [
  "http",
  "quote",
+ "serde_json",
  "syn 3.0.6",
  "tokio",
  "topcoat",

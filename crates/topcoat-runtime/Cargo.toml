@@ -11,7 +11,6 @@ categories.workspace = true
 rust-version.workspace = true
 
 [features]
-discover = ["dep:inventory"]
 router = [
 	"dep:topcoat-router",
 ]
@@ -22,7 +21,6 @@ topcoat-core.workspace = true
 topcoat-router = { workspace = true, optional = true }
 topcoat-view.workspace = true
 
-inventory = { workspace = true, optional = true }
 ref-cast.workspace = true
 serde.workspace = true
 serde_json.workspace = true

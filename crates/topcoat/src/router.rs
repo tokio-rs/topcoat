@@ -26,12 +26,6 @@ impl RouterBuilderDiscoverExt for RouterBuilder {
             use topcoat_font::RouterBuilderFontExt;
             self = self.discover_fonts();
         }
-        #[cfg(feature = "runtime")]
-        {
-            use topcoat_runtime::{RouterBuilderProcedureExt, RouterBuilderShardExt};
-            self = self.discover_procedures();
-            self = self.discover_shards();
-        }
         self
     }
 }

@@ -34,14 +34,17 @@ it("serializes a signal's nested value while keeping its identity", () => {
 it("sends recursively serialized procedure arguments when the future is awaited", async () => {
 	const fetch = vi.fn(async () => new Response("null"));
 	vi.stubGlobal("fetch", fetch);
-	const procedure = new Procedure(new Context(new SignalRegistry()), "save");
+	const procedure = new Procedure(
+		new Context(new SignalRegistry()),
+		"/api/save",
+	);
 	const pending = procedure.call(Option.some(new F64(4)));
 	expect(fetch).not.toHaveBeenCalled();
 
 	await pending;
 
 	expect(fetch).toHaveBeenCalledWith(
-		"/_topcoat/runtime/procedures/save",
+		"/api/save",
 		expect.objectContaining({
 			body: JSON.stringify([{ t: "Option", v: 4 }]),
 		}),

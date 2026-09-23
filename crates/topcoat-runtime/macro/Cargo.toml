@@ -28,6 +28,7 @@ syn = { workspace = true, features = ["full"] }
 topcoat = { workspace = true, features = ["asset", "router", "runtime", "view"] }
 
 http.workspace = true
+serde_json.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [lints]

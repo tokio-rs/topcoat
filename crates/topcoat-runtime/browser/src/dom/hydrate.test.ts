@@ -85,8 +85,8 @@ it("updates bindings and text after events, then stops both on disposal", async 
 it("a page replacement releases nested shards and adopts surviving signals", async () => {
 	document.body.innerHTML = `
 		<!--::topcoat::signal({"t":"signal","id":"a","v":1})-->
-		<!--::topcoat::shard::start("1", "0", [])-->
-			<!--::topcoat::shard::start("2", "1", [])-->
+		<!--::topcoat::shard::start("/shards/1", "0", [])-->
+			<!--::topcoat::shard::start("/shards/2", "1", [])-->
 				<!--::topcoat::signal({"t":"signal","id":"b","v":0})-->
 				<!--::topcoat::dep("b")-->
 			<!--::topcoat::shard::end("1")-->

@@ -7,7 +7,7 @@ import type { Scope } from "../scope";
 import type { SignalId } from "../signal-registry";
 import { F64 } from "../surrogate";
 import { RUNTIME_HEADER } from "./request";
-import { SHARD_ROUTE_PREFIX, ShardUnit } from "./shard";
+import { ShardUnit } from "./shard";
 import { RenderUnit } from "./unit";
 
 const originalFetch = globalThis.fetch;
@@ -54,14 +54,14 @@ function refetch(unit: RenderUnit): () => Promise<void> {
  * hydrates its content and starts watching its inputs.
  */
 function mountShard(content: string) {
-	document.body.innerHTML = `<p>outside</p><!--::topcoat::shard::start("1", "0", [])-->${content}<!--::topcoat::shard::end("0")-->`;
+	document.body.innerHTML = `<p>outside</p><!--::topcoat::shard::start("/shards/1", "0", [])-->${content}<!--::topcoat::shard::end("0")-->`;
 	const runtime = new Runtime();
 	const start = document.body.childNodes[1] as Comment;
 	const end = document.body.lastChild as Comment;
 	const shard = new ShardUnit(
 		runtime.page.contentScope,
 		runtime,
-		"1",
+		"/shards/1",
 		"0",
 		[],
 		start,
@@ -80,7 +80,7 @@ it("a shard sends the identity in a header and the arguments and signal values i
 
 	await fetchAndReplace().catch(() => undefined);
 
-	expect(stub.url()).toBe(`${SHARD_ROUTE_PREFIX}/1`);
+	expect(stub.url()).toBe("/shards/1");
 	const headers = stub.request()?.headers as Record<string, string>;
 	expect(headers["X-Topcoat-Identity"]).toBe("0");
 	expect(JSON.parse(stub.request()?.body as string)).toEqual({

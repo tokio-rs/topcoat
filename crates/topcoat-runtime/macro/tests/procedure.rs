@@ -1,12 +1,17 @@
 use topcoat::{
     Result,
     router::{Body, Route, Router, response::Response, to_bytes},
-    runtime::{Procedure, ProcedureRoute, procedure},
+    runtime::{Surrogated, procedure},
 };
 
 #[procedure]
 async fn without_arguments() -> Result<bool> {
     Ok(true)
+}
+
+#[procedure("/api/double")]
+async fn at_path(value: f64) -> Result<f64> {
+    Ok(value * 2.0)
 }
 
 #[procedure]
@@ -19,22 +24,50 @@ async fn with_arguments(enabled: bool, label: String) -> Result<String> {
     Ok(if enabled { label } else { String::new() })
 }
 
-async fn call(procedure: &'static dyn Procedure, body: &'static str) -> Response {
-    let route = ProcedureRoute::new(procedure);
+async fn call(procedure: &'static dyn Route, body: &'static str) -> Response {
     let request = http::Request::builder()
         .method("POST")
-        .uri(route.path().as_str())
+        .uri(procedure.path().as_str())
         .header("content-type", "application/json")
         .body(Body::from(body))
         .unwrap();
-    Router::builder().route(route).build().handle(request).await
+    Router::builder()
+        .route(procedure)
+        .build()
+        .handle(request)
+        .await
+}
+
+#[tokio::test]
+async fn a_procedure_without_a_path_is_served_below_the_runtime_prefix() {
+    let path = without_arguments.path().as_str();
+    let tail = path
+        .strip_prefix("/_topcoat/runtime/procedures/")
+        .expect(path);
+    assert_eq!(tail.len(), 32, "{path}");
+    assert!(tail.bytes().all(|b| b.is_ascii_hexdigit()), "{path}");
+    assert_ne!(without_arguments.path(), with_unit.path());
+}
+
+#[tokio::test]
+async fn a_procedure_with_a_path_is_served_there_and_its_surrogate_names_it() {
+    assert_eq!(at_path.path().as_str(), "/api/double");
+
+    let response = call(&at_path, "[2.5]").await;
+    assert_eq!(response.status(), http::StatusCode::OK);
+    let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    assert_eq!(&bytes[..], b"5.0");
+
+    let surrogate = serde_json::to_value(Surrogated::into_surrogate(at_path)).unwrap();
+    assert_eq!(surrogate["t"], "Procedure");
+    assert_eq!(surrogate["path"], "/api/double");
 }
 
 #[tokio::test]
 async fn empty_arguments_and_one_unit_argument_are_distinct() {
     for (procedure, body) in [
-        (&without_arguments as &'static dyn Procedure, "[]"),
-        (&with_unit as &'static dyn Procedure, "[null]"),
+        (&without_arguments as &'static dyn Route, "[]"),
+        (&with_unit as &'static dyn Route, "[null]"),
     ] {
         let response = call(procedure, body).await;
         assert_eq!(response.status(), http::StatusCode::OK);

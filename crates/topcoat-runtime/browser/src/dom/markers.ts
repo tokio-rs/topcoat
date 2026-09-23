@@ -16,8 +16,8 @@ export type CommentMarker =
 	| { kind: "expr-end" }
 	| {
 			kind: "shard-start";
-			/** The id of the shard, which names its route. */
-			shard: string;
+			/** The path of the shard's endpoint, where re-renders are requested. */
+			path: string;
 			/**
 			 * The identity of the shard invocation, which pairs the start
 			 * marker with its end marker and is sent back with every
@@ -89,7 +89,7 @@ export function parseComment(node: Comment): CommentMarker | null {
 		}
 		return {
 			kind: "shard-start",
-			shard: JSON.parse(start[1] ?? "") as string,
+			path: JSON.parse(start[1] ?? "") as string,
 			identity: JSON.parse(start[2] ?? "") as string,
 			exprs,
 		};
