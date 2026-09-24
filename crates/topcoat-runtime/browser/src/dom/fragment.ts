@@ -1,7 +1,6 @@
 /**
- * Parses `html` as content of `parent`, so elements only allowed in that
- * context survive: a `<tr>` parsed for a `<tbody>` stays a row, where a
- * parse in the document's context would drop it and keep its text.
+ * Parses HTML using the parent element's rules. This keeps elements such
+ * as table rows that would be discarded when parsed as ordinary body content.
  */
 export function parseChildren(parent: Node, html: string): Node[] {
 	const range = document.createRange();

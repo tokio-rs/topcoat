@@ -6,14 +6,13 @@ import type { Runtime } from "./runtime";
 import type { SignalId } from "./signal-registry";
 
 /**
- * A live region within a scope's content: the range between its marker
- * comments, whose resources the region's own scope owns so a swap can
- * replace them along with the range.
+ * A live region bounded by two comments. Its scope owns the resources
+ * that need to be released when the region's content is replaced.
  */
 export type Region = {
 	id: string;
 	start: Comment;
-	/** Attached when the end marker is reached. */
+	/** Set when hydration finds the closing comment. */
 	end: Comment | null;
 	scope: Scope;
 };
@@ -27,19 +26,15 @@ export class Scope {
 	/** The ids of the signals declared in this scope's content. */
 	readonly signalIds = new Set<SignalId>();
 	/**
-	 * Signals read on the server while rendering this scope's own content.
-	 * A change re-renders the enclosing unit, which watches the
-	 * dependencies of its whole content through
-	 * [`collectDependencies`](Scope.collectDependencies).
+	 * Signals read by the server for this scope's content. The owning unit
+	 * uses collectDependencies() to watch these signals across its scopes.
 	 */
 	readonly dependencies = new Set<SignalId>();
 	/**
-	 * Whether the server requested a connection while rendering this
-	 * scope's own content. The enclosing unit renders again over a
-	 * connection.
+	 * Records a connection request found in this scope's content.
 	 */
 	requiresConnection = false;
-	/** The live regions directly within this scope's content, by id. */
+	/** Regions directly owned by this scope, indexed by region id. */
 	readonly regions = new Map<string, Region>();
 	private readonly effects = new Set<Effect>();
 	/** Aborted on release, removing listeners and cancelling owned requests. */
@@ -50,8 +45,8 @@ export class Scope {
 		readonly parent: Scope | null,
 		readonly runtime: Runtime,
 		/**
-		 * The unit whose content this scope belongs to: the one the
-		 * dependencies and connection requirements found in it describe.
+		 * The page or shard that owns this scope's content and handles its
+		 * signal dependencies and connection requests.
 		 */
 		readonly unit: RenderUnit | null = null,
 	) {
@@ -59,8 +54,8 @@ export class Scope {
 	}
 
 	/**
-	 * The dependencies of this scope's content, including its live regions.
-	 * A nested unit watches its own content, so its scopes are left out.
+	 * Collects signal dependencies from this scope and its live regions.
+	 * Skips nested units because they watch their own dependencies.
 	 */
 	collectDependencies(into = new Set<SignalId>()): Set<SignalId> {
 		for (const id of this.dependencies) into.add(id);
@@ -70,7 +65,7 @@ export class Scope {
 		return into;
 	}
 
-	/** Whether this scope's content, including its live regions, requires a connection. */
+	/** Checks this scope and its live regions for a connection request. */
 	contentRequiresConnection(): boolean {
 		if (this.requiresConnection) return true;
 		for (const child of this.children) {
@@ -82,8 +77,8 @@ export class Scope {
 	}
 
 	/**
-	 * Runs a reaction immediately and owns its subscriptions until release.
-	 * Returns the effect, or `null` when the scope is already released.
+	 * Runs an effect and keeps its subscriptions until this scope is released.
+	 * Returns `null` if the scope has already been released.
 	 */
 	effect(fn: () => void): Effect | null {
 		if (this.disposed) return null;
@@ -99,7 +94,7 @@ export class Scope {
 		return effect;
 	}
 
-	/** Finds the live region `id` in this scope's content or a descendant's. */
+	/** Looks up a region in this scope or any of its children. */
 	findRegion(id: string): Region | undefined {
 		const own = this.regions.get(id);
 		if (own !== undefined) return own;

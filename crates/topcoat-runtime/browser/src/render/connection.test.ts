@@ -12,7 +12,7 @@ afterEach(() => {
 	vi.useRealTimers();
 });
 
-/** A WebSocket the test drives by hand. */
+/** A fake WebSocket whose events are controlled by the test. */
 class FakeSocket extends EventTarget {
 	readyState = 0;
 	readonly sent: unknown[] = [];
@@ -35,20 +35,20 @@ class FakeSocket extends EventTarget {
 		this.dispatchEvent(new Event("close"));
 	}
 
-	/** The server accepted the handshake. */
+	/** Simulates a successful connection. */
 	open(): void {
 		this.readyState = 1;
 		this.dispatchEvent(new Event("open"));
 	}
 
-	/** The server sent `message`. */
+	/** Delivers a message as if it came from the server. */
 	receive(message: unknown): void {
 		this.dispatchEvent(
 			new MessageEvent("message", { data: JSON.stringify(message) }),
 		);
 	}
 
-	/** The connection dropped. */
+	/** Simulates a lost connection. */
 	drop(): void {
 		this.readyState = 3;
 		this.dispatchEvent(new Event("close"));
@@ -115,7 +115,7 @@ it("the output of a superseded run is dropped until the latest run's output star
 	connection.requestRun();
 	expect(socket().sent[1]).toEqual({ run: 2, signals: { a: 2 } });
 
-	// The server still finishes the first run before it starts the second.
+	// Old output can still arrive before the server announces the new run.
 	socket().receive({ t: "run", id: 1 });
 	socket().receive({ t: "snapshot", html: "<p>stale</p>" });
 	socket().receive({ t: "swap", region: "r", html: "<p>stale</p>" });
@@ -166,7 +166,7 @@ it("a dropped connection is reopened with a growing delay and requests a fresh r
 
 	socket().drop();
 	expect(connection.isOpen).toBe(false);
-	// A run requested while reconnecting is folded into the reopening.
+	// Requests made while disconnected wait for the automatic render on reconnect.
 	connection.requestRun();
 	vi.advanceTimersByTime(999);
 	expect(sockets).toHaveLength(1);
@@ -181,7 +181,7 @@ it("a dropped connection is reopened with a growing delay and requests a fresh r
 	socket().open();
 	expect(socket().sent).toEqual([{ run: 2, signals: { a: 1 } }]);
 
-	// A successful opening resets the delay.
+	// After a successful connection, retries start at the shortest delay again.
 	socket().drop();
 	vi.advanceTimersByTime(1000);
 	expect(sockets).toHaveLength(4);

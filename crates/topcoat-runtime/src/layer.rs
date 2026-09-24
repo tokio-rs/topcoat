@@ -6,26 +6,27 @@ pub use socket::*;
 use topcoat_core::context::Cx;
 use topcoat_router::{Body, Layer, LayerFuture, Next, Path};
 
-/// A [`Layer`] that serves the runtime protocol at page URLs.
+/// A [`Layer`] that handles runtime requests at each page's URL.
 ///
-/// The protocol has two transports, both addressed to the page's own URL:
+/// The browser can request a render in two ways:
 ///
-/// - A page rerun: a `POST` with `X-Topcoat-Runtime: true` and a JSON body containing the
-///   document's signal values. The layer rewrites it to a `GET` at the same path and query. The
-///   page runs through its layouts and guards, and its signals resume from the supplied values. The
-///   rewritten request has an empty body, and its [`RUNTIME_HEADER`], `Content-Type`, and
-///   `Content-Length` headers are removed. Read the client's original method with
+/// - Send a `POST` with `X-Topcoat-Runtime: true` and the document's signal
+///   values as JSON. The layer rewrites this to a `GET` at the same path
+///   and query. The page, layouts, and guards run with the supplied signal
+///   values. The rewritten request has an empty body and no [`RUNTIME_HEADER`],
+///   `Content-Type`, or `Content-Length` headers. To read the original method, use
 ///   [`original_method`](topcoat_router::request::original_method).
-/// - A connection: a WebSocket handshake requesting the [`RUNTIME_PROTOCOL`] subprotocol. The layer
-///   accepts it and renders the page over the connection each time the browser asks, as a `GET`
-///   with the handshake's headers and the supplied signal values.
+/// - Open a WebSocket with the [`RUNTIME_PROTOCOL`] subprotocol. Each render
+///   request on this connection runs the page as a `GET`, using headers from
+///   the handshake and the signal values sent by the browser.
 ///
-/// Every other request passes through unchanged, including ordinary form
-/// submissions and the application's own WebSocket routes.
+/// Other requests pass through unchanged, including form submissions and
+/// WebSocket requests that do not use the runtime subprotocol.
 ///
-/// [`RouterBuilderRuntimeExt::runtime`](crate::RouterBuilderRuntimeExt::runtime)
-/// registers this layer. Call it after registering your application's
-/// pathless layers so those layers receive the rewritten `GET`.
+/// Register this layer with
+/// [`RouterBuilderRuntimeExt::runtime`](crate::RouterBuilderRuntimeExt::runtime).
+/// Call it after adding your application's pathless layers so they receive
+/// the rewritten `GET`.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RuntimeLayer;
 

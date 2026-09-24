@@ -1,8 +1,8 @@
-//! Page renders over a runtime connection.
+//! Tests page rendering over a runtime WebSocket.
 //!
-//! A WebSocket handshake at a page's URL requesting the `topcoat-runtime`
-//! subprotocol opens a connection. Each render request over it runs the
-//! page as a connected `GET` and streams the page's frames back.
+//! The client connects at the page's URL using the `topcoat-runtime`
+//! subprotocol. Each render request runs the page as a connected `GET`
+//! and sends its content back as frames.
 
 use std::{io, net::SocketAddr, time::Duration};
 
@@ -24,8 +24,8 @@ use topcoat::{
     view::{View, emit, live, view},
 };
 
-/// The connection's page: shows whether the render is connected and the
-/// current value of its signal, and emits twice into a live region.
+/// Displays the connection state and a signal value, then emits two
+/// updates from a live region.
 #[page("/room")]
 async fn room(cx: &Cx) -> Result<impl View> {
     let query = signal(cx, || String::from("initial"));
@@ -49,7 +49,7 @@ async fn room(cx: &Cx) -> Result<impl View> {
     })
 }
 
-/// A page whose live region never finishes once connected.
+/// Keeps a live region open indefinitely during a connected render.
 #[page("/slow")]
 async fn slow(cx: &Cx) -> Result<impl View> {
     Ok(view! {
@@ -65,7 +65,7 @@ async fn slow(cx: &Cx) -> Result<impl View> {
     })
 }
 
-/// A page that redirects before producing content.
+/// Redirects before rendering any content.
 #[page("/away")]
 async fn away() -> Result<impl View> {
     let redirected: Result<()> = Err(redirect("/target").into());
@@ -73,7 +73,7 @@ async fn away() -> Result<impl View> {
     Ok(view! { <p>"never"</p> })
 }
 
-/// A page that fails before producing content.
+/// Returns an error before rendering any content.
 #[page("/broken")]
 async fn broken() -> Result<impl View> {
     let failed: Result<()> = Err(bad_request("broken").into());
@@ -91,8 +91,8 @@ fn router() -> Router {
         .build()
 }
 
-/// Serves the router on an ephemeral port, shutting down when the returned
-/// sender fires.
+/// Starts a server on an available port. Sending on the returned channel
+/// shuts it down.
 async fn spawn_server() -> (SocketAddr, oneshot::Sender<()>, JoinHandle<io::Result<()>>) {
     let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -103,8 +103,7 @@ async fn spawn_server() -> (SocketAddr, oneshot::Sender<()>, JoinHandle<io::Resu
     (addr, shutdown_tx, server)
 }
 
-/// Waits for the server to return, bounded so a stuck shutdown fails the
-/// test instead of hanging it.
+/// Stops the server and fails the test if shutdown takes too long.
 async fn shut_down(shutdown_tx: oneshot::Sender<()>, server: JoinHandle<io::Result<()>>) {
     shutdown_tx.send(()).unwrap();
     tokio::time::timeout(Duration::from_secs(5), server)
@@ -116,7 +115,7 @@ async fn shut_down(shutdown_tx: oneshot::Sender<()>, server: JoinHandle<io::Resu
 
 type Client = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 
-/// Opens a runtime connection at `path`.
+/// Connects to `path` using the runtime subprotocol.
 async fn connect(addr: SocketAddr, path: &str) -> Client {
     let mut request = format!("ws://{addr}{path}").into_client_request().unwrap();
     request
@@ -136,7 +135,7 @@ async fn connect(addr: SocketAddr, path: &str) -> Client {
     client
 }
 
-/// Sends a render request for run `run` with the given signals JSON.
+/// Requests a render with the supplied run id and JSON signal values.
 async fn request_run(client: &mut Client, run: u64, signals: &str) {
     client
         .send(Message::text(format!(
@@ -146,8 +145,8 @@ async fn request_run(client: &mut Client, run: u64, signals: &str) {
         .unwrap();
 }
 
-/// Reads the next text message as JSON, bounded so a missing message fails
-/// the test instead of hanging it.
+/// Parses the next text message as JSON, failing the test if it does not
+/// arrive before the timeout.
 async fn next_json(client: &mut Client) -> serde_json::Value {
     let message = tokio::time::timeout(Duration::from_secs(5), client.next())
         .await
@@ -160,7 +159,7 @@ async fn next_json(client: &mut Client) -> serde_json::Value {
     serde_json::from_str(text.as_str()).unwrap()
 }
 
-/// The id of the last signal declared in `html`.
+/// Finds the last signal declaration in `html` and returns its id.
 fn last_signal_id(html: &str) -> &str {
     let declaration = html.rfind("::topcoat::signal(").expect(html);
     let key = "&quot;id&quot;:&quot;";
@@ -187,7 +186,7 @@ async fn a_run_renders_the_page_connected_and_streams_its_frames() {
     assert!(html.contains("query: initial"), "{html}");
     assert!(html.contains("<!--::topcoat::connect-->"), "{html}");
     assert!(html.contains("<p>one</p>"), "{html}");
-    // The live region's second emission follows as a swap for its region.
+    // The second emission must update the region from the initial HTML.
     let swap = next_json(&mut client).await;
     assert_eq!(swap["t"], "swap");
     assert_eq!(swap["html"], "<p>two</p>");
@@ -234,8 +233,8 @@ async fn a_new_run_supersedes_a_run_that_never_finishes() {
     assert_eq!(next_json(&mut client).await["t"], "run");
     assert_eq!(next_json(&mut client).await["t"], "snapshot");
 
-    // The first run is still pending in its live body when the second
-    // arrives; the second's output follows without anything in between.
+    // Request a new render while the first is still waiting for updates.
+    // The next messages must belong to the new run.
     request_run(&mut client, 2, "{}").await;
     assert_eq!(
         next_json(&mut client).await,
@@ -243,7 +242,7 @@ async fn a_new_run_supersedes_a_run_that_never_finishes() {
     );
     assert_eq!(next_json(&mut client).await["t"], "snapshot");
 
-    // Closing while a run is pending still tears the connection down.
+    // Disconnecting must also stop a render that is still waiting.
     client.close(None).await.unwrap();
     shut_down(shutdown_tx, server).await;
 }
@@ -298,7 +297,7 @@ async fn a_malformed_render_request_is_answered_and_the_connection_stays_open() 
     shut_down(shutdown_tx, server).await;
 }
 
-/// Builds a handshake for `/room` with the given extra headers.
+/// Creates a WebSocket handshake request for `/room` with extra headers.
 fn handshake(extra: &[(&str, &str)]) -> http::Request<Body> {
     let mut request = http::Request::builder()
         .method("GET")
@@ -324,7 +323,7 @@ async fn a_handshake_without_the_runtime_protocol_reaches_the_page() {
 
 #[tokio::test]
 async fn a_runtime_handshake_on_a_connection_that_cannot_upgrade_is_a_bad_request() {
-    // Dispatched directly, the request carries no upgrade handle.
+    // Calling the router directly provides no connection to upgrade.
     let response = router()
         .handle(handshake(&[("sec-websocket-protocol", RUNTIME_PROTOCOL)]))
         .await;

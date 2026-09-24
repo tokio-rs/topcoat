@@ -14,9 +14,7 @@ export type CommentMarker =
 	  }
 	| {
 			/**
-			 * The content requires a server connection: the innermost unit
-			 * enclosing the marker renders again over a connection once
-			 * one is open.
+			 * Marks the enclosing page or shard as needing a connection.
 			 */
 			kind: "connect";
 	  }
@@ -24,8 +22,8 @@ export type CommentMarker =
 	| { kind: "expr-end" }
 	| {
 			/**
-			 * A live region starts: the content up to the matching end
-			 * marker is replaced as a whole by the region's swaps.
+			 * Starts a live region. Each update replaces the content between
+			 * this marker and its matching end marker.
 			 */
 			kind: "region-start";
 			id: string;

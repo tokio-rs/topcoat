@@ -68,7 +68,7 @@ it("a live region owns its content's signals and reports its dependencies and co
 		expect(page.signalIds).toEqual(new Set(["outside"]));
 		expect(outer.scope.signalIds).toEqual(new Set(["1a"]));
 		expect(inner.scope.signalIds).toEqual(new Set(["nested"]));
-		// Regions record what they find, and the unit sees it through them.
+		// The page collects dependencies and connection requests from its regions.
 		expect(page.dependencies).toEqual(new Set());
 		expect(outer.scope.dependencies).toEqual(new Set(["1a"]));
 		expect(page.collectDependencies()).toEqual(new Set(["1a"]));

@@ -24,37 +24,35 @@ use crate::{
     response::{AsyncIntoResponse, IntoResponse, Response},
 };
 
-/// How a view response reaches the browser.
+/// The format used to send a view response to the browser.
 ///
-/// Register a delivery on the request context to select it for the
-/// dispatch; view responses use [`Html`](Self::Html) otherwise. The status
-/// code and headers a view declares apply with either delivery, and a
-/// redirect or error before the first content is an ordinary redirect or
-/// error response.
+/// Add this value to the request context to choose a format. The default
+/// is [`Html`](Self::Html). Both formats use the view's status code and
+/// headers. A redirect or error before the view produces any content
+/// becomes a normal HTTP redirect or error response.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum ViewResponseDelivery {
-    /// HTML the browser parses as a document.
+    /// Sends HTML for the browser to display.
     ///
-    /// The first content is the document itself. Each later replacement a
-    /// live region emits follows as a template and a script that swaps it
-    /// into the region, and a redirect after the first content is a script
-    /// navigating to its target.
+    /// The response starts with the document. Later live region updates
+    /// include a template with the new content and a script to apply it.
+    /// A redirect after the document starts uses a script to navigate.
     #[default]
     Html,
-    /// Newline-delimited JSON frames the browser runtime applies.
+    /// Sends JSON frames for the browser runtime to apply, one per line.
     ///
-    /// The content type is `application/x-ndjson`. Each frame has a `t`
-    /// field naming its kind: `snapshot` carries the first content as
-    /// `html`; `swap` carries a `region` id and the `html` replacing that
-    /// region's content; `redirect` carries the `location` of a redirect
-    /// after the first content.
+    /// The content type is `application/x-ndjson`. The `t` field identifies
+    /// the frame type. A `snapshot` contains the initial `html`. A `swap`
+    /// contains a `region` id and the `html` to put in that region. A
+    /// `redirect` contains the `location` to navigate to after content has
+    /// already been sent.
     Frames,
 }
 
-/// Returns the delivery selected for view responses of the current request.
+/// Returns the view response format for this request.
 ///
-/// Defaults to [`ViewResponseDelivery::Html`] when the request context holds
-/// no delivery.
+/// Returns [`ViewResponseDelivery::Html`] if none is set in the request
+/// context.
 #[must_use]
 pub fn view_response_delivery(cx: &Cx) -> ViewResponseDelivery {
     try_request_context::<ViewResponseDelivery>(cx)
@@ -63,7 +61,7 @@ pub fn view_response_delivery(cx: &Cx) -> ViewResponseDelivery {
 }
 
 impl ViewResponseDelivery {
-    /// The content type of a response with this delivery.
+    /// Returns the content type for this format.
     fn content_type(self) -> HeaderValue {
         HeaderValue::from_static(match self {
             Self::Html => "text/html; charset=utf-8",
@@ -71,7 +69,7 @@ impl ViewResponseDelivery {
         })
     }
 
-    /// The body chunk carrying the first content.
+    /// Formats the initial HTML as a response body chunk.
     fn first(self, html: String) -> String {
         match self {
             Self::Html => html,
@@ -79,14 +77,14 @@ impl ViewResponseDelivery {
         }
     }
 
-    /// The body chunk carrying a region replacement. `script` is the swap
-    /// applier if it has not been sent yet; only HTML delivery needs it.
+    /// Formats a live region update as a response body chunk.
+    /// For HTML, `script` contains the update script if it is still needed.
     fn swap(self, cx: &Cx, swap: ViewSwap, script: Option<&'static str>) -> String {
         let region = swap.region;
         match self {
             Self::Html => {
-                // The envelope's fixed parts and two region ids on top of
-                // the replacement's own estimate.
+                // Allow room for the content, its wrapper, both region ids,
+                // and the optional script.
                 let mut envelope = String::with_capacity(
                     script.map_or(0, str::len) + swap.replacement.size_hint() + 96,
                 );
@@ -112,13 +110,12 @@ impl ViewResponseDelivery {
         }
     }
 
-    /// The body chunk carrying a redirect raised after the first content.
+    /// Formats a redirect that occurs after the initial content was sent.
     fn redirect(self, location: &HeaderValue) -> String {
         match self {
             Self::Html => redirect_script(location),
             Self::Frames => {
-                // The location is percent-encoded down to ASCII, so it
-                // converts back.
+                // Percent-encoding makes the location valid ASCII.
                 let location = location.to_str().expect("redirect location is ASCII");
                 ViewFrame::Redirect { location }.to_line()
             }
@@ -126,7 +123,7 @@ impl ViewResponseDelivery {
     }
 }
 
-/// One frame of a response with [`ViewResponseDelivery::Frames`].
+/// A JSON frame sent with [`ViewResponseDelivery::Frames`].
 #[derive(Serialize)]
 #[serde(tag = "t", rename_all = "snake_case")]
 enum ViewFrame<'a> {
@@ -143,7 +140,7 @@ enum ViewFrame<'a> {
     },
 }
 
-/// Serializes a region id the way its markers spell it.
+/// Writes a region id in the same format as its HTML markers.
 fn serialize_region<S: serde::Serializer>(
     region: &RegionId,
     serializer: S,
@@ -152,7 +149,7 @@ fn serialize_region<S: serde::Serializer>(
 }
 
 impl ViewFrame<'_> {
-    /// Serializes the frame as one line of the response body.
+    /// Encodes a frame as JSON followed by a newline.
     fn to_line(&self) -> String {
         let mut line = serde_json::to_string(self).expect("a view frame serializes");
         line.push('\n');
@@ -222,8 +219,8 @@ async fn stream<V: View + Unpin + 'static>(mut view: V, cx: &Cx) -> Result<Respo
     }
 }
 
-/// Builds a response around `body` with the content type of `delivery`,
-/// applying the status code and headers a view declared.
+/// Builds a response with the chosen format's content type and the view's
+/// status code and headers.
 fn view_response(
     cx: &Cx,
     body: impl Into<Body>,
@@ -294,8 +291,7 @@ pin_project! {
     struct ViewBody<V> {
         cx: Cx,
         first: Option<String>,
-        // The swap applier, taken by the first swap it is sent ahead of.
-        // Only HTML delivery has one.
+        // HTML responses send this script once, before the first update.
         script: Option<&'static str>,
         delivery: ViewResponseDelivery,
         // Whether the view has reported it has no further swaps. Polling a
@@ -385,8 +381,7 @@ mod tests {
         send(&router, "/p").await
     }
 
-    /// Serves `render` as a page at `/p` and dispatches a `GET` to it that
-    /// selects framed delivery.
+    /// Requests `/p` using JSON frames, with `render` as its page handler.
     async fn send_page_framed(render: crate::PageRenderFn) -> Response {
         let router = RouterBuilder::new()
             .page(PageFn::new(Method::GET, "/p", render))
@@ -401,8 +396,8 @@ mod tests {
             .await
     }
 
-    /// Reads a framed response body as its frames, one parsed JSON object
-    /// per body frame, checking each is a single newline-terminated line.
+    /// Parses the response frames and checks that each body chunk contains
+    /// one JSON object followed by a newline.
     async fn json_frames(body: Body) -> Vec<serde_json::Value> {
         data_frames(body)
             .await
@@ -996,7 +991,7 @@ mod tests {
         );
 
         let raw = data_frames(response.into_body()).await;
-        // No applier and no swap scripts: the runtime applies the frames.
+        // JSON frames need no scripts because the runtime applies them.
         assert!(
             raw.iter().all(|frame| !frame.contains("<script")),
             "{raw:?}"
@@ -1007,8 +1002,7 @@ mod tests {
             .map(|frame| serde_json::from_str(frame.trim_end()).unwrap())
             .collect();
         assert_eq!(frames.len(), 3);
-        // The snapshot is the marked-up document, so the swaps that follow
-        // name a region the runtime can find in it.
+        // Later updates must refer to a region in the initial HTML.
         let html = frames[0]["html"].as_str().unwrap();
         let region = region_ids(html)[0];
         assert_eq!(frames[0]["t"], "snapshot");
@@ -1031,7 +1025,7 @@ mod tests {
         let html = frames[0]["html"].as_str().unwrap();
         let regions = region_ids(html);
         assert_eq!(regions.len(), 2);
-        // Every swap after the snapshot belongs to one of the two regions.
+        // Each update must target one of the page's two regions.
         for frame in &frames[1..] {
             assert_eq!(frame["t"], "swap");
             let region = frame["region"].as_str().unwrap();

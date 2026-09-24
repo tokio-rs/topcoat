@@ -16,10 +16,9 @@ import { RenderUnit } from "./unit";
  * The outermost render unit. Requests use the current URL and signal values.
  * Responses contain a full document, but only the body's children are updated.
  *
- * Once the content asks for a connection, the page opens one at its own URL
- * and re-renders over it instead of posting. The connection stays open for
- * the rest of the page's life, whether or not later content still asks for
- * it.
+ * When the content requests a connection, the page opens a WebSocket at its
+ * URL and uses it for renders while connected. It keeps the connection for
+ * the rest of the page's lifetime, even if later content no longer needs it.
  */
 export class PageUnit extends RenderUnit implements ConnectionTarget {
 	protected readonly label = "Page";
@@ -37,9 +36,9 @@ export class PageUnit extends RenderUnit implements ConnectionTarget {
 	}
 
 	/**
-	 * Opens the connection the content asks for. Waits for the document to
-	 * finish loading first, so a swap still streaming in over HTTP cannot
-	 * land after the connected snapshot.
+	 * Opens a connection if the page needs one. Waits for the document to
+	 * finish loading so all initial HTTP updates arrive before the first
+	 * render over the connection.
 	 */
 	private connectIfRequired(loaded = document.readyState === "complete"): void {
 		if (this.isDisposed || this.connection !== null) return;
@@ -59,7 +58,7 @@ export class PageUnit extends RenderUnit implements ConnectionTarget {
 	}
 
 	override refresh(): Promise<void> {
-		// Over an open connection, a re-render is a new run on it.
+		// Reuse the open connection for the next render.
 		if (this.connection?.isOpen) {
 			this.connection.requestRun();
 			return Promise.resolve();
@@ -68,7 +67,7 @@ export class PageUnit extends RenderUnit implements ConnectionTarget {
 	}
 
 	collectSignals(): Record<SignalId, DehydratedSurrogate> {
-		// Include descendant signals so the server can restore the whole page.
+		// Include nested signals to preserve state across the whole page.
 		return untrack(() => this.contentScope.collectSignalValues());
 	}
 
@@ -130,14 +129,14 @@ export class PageUnit extends RenderUnit implements ConnectionTarget {
 }
 
 /**
- * The page's own URL without its fragment. Built from the parts rather
- * than resolved, so a path starting with two slashes stays on this origin.
+ * Returns the page URL without its fragment. Joining these parts keeps
+ * paths starting with two slashes on the current origin.
  */
 function pageUrl(): string {
 	return `${location.origin}${location.pathname}${location.search}`;
 }
 
-/** The page's own URL as a WebSocket URL. */
+/** Converts the page URL to use ws: or wss:. */
 function connectionUrl(): string {
 	const url = new URL(pageUrl());
 	url.protocol = url.protocol === "https:" ? "wss:" : "ws:";

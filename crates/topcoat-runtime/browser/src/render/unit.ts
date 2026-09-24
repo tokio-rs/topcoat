@@ -19,11 +19,10 @@ export abstract class RenderUnit {
 	/** Names the unit in error messages. */
 	protected abstract readonly label: string;
 	private readonly requestController: RenderRequest;
-	/** The effect watching the current content's inputs. */
+	/** Watches the signals used by the current content. */
 	private watch: Effect | null = null;
 	/**
-	 * Set while the watch effect runs only to subscribe, so it does not
-	 * request a re-render.
+	 * Prevents a render request while the effect updates its subscriptions.
 	 */
 	private subscribing = false;
 
@@ -44,8 +43,8 @@ export abstract class RenderUnit {
 	}
 
 	/**
-	 * Whether the current content asked for a server connection. Replacing
-	 * the content re-evaluates this from the new content's markers.
+	 * Checks whether the current content contains a connection marker.
+	 * Replacing the content can change the result.
 	 */
 	get requiresConnection(): boolean {
 		return this.contentScope.contentRequiresConnection();
@@ -102,8 +101,8 @@ export abstract class RenderUnit {
 	}
 
 	/**
-	 * Subscribes the watch effect to the inputs again, after a swap changed
-	 * the dependencies of the current content.
+	 * Updates the effect's subscriptions after a swap changes which signals
+	 * the content depends on.
 	 */
 	resubscribe(): void {
 		this.subscribing = true;
@@ -139,12 +138,11 @@ export abstract class RenderUnit {
 	}
 
 	/**
-	 * Replaces the content of the live region `id` with `html`, rebuilding
-	 * the region's resources around the update the way a whole replacement
-	 * does for the unit.
+	 * Replaces a live region's content and hydrates the new HTML.
+	 * Releases the old content's resources and preserves signals declared
+	 * again in the replacement.
 	 *
-	 * A region the current content does not have is ignored: the content
-	 * changed shape since the swap was produced, and a snapshot follows.
+	 * Ignores updates for regions that are no longer in the current content.
 	 */
 	applySwap(id: string, html: string): void {
 		if (this.isDisposed) return;
@@ -170,8 +168,7 @@ export abstract class RenderUnit {
 		);
 		for (const id of orphans) this.runtime.registry.delete(id);
 
-		// The swap changed the dependencies of the unit the region belongs
-		// to, which is a nested unit when the region lies inside one.
+		// Update the owning unit's subscriptions, including for nested shards.
 		region.scope.unit?.resubscribe();
 	}
 

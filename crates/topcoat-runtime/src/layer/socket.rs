@@ -1,5 +1,4 @@
-//! The WebSocket transport of the runtime protocol: a connection opened at
-//! the page's own URL that renders the page on request.
+//! Renders a page over a WebSocket opened at the page's URL.
 
 use std::sync::Arc;
 
@@ -21,21 +20,19 @@ use topcoat_router::{
 
 use crate::{ConnectedRender, SignalValues};
 
-/// The WebSocket subprotocol the browser requests a runtime connection with.
+/// The WebSocket subprotocol for runtime connections.
 ///
-/// A handshake at a page's URL naming this protocol is answered by
-/// [`RuntimeLayer`](crate::RuntimeLayer) instead of the page. Over the
-/// connection, the browser sends render requests and receives the page's
-/// frames.
+/// Request this subprotocol at a page's URL to open a connection through
+/// [`RuntimeLayer`](crate::RuntimeLayer). The browser can then request
+/// renders and receive the page's content as frames.
 pub const RUNTIME_PROTOCOL: &str = "topcoat-runtime";
 
-/// Whether the request is a runtime handshake: a `GET` whose requested
-/// subprotocols include the runtime's.
+/// Checks for a `GET` that requests the runtime WebSocket subprotocol.
 pub(super) fn requested(cx: &Cx) -> bool {
     *method(cx) == Method::GET && requests_runtime_protocol(headers(cx))
 }
 
-/// Whether a handshake's requested subprotocols include the runtime's.
+/// Checks whether the headers request the runtime subprotocol.
 fn requests_runtime_protocol(headers: &HeaderMap) -> bool {
     headers
         .get_all(header::SEC_WEBSOCKET_PROTOCOL)
@@ -45,7 +42,7 @@ fn requests_runtime_protocol(headers: &HeaderMap) -> bool {
         .any(|protocol| protocol.trim() == RUNTIME_PROTOCOL)
 }
 
-/// Accepts the handshake and renders the page over the connection.
+/// Opens the WebSocket and starts handling render requests.
 pub(super) async fn accept(cx: &Cx, body: Body) -> Result<Response> {
     let upgrade = WebSocketUpgrade::from_request(cx, body).await?;
     let target = Arc::new(ConnectionTarget::from_handshake(cx));
@@ -54,28 +51,27 @@ pub(super) async fn accept(cx: &Cx, body: Body) -> Result<Response> {
         .on_upgrade(move |socket| run(target, socket))
 }
 
-/// A request from the browser to render the connection's page.
+/// The browser's request for a new page render.
 #[derive(Debug, Deserialize)]
 struct RenderRequest {
-    /// The browser's number for the run, echoed ahead of the run's output
-    /// so the browser can tell the runs apart.
+    /// The run id chosen by the browser. Sent back before any output so
+    /// the browser can identify which render it belongs to.
     #[serde(default)]
     run: u64,
-    /// The document's current signal values.
+    /// The signal values to use for this render.
     #[serde(default)]
     signals: SignalValues,
 }
 
-/// A message the connection sends besides the frames of a view response.
+/// A connection message for identifying runs, redirects, and errors.
 #[derive(Serialize)]
 #[serde(tag = "t", rename_all = "snake_case")]
 enum ConnectionMessage<'a> {
-    /// The output of the run with this id follows, until the next `run`.
+    /// Identifies all following output until the next run announcement.
     Run { id: u64 },
-    /// The run redirected before producing content.
+    /// Tells the browser to navigate after a render returned a redirect.
     Redirect { location: &'a str },
-    /// The run produced no content: it failed with this status, or the
-    /// browser's request could not be read.
+    /// Reports a failed render or an invalid request from the browser.
     Error { status: u16 },
 }
 
@@ -85,13 +81,12 @@ impl ConnectionMessage<'_> {
     }
 }
 
-/// The page a connection renders, with the request details every run
-/// reuses from the handshake.
+/// The router, URL, and request details used for every render on a connection.
 struct ConnectionTarget {
     router: Router,
     uri: Uri,
-    /// The handshake headers without the ones that only describe the
-    /// upgrade or negotiate an encoding the runtime cannot undo.
+    /// Headers from the handshake, with WebSocket headers and
+    /// `Accept-Encoding` removed.
     headers: HeaderMap,
     remote: Option<RemoteAddr>,
 }
@@ -118,7 +113,7 @@ impl ConnectionTarget {
         }
     }
 
-    /// The logical `GET` a run dispatches for the page.
+    /// Builds the `GET` request used to render the page.
     fn request(&self) -> Request {
         let mut request = Request::new(Body::empty());
         *request.method_mut() = Method::GET;
@@ -130,8 +125,8 @@ impl ConnectionTarget {
         request
     }
 
-    /// Renders the page once for `request`, sending the run's output to
-    /// `out` until it ends or the receiver is gone.
+    /// Renders the page and sends its output to `out`.
+    /// Stops when rendering finishes or the receiver closes.
     async fn render(&self, request: RenderRequest, out: mpsc::Sender<Message>) {
         let run = ConnectionMessage::Run { id: request.run }.to_message();
         if out.send(run).await.is_err() {
@@ -192,15 +187,12 @@ impl ConnectionTarget {
     }
 }
 
-/// Serves render requests over `socket` until the browser disconnects.
+/// Handles render requests until the browser disconnects.
 ///
-/// Each render request starts a run, cancelling the run before it. The
-/// cancelled run is awaited before its replacement starts, since aborting
-/// only takes effect at the run's next yield point and a run mid-poll on
-/// another worker could still queue a frame. A run's output therefore goes
-/// out in order behind everything the earlier run queued, so the browser
-/// always sees a run's messages after its `run` announcement and never
-/// interleaved with another run's.
+/// Each request cancels the previous render and waits for it to stop before
+/// starting another. Aborting alone is not enough because a task running
+/// on another worker can still send output until it yields. Waiting keeps
+/// that output ahead of the next run announcement in the queue.
 async fn run(target: Arc<ConnectionTarget>, socket: WebSocket) {
     let (mut sink, mut stream) = socket.split();
     let (out, mut queue) = mpsc::channel::<Message>(16);
@@ -228,7 +220,7 @@ async fn run(target: Arc<ConnectionTarget>, socket: WebSocket) {
             };
             if let Some(current) = current.take() {
                 current.abort();
-                // Resolves once the run is actually gone, cancelled or not.
+                // Wait until the old render can no longer send frames.
                 let _ = current.await;
             }
             let target = Arc::clone(&target);
@@ -240,7 +232,7 @@ async fn run(target: Arc<ConnectionTarget>, socket: WebSocket) {
         if let Some(current) = current {
             current.abort();
         }
-        // Dropping the last sender ends the forwarder once the queue drains.
+        // The forwarder finishes after all senders close and queued messages are sent.
     };
 
     futures_util::future::join(forward, receive).await;

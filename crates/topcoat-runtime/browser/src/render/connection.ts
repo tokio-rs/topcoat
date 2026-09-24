@@ -1,10 +1,10 @@
 import type { DehydratedSurrogate } from "../expression/serialized";
 import type { SignalId } from "../signal-registry";
 
-/** The WebSocket subprotocol a runtime connection is requested with. */
+/** The WebSocket subprotocol used by the runtime. */
 export const RUNTIME_PROTOCOL = "topcoat-runtime";
 
-/** A message the server sends over a connection. */
+/** A message received from the server. */
 type ServerMessage =
 	| { t: "run"; id: number }
 	| { t: "snapshot"; html: string }
@@ -12,46 +12,44 @@ type ServerMessage =
 	| { t: "redirect"; location: string }
 	| { t: "error"; status: number };
 
-/** The content a connection renders. */
+/** Receives rendered content and supplies signal values for new renders. */
 export interface ConnectionTarget {
-	/** The signal values a run starts from. */
+	/** Collects the signal values to send with a render request. */
 	collectSignals(): Record<SignalId, DehydratedSurrogate>;
-	/** Applies a run's snapshot. */
+	/** Replaces the content with the render's initial HTML. */
 	replaceContent(html: string): void;
-	/** Applies a run's region swap. */
+	/** Updates one live region. */
 	applySwap(region: string, html: string): void;
 	reportError(error: unknown): void;
 }
 
-/** Opens the WebSocket for a connection. */
+/** Creates a WebSocket with the given URL and subprotocol. */
 export type OpenSocket = (url: string, protocol: string) => WebSocket;
 
 const defaultOpen: OpenSocket = (url, protocol) => new WebSocket(url, protocol);
 
-/** The `readyState` of a WebSocket that can send. */
+/** The WebSocket state that allows sending messages. */
 const OPEN = 1;
 
 const INITIAL_RETRY_DELAY = 1000;
 const MAX_RETRY_DELAY = 30_000;
 
 /**
- * A runtime connection: a WebSocket at the target's URL, over which the
- * server renders the target each time it is asked to.
+ * Requests server renders over a WebSocket at the target's URL.
  *
- * Each request starts a run. The server announces a run before its output,
- * so the output of a run that a later request superseded is dropped. A
- * connection that closes is reopened after a growing delay, and every
- * opening requests a fresh run, since the server keeps nothing between
- * connections.
+ * Each request starts a new run. The server sends the run id before its
+ * output, allowing the browser to ignore updates from older runs.
+ * If the connection closes, retries wait longer after each failed attempt.
+ * Each successful connection starts a fresh render with the current signals.
  */
 export class Connection {
 	private socket: WebSocket | null = null;
 	private retry: ReturnType<typeof setTimeout> | null = null;
-	/** How many times in a row the connection had to be reopened. */
+	/** Reconnect attempts since the last successful connection. */
 	private attempt = 0;
-	/** The number of the last run requested. */
+	/** The most recent run id sent to the server. */
 	private requested = 0;
-	/** The number of the run whose output the server is sending. */
+	/** The run id announced by the server for incoming output. */
 	private receiving = 0;
 
 	constructor(
@@ -64,15 +62,15 @@ export class Connection {
 		this.connect();
 	}
 
-	/** Whether a run can be requested right now. */
+	/** Whether the socket is ready to send a render request. */
 	get isOpen(): boolean {
 		return this.socket?.readyState === OPEN;
 	}
 
 	/**
-	 * Asks the server to render the target again with its current signal
-	 * values. Does nothing while the connection is not open: opening it
-	 * requests a run anyway.
+	 * Requests a new render with the current signal values.
+	 * Does nothing while disconnected. Opening the connection requests a
+	 * render automatically.
 	 */
 	requestRun(): void {
 		if (this.socket === null || !this.isOpen) return;
@@ -95,7 +93,7 @@ export class Connection {
 		});
 		socket.addEventListener("message", (event) => this.receive(event.data));
 		socket.addEventListener("close", () => {
-			// A socket this connection closed itself is not reopened.
+			// Do not reconnect if close() already cleared this socket.
 			if (this.socket !== socket) return;
 			this.socket = null;
 			this.scheduleReconnect();
@@ -133,7 +131,7 @@ export class Connection {
 				this.receiving = message.id;
 				return;
 			}
-			// Output of a run that a later request superseded.
+			// Ignore output if we have already requested a newer run.
 			if (this.receiving !== this.requested) return;
 			this.apply(message);
 		} catch (error) {

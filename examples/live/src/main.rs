@@ -44,8 +44,7 @@ async fn layout(slot: Slot<'_>) -> Result<impl View> {
                 // Reloads the browser when the dev server rebuilds the app.
                 topcoat::dev::script()
 
-                // The chat page's connection and event handlers need the
-                // browser runtime.
+                // Load the browser runtime for chat connections and button handlers.
                 topcoat::runtime::script()
             </head>
             <body>

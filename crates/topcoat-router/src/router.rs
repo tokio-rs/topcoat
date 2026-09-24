@@ -39,8 +39,7 @@ use crate::{
 /// # }
 /// ```
 ///
-/// Cloning a router is cheap: every clone dispatches through the same
-/// routing tables.
+/// Clones share the same routing tables, so cloning is cheap.
 #[derive(Clone)]
 pub struct Router {
     /// The routing tables, shared with every request context this router
@@ -75,24 +74,20 @@ impl Router {
         self.handle_with(request, RequestContext::new()).await
     }
 
-    /// Dispatches a request like [`handle`](Self::handle), with `values`
-    /// installed on its request context.
+    /// Handles a request with additional values in its request context.
     ///
-    /// `values` is a tuple of context values or a [`RequestContext`]. Every
-    /// dispatch of the request, including those reached through internal
-    /// rewrites, starts from a fresh context holding these values, so a
-    /// route and its layers can read them with
-    /// [`request_context`](topcoat_core::context::request_context). A
-    /// rewrite that carries a value of the same type replaces it for the
-    /// dispatches after it. The router's own request information, such as
-    /// the request parts and the matched path parameters, takes precedence
-    /// over `values`.
+    /// Works like [`handle`](Self::handle). Pass a tuple of values or a
+    /// [`RequestContext`]. Routes and layers can read these values with
+    /// [`request_context`](topcoat_core::context::request_context).
     ///
-    /// Use this to dispatch a request on behalf of another, seeding the
-    /// context with what that request established. The dispatch is
-    /// independent of the caller's: it shares nothing with the caller's
-    /// request context, and its response returns to the caller instead of
-    /// being sent.
+    /// Each request and internal rewrite gets a fresh context containing
+    /// these values. A rewrite can replace a value by supplying another
+    /// of the same type. The router's own values, such as request parts
+    /// and path parameters, always take precedence.
+    ///
+    /// A route or layer can call this to handle another request. The new
+    /// request has its own context, with only the values explicitly passed
+    /// here. Its response is returned to the caller.
     pub async fn handle_with<V>(&self, request: Request, values: V) -> Response
     where
         V: ContextValues,
@@ -111,8 +106,8 @@ impl Router {
         .await
     }
 
-    /// Handles one request inside the panic isolation boundary, starting
-    /// from the values `chain` already carries.
+    /// Handles a request using the context values in `chain`.
+    /// The caller catches panics from this future.
     async fn handle_inner(&self, request: Request, mut chain: RewriteChain) -> Response {
         let inner = &*self.inner;
         // Resolve the client's address once from the original request,
@@ -122,11 +117,9 @@ impl Router {
         let original = OriginalParts(Arc::new(parts.clone()));
 
         let (cx, result) = loop {
-            // Every dispatch starts from a fresh context, so a rewrite drops
-            // whatever the discarded dispatch registered or queued. Only the
-            // values carried by the chain come along, seeded by the caller
-            // or handed over by rewrites, and the router's own values are
-            // installed after them so they take precedence.
+            // Rewrites start with a fresh context. Keep only the values
+            // passed by the caller or a rewrite, and discard any other
+            // request state. Add the router's values last so they win.
             let cx = Cx::new(Arc::clone(&inner.app_context))
                 .with_many(chain.context().clone())
                 .with_many((
@@ -241,17 +234,15 @@ pub(crate) struct Matched {
     route: Option<RouteIndex>,
 }
 
-/// Returns the router dispatching the current request.
+/// Returns the router handling this request.
 ///
-/// The returned router shares the routing tables of the one that dispatched
-/// the request, so it can [`handle`](Router::handle) further requests from
-/// inside a route or layer. Such a dispatch is independent of the current
-/// request: it starts from a fresh context and its response returns to the
-/// caller.
+/// This is a cheap clone of the router. A route or layer can use it to
+/// [`handle`](Router::handle) another request. That request gets a fresh
+/// context, and its response is returned to the caller.
 ///
 /// # Panics
 ///
-/// Panics if the request was not dispatched by a router.
+/// Panics if the context does not belong to a router request.
 #[must_use]
 #[track_caller]
 pub fn router(cx: &Cx) -> Router {
@@ -261,8 +252,8 @@ pub fn router(cx: &Cx) -> Router {
     }
 }
 
-/// Returns the router dispatching the current request, or `None` if the
-/// request was not dispatched by a router.
+/// Returns the router handling this request, or `None` if the context does
+/// not belong to a router request.
 #[must_use]
 pub fn try_router(cx: &Cx) -> Option<Router> {
     let inner = try_request_context::<Arc<RouterInner>>(cx)?;
@@ -1019,8 +1010,7 @@ mod tests {
         assert_eq!(&body[..], b"second");
     }
 
-    /// Dispatches a request seeded with `values` and reads the full
-    /// response.
+    /// Sends a request with context values and reads its full response.
     fn send_with(
         router: &Router,
         method: Method,
@@ -1048,7 +1038,7 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         assert_eq!(&body[..], b"seeded");
 
-        // The seed belongs to that dispatch alone.
+        // A separate request must not inherit these values.
         let (_, _, body) = send(&router, Method::GET, "/carried-again");
         assert_eq!(&body[..], b"none");
     }
@@ -1065,11 +1055,11 @@ mod tests {
             ))
             .build();
 
-        // A plain rewrite keeps the seed.
+        // Rewrites preserve values unless they explicitly replace them.
         let (_, _, body) = send_with(&router, Method::GET, "/carried", (Carried("seeded"),));
         assert_eq!(&body[..], b"seeded");
 
-        // A rewrite carrying the same type replaces it.
+        // A new value of the same type overrides the original value.
         let (_, _, body) = send_with(&router, Method::GET, "/old", (Carried("seeded"),));
         assert_eq!(&body[..], b"handed over");
     }
@@ -1080,7 +1070,7 @@ mod tests {
             .route(RouteFn::new(Method::GET, path("/users/{id}"), echo_params))
             .build();
 
-        // Seeding empty path parameters must not hide the matched ones.
+        // The matched path parameters must override the supplied empty ones.
         let (_, _, body) = send_with(
             &router,
             Method::GET,
@@ -1092,8 +1082,8 @@ mod tests {
 
     #[test]
     fn a_route_can_dispatch_an_independent_request_through_its_router() {
-        /// Dispatches a seeded request to `/carried-again` and echoes its
-        /// body, after checking the nested dispatch left this context alone.
+        /// Sends context values to `/carried-again` and returns its body.
+        /// Checks that the nested request leaves this context unchanged.
         fn nested(cx: &Cx, _body: Body) -> RouteFuture<'_> {
             Box::pin(async move {
                 let response = router(cx)

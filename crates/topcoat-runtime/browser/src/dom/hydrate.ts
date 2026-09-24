@@ -13,8 +13,8 @@ type PendingTextExpression = {
 };
 
 /**
- * The scope the markup being walked belongs to, with the shard or region
- * whose end marker closes it.
+ * The scope being hydrated and the shard or region whose end marker
+ * tells us to return to the parent scope.
  */
 type Frame = {
 	scope: Scope;
@@ -81,8 +81,7 @@ function processMarker(
 	textExpressions: PendingTextExpression[],
 	adoptable: Set<SignalId>,
 ): void {
-	// The top of the stack is the innermost unit or region enclosing the
-	// marker.
+	// The last stack entry owns the content around this marker.
 	const current = stack[stack.length - 1]?.scope;
 	if (current === undefined) throw new Error("Stack was empty");
 

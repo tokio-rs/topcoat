@@ -398,7 +398,7 @@ it("a connection requirement inside a shard belongs to the shard, not the page",
 const declaration = (id: string, value: number) =>
 	`<!--::topcoat::signal({"t":"signal","id":"${id}","v":${value}})-->`;
 
-/** Mounts a page whose body holds `outside` and the live region `aa`. */
+/** Creates a page with content outside and inside live region `aa`. */
 function mountRegion(outside: string, region: string) {
 	document.body.innerHTML = `${outside}<!--::topcoat::region::start(aa)-->${region}<!--::topcoat::region::end(aa)-->`;
 	const runtime = new Runtime();
@@ -422,7 +422,7 @@ it("a swap replaces its region's content, rebuilding the region's resources and 
 		expect(document.body.innerHTML).toBe(
 			`<p>outside</p><!--::topcoat::region::start(aa)-->${declaration("a", 0)}${button}<p>two</p><!--::topcoat::region::end(aa)-->`,
 		);
-		// The client's value survives, and the region owns it again.
+		// The new region scope keeps the signal and its browser-side value.
 		expect((runtime.registry.read("a") as F64).dehydrate()).toBe(5);
 		expect(runtime.registry.has("b")).toBe(false);
 		const region = runtime.page.contentScope.regions.get("aa");
@@ -431,7 +431,7 @@ it("a swap replaces its region's content, rebuilding the region's resources and 
 		expect(region?.scope.signalIds).toEqual(new Set(["a"]));
 		expect(runtime.page.contentScope.signalIds).toEqual(new Set());
 
-		// The morph kept the button; only the new content's handler is attached.
+		// The button is reused, with only its new handler attached.
 		expect(document.querySelector("button")).toBe(el);
 		el.click();
 		await Promise.resolve();
@@ -535,7 +535,7 @@ it("a swap inside a shard re-subscribes the shard, not the page", async () => {
 		`<!--::topcoat::region::start(aa)--><p>one</p><!--::topcoat::region::end(aa)-->`,
 	);
 	try {
-		// The page receives the frame and finds the region inside the shard.
+		// A frame sent to the page can update a region owned by a shard.
 		runtime.page.applySwap(
 			"aa",
 			`${declaration("d", 0)}<!--::topcoat::dep("d")-->`,
@@ -553,7 +553,7 @@ it("a swap inside a shard re-subscribes the shard, not the page", async () => {
 	}
 });
 
-/** A WebSocket the test drives by hand, installed as the global. */
+/** A fake global WebSocket with events controlled by the test. */
 class FakeSocket extends EventTarget {
 	static opened: FakeSocket[] = [];
 	readyState = 0;
@@ -588,7 +588,7 @@ class FakeSocket extends EventTarget {
 	}
 }
 
-/** Installs the fake socket and a page URL, with the document loaded. */
+/** Sets up the fake WebSocket, page URL, and document loading state. */
 function installSocket(readyState = "complete") {
 	FakeSocket.opened = [];
 	vi.stubGlobal("WebSocket", FakeSocket);
@@ -617,7 +617,7 @@ it("a page whose content asks for a connection opens one at its own URL once the
 		socket.open();
 		expect(socket.sent).toEqual([{ run: 1, signals: { a: 1 } }]);
 
-		// A re-render over the open connection is a new run, not a post.
+		// Changing the signal requests another run on the same connection.
 		runtime.context.signal("a").set(new F64(2));
 		await settle();
 		expect(socket.sent).toEqual([
@@ -626,7 +626,7 @@ it("a page whose content asks for a connection opens one at its own URL once the
 		]);
 		expect(stub.url()).toBe(undefined);
 
-		// The run's snapshot morphs the body and keeps the connection.
+		// Receiving new page content leaves the connection open.
 		socket.receive({ t: "run", id: 2 });
 		socket.receive({
 			t: "snapshot",

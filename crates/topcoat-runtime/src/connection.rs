@@ -3,33 +3,33 @@ use std::any::TypeId;
 use topcoat_core::context::{Cx, try_request_context};
 use topcoat_view::{HoistKey, hoist_once};
 
-/// Marks a request as a render over an open browser connection.
+/// Identifies a render requested through a browser connection.
 ///
-/// Register this in the request context of a render driven by a connection.
-/// Renders over plain HTTP do not carry it.
+/// Add this to the request context when rendering over a connection.
+/// Leave it out for HTTP renders.
 #[derive(Debug, Default, Clone, Copy)]
 pub(crate) struct ConnectedRender;
 
-/// Whether the current render runs over a browser connection, requesting
-/// one when it does not.
+/// Returns whether this render runs over a browser connection and marks
+/// the content as needing one.
 ///
-/// Over HTTP this returns `false` and marks the enclosing page or shard as
-/// needing a connection once the response finishes. The browser then
-/// connects and renders that page or shard again, where this returns
-/// `true`. Calling it opts into a connection even when the result only
-/// selects some text, so use [`connected_untracked`] to adapt without
-/// requesting one.
+/// During an HTTP page render, this returns `false`. Once the response
+/// finishes, the browser opens a connection and renders the page again.
+/// That render returns `true`.
 ///
-/// The result describes the current render, not whether another part of
-/// the document has a connection. The requirement belongs to the innermost
-/// enclosing page or shard; a call inside a layout or component belongs to
-/// the page rendering it. For now only a page's requirement opens a
-/// connection: a shard records it, but the browser does not act on it yet.
+/// The connection request belongs to the enclosing page or shard. Layouts
+/// and components belong to the page that renders them. Shards record the
+/// request, but opening connections for shards is not supported yet.
+///
+/// Calling this requests a connection even if you only use the result to
+/// choose some text. Use [`connected_untracked`] to check without requesting
+/// one. Both functions describe this render, regardless of connections
+/// elsewhere in the document.
 ///
 /// # Panics
 ///
-/// Panics outside an active rendering scope. A spawned task must establish
-/// its own rendering scope before calling this.
+/// Panics when called outside a rendering scope. Spawned tasks need their
+/// own rendering scope.
 #[must_use]
 #[track_caller]
 pub fn connected(cx: &Cx) -> bool {
@@ -41,12 +41,11 @@ pub fn connected(cx: &Cx) -> bool {
     connected_untracked(cx)
 }
 
-/// Whether the current render runs over a browser connection, without
-/// requesting one.
+/// Returns whether this render runs over a browser connection without
+/// asking the browser to open one.
 ///
-/// This lets a component adapt to a connected render without making every
-/// page using it open a connection. It works in any context and never
-/// renders anything.
+/// Use this to change what a component displays based on the connection.
+/// It works outside rendering scopes too and adds nothing to the output.
 #[must_use]
 pub fn connected_untracked(cx: &Cx) -> bool {
     try_request_context::<ConnectedRender>(cx).is_some()
@@ -66,7 +65,7 @@ mod tests {
 
     const MARKER: &str = "<!--::topcoat::connect-->";
 
-    /// Drives a future that never yields to completion.
+    /// Polls a future until it completes, without waiting between polls.
     fn block_on<F: Future>(future: F) -> F::Output {
         let mut future = pin!(future);
         let mut cx = Context::from_waker(Waker::noop());
@@ -77,7 +76,7 @@ mod tests {
         }
     }
 
-    /// Renders a body under `cx` whose content shows what `check` returned.
+    /// Renders the result of `check` using the supplied context.
     fn render(cx: Cx, check: impl Fn(&Cx) -> bool + Send + 'static) -> String {
         let view = HoistView::new(ThenView::new(async move {
             let cx = &cx;

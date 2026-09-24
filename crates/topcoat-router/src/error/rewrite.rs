@@ -165,8 +165,8 @@ pub(crate) struct RewriteChain {
 }
 
 impl RewriteChain {
-    /// Starts a chain that already carries `values`, as if a rewrite had
-    /// handed them over before the first dispatch.
+    /// Starts a rewrite chain with context values for the first request
+    /// and any rewrites that follow.
     pub(crate) fn carrying(values: impl ContextValues) -> Self {
         let mut context = RequestContext::new();
         values.install(&mut context);

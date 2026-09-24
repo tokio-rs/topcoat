@@ -1,5 +1,4 @@
-//! The HTTP transport of the runtime protocol: a page rerun posted to the
-//! page's own URL.
+//! Renders a page again when the browser sends a runtime POST to its URL.
 
 use serde::Deserialize;
 use topcoat_core::{context::Cx, error::Result};
@@ -14,37 +13,35 @@ use topcoat_router::{
 
 use crate::SignalValues;
 
-/// The header used to request a page rerun.
+/// The header that identifies an HTTP page rerun.
 ///
-/// A `POST` with `X-Topcoat-Runtime: true` is handled by
-/// [`RuntimeLayer`](crate::RuntimeLayer).
+/// Set `X-Topcoat-Runtime: true` on a `POST` request for
+/// [`RuntimeLayer`](crate::RuntimeLayer) to handle it as a page rerun.
 pub static RUNTIME_HEADER: HeaderName = HeaderName::from_static("x-topcoat-runtime");
 
-/// The header value that identifies a page rerun.
+/// The value required in the runtime header.
 static RERUN: HeaderValue = HeaderValue::from_static("true");
 
-/// The document's current signal values, sent as the JSON body of a page rerun.
+/// The JSON request body containing the browser's signal values.
 #[derive(Debug, Deserialize)]
 struct PageRerunRequest {
     #[serde(default)]
     signals: SignalValues,
 }
 
-/// Whether the request is a page rerun: a `POST` carrying the marker.
+/// Checks for a `POST` with the runtime header set to `true`.
 pub(super) fn requested(cx: &Cx) -> bool {
     *method(cx) == Method::POST && headers(cx).get(&RUNTIME_HEADER) == Some(&RERUN)
 }
 
-/// Reads the rerun's signal values and rewrites the request to a `GET` at
-/// the same path and query carrying them.
+/// Reads the signal values and rewrites the request as a `GET` at the same
+/// path and query, with those values in its context.
 ///
-/// The rewrite is returned as the error it travels as, so this never
-/// produces a response of its own.
+/// Returns the rewrite as an error for the router to handle.
 pub(super) async fn dispatch(cx: &Cx, body: Body) -> Result<Response> {
     let Json(request) = Json::<PageRerunRequest>::from_request(cx, body).await?;
 
-    // Remove the rerun marker and body headers before dispatching the GET
-    // with an empty body.
+    // The rewritten GET has no body and is no longer a rerun request.
     let mut headers = headers(cx).clone();
     headers.remove(&RUNTIME_HEADER);
     headers.remove(header::CONTENT_TYPE);
