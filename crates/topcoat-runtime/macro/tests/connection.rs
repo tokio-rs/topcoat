@@ -32,8 +32,14 @@ async fn room(cx: &Cx) -> Result<impl View> {
     let current = query.get();
     let connected = connected(cx);
     Ok(view! {
-        <p>"connected: " (connected)</p>
-        <p>"query: " (current)</p>
+        <p>
+            "connected: "
+            (connected)
+        </p>
+        <p>
+            "query: "
+            (current)
+        </p>
         <main>
             (live! {
                 emit! { <p>"one"</p> }?;

@@ -12,12 +12,14 @@ use topcoat::{
     view::{View, view},
 };
 
+use crate::chat::Chat;
+
 #[tokio::main]
 async fn main() {
     topcoat::start(
         module_router!()
             .assets(AssetBundle::load().unwrap())
-            .app_context(chat::Chat::default())
+            .app_context(Chat::default())
             .discover()
             .runtime()
             .build(),

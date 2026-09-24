@@ -29,12 +29,14 @@ afterEach(() => {
 function stubFetch(status: number, statusText: string, body = "") {
 	let url: string | undefined;
 	let request: RequestInit | undefined;
+	let calls = 0;
 	globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 		url = String(input);
 		request = init;
+		calls += 1;
 		return new Response(body, { status, statusText });
 	}) as typeof fetch;
-	return { url: () => url, request: () => request };
+	return { url: () => url, request: () => request, calls: () => calls };
 }
 
 /** Waits for scheduled effects and the fetches they queue to settle. */
@@ -461,12 +463,58 @@ it("a dependency a swap declares re-renders the unit when it changes", async () 
 			"aa",
 			`${declaration("c", 0)}<!--::topcoat::dep("c")-->`,
 		);
-		expect(runtime.page.contentScope.dependencies).toEqual(new Set(["c"]));
+		expect(runtime.page.contentScope.collectDependencies()).toEqual(
+			new Set(["c"]),
+		);
 
 		runtime.context.signal("c").set(new F64(1));
 		await settle();
 
 		expect(stub.url()).toBe("https://app.example/");
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
+it("a swap that removes a signal drops the dependency on it", () => {
+	const runtime = mountRegion(
+		``,
+		`${declaration("c", 0)}<!--::topcoat::dep("c")-->`,
+	);
+	try {
+		expect(runtime.page.contentScope.collectDependencies()).toEqual(
+			new Set(["c"]),
+		);
+
+		runtime.page.applySwap("aa", `<p>gone</p>`);
+
+		expect(runtime.registry.has("c")).toBe(false);
+		expect(runtime.page.contentScope.collectDependencies()).toEqual(new Set());
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
+it("a swap inside a shard re-subscribes the shard, not the page", async () => {
+	const stub = stubFetch(500, "Internal Server Error");
+	globalThis.location = new URL("https://app.example/") as unknown as Location;
+	const { runtime, shard } = mountShard(
+		`<!--::topcoat::region::start(aa)--><p>one</p><!--::topcoat::region::end(aa)-->`,
+	);
+	try {
+		// The page receives the frame and finds the region inside the shard.
+		runtime.page.applySwap(
+			"aa",
+			`${declaration("d", 0)}<!--::topcoat::dep("d")-->`,
+		);
+		expect(shard.contentScope.collectDependencies()).toEqual(new Set(["d"]));
+		expect(runtime.page.contentScope.collectDependencies()).toEqual(new Set());
+
+		runtime.context.signal("d").set(new F64(1));
+		await settle();
+
+		expect(stub.calls()).toBe(1);
+		expect(stub.url()).toBe("/shards/1");
 	} finally {
 		runtime.page.dispose();
 	}

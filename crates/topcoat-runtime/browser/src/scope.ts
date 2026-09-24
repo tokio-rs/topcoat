@@ -1,6 +1,7 @@
 import { dehydrate } from "./expression/dehydrate";
 import type { DehydratedSurrogate } from "./expression/serialized";
 import { Effect } from "./reactivity";
+import type { RenderUnit } from "./render/unit";
 import type { Runtime } from "./runtime";
 import type { SignalId } from "./signal-registry";
 
@@ -26,22 +27,20 @@ export class Scope {
 	/** The ids of the signals declared in this scope's content. */
 	readonly signalIds = new Set<SignalId>();
 	/**
-	 * Signals read on the server. A change re-renders the enclosing unit.
+	 * Signals read on the server while rendering this scope's own content.
+	 * A change re-renders the enclosing unit, which watches the
+	 * dependencies of its whole content through
+	 * [`collectDependencies`](Scope.collectDependencies).
 	 */
 	readonly dependencies = new Set<SignalId>();
 	/**
 	 * Whether the server requested a connection while rendering this
-	 * scope's content. The enclosing unit renders again over a connection.
+	 * scope's own content. The enclosing unit renders again over a
+	 * connection.
 	 */
 	requiresConnection = false;
 	/** The live regions directly within this scope's content, by id. */
 	readonly regions = new Map<string, Region>();
-	/**
-	 * The content scope of the enclosing unit: this scope itself, unless
-	 * this scope owns a region within that content. Dependencies and
-	 * connection requirements describe the unit, so they are recorded there.
-	 */
-	readonly owner: Scope;
 	private readonly effects = new Set<Effect>();
 	/** Aborted on release, removing listeners and cancelling owned requests. */
 	private readonly listenerController = new AbortController();
@@ -50,10 +49,36 @@ export class Scope {
 	constructor(
 		readonly parent: Scope | null,
 		readonly runtime: Runtime,
-		owner?: Scope,
+		/**
+		 * The unit whose content this scope belongs to: the one the
+		 * dependencies and connection requirements found in it describe.
+		 */
+		readonly unit: RenderUnit | null = null,
 	) {
-		this.owner = owner ?? this;
 		parent?.children.add(this);
+	}
+
+	/**
+	 * The dependencies of this scope's content, including its live regions.
+	 * A nested unit watches its own content, so its scopes are left out.
+	 */
+	collectDependencies(into = new Set<SignalId>()): Set<SignalId> {
+		for (const id of this.dependencies) into.add(id);
+		for (const child of this.children) {
+			if (child.unit === this.unit) child.collectDependencies(into);
+		}
+		return into;
+	}
+
+	/** Whether this scope's content, including its live regions, requires a connection. */
+	contentRequiresConnection(): boolean {
+		if (this.requiresConnection) return true;
+		for (const child of this.children) {
+			if (child.unit === this.unit && child.contentRequiresConnection()) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

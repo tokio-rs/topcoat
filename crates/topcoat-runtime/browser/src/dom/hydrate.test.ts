@@ -68,15 +68,18 @@ it("a live region owns its content's signals and reports its dependencies and co
 		expect(page.signalIds).toEqual(new Set(["outside"]));
 		expect(outer.scope.signalIds).toEqual(new Set(["1a"]));
 		expect(inner.scope.signalIds).toEqual(new Set(["nested"]));
-		expect(page.dependencies).toEqual(new Set(["1a"]));
-		expect(outer.scope.dependencies).toEqual(new Set());
+		// Regions record what they find, and the unit sees it through them.
+		expect(page.dependencies).toEqual(new Set());
+		expect(outer.scope.dependencies).toEqual(new Set(["1a"]));
+		expect(page.collectDependencies()).toEqual(new Set(["1a"]));
+		expect(page.requiresConnection).toBe(false);
+		expect(outer.scope.requiresConnection).toBe(true);
 		expect(runtime.page.requiresConnection).toBe(true);
-		expect(outer.scope.requiresConnection).toBe(false);
 
 		expect(outer.start.data).toBe("::topcoat::region::start(ab)");
 		expect(outer.end?.data).toBe("::topcoat::region::end(ab)");
-		expect(outer.scope.owner).toBe(page);
-		expect(inner.scope.owner).toBe(page);
+		expect(outer.scope.unit).toBe(runtime.page);
+		expect(inner.scope.unit).toBe(runtime.page);
 		expect(page.findRegion("cd")).toBe(inner);
 		expect(page.regions.has("cd")).toBe(false);
 	} finally {
@@ -101,9 +104,10 @@ it("a region inside a shard belongs to the shard", () => {
 		if (!region) throw new Error("Missing region");
 
 		expect(page.regions.size).toBe(0);
-		expect(page.dependencies).toEqual(new Set());
-		expect(region.scope.owner).not.toBe(page);
-		expect(region.scope.owner.dependencies).toEqual(new Set(["e"]));
+		expect(page.collectDependencies()).toEqual(new Set());
+		const shard = region.scope.unit;
+		expect(shard).not.toBe(runtime.page);
+		expect(shard?.contentScope.collectDependencies()).toEqual(new Set(["e"]));
 	} finally {
 		runtime.page.dispose();
 	}

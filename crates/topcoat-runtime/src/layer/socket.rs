@@ -194,10 +194,13 @@ impl ConnectionTarget {
 
 /// Serves render requests over `socket` until the browser disconnects.
 ///
-/// Each render request starts a run, cancelling the run before it. A run's
-/// output goes out in order behind the output the earlier run already
-/// queued, so the browser always sees a run's messages after its `run`
-/// announcement and never interleaved with another run's.
+/// Each render request starts a run, cancelling the run before it. The
+/// cancelled run is awaited before its replacement starts, since aborting
+/// only takes effect at the run's next yield point and a run mid-poll on
+/// another worker could still queue a frame. A run's output therefore goes
+/// out in order behind everything the earlier run queued, so the browser
+/// always sees a run's messages after its `run` announcement and never
+/// interleaved with another run's.
 async fn run(target: Arc<ConnectionTarget>, socket: WebSocket) {
     let (mut sink, mut stream) = socket.split();
     let (out, mut queue) = mpsc::channel::<Message>(16);
@@ -211,7 +214,7 @@ async fn run(target: Arc<ConnectionTarget>, socket: WebSocket) {
     };
 
     let receive = async move {
-        let mut current: Option<tokio::task::AbortHandle> = None;
+        let mut current: Option<tokio::task::JoinHandle<()>> = None;
         while let Some(Ok(message)) = stream.next().await {
             let Message::Text(text) = message else {
                 continue;
@@ -225,11 +228,14 @@ async fn run(target: Arc<ConnectionTarget>, socket: WebSocket) {
             };
             if let Some(current) = current.take() {
                 current.abort();
+                // Resolves once the run is actually gone, cancelled or not.
+                let _ = current.await;
             }
             let target = Arc::clone(&target);
             let out = out.clone();
-            current =
-                Some(tokio::spawn(async move { target.render(request, out).await }).abort_handle());
+            current = Some(tokio::spawn(async move {
+                target.render(request, out).await;
+            }));
         }
         if let Some(current) = current {
             current.abort();

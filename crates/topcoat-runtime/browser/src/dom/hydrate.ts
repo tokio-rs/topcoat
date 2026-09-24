@@ -82,7 +82,7 @@ function processMarker(
 	adoptable: Set<SignalId>,
 ): void {
 	// The top of the stack is the innermost unit or region enclosing the
-	// marker; its owner is the enclosing unit's content scope.
+	// marker.
 	const current = stack[stack.length - 1]?.scope;
 	if (current === undefined) throw new Error("Stack was empty");
 
@@ -102,12 +102,12 @@ function processMarker(
 		}
 
 		case "dep": {
-			current.owner.dependencies.add(marker.id);
+			current.dependencies.add(marker.id);
 			break;
 		}
 
 		case "connect": {
-			current.owner.requiresConnection = true;
+			current.requiresConnection = true;
 			break;
 		}
 
@@ -130,7 +130,7 @@ function processMarker(
 		}
 
 		case "region-start": {
-			const scope = new Scope(current, current.runtime, current.owner);
+			const scope = new Scope(current, current.runtime, current.unit);
 			const region: Region = { id: marker.id, start: node, end: null, scope };
 			current.regions.set(marker.id, region);
 			stack.push({ scope, shard: null, region });

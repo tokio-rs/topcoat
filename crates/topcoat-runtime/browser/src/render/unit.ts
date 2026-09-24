@@ -30,8 +30,8 @@ export abstract class RenderUnit {
 		parent: Scope | null,
 		readonly runtime: Runtime,
 	) {
-		this.lifetime = new Scope(parent, runtime);
-		this.contentScope = new Scope(this.lifetime, runtime);
+		this.lifetime = new Scope(parent, runtime, this);
+		this.contentScope = new Scope(this.lifetime, runtime, this);
 		this.requestController = new RenderRequest(
 			this.lifetime.abortSignal,
 			(error) => runtime.reportError(error),
@@ -47,7 +47,7 @@ export abstract class RenderUnit {
 	 * the content re-evaluates this from the new content's markers.
 	 */
 	get requiresConnection(): boolean {
-		return this.contentScope.requiresConnection;
+		return this.contentScope.contentRequiresConnection();
 	}
 
 	dispose(): void {
@@ -91,7 +91,7 @@ export abstract class RenderUnit {
 		try {
 			this.watch = scope.effect(() => {
 				this.readInputs();
-				for (const id of scope.dependencies) registry.read(id);
+				for (const id of scope.collectDependencies()) registry.read(id);
 				if (this.subscribing) return;
 				this.requestController.schedule(() => this.refresh());
 			});
@@ -104,7 +104,7 @@ export abstract class RenderUnit {
 	 * Subscribes the watch effect to the inputs again, after a swap changed
 	 * the dependencies of the current content.
 	 */
-	private resubscribe(): void {
+	resubscribe(): void {
 		this.subscribing = true;
 		try {
 			this.watch?.run();
@@ -158,7 +158,7 @@ export abstract class RenderUnit {
 		region.scope = new Scope(
 			region.scope.parent,
 			this.runtime,
-			region.scope.owner,
+			region.scope.unit,
 		);
 		morph(parent, region.start, region.end, nodes);
 		this.runtime.hydrate(
@@ -170,8 +170,9 @@ export abstract class RenderUnit {
 		);
 		for (const id of orphans) this.runtime.registry.delete(id);
 
-		// The swap may have declared dependencies the effect has not seen.
-		this.resubscribe();
+		// The swap changed the dependencies of the unit the region belongs
+		// to, which is a nested unit when the region lies inside one.
+		region.scope.unit?.resubscribe();
 	}
 
 	/** Rebuilds the content's resources around a DOM update. */
@@ -182,7 +183,7 @@ export abstract class RenderUnit {
 		this.requestController.cancel();
 
 		const orphans = this.contentScope.release();
-		this.contentScope = new Scope(this.lifetime, this.runtime);
+		this.contentScope = new Scope(this.lifetime, this.runtime, this);
 		insert(this.contentScope, orphans);
 		for (const id of orphans) this.runtime.registry.delete(id);
 

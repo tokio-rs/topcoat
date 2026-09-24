@@ -23,7 +23,8 @@ pub(crate) struct ConnectedRender;
 /// The result describes the current render, not whether another part of
 /// the document has a connection. The requirement belongs to the innermost
 /// enclosing page or shard; a call inside a layout or component belongs to
-/// the page rendering it.
+/// the page rendering it. For now only a page's requirement opens a
+/// connection: a shard records it, but the browser does not act on it yet.
 ///
 /// # Panics
 ///
