@@ -1004,9 +1004,11 @@ mod tests {
 
     #[tokio::test]
     async fn a_request_accepting_frames_gets_them() {
-        let response =
-            send_page_accepting(render_thrice_emitting_page, "text/html, application/x-ndjson;q=0.9")
-                .await;
+        let response = send_page_accepting(
+            render_thrice_emitting_page,
+            "text/html, application/x-ndjson;q=0.9",
+        )
+        .await;
         assert_eq!(
             response.headers().get(CONTENT_TYPE).unwrap(),
             "application/x-ndjson"
@@ -1028,11 +1030,7 @@ mod tests {
     #[tokio::test]
     async fn a_delivery_in_the_context_wins_over_the_accept_header() {
         let router = RouterBuilder::new()
-            .page(PageFn::new(
-                Method::GET,
-                "/p",
-                render_settled_region_page,
-            ))
+            .page(PageFn::new(Method::GET, "/p", render_settled_region_page))
             .build();
         let request = http::Request::builder()
             .method(Method::GET)

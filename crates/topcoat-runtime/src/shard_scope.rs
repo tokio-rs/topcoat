@@ -5,9 +5,7 @@ use std::{
 
 use pin_project_lite::pin_project;
 use topcoat_core::{context::Cx, error::Result, identity::Identity};
-use topcoat_view::{
-    NodeViewParts, PartsWriter, View, ViewFirst, ViewSwap, internal::Builder,
-};
+use topcoat_view::{NodeViewParts, PartsWriter, View, ViewFirst, ViewSwap, internal::Builder};
 
 use crate::Js;
 

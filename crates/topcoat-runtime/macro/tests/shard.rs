@@ -100,10 +100,7 @@ async fn drive(cx: &Cx, view: impl View) -> (String, Vec<(String, String)>) {
     let html = first.content.render(cx);
     let mut swaps = Vec::new();
     if first.live {
-        while let Some(swap) = poll_fn(|task| view.as_mut().poll_swap(task))
-            .await
-            .unwrap()
-        {
+        while let Some(swap) = poll_fn(|task| view.as_mut().poll_swap(task)).await.unwrap() {
             swaps.push((swap.region.to_string(), swap.replacement.render(cx)));
         }
     }
@@ -198,7 +195,10 @@ async fn a_live_shard_streams_its_updates_through_the_enclosing_content() {
     let shard_start = html.find("::topcoat::shard::start(").expect(&html);
     let shard_end = html.find("::topcoat::shard::end(").expect(&html);
     let region_start = html.find("::topcoat::region::start(").expect(&html);
-    assert!(shard_start < region_start && region_start < shard_end, "{html}");
+    assert!(
+        shard_start < region_start && region_start < shard_end,
+        "{html}"
+    );
 
     // The later emission follows as an update to that region.
     let region = region_id(&html);
@@ -241,8 +241,7 @@ async fn a_live_shard_endpoint_sends_frames_to_a_request_accepting_them() {
     let region = region_id(&inline);
 
     let body = Body::from(r#"{"args":[],"signals":{}}"#);
-    let response =
-        endpoint_accepting(&region_probe, identity, body, "application/x-ndjson").await;
+    let response = endpoint_accepting(&region_probe, identity, body, "application/x-ndjson").await;
     assert_eq!(response.status(), http::StatusCode::OK);
     assert_eq!(
         response.headers().get("content-type").unwrap(),
@@ -263,7 +262,12 @@ async fn a_live_shard_endpoint_sends_frames_to_a_request_accepting_them() {
     assert!(html.contains("<p>first</p>"), "{html}");
     assert_eq!(swap["t"], "swap");
     assert_eq!(swap["region"], region);
-    assert!(swap["html"].as_str().expect(&text).contains("<p>second</p>"));
+    assert!(
+        swap["html"]
+            .as_str()
+            .expect(&text)
+            .contains("<p>second</p>")
+    );
 }
 
 #[tokio::test]

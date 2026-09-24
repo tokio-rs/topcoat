@@ -243,7 +243,10 @@ async fn a_live_shard_streams_its_updates_over_the_page_connection() {
         .expect(html);
     let shard_start = html.find("::topcoat::shard::start(").expect(html);
     let shard_end = html.find("::topcoat::shard::end(").expect(html);
-    assert!(shard_start < region_start && region_start < shard_end, "{html}");
+    assert!(
+        shard_start < region_start && region_start < shard_end,
+        "{html}"
+    );
 
     client.close(None).await.unwrap();
     shut_down(shutdown_tx, server).await;
