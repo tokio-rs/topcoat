@@ -18,14 +18,7 @@ use topcoat_router::{
     router,
 };
 
-use crate::{ConnectedRender, SignalValues};
-
-/// The WebSocket subprotocol for runtime connections.
-///
-/// Request this subprotocol at a page's URL to open a connection through
-/// [`RuntimeLayer`](crate::RuntimeLayer). The browser can then request
-/// renders and receive the page's content as frames.
-pub const RUNTIME_PROTOCOL: &str = "topcoat-runtime";
+use crate::{ConnectedRender, RUNTIME_PROTOCOL, SignalValues};
 
 /// Checks for a `GET` that requests the runtime WebSocket subprotocol.
 pub(super) fn requested(cx: &Cx) -> bool {

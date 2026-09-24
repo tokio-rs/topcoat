@@ -15,7 +15,6 @@ router = [
 	"dep:futures-util",
 	"dep:tokio",
 	"dep:topcoat-router",
-	"topcoat-router/websocket",
 ]
 
 [dependencies]
@@ -24,10 +23,14 @@ topcoat-core.workspace = true
 topcoat-router = { workspace = true, optional = true }
 topcoat-view.workspace = true
 
-futures-util = { workspace = true, optional = true }
 ref-cast.workspace = true
-serde.workspace = true
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+topcoat-router = { workspace = true, optional = true, features = ["websocket"] }
+
+futures-util = { workspace = true, optional = true, features = ["sink"] }
 tokio = { workspace = true, optional = true, features = ["rt", "sync"] }
 
 [dev-dependencies]
