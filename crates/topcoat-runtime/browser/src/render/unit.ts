@@ -144,11 +144,7 @@ export abstract class RenderUnit implements ConnectionTarget {
 		if (this.coveredByAncestor) return;
 		const url = new URL(this.url(), location.href);
 		url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-		this.connection = new Connection(
-			url.href,
-			this,
-			this.lifetime.abortSignal,
-		);
+		this.connection = new Connection(url.href, this, this.lifetime.abortSignal);
 	}
 
 	/**
