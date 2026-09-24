@@ -15,7 +15,11 @@ use tokio_tungstenite::{
 use topcoat::{
     Result,
     context::Cx,
-    router::{Body, Router, error::{bad_request, redirect}, page, to_bytes},
+    router::{
+        Body, Router,
+        error::{bad_request, redirect},
+        page, to_bytes,
+    },
     runtime::{RUNTIME_PROTOCOL, RouterBuilderRuntimeExt, connected, signal},
     view::{View, emit, live, view},
 };
@@ -109,10 +113,9 @@ type Client = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 /// Opens a runtime connection at `path`.
 async fn connect(addr: SocketAddr, path: &str) -> Client {
     let mut request = format!("ws://{addr}{path}").into_client_request().unwrap();
-    request.headers_mut().insert(
-        "sec-websocket-protocol",
-        RUNTIME_PROTOCOL.parse().unwrap(),
-    );
+    request
+        .headers_mut()
+        .insert("sec-websocket-protocol", RUNTIME_PROTOCOL.parse().unwrap());
     let (client, response) = tokio_tungstenite::connect_async(request)
         .await
         .expect("the handshake succeeds");
@@ -183,7 +186,10 @@ async fn a_run_renders_the_page_connected_and_streams_its_frames() {
     assert_eq!(swap["t"], "swap");
     assert_eq!(swap["html"], "<p>two</p>");
     let region = swap["region"].as_str().unwrap();
-    assert!(html.contains(&format!("::topcoat::region::start({region})")), "{html}");
+    assert!(
+        html.contains(&format!("::topcoat::region::start({region})")),
+        "{html}"
+    );
 
     client.close(None).await.unwrap();
     shut_down(shutdown_tx, server).await;
