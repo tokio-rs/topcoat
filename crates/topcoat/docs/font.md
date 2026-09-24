@@ -77,7 +77,7 @@ Use `url(asset!("./fonts/inter-400.woff2"))` for a local file. Enable the `asset
 Fontsource support lives behind the `font-fontsource` feature:
 
 ```toml
-topcoat = { version = "0.8.1", features = ["font-fontsource"] }
+topcoat = { version = "0.9.0", features = ["font-fontsource"] }
 ```
 
 Choose a font from [`families`]. By default, the declaration includes all its weights and styles in its default character subset. The browser loads the files from [jsDelivr]:
