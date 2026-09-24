@@ -2,6 +2,7 @@
 
 mod arguments;
 mod bind_attribute;
+mod connection;
 mod event_handler;
 mod expr;
 mod js;
@@ -19,6 +20,7 @@ mod surrogate;
 
 pub use arguments::*;
 pub use bind_attribute::*;
+pub use connection::*;
 pub use event_handler::*;
 pub use expr::*;
 pub use js::*;
