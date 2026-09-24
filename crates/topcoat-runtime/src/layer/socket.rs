@@ -1,4 +1,4 @@
-//! Renders a page over a WebSocket opened at the page's URL.
+//! Renders a page or shard over a WebSocket opened at its URL.
 
 use std::sync::Arc;
 
@@ -7,13 +7,13 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use topcoat_core::{context::Cx, error::Result};
 use topcoat_router::{
-    Body, HeaderMap, Method, RemoteAddr, Router, Uri,
+    Body, HeaderMap, HeaderName, HeaderValue, Method, RemoteAddr, Router, Uri,
     content::{
         ViewResponseDelivery,
         websocket::{Message, WebSocket, WebSocketUpgrade},
     },
     header,
-    request::{FromRequest, Request, extensions, headers, method, uri},
+    request::{FromRequest, IDENTITY_HEADER, Request, extensions, headers, method, uri},
     response::Response,
     router,
 };
@@ -44,16 +44,31 @@ pub(super) async fn accept(cx: &Cx, body: Body) -> Result<Response> {
         .on_upgrade(move |socket| run(target, socket))
 }
 
-/// The browser's request for a new page render.
+/// The browser's request for a new render.
+///
+/// A request naming a shard identity renders the shard endpoint at the
+/// connection's URL. The whole message is then the endpoint's request body,
+/// so it also carries the shard's arguments and signal values. Other
+/// requests render the page.
 #[derive(Debug, Deserialize)]
 struct RenderRequest {
     /// The run id chosen by the browser. Sent back before any output so
     /// the browser can identify which render it belongs to.
     #[serde(default)]
     run: u64,
-    /// The signal values to use for this render.
+    /// The identity of the shard invocation to render.
+    #[serde(default)]
+    shard: Option<String>,
+    /// The signal values to use for a page render.
     #[serde(default)]
     signals: SignalValues,
+}
+
+/// A render request and the message text it was parsed from.
+struct Render {
+    request: RenderRequest,
+    /// Sent as the request body of a shard render.
+    text: String,
 }
 
 /// A connection message for identifying runs, redirects, and errors.
@@ -106,37 +121,64 @@ impl ConnectionTarget {
         }
     }
 
-    /// Builds the `GET` request used to render the page.
-    fn request(&self) -> Request {
-        let mut request = Request::new(Body::empty());
-        *request.method_mut() = Method::GET;
+    /// Builds a request for the connection's URL.
+    fn request(&self, method: Method, headers: HeaderMap, body: Body) -> Request {
+        let mut request = Request::new(body);
+        *request.method_mut() = method;
         *request.uri_mut() = self.uri.clone();
-        *request.headers_mut() = self.headers.clone();
+        *request.headers_mut() = headers;
         if let Some(remote) = self.remote {
             request.extensions_mut().insert(remote);
         }
         request
     }
 
-    /// Renders the page and sends its output to `out`.
+    /// Renders the page or shard and sends its output to `out`.
     /// Stops when rendering finishes or the receiver closes.
-    async fn render(&self, request: RenderRequest, out: mpsc::Sender<Message>) {
+    async fn render(&self, render: Render, out: mpsc::Sender<Message>) {
+        let Render { request, text } = render;
         let run = ConnectionMessage::Run { id: request.run }.to_message();
         if out.send(run).await.is_err() {
             return;
         }
 
-        let response = self
-            .router
-            .handle_with(
-                self.request(),
-                (
-                    ConnectedRender,
-                    request.signals,
-                    ViewResponseDelivery::Frames,
-                ),
-            )
-            .await;
+        let response = match request.shard {
+            // A shard endpoint reads its arguments and signal values from
+            // the body and its identity from a header, like an HTTP
+            // re-render of the shard.
+            Some(identity) => {
+                let Ok(identity) = HeaderValue::try_from(identity) else {
+                    let _ = out
+                        .send(ConnectionMessage::Error { status: 400 }.to_message())
+                        .await;
+                    return;
+                };
+                let mut headers = self.headers.clone();
+                headers.insert(
+                    header::CONTENT_TYPE,
+                    HeaderValue::from_static("application/json"),
+                );
+                headers.insert(HeaderName::from_static(IDENTITY_HEADER), identity);
+                self.router
+                    .handle_with(
+                        self.request(Method::POST, headers, Body::from(text)),
+                        (ConnectedRender, ViewResponseDelivery::Frames),
+                    )
+                    .await
+            }
+            None => {
+                self.router
+                    .handle_with(
+                        self.request(Method::GET, self.headers.clone(), Body::empty()),
+                        (
+                            ConnectedRender,
+                            request.signals,
+                            ViewResponseDelivery::Frames,
+                        ),
+                    )
+                    .await
+            }
+        };
 
         let status = response.status();
         if status.is_redirection()
@@ -216,10 +258,14 @@ async fn run(target: Arc<ConnectionTarget>, socket: WebSocket) {
                 // Wait until the old render can no longer send frames.
                 let _ = current.await;
             }
+            let render = Render {
+                request,
+                text: text.as_str().to_owned(),
+            };
             let target = Arc::clone(&target);
             let out = out.clone();
             current = Some(tokio::spawn(async move {
-                target.render(request, out).await;
+                target.render(render, out).await;
             }));
         }
         if let Some(current) = current {

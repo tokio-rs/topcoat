@@ -60,7 +60,7 @@ function fixture() {
 	const lifetime = new AbortController();
 	const target = {
 		signals: { a: 1 } as Record<string, unknown>,
-		collectSignals: vi.fn(() => target.signals),
+		renderInputs: vi.fn(() => ({ signals: target.signals })),
 		replaceContent: vi.fn(),
 		applySwap: vi.fn(),
 		reportError: vi.fn(),

@@ -4,6 +4,7 @@ import type { Effect } from "../reactivity";
 import type { Runtime } from "../runtime";
 import { Scope } from "../scope";
 import type { SignalId } from "../signal-registry";
+import { Connection, type ConnectionTarget } from "./connection";
 import {
 	applyFrame,
 	FRAMES_MEDIA_TYPE,
@@ -18,13 +19,19 @@ import { RenderRequest } from "./request";
  * `contentScope` owns the current content's resources. Its watch effect
  * subscribes to inputs and server-read dependencies. Replacing content rebuilds
  * the scope and effect so subscriptions reflect the new content.
+ *
+ * When the content requests a connection and no enclosing unit provides
+ * one, the unit opens a WebSocket at its URL and uses it for renders while
+ * connected. It keeps the connection for the rest of its lifetime, even if
+ * later content no longer needs it.
  */
-export abstract class RenderUnit {
+export abstract class RenderUnit implements ConnectionTarget {
 	protected readonly lifetime: Scope;
 	contentScope: Scope;
 	/** Names the unit in error messages. */
 	protected abstract readonly label: string;
 	private readonly requestController: RenderRequest;
+	private connection: Connection | null = null;
 	/** Watches the signals used by the current content. */
 	private watch: Effect | null = null;
 	/**
@@ -91,6 +98,69 @@ export abstract class RenderUnit {
 		adoptable: Set<SignalId>,
 	): void;
 
+	/** Returns the HTTP URL of the unit's renders, where it connects. */
+	protected abstract url(): string;
+
+	/** Collects the fields to send with a render request. */
+	abstract renderInputs(): object;
+
+	reportError(error: unknown): void {
+		this.runtime.reportError(error);
+	}
+
+	/** Returns the units enclosing this one, innermost first. */
+	private *ancestors(): Generator<RenderUnit> {
+		for (let scope = this.lifetime.parent; scope; scope = scope.parent) {
+			if (scope.unit !== null && scope.unit !== this) yield scope.unit;
+		}
+	}
+
+	/**
+	 * Checks whether an enclosing unit renders this unit's content over its
+	 * own connection, or is about to.
+	 */
+	private get coveredByAncestor(): boolean {
+		for (const unit of this.ancestors()) {
+			if (unit.connection !== null || unit.requiresConnection) return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Opens a connection if the content needs one and no enclosing unit
+	 * provides it. Waits for the document to finish loading so all initial
+	 * HTTP updates arrive before the first render over the connection.
+	 */
+	private connectIfRequired(loaded = document.readyState === "complete"): void {
+		if (this.isDisposed || this.connection !== null) return;
+		if (!this.requiresConnection) return;
+		if (!loaded) {
+			window.addEventListener("load", () => this.connectIfRequired(true), {
+				once: true,
+				signal: this.lifetime.abortSignal,
+			});
+			return;
+		}
+		if (this.coveredByAncestor) return;
+		const url = new URL(this.url(), location.href);
+		url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+		this.connection = new Connection(
+			url.href,
+			this,
+			this.lifetime.abortSignal,
+		);
+	}
+
+	/**
+	 * Checks whether the current content needs a connection. A unit
+	 * hydrated inside other content defers the check until the enclosing
+	 * content has been scanned, so it can see whether an enclosing unit
+	 * connects instead.
+	 */
+	protected scheduleConnection(): void {
+		this.connectIfRequired();
+	}
+
 	/**
 	 * Starts the watch effect over the current content. The effect
 	 * subscribes to every input; the first run is the initial subscription
@@ -110,11 +180,12 @@ export abstract class RenderUnit {
 		} finally {
 			this.subscribing = false;
 		}
+		this.scheduleConnection();
 	}
 
 	/**
-	 * Updates the effect's subscriptions after a swap changes which signals
-	 * the content depends on.
+	 * Updates the effect's subscriptions and connection after a swap
+	 * changes what the content depends on.
 	 */
 	resubscribe(): void {
 		this.subscribing = true;
@@ -123,14 +194,28 @@ export abstract class RenderUnit {
 		} finally {
 			this.subscribing = false;
 		}
+		this.scheduleConnection();
 	}
 
 	/**
-	 * Re-runs this unit immediately with its current inputs. The response
-	 * arrives as frames: a snapshot replacing the content, then a swap for
-	 * each later update of a live region.
+	 * Re-runs this unit immediately with its current inputs.
+	 *
+	 * While the unit's connection is open, the run goes over it. Content
+	 * that needs a connection inside a connected unit re-runs that unit, so
+	 * it stays connected. Otherwise the unit posts an HTTP request, whose
+	 * response arrives as frames: a snapshot replacing the content, then a
+	 * swap for each later update of a live region.
 	 */
 	refresh(): Promise<void> {
+		if (this.connection?.isOpen) {
+			this.connection.requestRun();
+			return Promise.resolve();
+		}
+		if (this.requiresConnection) {
+			for (const unit of this.ancestors()) {
+				if (unit.connection?.isOpen) return unit.refresh();
+			}
+		}
 		const render = newRender();
 		return this.requestController.run(
 			(signal) => this.request(signal, FRAMES_MEDIA_TYPE),

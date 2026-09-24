@@ -73,7 +73,7 @@ Ok(view! {
 Returning `Ok(EmitToken)` satisfies the return type but does not emit content. The body still needs to emit at least once, so the loop above must receive a price.
 
 
-# Long-lived connections
+# Long-lived Connections
 
 Call [`connected(cx)`] to keep a live region updating after the HTTP response finishes. During HTTP rendering, it returns `false` and asks the browser to connect the enclosing page or shard. Once the response finishes, the browser opens a WebSocket and renders that page or shard again, with `connected(cx)` returning `true`. Enable `.runtime()` on the router and include `topcoat::runtime::script()` in the document, as shown in the [runtime setup guide].
 

@@ -8,9 +8,10 @@ use topcoat_router::{Body, Layer, LayerFuture, Next, Path};
 
 /// The WebSocket subprotocol for runtime connections.
 ///
-/// Request this subprotocol at a page's URL to open a connection through
-/// [`RuntimeLayer`]. The browser can then request renders and receive the
-/// page's content as frames. WebSocket connections require a native server.
+/// Request this subprotocol at a page's or shard's URL to open a connection
+/// through [`RuntimeLayer`]. The browser can then request renders and
+/// receive the content as frames. WebSocket connections require a native
+/// server.
 pub const RUNTIME_PROTOCOL: &str = "topcoat-runtime";
 
 /// A [`Layer`] that handles runtime requests at each page's URL.
@@ -24,7 +25,8 @@ pub const RUNTIME_PROTOCOL: &str = "topcoat-runtime";
 ///   use [`original_method`](topcoat_router::request::original_method).
 /// - Open a WebSocket with the [`RUNTIME_PROTOCOL`] subprotocol. Each render request on this
 ///   connection runs the page as a `GET`, using headers from the handshake and the signal values
-///   sent by the browser.
+///   sent by the browser. A render request naming a shard identity instead runs the shard endpoint
+///   at that URL with the arguments and signal values it carries.
 ///
 /// WebSocket connections are supported on native servers. HTTP page reruns
 /// are also available on WebAssembly.

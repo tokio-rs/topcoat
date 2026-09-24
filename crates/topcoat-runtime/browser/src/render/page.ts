@@ -8,7 +8,6 @@ import { untrack } from "../reactivity";
 import type { Runtime } from "../runtime";
 import type { Scope } from "../scope";
 import type { SignalId } from "../signal-registry";
-import { Connection, type ConnectionTarget } from "./connection";
 import { newRender } from "./frames";
 import { RUNTIME_HEADER } from "./request";
 import { RenderUnit } from "./unit";
@@ -16,14 +15,9 @@ import { RenderUnit } from "./unit";
 /**
  * The outermost render unit. Requests use the current URL and signal values.
  * Responses contain a full document, but only the body's children are updated.
- *
- * When the content requests a connection, the page opens a WebSocket at its
- * URL and uses it for renders while connected. It keeps the connection for
- * the rest of the page's lifetime, even if later content no longer needs it.
  */
-export class PageUnit extends RenderUnit implements ConnectionTarget {
+export class PageUnit extends RenderUnit {
 	protected readonly label = "Page";
-	private connection: Connection | null = null;
 
 	constructor(runtime: Runtime) {
 		super(null, runtime);
@@ -31,49 +25,13 @@ export class PageUnit extends RenderUnit implements ConnectionTarget {
 
 	protected readInputs(): void {}
 
-	override startWatching(): void {
-		super.startWatching();
-		this.connectIfRequired();
+	protected url(): string {
+		return pageUrl();
 	}
 
-	/**
-	 * Opens a connection if the page needs one. Waits for the document to
-	 * finish loading so all initial HTTP updates arrive before the first
-	 * render over the connection.
-	 */
-	private connectIfRequired(loaded = document.readyState === "complete"): void {
-		if (this.isDisposed || this.connection !== null) return;
-		if (!this.requiresConnection) return;
-		if (!loaded) {
-			window.addEventListener("load", () => this.connectIfRequired(true), {
-				once: true,
-				signal: this.lifetime.abortSignal,
-			});
-			return;
-		}
-		this.connection = new Connection(
-			connectionUrl(),
-			this,
-			this.lifetime.abortSignal,
-		);
-	}
-
-	override refresh(): Promise<void> {
-		// Reuse the open connection for the next render.
-		if (this.connection?.isOpen) {
-			this.connection.requestRun();
-			return Promise.resolve();
-		}
-		return super.refresh();
-	}
-
-	collectSignals(): Record<SignalId, DehydratedSurrogate> {
+	renderInputs(): { signals: Record<SignalId, DehydratedSurrogate> } {
 		// Include nested signals to preserve state across the whole page.
-		return untrack(() => this.contentScope.collectSignalValues());
-	}
-
-	reportError(error: unknown): void {
-		this.runtime.reportError(error);
+		return { signals: untrack(() => this.contentScope.collectSignalValues()) };
 	}
 
 	/** Lets a dev refresh update the whole document with this page's state. */
@@ -98,7 +56,6 @@ export class PageUnit extends RenderUnit implements ConnectionTarget {
 	}
 
 	protected request(signal: AbortSignal, accept: string): Promise<Response> {
-		const signals = this.collectSignals();
 		// The runtime header asks the server to rerun this URL as a GET
 		// with the supplied signal values.
 		return fetch(pageUrl(), {
@@ -109,7 +66,7 @@ export class PageUnit extends RenderUnit implements ConnectionTarget {
 				"Content-Type": "application/json",
 				[RUNTIME_HEADER]: "true",
 			},
-			body: JSON.stringify({ signals }),
+			body: JSON.stringify(this.renderInputs()),
 			signal,
 		});
 	}
@@ -137,11 +94,4 @@ export class PageUnit extends RenderUnit implements ConnectionTarget {
  */
 function pageUrl(): string {
 	return `${location.origin}${location.pathname}${location.search}`;
-}
-
-/** Converts the page URL to use ws: or wss:. */
-function connectionUrl(): string {
-	const url = new URL(pageUrl());
-	url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-	return url.href;
 }

@@ -13,13 +13,14 @@ pub(crate) struct ConnectedRender;
 /// Returns whether this render runs over a browser connection and marks
 /// the content as needing one.
 ///
-/// During an HTTP page render, this returns `false`. Once the response
-/// finishes, the browser opens a connection and renders the page again.
-/// That render returns `true`.
+/// During an HTTP render, this returns `false`. Once the response
+/// finishes, the browser opens a connection and renders the enclosing page
+/// or shard again. That render returns `true`.
 ///
 /// The connection request belongs to the enclosing page or shard. Layouts
-/// and components belong to the page that renders them. Shards record the
-/// request, but opening connections for shards is not supported yet.
+/// and components belong to the page that renders them. A shard inside
+/// content that already has a connection renders through it instead of
+/// opening its own.
 ///
 /// Calling this requests a connection even if you only use the result to
 /// choose some text. Use [`connected_untracked`] to check without requesting

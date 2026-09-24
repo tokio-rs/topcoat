@@ -2,6 +2,7 @@ import { morph } from "../../../../topcoat-core/browser/morph";
 import { parseChildren } from "../dom/fragment";
 import { compile, type Expression } from "../expression/compile";
 import { dehydrate } from "../expression/dehydrate";
+import type { DehydratedSurrogate } from "../expression/serialized";
 import { untrack } from "../reactivity";
 import type { Runtime } from "../runtime";
 import type { Scope } from "../scope";
@@ -11,7 +12,7 @@ import { RenderUnit } from "./unit";
 /**
  * A region bounded by shard start and end comments. When an input changes,
  * it requests new content from the endpoint with the current arguments and
- * signal values.
+ * signal values. A connection opens at the endpoint's URL.
  */
 export class ShardUnit extends RenderUnit {
 	protected readonly label = "Shard";
@@ -48,14 +49,38 @@ export class ShardUnit extends RenderUnit {
 		for (const compute of this.computes) compute(context);
 	}
 
-	protected request(signal: AbortSignal, accept: string): Promise<Response> {
+	protected url(): string {
+		return this.path;
+	}
+
+	/**
+	 * Collects the current arguments and the values of the signals the
+	 * current content created, so the server resumes them instead of
+	 * starting them over.
+	 */
+	private endpointBody(): {
+		args: DehydratedSurrogate[];
+		signals: Record<SignalId, DehydratedSurrogate>;
+	} {
 		const { context } = this.runtime;
-		// The signals the current content created travel with the request,
-		// so the server resumes them instead of starting them over.
-		const { args, signals } = untrack(() => ({
+		return untrack(() => ({
 			args: this.computes.map((compute) => dehydrate(compute(context))),
 			signals: this.contentScope.collectSignalValues(),
 		}));
+	}
+
+	/** Names the invocation alongside the endpoint's body. */
+	renderInputs(): object {
+		return { ...this.endpointBody(), shard: this.identity };
+	}
+
+	protected override scheduleConnection(): void {
+		// The enclosing content may still be scanning, so wait until its
+		// connection requirements are known.
+		queueMicrotask(() => super.scheduleConnection());
+	}
+
+	protected request(signal: AbortSignal, accept: string): Promise<Response> {
 		return fetch(this.path, {
 			method: "POST",
 			headers: {
@@ -63,7 +88,7 @@ export class ShardUnit extends RenderUnit {
 				"Content-Type": "application/json",
 				"X-Topcoat-Identity": this.identity,
 			},
-			body: JSON.stringify({ args, signals }),
+			body: JSON.stringify(this.endpointBody()),
 			signal,
 		});
 	}

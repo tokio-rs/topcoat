@@ -1,5 +1,3 @@
-import type { DehydratedSurrogate } from "../expression/serialized";
-import type { SignalId } from "../signal-registry";
 import {
 	applyFrame,
 	type FrameTarget,
@@ -11,10 +9,13 @@ import {
 /** The WebSocket subprotocol used by the runtime. */
 export const RUNTIME_PROTOCOL = "topcoat-runtime";
 
-/** Receives rendered content and supplies signal values for new renders. */
+/** Receives rendered content and supplies the inputs for new renders. */
 export interface ConnectionTarget extends FrameTarget {
-	/** Collects the signal values to send with a render request. */
-	collectSignals(): Record<SignalId, DehydratedSurrogate>;
+	/**
+	 * Collects the fields to send with a render request, such as the
+	 * current signal values.
+	 */
+	renderInputs(): object;
 	reportError(error: unknown): void;
 }
 
@@ -35,7 +36,7 @@ const MAX_RETRY_DELAY = 30_000;
  * Each request starts a new run. The server sends the run id before its
  * output, allowing the browser to ignore updates from older runs.
  * If the connection closes, retries wait longer after each failed attempt.
- * Each successful connection starts a fresh render with the current signals.
+ * Each successful connection starts a fresh render with the current inputs.
  */
 export class Connection {
 	private socket: WebSocket | null = null;
@@ -65,7 +66,7 @@ export class Connection {
 	}
 
 	/**
-	 * Requests a new render with the current signal values.
+	 * Requests a new render with the target's current inputs.
 	 * Does nothing while disconnected. Opening the connection requests a
 	 * render automatically.
 	 */
@@ -73,10 +74,7 @@ export class Connection {
 		if (this.socket === null || !this.isOpen) return;
 		this.requested += 1;
 		this.socket.send(
-			JSON.stringify({
-				run: this.requested,
-				signals: this.target.collectSignals(),
-			}),
+			JSON.stringify({ ...this.target.renderInputs(), run: this.requested }),
 		);
 	}
 

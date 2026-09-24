@@ -15,6 +15,7 @@ use tokio_tungstenite::{
 use topcoat::{
     Result,
     context::Cx,
+    core::identity::Identity,
     router::{
         Body, Router,
         error::{bad_request, redirect},
@@ -82,6 +83,32 @@ async fn shards() -> Result<impl View> {
     Ok(view! { <main>ticker()</main> })
 }
 
+/// Shows its argument, the connection state, and a signal of its own,
+/// then updates a live region while connected.
+#[shard("/feed")]
+async fn feed(cx: &Cx, label: String) -> Result<impl View> {
+    let count = signal(cx, || 0.0);
+    let current = count.get();
+    let connected = connected(cx);
+    Ok(view! {
+        <p>
+            (label)
+            " connected: "
+            (connected)
+            " count: "
+            (current)
+        </p>
+        (live! {
+            let token = emit! { <p>"first"</p> }?;
+            if connected {
+                emit! { <p>"pushed"</p> }
+            } else {
+                Ok(token)
+            }
+        })
+    })
+}
+
 /// Redirects before rendering any content.
 #[page("/away")]
 async fn away() -> Result<impl View> {
@@ -105,6 +132,7 @@ fn router() -> Router {
         .page(shards)
         .page(away)
         .page(broken)
+        .route(feed)
         .runtime()
         .build()
 }
@@ -158,6 +186,18 @@ async fn request_run(client: &mut Client, run: u64, signals: &str) {
     client
         .send(Message::text(format!(
             "{{\"run\":{run},\"signals\":{signals}}}"
+        )))
+        .await
+        .unwrap();
+}
+
+/// Requests a shard render at the root identity with the supplied run id,
+/// JSON arguments, and JSON signal values.
+async fn request_shard_run(client: &mut Client, run: u64, args: &str, signals: &str) {
+    let identity = Identity::ROOT;
+    client
+        .send(Message::text(format!(
+            "{{\"run\":{run},\"shard\":\"{identity}\",\"args\":{args},\"signals\":{signals}}}"
         )))
         .await
         .unwrap();
@@ -246,6 +286,71 @@ async fn a_live_shard_streams_its_updates_over_the_page_connection() {
     assert!(
         shard_start < region_start && region_start < shard_end,
         "{html}"
+    );
+
+    client.close(None).await.unwrap();
+    shut_down(shutdown_tx, server).await;
+}
+
+#[tokio::test]
+async fn a_shard_run_renders_the_shard_endpoint_connected() {
+    let (addr, shutdown_tx, server) = spawn_server().await;
+    let mut client = connect(addr, "/feed").await;
+
+    request_shard_run(&mut client, 1, r#"["news"]"#, "{}").await;
+
+    assert_eq!(
+        next_json(&mut client).await,
+        serde_json::json!({ "t": "run", "id": 1 })
+    );
+    let snapshot = next_json(&mut client).await;
+    assert_eq!(snapshot["t"], "snapshot", "{snapshot}");
+    let html = snapshot["html"].as_str().unwrap();
+    assert!(html.contains("news connected: true"), "{html}");
+    assert!(html.contains("<!--::topcoat::connect-->"), "{html}");
+    // The endpoint renders the shard's content without its scope markers.
+    assert!(!html.contains("::topcoat::shard::start("), "{html}");
+    let swap = next_json(&mut client).await;
+    assert_eq!(swap["t"], "swap");
+    assert_eq!(swap["html"], "<p>pushed</p>");
+
+    client.close(None).await.unwrap();
+    shut_down(shutdown_tx, server).await;
+}
+
+#[tokio::test]
+async fn a_shard_run_restores_the_signal_values_it_is_sent() {
+    let (addr, shutdown_tx, server) = spawn_server().await;
+    let mut client = connect(addr, "/feed").await;
+
+    request_shard_run(&mut client, 1, r#"["news"]"#, "{}").await;
+    let _run = next_json(&mut client).await;
+    let snapshot = next_json(&mut client).await;
+    let id = last_signal_id(snapshot["html"].as_str().unwrap()).to_owned();
+    let _swap = next_json(&mut client).await;
+
+    request_shard_run(&mut client, 2, r#"["news"]"#, &format!(r#"{{"{id}":7}}"#)).await;
+    assert_eq!(next_json(&mut client).await["t"], "run");
+    let snapshot = next_json(&mut client).await;
+    let html = snapshot["html"].as_str().unwrap();
+    assert!(html.contains("count: 7"), "{html}");
+
+    client.close(None).await.unwrap();
+    shut_down(shutdown_tx, server).await;
+}
+
+#[tokio::test]
+async fn a_shard_run_with_invalid_arguments_sends_an_error_message() {
+    let (addr, shutdown_tx, server) = spawn_server().await;
+    let mut client = connect(addr, "/feed").await;
+
+    request_shard_run(&mut client, 1, "[1,2,3]", "{}").await;
+    assert_eq!(next_json(&mut client).await["t"], "run");
+    let error = next_json(&mut client).await;
+    assert_eq!(error["t"], "error");
+    assert!(
+        (400..500).contains(&error["status"].as_u64().unwrap()),
+        "{error}"
     );
 
     client.close(None).await.unwrap();
