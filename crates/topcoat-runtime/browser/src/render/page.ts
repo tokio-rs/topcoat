@@ -9,6 +9,7 @@ import type { Runtime } from "../runtime";
 import type { Scope } from "../scope";
 import type { SignalId } from "../signal-registry";
 import { Connection, type ConnectionTarget } from "./connection";
+import { newRender } from "./frames";
 import { RUNTIME_HEADER } from "./request";
 import { RenderUnit } from "./unit";
 
@@ -88,7 +89,7 @@ export class PageUnit extends RenderUnit implements ConnectionTarget {
 						this.replace((scope, adoptable) => {
 							update();
 							this.runtime.hydrate(document, null, null, scope, adoptable);
-						});
+						}, newRender());
 					},
 				};
 			},

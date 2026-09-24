@@ -104,8 +104,34 @@ it("a run's snapshot and swaps reach the target", () => {
 	socket().receive({ t: "snapshot", html: "<p>one</p>" });
 	socket().receive({ t: "swap", region: "r", html: "<p>two</p>" });
 
-	expect(target.replaceContent).toHaveBeenCalledExactlyOnceWith("<p>one</p>");
-	expect(target.applySwap).toHaveBeenCalledExactlyOnceWith("r", "<p>two</p>");
+	expect(target.replaceContent).toHaveBeenCalledExactlyOnceWith(
+		"<p>one</p>",
+		expect.any(Symbol),
+	);
+	expect(target.applySwap).toHaveBeenCalledExactlyOnceWith(
+		"r",
+		"<p>two</p>",
+		expect.any(Symbol),
+	);
+	// The swap belongs to the render the snapshot came from.
+	expect(target.applySwap.mock.calls[0]?.[2]).toBe(
+		target.replaceContent.mock.calls[0]?.[1],
+	);
+});
+
+it("each run's output belongs to its own render", () => {
+	const { connection, socket, target } = fixture();
+	socket().open();
+
+	socket().receive({ t: "run", id: 1 });
+	socket().receive({ t: "snapshot", html: "<p>one</p>" });
+	connection.requestRun();
+	socket().receive({ t: "run", id: 2 });
+	socket().receive({ t: "snapshot", html: "<p>two</p>" });
+
+	const renders = target.replaceContent.mock.calls.map((call) => call[1]);
+	expect(renders).toHaveLength(2);
+	expect(renders[0]).not.toBe(renders[1]);
 });
 
 it("the output of a superseded run is dropped until the latest run's output starts", () => {
@@ -122,7 +148,10 @@ it("the output of a superseded run is dropped until the latest run's output star
 	socket().receive({ t: "run", id: 2 });
 	socket().receive({ t: "snapshot", html: "<p>fresh</p>" });
 
-	expect(target.replaceContent).toHaveBeenCalledExactlyOnceWith("<p>fresh</p>");
+	expect(target.replaceContent).toHaveBeenCalledExactlyOnceWith(
+		"<p>fresh</p>",
+		expect.any(Symbol),
+	);
 	expect(target.applySwap).not.toHaveBeenCalled();
 });
 
@@ -156,7 +185,11 @@ it("a failure applying a message is reported and later messages still apply", ()
 	expect(target.reportError).toHaveBeenCalledExactlyOnceWith(
 		expect.objectContaining({ message: "morph failed" }),
 	);
-	expect(target.applySwap).toHaveBeenCalledExactlyOnceWith("r", "<p>two</p>");
+	expect(target.applySwap).toHaveBeenCalledExactlyOnceWith(
+		"r",
+		"<p>two</p>",
+		expect.any(Symbol),
+	);
 });
 
 it("a dropped connection is reopened with a growing delay and requests a fresh run", () => {

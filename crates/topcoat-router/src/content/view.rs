@@ -242,6 +242,10 @@ async fn stream<V: View + Unpin + 'static>(mut view: V, cx: &Cx) -> Result<Respo
 
 /// Builds a response with the chosen format's content type and the view's
 /// status code and headers.
+///
+/// A format chosen from the request's `Accept` header rather than the
+/// context makes the response vary by that header, so a cache keeps the
+/// two formats apart.
 fn view_response(
     cx: &Cx,
     body: impl Into<Body>,
@@ -258,6 +262,11 @@ fn view_response(
         *response.status_mut() = status_code;
     }
     response.headers_mut().extend(headers);
+    if try_request_context::<ViewResponseDelivery>(cx).is_none() {
+        response
+            .headers_mut()
+            .append(http::header::VARY, HeaderValue::from_static("Accept"));
+    }
     Ok(response)
 }
 
@@ -1013,6 +1022,12 @@ mod tests {
             response.headers().get(CONTENT_TYPE).unwrap(),
             "application/x-ndjson"
         );
+        // The same URL serves HTML to other requests, so caches must key
+        // on the header that told them apart.
+        assert_eq!(
+            response.headers().get(http::header::VARY).unwrap(),
+            "Accept"
+        );
         let frames = json_frames(response.into_body()).await;
         assert_eq!(frames[0]["t"], "snapshot");
         assert_eq!(frames.len(), 3, "{frames:?}");
@@ -1045,6 +1060,8 @@ mod tests {
             response.headers().get(CONTENT_TYPE).unwrap(),
             "text/html; charset=utf-8"
         );
+        // The format did not depend on the header.
+        assert!(response.headers().get(http::header::VARY).is_none());
     }
 
     #[tokio::test]

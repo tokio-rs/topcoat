@@ -9,30 +9,43 @@ export type ServerMessage =
 	| { t: "redirect"; location: string }
 	| { t: "error"; status: number };
 
+/**
+ * Identifies one render's output. Content remembers the render that
+ * produced it, so a swap from an older render cannot overwrite content a
+ * newer render of the same unit put in place.
+ */
+export type RenderToken = symbol;
+
+/** Starts a new render's identity. */
+export function newRender(): RenderToken {
+	return Symbol("render");
+}
+
 /** Content that render frames update. */
 export interface FrameTarget {
 	/** Replaces the content with a render's initial HTML. */
-	replaceContent(html: string): void;
-	/** Updates one live region. */
-	applySwap(region: string, html: string): void;
+	replaceContent(html: string, render: RenderToken): void;
+	/** Updates one live region the same render produced. */
+	applySwap(region: string, html: string, render: RenderToken): void;
 }
 
 /**
- * Applies one frame of a render to `target`. A run announcement carries no
- * output and is ignored. `label` names the render in the error a failure
- * frame becomes.
+ * Applies one frame of the render identified by `render` to `target`. A
+ * run announcement carries no output and is ignored. `label` names the
+ * render in the error a failure frame becomes.
  */
 export function applyFrame(
 	target: FrameTarget,
 	frame: ServerMessage,
 	label: string,
+	render: RenderToken,
 ): void {
 	switch (frame.t) {
 		case "snapshot":
-			target.replaceContent(frame.html);
+			target.replaceContent(frame.html, render);
 			break;
 		case "swap":
-			target.applySwap(frame.region, frame.html);
+			target.applySwap(frame.region, frame.html, render);
 			break;
 		case "redirect":
 			location.assign(frame.location);

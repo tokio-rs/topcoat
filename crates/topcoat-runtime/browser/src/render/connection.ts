@@ -1,6 +1,12 @@
 import type { DehydratedSurrogate } from "../expression/serialized";
 import type { SignalId } from "../signal-registry";
-import { applyFrame, type FrameTarget, type ServerMessage } from "./frames";
+import {
+	applyFrame,
+	type FrameTarget,
+	newRender,
+	type RenderToken,
+	type ServerMessage,
+} from "./frames";
 
 /** The WebSocket subprotocol used by the runtime. */
 export const RUNTIME_PROTOCOL = "topcoat-runtime";
@@ -40,6 +46,8 @@ export class Connection {
 	private requested = 0;
 	/** The run id announced by the server for incoming output. */
 	private receiving = 0;
+	/** The render the announced run's output belongs to. */
+	private render: RenderToken = newRender();
 
 	constructor(
 		private readonly url: string,
@@ -118,11 +126,12 @@ export class Connection {
 			const message = JSON.parse(data) as ServerMessage;
 			if (message.t === "run") {
 				this.receiving = message.id;
+				this.render = newRender();
 				return;
 			}
 			// Ignore output if we have already requested a newer run.
 			if (this.receiving !== this.requested) return;
-			applyFrame(this.target, message, "Connected");
+			applyFrame(this.target, message, "Connected", this.render);
 		} catch (error) {
 			this.target.reportError(error);
 		}

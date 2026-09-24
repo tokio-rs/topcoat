@@ -1,6 +1,7 @@
 import { dehydrate } from "./expression/dehydrate";
 import type { DehydratedSurrogate } from "./expression/serialized";
 import { Effect } from "./reactivity";
+import type { RenderToken } from "./render/frames";
 import type { RenderUnit } from "./render/unit";
 import type { Runtime } from "./runtime";
 import type { SignalId } from "./signal-registry";
@@ -49,6 +50,12 @@ export class Scope {
 		 * signal dependencies and connection requests.
 		 */
 		readonly unit: RenderUnit | null = null,
+		/**
+		 * The render that produced this scope's content. Content scanned
+		 * into a child scope belongs to the same render unless the child
+		 * says otherwise. `null` for the content the document loaded with.
+		 */
+		readonly render: RenderToken | null = parent?.render ?? null,
 	) {
 		parent?.children.add(this);
 	}

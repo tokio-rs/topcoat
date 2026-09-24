@@ -7,7 +7,7 @@ import type { Scope } from "../scope";
 import type { SignalId } from "../signal-registry";
 import { F64 } from "../surrogate";
 import { RUNTIME_PROTOCOL } from "./connection";
-import type { ServerMessage } from "./frames";
+import { newRender, type ServerMessage } from "./frames";
 import { RUNTIME_HEADER } from "./request";
 import { ShardUnit } from "./shard";
 import { RenderUnit } from "./unit";
@@ -303,7 +303,7 @@ function mountScripted() {
 		/** Makes `content` the current content, as a replacement would. */
 		render(content: (typeof unit.script)[number]) {
 			unit.script.push(content);
-			unit.replaceContent("");
+			unit.replaceContent("", newRender());
 		},
 	};
 }
@@ -436,7 +436,11 @@ it("a swap replaces its region's content, rebuilding the region's resources and 
 		const el = document.querySelector("button") as HTMLButtonElement;
 		const before = runtime.page.contentScope.regions.get("aa")?.scope;
 
-		runtime.page.applySwap("aa", `${declaration("a", 0)}${button}<p>two</p>`);
+		runtime.page.applySwap(
+			"aa",
+			`${declaration("a", 0)}${button}<p>two</p>`,
+			null,
+		);
 
 		expect(document.body.innerHTML).toBe(
 			`<p>outside</p><!--::topcoat::region::start(aa)-->${declaration("a", 0)}${button}<p>two</p><!--::topcoat::region::end(aa)-->`,
@@ -465,9 +469,32 @@ it("a swap for a region the content does not have is ignored", () => {
 	try {
 		const before = document.body.innerHTML;
 
-		runtime.page.applySwap("zz", `<p>two</p>`);
+		runtime.page.applySwap("zz", `<p>two</p>`, null);
 
 		expect(document.body.innerHTML).toBe(before);
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
+it("a swap from an older render cannot overwrite a region a newer render produced", () => {
+	const region = (html: string) =>
+		`<!--::topcoat::region::start(aa)-->${html}<!--::topcoat::region::end(aa)-->`;
+	// The page's render put the shard and its region in place.
+	const { runtime, shard } = mountShard(region(`<p>one</p>`));
+	try {
+		// The shard renders again on its own while the page's render is still
+		// streaming, so the region now belongs to the shard's render.
+		const own = newRender();
+		shard.replaceContent(region(`<p>two</p>`), own);
+
+		// A late swap from the page's render must not overwrite the newer content.
+		runtime.page.applySwap("aa", `<p>stale</p>`, null);
+		expect(document.body.innerHTML).toContain(region(`<p>two</p>`));
+
+		// The shard's own render keeps updating its region.
+		shard.applySwap("aa", `<p>three</p>`, own);
+		expect(document.body.innerHTML).toContain(region(`<p>three</p>`));
 	} finally {
 		runtime.page.dispose();
 	}
@@ -481,6 +508,7 @@ it("a dependency a swap declares re-renders the unit when it changes", async () 
 		runtime.page.applySwap(
 			"aa",
 			`${declaration("c", 0)}<!--::topcoat::dep("c")-->`,
+			null,
 		);
 		expect(runtime.page.contentScope.collectDependencies()).toEqual(
 			new Set(["c"]),
@@ -500,7 +528,7 @@ it("a swap parses its content in the region's context, so table rows survive", (
 	const runtime = new Runtime();
 	runtime.start(document);
 	try {
-		runtime.page.applySwap("aa", `<tr><td>two</td></tr>`);
+		runtime.page.applySwap("aa", `<tr><td>two</td></tr>`, null);
 
 		expect(document.querySelectorAll("tr")).toHaveLength(1);
 		expect(document.querySelector("tbody")?.innerHTML).toBe(
@@ -582,7 +610,7 @@ it("a swap that removes a signal drops the dependency on it", () => {
 			new Set(["c"]),
 		);
 
-		runtime.page.applySwap("aa", `<p>gone</p>`);
+		runtime.page.applySwap("aa", `<p>gone</p>`, null);
 
 		expect(runtime.registry.has("c")).toBe(false);
 		expect(runtime.page.contentScope.collectDependencies()).toEqual(new Set());
@@ -602,6 +630,7 @@ it("a swap inside a shard re-subscribes the shard, not the page", async () => {
 		runtime.page.applySwap(
 			"aa",
 			`${declaration("d", 0)}<!--::topcoat::dep("d")-->`,
+			null,
 		);
 		expect(shard.contentScope.collectDependencies()).toEqual(new Set(["d"]));
 		expect(runtime.page.contentScope.collectDependencies()).toEqual(new Set());
