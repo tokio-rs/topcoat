@@ -9,20 +9,168 @@ use futures_util::future::poll_fn;
 use http::{HeaderMap, HeaderValue, StatusCode};
 use http_body::Frame;
 use pin_project_lite::pin_project;
-use topcoat_core::{context::Cx, error::Result};
-use topcoat_view::{BoxView, Formatter, View, ViewExt, ViewHandle, internal::MoveView};
+use serde::Serialize;
+use topcoat_core::{
+    context::{Cx, try_request_context},
+    error::Result,
+};
+use topcoat_view::{
+    BoxView, Formatter, RegionId, View, ViewExt, ViewHandle, ViewSwap, internal::MoveView,
+};
 
 use crate::{
     Body, BoxError,
-    content::Html,
     error::redirect_location,
     response::{AsyncIntoResponse, IntoResponse, Response},
 };
 
+/// How a view response reaches the browser.
+///
+/// Register a delivery on the request context to select it for the
+/// dispatch; view responses use [`Html`](Self::Html) otherwise. The status
+/// code and headers a view declares apply with either delivery, and a
+/// redirect or error before the first content is an ordinary redirect or
+/// error response.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum ViewResponseDelivery {
+    /// HTML the browser parses as a document.
+    ///
+    /// The first content is the document itself. Each later replacement a
+    /// live region emits follows as a template and a script that swaps it
+    /// into the region, and a redirect after the first content is a script
+    /// navigating to its target.
+    #[default]
+    Html,
+    /// Newline-delimited JSON frames the browser runtime applies.
+    ///
+    /// The content type is `application/x-ndjson`. Each frame has a `t`
+    /// field naming its kind: `snapshot` carries the first content as
+    /// `html`; `swap` carries a `region` id and the `html` replacing that
+    /// region's content; `redirect` carries the `location` of a redirect
+    /// after the first content.
+    Frames,
+}
+
+/// Returns the delivery selected for view responses of the current request.
+///
+/// Defaults to [`ViewResponseDelivery::Html`] when the request context holds
+/// no delivery.
+#[must_use]
+pub fn view_response_delivery(cx: &Cx) -> ViewResponseDelivery {
+    try_request_context::<ViewResponseDelivery>(cx)
+        .copied()
+        .unwrap_or_default()
+}
+
+impl ViewResponseDelivery {
+    /// The content type of a response with this delivery.
+    fn content_type(self) -> HeaderValue {
+        HeaderValue::from_static(match self {
+            Self::Html => "text/html; charset=utf-8",
+            Self::Frames => "application/x-ndjson",
+        })
+    }
+
+    /// The body chunk carrying the first content.
+    fn first(self, html: String) -> String {
+        match self {
+            Self::Html => html,
+            Self::Frames => ViewFrame::Snapshot { html: &html }.to_line(),
+        }
+    }
+
+    /// The body chunk carrying a region replacement. `script` is the swap
+    /// applier if it has not been sent yet; only HTML delivery needs it.
+    fn swap(self, cx: &Cx, swap: ViewSwap, script: Option<&'static str>) -> String {
+        let region = swap.region;
+        match self {
+            Self::Html => {
+                // The envelope's fixed parts and two region ids on top of
+                // the replacement's own estimate.
+                let mut envelope = String::with_capacity(
+                    script.map_or(0, str::len) + swap.replacement.size_hint() + 96,
+                );
+                let mut f = Formatter::new(&mut envelope);
+                if let Some(script) = script {
+                    f.write_str(script);
+                }
+                write!(f, "<template data-topcoat-swap=\"{region}\">").unwrap();
+                swap.replacement.render_into(cx, &mut f);
+                write!(f, "</template><script>topcoat.swap(\"{region}\")</script>").unwrap();
+                envelope
+            }
+            Self::Frames => {
+                let mut html = String::with_capacity(swap.replacement.size_hint());
+                swap.replacement
+                    .render_into(cx, &mut Formatter::new(&mut html));
+                ViewFrame::Swap {
+                    region,
+                    html: &html,
+                }
+                .to_line()
+            }
+        }
+    }
+
+    /// The body chunk carrying a redirect raised after the first content.
+    fn redirect(self, location: &HeaderValue) -> String {
+        match self {
+            Self::Html => redirect_script(location),
+            Self::Frames => {
+                // The location is percent-encoded down to ASCII, so it
+                // converts back.
+                let location = location.to_str().expect("redirect location is ASCII");
+                ViewFrame::Redirect { location }.to_line()
+            }
+        }
+    }
+}
+
+/// One frame of a response with [`ViewResponseDelivery::Frames`].
+#[derive(Serialize)]
+#[serde(tag = "t", rename_all = "snake_case")]
+enum ViewFrame<'a> {
+    Snapshot {
+        html: &'a str,
+    },
+    Swap {
+        #[serde(serialize_with = "serialize_region")]
+        region: RegionId,
+        html: &'a str,
+    },
+    Redirect {
+        location: &'a str,
+    },
+}
+
+/// Serializes a region id the way its markers spell it.
+fn serialize_region<S: serde::Serializer>(
+    region: &RegionId,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    serializer.collect_str(region)
+}
+
+impl ViewFrame<'_> {
+    /// Serializes the frame as one line of the response body.
+    fn to_line(&self) -> String {
+        let mut line = serde_json::to_string(self).expect("a view frame serializes");
+        line.push('\n');
+        line
+    }
+}
+
 impl IntoResponse for ViewHandle {
     fn into_response(self, cx: &Cx) -> Result<Response> {
+        let delivery = view_response_delivery(cx);
         let rendered = self.render_response(cx);
-        html_response(cx, rendered.html, rendered.status_code, rendered.headers)
+        view_response(
+            cx,
+            delivery.first(rendered.html),
+            rendered.status_code,
+            rendered.headers,
+            delivery,
+        )
     }
 }
 
@@ -42,37 +190,52 @@ where
 }
 
 async fn stream<V: View + Unpin + 'static>(mut view: V, cx: &Cx) -> Result<Response> {
+    let delivery = view_response_delivery(cx);
     let mut pinned_view = Pin::new(&mut view);
     let first = poll_fn(|cx| pinned_view.as_mut().poll_first(cx)).await?;
     let rendered = first.content.render_response(cx);
+    let first_content = delivery.first(rendered.html);
     if first.live {
         let body = ViewBody {
             cx: cx.clone(),
-            first: Some(rendered.html),
-            script: Some(SWAP_SCRIPT),
+            first: Some(first_content),
+            script: (delivery == ViewResponseDelivery::Html).then_some(SWAP_SCRIPT),
+            delivery,
             done: false,
             view,
         };
-        html_response(cx, Body::new(body), rendered.status_code, rendered.headers)
-    } else {
-        html_response(
+        view_response(
             cx,
-            Body::new(rendered.html),
+            Body::new(body),
             rendered.status_code,
             rendered.headers,
+            delivery,
+        )
+    } else {
+        view_response(
+            cx,
+            Body::new(first_content),
+            rendered.status_code,
+            rendered.headers,
+            delivery,
         )
     }
 }
 
-/// Builds an HTML response around `body`, applying the status code and
-/// headers a view declared.
-fn html_response(
+/// Builds a response around `body` with the content type of `delivery`,
+/// applying the status code and headers a view declared.
+fn view_response(
     cx: &Cx,
     body: impl Into<Body>,
     status_code: Option<StatusCode>,
     headers: HeaderMap,
+    delivery: ViewResponseDelivery,
 ) -> Result<Response> {
-    let mut response = Html(body.into()).into_response(cx)?;
+    let mut response = (
+        [(http::header::CONTENT_TYPE, delivery.content_type())],
+        body.into(),
+    )
+        .into_response(cx)?;
     if let Some(status_code) = status_code {
         *response.status_mut() = status_code;
     }
@@ -132,7 +295,9 @@ pin_project! {
         cx: Cx,
         first: Option<String>,
         // The swap applier, taken by the first swap it is sent ahead of.
+        // Only HTML delivery has one.
         script: Option<&'static str>,
+        delivery: ViewResponseDelivery,
         // Whether the view has reported it has no further swaps. Polling a
         // view past that point resumes a future that already completed.
         done: bool,
@@ -158,23 +323,8 @@ impl<V: View + 'static> http_body::Body for ViewBody<V> {
         }
         match this.view.poll_swap(cx) {
             Poll::Ready(Ok(Some(swap))) => {
-                let script = this.script.take();
-                let region = swap.region;
-                // The envelope's fixed parts and two region ids on top of
-                // the replacement's own estimate.
-                let mut envelope = String::with_capacity(
-                    script.map_or(0, str::len) + swap.replacement.size_hint() + 96,
-                );
-                {
-                    let mut f = Formatter::new(&mut envelope);
-                    if let Some(script) = script {
-                        f.write_str(script);
-                    }
-                    write!(f, "<template data-topcoat-swap=\"{region}\">").unwrap();
-                    swap.replacement.render_into(this.cx, &mut f);
-                    write!(f, "</template><script>topcoat.swap(\"{region}\")</script>").unwrap();
-                }
-                Poll::Ready(Some(Ok(Frame::data(envelope.into()))))
+                let chunk = this.delivery.swap(this.cx, swap, this.script.take());
+                Poll::Ready(Some(Ok(Frame::data(chunk.into()))))
             }
             Poll::Ready(Ok(None)) => {
                 *this.done = true;
@@ -187,7 +337,8 @@ impl<V: View + 'static> http_body::Body for ViewBody<V> {
                 // to a client-side navigation instead.
                 match redirect_location(error) {
                     Ok(location) => {
-                        Poll::Ready(Some(Ok(Frame::data(redirect_script(&location).into()))))
+                        let chunk = this.delivery.redirect(&location);
+                        Poll::Ready(Some(Ok(Frame::data(chunk.into()))))
                     }
                     Err(error) => Poll::Ready(Some(Err(error.into()))),
                 }
@@ -232,6 +383,36 @@ mod tests {
             .page(PageFn::new(Method::GET, "/p", render))
             .build();
         send(&router, "/p").await
+    }
+
+    /// Serves `render` as a page at `/p` and dispatches a `GET` to it that
+    /// selects framed delivery.
+    async fn send_page_framed(render: crate::PageRenderFn) -> Response {
+        let router = RouterBuilder::new()
+            .page(PageFn::new(Method::GET, "/p", render))
+            .build();
+        let request = http::Request::builder()
+            .method(Method::GET)
+            .uri("/p")
+            .body(Body::empty())
+            .unwrap();
+        router
+            .handle_with(request, (ViewResponseDelivery::Frames,))
+            .await
+    }
+
+    /// Reads a framed response body as its frames, one parsed JSON object
+    /// per body frame, checking each is a single newline-terminated line.
+    async fn json_frames(body: Body) -> Vec<serde_json::Value> {
+        data_frames(body)
+            .await
+            .into_iter()
+            .map(|frame| {
+                let line = frame.strip_suffix('\n').expect("a frame ends with a newline");
+                assert!(!line.contains('\n'), "{frame}");
+                serde_json::from_str(line).unwrap()
+            })
+            .collect()
     }
 
     /// Reads the response body as its data frames, one string per frame.
@@ -773,6 +954,132 @@ mod tests {
         assert_eq!(
             script,
             "<script>window.location.replace(\"/caf%C3%A9\")</script>"
+        );
+    }
+
+    #[test]
+    fn a_request_without_a_delivery_gets_html() {
+        assert_eq!(
+            view_response_delivery(&Cx::default()),
+            ViewResponseDelivery::Html
+        );
+        assert_eq!(
+            view_response_delivery(&Cx::default().with(ViewResponseDelivery::Frames)),
+            ViewResponseDelivery::Frames
+        );
+    }
+
+    #[tokio::test]
+    async fn a_framed_settled_page_is_one_snapshot_frame() {
+        let response = send_page_framed(render_settled_region_page).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(CONTENT_TYPE).unwrap(),
+            "application/x-ndjson"
+        );
+
+        let frames = json_frames(response.into_body()).await;
+        assert_eq!(
+            frames,
+            [serde_json::json!({ "t": "snapshot", "html": "<main><p>only</p></main>" })]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_framed_live_page_sends_its_snapshot_then_one_frame_per_swap() {
+        let response = send_page_framed(render_thrice_emitting_page).await;
+        assert_eq!(
+            response.headers().get(CONTENT_TYPE).unwrap(),
+            "application/x-ndjson"
+        );
+
+        let raw = data_frames(response.into_body()).await;
+        // No applier and no swap scripts: the runtime applies the frames.
+        assert!(raw.iter().all(|frame| !frame.contains("<script")), "{raw:?}");
+
+        let frames: Vec<serde_json::Value> = raw
+            .iter()
+            .map(|frame| serde_json::from_str(frame.trim_end()).unwrap())
+            .collect();
+        assert_eq!(frames.len(), 3);
+        // The snapshot is the marked-up document, so the swaps that follow
+        // name a region the runtime can find in it.
+        let html = frames[0]["html"].as_str().unwrap();
+        let region = region_ids(html)[0];
+        assert_eq!(frames[0]["t"], "snapshot");
+        assert!(html.contains("<p>one</p>"), "{html}");
+        assert_eq!(
+            frames[1],
+            serde_json::json!({ "t": "swap", "region": region, "html": "<p>two</p>" })
+        );
+        assert_eq!(
+            frames[2],
+            serde_json::json!({ "t": "swap", "region": region, "html": "<p>three</p>" })
+        );
+    }
+
+    #[tokio::test]
+    async fn framed_sibling_regions_name_their_own_region() {
+        let response = send_page_framed(render_two_region_page).await;
+
+        let frames = json_frames(response.into_body()).await;
+        let html = frames[0]["html"].as_str().unwrap();
+        let regions = region_ids(html);
+        assert_eq!(regions.len(), 2);
+        // Every swap after the snapshot belongs to one of the two regions.
+        for frame in &frames[1..] {
+            assert_eq!(frame["t"], "swap");
+            let region = frame["region"].as_str().unwrap();
+            assert!(regions.contains(&region), "{frame}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_framed_redirect_after_the_first_content_is_a_redirect_frame() {
+        let response = send_page_framed(render_late_redirecting_page).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let frames = json_frames(response.into_body()).await;
+        assert_eq!(frames.len(), 2);
+        assert_eq!(frames[0]["t"], "snapshot");
+        assert_eq!(
+            frames[1],
+            serde_json::json!({ "t": "redirect", "location": "/target" })
+        );
+    }
+
+    #[tokio::test]
+    async fn a_framed_redirect_before_the_first_content_is_a_real_redirect() {
+        let response = send_page_framed(render_redirecting_page).await;
+        assert_eq!(response.status(), StatusCode::TEMPORARY_REDIRECT);
+        assert_eq!(
+            response.headers().get(http::header::LOCATION).unwrap(),
+            "/target"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_framed_view_handle_response_is_a_snapshot_frame_with_its_status() {
+        let cx = &Cx::default().with(ViewResponseDelivery::Frames);
+        let handle = view! {
+            cx =>
+            (StatusCode::CREATED)
+            <p>"made"</p>
+        }
+        .single()
+        .await
+        .unwrap();
+
+        let response = handle.into_response(cx).unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED);
+        assert_eq!(
+            response.headers().get(CONTENT_TYPE).unwrap(),
+            "application/x-ndjson"
+        );
+        let frames = json_frames(response.into_body()).await;
+        assert_eq!(
+            frames,
+            [serde_json::json!({ "t": "snapshot", "html": "<p>made</p>" })]
         );
     }
 }
