@@ -1,4 +1,4 @@
-The [`live!`] and [`emit!`] macros stream updates to part of a page. Use them to show content while slower work finishes. Updates travel over the page's HTTP response.
+The [`live!`] and [`emit!`] macros stream updates to part of a page. Use them to show content while slower work finishes, or keep content up to date as application events arrive. Updates travel over the HTTP response, or over a WebSocket when the page or shard requests a connection.
 
 [`live!`] marks a region of the page whose content can still change while the response streams. Its body is ordinary async Rust. Inside the body, [`emit!`] renders markup into the region, and every emission replaces the previous one in the browser.
 
@@ -71,6 +71,60 @@ Ok(view! {
 ```
 
 Returning `Ok(EmitToken)` satisfies the return type but does not emit content. The body still needs to emit at least once, so the loop above must receive a price.
+
+
+# Long-lived connections
+
+Call [`connected(cx)`] to keep a live region updating after the HTTP response finishes. During HTTP rendering, it returns `false` and asks the browser to connect the enclosing page or shard. Once the response finishes, the browser opens a WebSocket and renders that page or shard again, with `connected(cx)` returning `true`. Enable `.runtime()` on the router and include `topcoat::runtime::script()` in the document, as shown in the [runtime setup guide].
+
+The same live body runs from the top on both renders. Emit the current content during the HTTP render, then finish. During the connected render, emit fresh content and keep listening for changes. For example, a chat can subscribe to message notifications and reload the list each time one arrives:
+
+```rust
+use topcoat::{
+    Result,
+    context::{Cx, app_context},
+    router::page,
+    runtime::connected,
+    view::{View, emit, live, view},
+};
+# struct Chat;
+# impl Chat {
+#     fn subscribe(&self) -> tokio::sync::broadcast::Receiver<()> { unimplemented!() }
+#     fn messages(&self) -> Vec<String> { unimplemented!() }
+# }
+
+#[page]
+async fn chat(cx: &Cx) -> Result<impl View> {
+    Ok(view! {
+        <h1>"Chat"</h1>
+        (live! {
+            let chat = app_context::<Chat>(cx);
+            let mut changed = chat.subscribe();
+            loop {
+                let token = emit! {
+                    <ul>
+                        for message in chat.messages() {
+                            <li>(message)</li>
+                        }
+                    </ul>
+                }?;
+                if !connected(cx) {
+                    break Ok(token);
+                }
+                changed.recv().await.ok();
+            }
+        })
+    })
+}
+```
+
+Here, `Chat` is application state registered on the router. It stores the messages and broadcasts a notification when a message is added. Subscribe before reading the list so a change between the read and the next wait is not missed. The subscription buffers notifications while the list renders. See the [chat example] for the full implementation.
+
+The HTTP render emits the list once and returns its emit token. The connected render emits a fresh list before waiting for notifications, catching changes that happened between the HTTP render and the connection. Each later emission replaces the list. Calling `connected(cx)` only requests a connection. It does not end the HTTP response or interrupt an await, so keep indefinite waits behind the connection check.
+
+When a connection closes, its render and subscriptions are dropped. The browser reconnects and starts a fresh render with its current inputs and signal values. Local variables and subscriptions are created again, so the live body should read the current state on every run. Start long-running jobs separately and observe their progress here to avoid starting them again on reconnect.
+
+[`connected_untracked(cx)`] returns the same boolean without requesting a connection. Use it when a component should adapt to a connected render without making its page or shard open a socket. Both functions describe the current render, regardless of connections elsewhere in the document.
 
 # Handling Errors
 
@@ -189,9 +243,13 @@ Use [`live!`] directly when you need to control the updates, such as showing pro
 [`EmitToken`]: struct.EmitToken.html
 [`Result`]: ../type.Result.html
 [`component`]: attr.component.html
+[`connected(cx)`]: https://docs.rs/topcoat/latest/topcoat/runtime/fn.connected.html
+[`connected_untracked(cx)`]: https://docs.rs/topcoat/latest/topcoat/runtime/fn.connected_untracked.html
 [`emit!`]: macro.emit.html
 [`error_boundary`]: struct.error_boundary.html
 [`live!`]: macro.live.html
 [`suspense`]: struct.suspense.html
 [`view!`]: macro.view.html
 [router's error guide]: https://docs.rs/topcoat/latest/topcoat/router/error/index.html
+[runtime setup guide]: https://docs.rs/topcoat/latest/topcoat/runtime/index.html#setup
+[chat example]: https://github.com/tokio-rs/topcoat/blob/main/examples/live/src/chat.rs
