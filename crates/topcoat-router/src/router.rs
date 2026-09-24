@@ -7,7 +7,7 @@ use std::{
 };
 
 use topcoat_core::{
-    context::{AppContext, Cx, try_request_context, with_identity},
+    context::{AppContext, ContextValues, Cx, RequestContext, try_request_context, with_identity},
     error::Result,
 };
 
@@ -38,6 +38,10 @@ use crate::{
 /// # Ok(())
 /// # }
 /// ```
+///
+/// Cloning a router is cheap: every clone dispatches through the same
+/// routing tables.
+#[derive(Clone)]
 pub struct Router {
     /// The routing tables, shared with every request context this router
     /// creates.
@@ -68,7 +72,32 @@ impl Router {
     /// while processing the request becomes a `500 Internal Server Error`
     /// response.
     pub async fn handle(&self, request: Request) -> Response {
-        let mut future = pin!(self.handle_inner(request));
+        self.handle_with(request, RequestContext::new()).await
+    }
+
+    /// Dispatches a request like [`handle`](Self::handle), with `values`
+    /// installed on its request context.
+    ///
+    /// `values` is a tuple of context values or a [`RequestContext`]. Every
+    /// dispatch of the request, including those reached through internal
+    /// rewrites, starts from a fresh context holding these values, so a
+    /// route and its layers can read them with
+    /// [`request_context`](topcoat_core::context::request_context). A
+    /// rewrite that carries a value of the same type replaces it for the
+    /// dispatches after it. The router's own request information, such as
+    /// the request parts and the matched path parameters, takes precedence
+    /// over `values`.
+    ///
+    /// Use this to dispatch a request on behalf of another, seeding the
+    /// context with what that request established. The dispatch is
+    /// independent of the caller's: it shares nothing with the caller's
+    /// request context, and its response returns to the caller instead of
+    /// being sent.
+    pub async fn handle_with<V>(&self, request: Request, values: V) -> Response
+    where
+        V: ContextValues,
+    {
+        let mut future = pin!(self.handle_inner(request, RewriteChain::carrying(values)));
 
         poll_fn(|cx| {
             // The whole request and its context are discarded after a panic,
@@ -82,21 +111,22 @@ impl Router {
         .await
     }
 
-    /// Handles one request inside the panic isolation boundary.
-    async fn handle_inner(&self, request: Request) -> Response {
+    /// Handles one request inside the panic isolation boundary, starting
+    /// from the values `chain` already carries.
+    async fn handle_inner(&self, request: Request, mut chain: RewriteChain) -> Response {
         let inner = &*self.inner;
         // Resolve the client's address once from the original request,
         // before any rewrite can replace its headers.
         let client_ip = ClientIp(inner.trusted_proxies.resolve(&request));
         let (mut parts, mut body) = request.into_parts();
         let original = OriginalParts(Arc::new(parts.clone()));
-        let mut chain = RewriteChain::default();
 
         let (cx, result) = loop {
             // Every dispatch starts from a fresh context, so a rewrite drops
             // whatever the discarded dispatch registered or queued. Only the
-            // values carried by rewrites come along, and the router's own
-            // values are installed after them so they take precedence.
+            // values carried by the chain come along, seeded by the caller
+            // or handed over by rewrites, and the router's own values are
+            // installed after them so they take precedence.
             let cx = Cx::new(Arc::clone(&inner.app_context))
                 .with_many(chain.context().clone())
                 .with_many((
@@ -209,6 +239,36 @@ pub(crate) struct Matched {
     /// The route serving the request, or `None` when the path matched but no
     /// route accepts the method (a 405).
     route: Option<RouteIndex>,
+}
+
+/// Returns the router dispatching the current request.
+///
+/// The returned router shares the routing tables of the one that dispatched
+/// the request, so it can [`handle`](Router::handle) further requests from
+/// inside a route or layer. Such a dispatch is independent of the current
+/// request: it starts from a fresh context and its response returns to the
+/// caller.
+///
+/// # Panics
+///
+/// Panics if the request was not dispatched by a router.
+#[must_use]
+#[track_caller]
+pub fn router(cx: &Cx) -> Router {
+    match try_router(cx) {
+        Some(router) => router,
+        None => panic!("the request was not dispatched by a router"),
+    }
+}
+
+/// Returns the router dispatching the current request, or `None` if the
+/// request was not dispatched by a router.
+#[must_use]
+pub fn try_router(cx: &Cx) -> Option<Router> {
+    let inner = try_request_context::<Arc<RouterInner>>(cx)?;
+    Some(Router {
+        inner: Arc::clone(inner),
+    })
 }
 
 /// Reads the router and dispatch record off a matched request's context.
@@ -957,6 +1017,115 @@ mod tests {
         let (status, _, body) = send(&router, Method::GET, "/start");
         assert_eq!(status, StatusCode::OK);
         assert_eq!(&body[..], b"second");
+    }
+
+    /// Dispatches a request seeded with `values` and reads the full
+    /// response.
+    fn send_with(
+        router: &Router,
+        method: Method,
+        path: &str,
+        values: impl ContextValues,
+    ) -> (StatusCode, HeaderMap, Bytes) {
+        let response = block_on(router.handle_with(request(method, path), values));
+        let (parts, body) = response.into_parts();
+        let bytes = block_on(to_bytes(body, usize::MAX)).unwrap();
+        (parts.status, parts.headers, bytes)
+    }
+
+    #[test]
+    fn a_seeded_dispatch_hands_its_values_to_the_route() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(
+                Method::GET,
+                path("/carried-again"),
+                echo_carried,
+            ))
+            .build();
+
+        let (status, _, body) =
+            send_with(&router, Method::GET, "/carried-again", (Carried("seeded"),));
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"seeded");
+
+        // The seed belongs to that dispatch alone.
+        let (_, _, body) = send(&router, Method::GET, "/carried-again");
+        assert_eq!(&body[..], b"none");
+    }
+
+    #[test]
+    fn seeded_values_survive_rewrites_and_yield_to_values_a_rewrite_carries() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/old"), rewrite_with_value))
+            .route(RouteFn::new(Method::GET, path("/carried"), rewrite_onward))
+            .route(RouteFn::new(
+                Method::GET,
+                path("/carried-again"),
+                echo_carried,
+            ))
+            .build();
+
+        // A plain rewrite keeps the seed.
+        let (_, _, body) = send_with(&router, Method::GET, "/carried", (Carried("seeded"),));
+        assert_eq!(&body[..], b"seeded");
+
+        // A rewrite carrying the same type replaces it.
+        let (_, _, body) = send_with(&router, Method::GET, "/old", (Carried("seeded"),));
+        assert_eq!(&body[..], b"handed over");
+    }
+
+    #[test]
+    fn the_routers_own_values_take_precedence_over_seeded_values() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(
+                Method::GET,
+                path("/users/{id}"),
+                echo_params,
+            ))
+            .build();
+
+        // Seeding empty path parameters must not hide the matched ones.
+        let (_, _, body) = send_with(
+            &router,
+            Method::GET,
+            "/users/42",
+            (RawPathParams::default(),),
+        );
+        assert_eq!(&body[..], b"id=42");
+    }
+
+    #[test]
+    fn a_route_can_dispatch_an_independent_request_through_its_router() {
+        /// Dispatches a seeded request to `/carried-again` and echoes its
+        /// body, after checking the nested dispatch left this context alone.
+        fn nested(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+            Box::pin(async move {
+                let response = router(cx)
+                    .handle_with(request(Method::GET, "/carried-again"), (Carried("nested"),))
+                    .await;
+                let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+                assert!(try_request_context::<Carried>(cx).is_none());
+                String::from_utf8(body.to_vec()).unwrap().into_response(cx)
+            })
+        }
+
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/outer"), nested))
+            .route(RouteFn::new(
+                Method::GET,
+                path("/carried-again"),
+                echo_carried,
+            ))
+            .build();
+
+        let (status, _, body) = send(&router, Method::GET, "/outer");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"nested");
+    }
+
+    #[test]
+    fn a_request_outside_a_router_has_no_router() {
+        assert!(try_router(&Cx::default()).is_none());
     }
 
     #[test]
