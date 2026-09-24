@@ -408,7 +408,9 @@ mod tests {
             .await
             .into_iter()
             .map(|frame| {
-                let line = frame.strip_suffix('\n').expect("a frame ends with a newline");
+                let line = frame
+                    .strip_suffix('\n')
+                    .expect("a frame ends with a newline");
                 assert!(!line.contains('\n'), "{frame}");
                 serde_json::from_str(line).unwrap()
             })
@@ -995,7 +997,10 @@ mod tests {
 
         let raw = data_frames(response.into_body()).await;
         // No applier and no swap scripts: the runtime applies the frames.
-        assert!(raw.iter().all(|frame| !frame.contains("<script")), "{raw:?}");
+        assert!(
+            raw.iter().all(|frame| !frame.contains("<script")),
+            "{raw:?}"
+        );
 
         let frames: Vec<serde_json::Value> = raw
             .iter()
