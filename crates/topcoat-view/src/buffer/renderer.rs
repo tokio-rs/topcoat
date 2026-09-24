@@ -92,13 +92,13 @@ impl<'a> Renderer<'a> {
 
                 Instruction::RegionStart { ptr } => {
                     let region = consts.fetch_region(*ptr);
-                    f.write_str("<!--topcoat::region::start(");
+                    f.write_str("<!--::topcoat::region::start(");
                     write!(f, "{region}").unwrap();
                     f.write_str(")-->");
                 }
                 Instruction::RegionEnd { ptr } => {
                     let region = consts.fetch_region(*ptr);
-                    f.write_str("<!--topcoat::region::end(");
+                    f.write_str("<!--::topcoat::region::end(");
                     write!(f, "{region}").unwrap();
                     f.write_str(")-->");
                 }

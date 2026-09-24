@@ -103,7 +103,7 @@ async fn error_boundary_replaces_streamed_content_on_a_late_error() {
     let content = first(&mut view).await.unwrap();
     assert!(content.live);
     let html = content.content.render(cx);
-    assert!(html.contains("<!--topcoat::region::start("), "{html}");
+    assert!(html.contains("<!--::topcoat::region::start("), "{html}");
     assert!(html.contains("<p>partial</p>"), "{html}");
 
     let _ = tx.send(());
@@ -167,7 +167,7 @@ async fn error_boundary_streams_a_multi_emission_fallback_after_a_late_error() {
     tx.send(()).unwrap();
     let replacement = next_swap(&mut view).await.unwrap().unwrap();
     assert!(html.starts_with(&format!(
-        "<!--topcoat::region::start({})-->",
+        "<!--::topcoat::region::start({})-->",
         replacement.region,
     )));
     let fallback_html = replacement.replacement.render(cx);
@@ -176,7 +176,7 @@ async fn error_boundary_streams_a_multi_emission_fallback_after_a_late_error() {
     assert_eq!(
         fallback_html,
         format!(
-            "<!--topcoat::region::start({})--><p class=\"error\">late</p><!--topcoat::region::end({})-->",
+            "<!--::topcoat::region::start({})--><p class=\"error\">late</p><!--::topcoat::region::end({})-->",
             update.region, update.region,
         ),
     );

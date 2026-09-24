@@ -72,7 +72,7 @@ async fn suspense_shows_the_fallback_until_the_child_is_ready() {
     let content = first(&mut view).await.unwrap();
     assert!(content.live);
     let html = content.content.render(cx);
-    assert!(html.contains("<!--topcoat::region::start("), "{html}");
+    assert!(html.contains("<!--::topcoat::region::start("), "{html}");
     assert!(html.contains("<p>loading</p>"), "{html}");
 
     tx.send(Ok("done")).unwrap();
@@ -121,7 +121,7 @@ async fn suspense_forwards_a_ready_childs_swaps() {
     assert_eq!(
         html,
         format!(
-            "<!--topcoat::region::start({})--><i>first</i><!--topcoat::region::end({})-->",
+            "<!--::topcoat::region::start({})--><i>first</i><!--::topcoat::region::end({})-->",
             swap.region, swap.region,
         ),
     );
@@ -154,7 +154,7 @@ async fn suspense_forwards_child_swaps_after_replacing_the_fallback() {
     assert_eq!(
         html,
         format!(
-            "<!--topcoat::region::start({})--><p>loading</p><!--topcoat::region::end({})-->",
+            "<!--::topcoat::region::start({})--><p>loading</p><!--::topcoat::region::end({})-->",
             replacement.region, replacement.region,
         ),
     );
@@ -164,7 +164,7 @@ async fn suspense_forwards_child_swaps_after_replacing_the_fallback() {
     assert_eq!(
         child_html,
         format!(
-            "<!--topcoat::region::start({})--><i>first</i><!--topcoat::region::end({})-->",
+            "<!--::topcoat::region::start({})--><i>first</i><!--::topcoat::region::end({})-->",
             update.region, update.region,
         ),
     );
@@ -246,7 +246,7 @@ async fn waiting_suspense_forwards_a_live_childs_swaps() {
     assert_eq!(
         html,
         format!(
-            "<!--topcoat::region::start({})--><i>first</i><!--topcoat::region::end({})-->",
+            "<!--::topcoat::region::start({})--><i>first</i><!--::topcoat::region::end({})-->",
             swap.region, swap.region,
         ),
     );

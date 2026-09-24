@@ -276,7 +276,7 @@ async fn a_key_borrows_the_item_and_is_evaluated_once_per_iteration() {
 }
 
 fn region_ids(html: &str) -> Vec<&str> {
-    html.split("<!--topcoat::region::start(")
+    html.split("<!--::topcoat::region::start(")
         .skip(1)
         .map(|part| {
             let (id, _) = part.split_once(")-->").unwrap();

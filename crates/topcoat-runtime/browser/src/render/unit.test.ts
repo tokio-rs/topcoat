@@ -360,3 +360,47 @@ it("disposing a unit deletes its signals", () => {
 	expect(unit.isDisposed).toBe(true);
 	expect(unit.contentScope.isDisposed).toBe(true);
 });
+
+it("a connection requirement anywhere in the page content belongs to the page", () => {
+	document.body.innerHTML = `<div><p>text</p><!--::topcoat::connect--></div>`;
+	const runtime = new Runtime();
+	try {
+		runtime.start(document);
+		expect(runtime.page.requiresConnection).toBe(true);
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
+it("a page without a connection requirement does not require one", () => {
+	document.body.innerHTML = `<div><!--::topcoat::dep("a")--><p>text</p></div>`;
+	const runtime = new Runtime();
+	try {
+		runtime.start(document);
+		expect(runtime.page.requiresConnection).toBe(false);
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
+it("a connection requirement inside a shard belongs to the shard, not the page", () => {
+	const { runtime, shard } = mountShard(`<p>text</p><!--::topcoat::connect-->`);
+
+	expect(shard.requiresConnection).toBe(true);
+	expect(runtime.page.requiresConnection).toBe(false);
+});
+
+it("a re-run re-evaluates the connection requirement from the new content", async () => {
+	stubFetch(200, "OK", `<p>quiet</p>`);
+	const { fetchAndReplace, shard } = mountShard(
+		`<p>text</p><!--::topcoat::connect-->`,
+	);
+	expect(shard.requiresConnection).toBe(true);
+
+	await fetchAndReplace();
+	expect(shard.requiresConnection).toBe(false);
+
+	stubFetch(200, "OK", `<p>live</p><!--::topcoat::connect-->`);
+	await fetchAndReplace();
+	expect(shard.requiresConnection).toBe(true);
+});

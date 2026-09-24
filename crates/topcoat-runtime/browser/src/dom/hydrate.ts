@@ -101,6 +101,11 @@ function processMarker(
 			break;
 		}
 
+		case "connect": {
+			current.requiresConnection = true;
+			break;
+		}
+
 		case "expr-start": {
 			textExpressions.push({
 				start: node,

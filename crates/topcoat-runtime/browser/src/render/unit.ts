@@ -33,6 +33,14 @@ export abstract class RenderUnit {
 		return this.lifetime.isDisposed;
 	}
 
+	/**
+	 * Whether the current content asked for a server connection. Replacing
+	 * the content re-evaluates this from the new content's markers.
+	 */
+	get requiresConnection(): boolean {
+		return this.contentScope.requiresConnection;
+	}
+
 	dispose(): void {
 		this.lifetime.dispose();
 	}

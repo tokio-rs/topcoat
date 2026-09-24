@@ -220,8 +220,8 @@ async fn region_emitting_twice_swaps_its_content() {
     assert_eq!(
         content.content.render(cx),
         format!(
-            "<main><!--topcoat::region::start({region})--><p>first</p>\
-             <!--topcoat::region::end({region})--></main>"
+            "<main><!--::topcoat::region::start({region})--><p>first</p>\
+             <!--::topcoat::region::end({region})--></main>"
         )
     );
     assert_eq!(swap.replacement.render(cx), "<p>second</p>");
@@ -252,8 +252,8 @@ async fn region_ids_are_stable_across_root_views() {
         assert_eq!(
             content.content.render(cx),
             format!(
-                "<main><!--topcoat::region::start({region})--><p>first</p>\
-             <!--topcoat::region::end({region})--></main>"
+                "<main><!--::topcoat::region::start({region})--><p>first</p>\
+             <!--::topcoat::region::end({region})--></main>"
             )
         );
         if let Some(previous) = previous {
@@ -377,8 +377,8 @@ async fn joined_emissions_all_reach_the_region() {
     assert_eq!(
         content.content.render(cx),
         format!(
-            "<main><!--topcoat::region::start({region})--><p>a</p>\
-             <!--topcoat::region::end({region})--></main>"
+            "<main><!--::topcoat::region::start({region})--><p>a</p>\
+             <!--::topcoat::region::end({region})--></main>"
         )
     );
     assert_eq!(swap.replacement.render(cx), "<p>b</p>");

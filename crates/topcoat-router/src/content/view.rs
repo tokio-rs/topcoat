@@ -95,8 +95,8 @@ window.topcoat ??= {
         const walker = document.createTreeWalker(document.documentElement, NodeFilter.SHOW_COMMENT);
         while (walker.nextNode()) {
             const comment = walker.currentNode;
-            if (comment.data === `topcoat::region::start(${id})`) open = comment;
-            else if (comment.data === `topcoat::region::end(${id})`) close = comment;
+            if (comment.data === `::topcoat::region::start(${id})`) open = comment;
+            else if (comment.data === `::topcoat::region::end(${id})`) close = comment;
         }
         if (open && close) {
             while (open.nextSibling && open.nextSibling !== close) open.nextSibling.remove();
@@ -253,7 +253,7 @@ mod tests {
     }
 
     fn region_ids(html: &str) -> Vec<&str> {
-        html.split("<!--topcoat::region::start(")
+        html.split("<!--::topcoat::region::start(")
             .skip(1)
             .map(|part| {
                 let (id, _) = part.split_once(")-->").unwrap();
@@ -439,8 +439,8 @@ mod tests {
         assert_eq!(
             frames[0],
             format!(
-                "<main><!--topcoat::region::start({region})--><p>first</p>\
-             <!--topcoat::region::end({region})--></main>"
+                "<main><!--::topcoat::region::start({region})--><p>first</p>\
+             <!--::topcoat::region::end({region})--></main>"
             )
         );
         // The swap arrives behind the applier, wrapped in a template the
@@ -480,10 +480,10 @@ mod tests {
             frames[0],
             format!(
                 "<main>\
-             <section><!--topcoat::region::start({a})--><p>a1</p>\
-             <!--topcoat::region::end({a})--></section>\
-             <section><!--topcoat::region::start({b})--><p>b1</p>\
-             <!--topcoat::region::end({b})--></section>\
+             <section><!--::topcoat::region::start({a})--><p>a1</p>\
+             <!--::topcoat::region::end({a})--></section>\
+             <section><!--::topcoat::region::start({b})--><p>b1</p>\
+             <!--::topcoat::region::end({b})--></section>\
              </main>"
             )
         );
@@ -526,8 +526,8 @@ mod tests {
         assert_eq!(
             frames[0],
             format!(
-                "R[<main><!--topcoat::region::start({region})--><p>first</p>\
-             <!--topcoat::region::end({region})--></main>]"
+                "R[<main><!--::topcoat::region::start({region})--><p>first</p>\
+             <!--::topcoat::region::end({region})--></main>]"
             )
         );
         assert_eq!(
@@ -634,7 +634,7 @@ mod tests {
 
         let mut frames = response.into_body().into_data_stream();
         let first = frames.next().await.unwrap().unwrap();
-        assert!(first.starts_with(b"<main><!--topcoat::region::start("));
+        assert!(first.starts_with(b"<main><!--::topcoat::region::start("));
         let error = frames.next().await.unwrap().unwrap_err();
         assert_eq!(error.to_string(), "late");
         // The failure ends the stream; the view is not polled again.
@@ -655,7 +655,7 @@ mod tests {
         // failure does instead of unwinding into the connection.
         let mut frames = response.into_body().into_data_stream();
         let first = frames.next().await.unwrap().unwrap();
-        assert!(first.starts_with(b"<main><!--topcoat::region::start("));
+        assert!(first.starts_with(b"<main><!--::topcoat::region::start("));
         let error = frames.next().await.unwrap().unwrap_err();
         let error = error.downcast::<BodyPanicError>().unwrap();
         assert_eq!(error.message(), Some("late"));
@@ -728,7 +728,7 @@ mod tests {
 
         let frames = data_frames(response.into_body()).await;
         assert_eq!(frames.len(), 2);
-        assert!(frames[0].starts_with("<main><!--topcoat::region::start("));
+        assert!(frames[0].starts_with("<main><!--::topcoat::region::start("));
         assert_eq!(
             frames[1],
             "<script>window.location.replace(\"/target\")</script>"

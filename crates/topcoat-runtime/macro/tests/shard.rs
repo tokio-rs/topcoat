@@ -155,13 +155,13 @@ async fn a_region_keeps_its_id_when_the_shard_reruns() {
         .unwrap()
         .render(cx);
     let (_, identity) = scope_marker(&inline);
-    let start = inline.split_once("<!--topcoat::region::start(").unwrap().1;
+    let start = inline.split_once("<!--::topcoat::region::start(").unwrap().1;
     let region = start.split_once(")-->").unwrap().0;
     assert_eq!(region.len(), 32);
 
     let rerendered = rerender_with(&region_probe, identity, "[]", "{}").await;
-    assert!(rerendered.contains(&format!("<!--topcoat::region::start({region})-->")));
-    assert!(rerendered.contains(&format!("<!--topcoat::region::end({region})-->")));
+    assert!(rerendered.contains(&format!("<!--::topcoat::region::start({region})-->")));
+    assert!(rerendered.contains(&format!("<!--::topcoat::region::end({region})-->")));
     assert!(rerendered.contains("<p>first</p>"));
 }
 

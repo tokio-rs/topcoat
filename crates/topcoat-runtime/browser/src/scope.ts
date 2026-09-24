@@ -16,6 +16,11 @@ export class Scope {
 	 * Signals read on the server. A change re-renders the enclosing unit.
 	 */
 	readonly dependencies = new Set<SignalId>();
+	/**
+	 * Whether the server requested a connection while rendering this
+	 * scope's content. The enclosing unit renders again over a connection.
+	 */
+	requiresConnection = false;
 	private readonly effects = new Set<Effect>();
 	/** Aborted on release, removing listeners and cancelling owned requests. */
 	private readonly listenerController = new AbortController();

@@ -23,6 +23,15 @@ it("parses signal values without resolving their references", () => {
 	});
 });
 
+it("parses a connection requirement", () => {
+	expect(parseComment(document.createComment("::topcoat::connect"))).toEqual({
+		kind: "connect",
+	});
+	expect(parseComment(document.createComment("::topcoat::connected"))).toBe(
+		null,
+	);
+});
+
 it("hydrates signal references using the runtime registry", () => {
 	const root = document.createElement("div");
 	root.innerHTML = `
