@@ -1,5 +1,5 @@
 import { ShardUnit } from "../render/shard";
-import type { Scope } from "../scope";
+import { type Region, Scope } from "../scope";
 import type { SignalId } from "../signal-registry";
 import { setupBinding } from "./binding";
 import { setupEventHandler } from "./event";
@@ -12,9 +12,14 @@ type PendingTextExpression = {
 	scope: Scope;
 };
 
+/**
+ * The scope the markup being walked belongs to, with the shard or region
+ * whose end marker closes it.
+ */
 type Frame = {
 	scope: Scope;
 	shard: ShardUnit | null;
+	region: Region | null;
 };
 
 /**
@@ -40,7 +45,7 @@ export function hydrate(
 	);
 	if (from) walker.currentNode = from;
 
-	const stack: Frame[] = [{ scope: initialScope, shard: null }];
+	const stack: Frame[] = [{ scope: initialScope, shard: null, region: null }];
 	const textExpressions: PendingTextExpression[] = [];
 
 	for (let node = walker.nextNode(); node; node = walker.nextNode()) {
@@ -76,8 +81,8 @@ function processMarker(
 	textExpressions: PendingTextExpression[],
 	adoptable: Set<SignalId>,
 ): void {
-	// Every scope on the stack is the content scope of a unit, so the top is
-	// the innermost unit enclosing the marker.
+	// The top of the stack is the innermost unit or region enclosing the
+	// marker; its owner is the enclosing unit's content scope.
 	const current = stack[stack.length - 1]?.scope;
 	if (current === undefined) throw new Error("Stack was empty");
 
@@ -97,12 +102,12 @@ function processMarker(
 		}
 
 		case "dep": {
-			current.dependencies.add(marker.id);
+			current.owner.dependencies.add(marker.id);
 			break;
 		}
 
 		case "connect": {
-			current.requiresConnection = true;
+			current.owner.requiresConnection = true;
 			break;
 		}
 
@@ -124,6 +129,31 @@ function processMarker(
 			break;
 		}
 
+		case "region-start": {
+			const scope = new Scope(current, current.runtime, current.owner);
+			const region: Region = { id: marker.id, start: node, end: null, scope };
+			current.regions.set(marker.id, region);
+			stack.push({ scope, shard: null, region });
+			break;
+		}
+
+		case "region-end": {
+			const region = stack[stack.length - 1]?.region;
+			if (!region) {
+				throw new Error(
+					`Unbalanced region: end marker ${marker.id} has no matching start`,
+				);
+			}
+			if (region.id !== marker.id) {
+				throw new Error(
+					`Mismatched region: end ${marker.id} does not match start ${region.id}`,
+				);
+			}
+			region.end = node;
+			stack.pop();
+			break;
+		}
+
 		case "shard-start": {
 			const shard = new ShardUnit(
 				current,
@@ -133,7 +163,7 @@ function processMarker(
 				marker.exprs,
 				node,
 			);
-			stack.push({ scope: shard.contentScope, shard });
+			stack.push({ scope: shard.contentScope, shard, region: null });
 			break;
 		}
 

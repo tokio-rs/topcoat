@@ -142,7 +142,11 @@ impl ConnectionTarget {
             .router
             .handle_with(
                 self.request(),
-                (ConnectedRender, request.signals, ViewResponseDelivery::Frames),
+                (
+                    ConnectedRender,
+                    request.signals,
+                    ViewResponseDelivery::Frames,
+                ),
             )
             .await;
 
@@ -224,9 +228,8 @@ async fn run(target: Arc<ConnectionTarget>, socket: WebSocket) {
             }
             let target = Arc::clone(&target);
             let out = out.clone();
-            current = Some(
-                tokio::spawn(async move { target.render(request, out).await }).abort_handle(),
-            );
+            current =
+                Some(tokio::spawn(async move { target.render(request, out).await }).abort_handle());
         }
         if let Some(current) = current {
             current.abort();

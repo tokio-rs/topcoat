@@ -5,6 +5,19 @@ import type { Runtime } from "./runtime";
 import type { SignalId } from "./signal-registry";
 
 /**
+ * A live region within a scope's content: the range between its marker
+ * comments, whose resources the region's own scope owns so a swap can
+ * replace them along with the range.
+ */
+export type Region = {
+	id: string;
+	start: Comment;
+	/** Attached when the end marker is reached. */
+	end: Comment | null;
+	scope: Scope;
+};
+
+/**
  * Owns reactive resources and child scopes. Disposing a scope recursively
  * releases its children and removes any signals it owns from the registry.
  */
@@ -21,6 +34,14 @@ export class Scope {
 	 * scope's content. The enclosing unit renders again over a connection.
 	 */
 	requiresConnection = false;
+	/** The live regions directly within this scope's content, by id. */
+	readonly regions = new Map<string, Region>();
+	/**
+	 * The content scope of the enclosing unit: this scope itself, unless
+	 * this scope owns a region within that content. Dependencies and
+	 * connection requirements describe the unit, so they are recorded there.
+	 */
+	readonly owner: Scope;
 	private readonly effects = new Set<Effect>();
 	/** Aborted on release, removing listeners and cancelling owned requests. */
 	private readonly listenerController = new AbortController();
@@ -29,13 +50,18 @@ export class Scope {
 	constructor(
 		readonly parent: Scope | null,
 		readonly runtime: Runtime,
+		owner?: Scope,
 	) {
+		this.owner = owner ?? this;
 		parent?.children.add(this);
 	}
 
-	/** Runs a reaction immediately and owns its subscriptions until release. */
-	effect(fn: () => void): void {
-		if (this.disposed) return;
+	/**
+	 * Runs a reaction immediately and owns its subscriptions until release.
+	 * Returns the effect, or `null` when the scope is already released.
+	 */
+	effect(fn: () => void): Effect | null {
+		if (this.disposed) return null;
 		const effect = new Effect(fn);
 		this.effects.add(effect);
 		try {
@@ -45,6 +71,18 @@ export class Scope {
 			this.effects.delete(effect);
 			throw error;
 		}
+		return effect;
+	}
+
+	/** Finds the live region `id` in this scope's content or a descendant's. */
+	findRegion(id: string): Region | undefined {
+		const own = this.regions.get(id);
+		if (own !== undefined) return own;
+		for (const child of this.children) {
+			const found = child.findRegion(id);
+			if (found !== undefined) return found;
+		}
+		return undefined;
 	}
 
 	/**
@@ -81,6 +119,7 @@ export class Scope {
 
 		for (const child of this.children) child.release(into);
 		this.children.clear();
+		this.regions.clear();
 
 		for (const effect of this.effects) effect.dispose();
 		this.effects.clear();

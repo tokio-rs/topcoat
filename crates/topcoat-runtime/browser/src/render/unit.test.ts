@@ -1,11 +1,12 @@
 // @vitest-environment happy-dom
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { flushEffects } from "../reactivity";
 import { Runtime } from "../runtime";
 import type { Scope } from "../scope";
 import type { SignalId } from "../signal-registry";
 import { F64 } from "../surrogate";
+import { RUNTIME_PROTOCOL } from "./connection";
 import { RUNTIME_HEADER } from "./request";
 import { ShardUnit } from "./shard";
 import { RenderUnit } from "./unit";
@@ -20,6 +21,8 @@ beforeEach(() => {
 afterEach(() => {
 	globalThis.fetch = originalFetch;
 	globalThis.location = originalLocation;
+	vi.unstubAllGlobals();
+	vi.restoreAllMocks();
 });
 
 /** Answers every fetch with `status`, recording the last request. */
@@ -388,6 +391,207 @@ it("a connection requirement inside a shard belongs to the shard, not the page",
 
 	expect(shard.requiresConnection).toBe(true);
 	expect(runtime.page.requiresConnection).toBe(false);
+});
+
+const declaration = (id: string, value: number) =>
+	`<!--::topcoat::signal({"t":"signal","id":"${id}","v":${value}})-->`;
+
+/** Mounts a page whose body holds `outside` and the live region `aa`. */
+function mountRegion(outside: string, region: string) {
+	document.body.innerHTML = `${outside}<!--::topcoat::region::start(aa)-->${region}<!--::topcoat::region::end(aa)-->`;
+	const runtime = new Runtime();
+	runtime.start(document);
+	return runtime;
+}
+
+it("a swap replaces its region's content, rebuilding the region's resources and keeping its surviving signals", async () => {
+	const button = `<button data-topcoat-on:click="() => cx.signal('a').increment()">go</button>`;
+	const runtime = mountRegion(
+		`<p>outside</p>`,
+		`${declaration("a", 0)}${declaration("b", 0)}${button}<p>one</p>`,
+	);
+	try {
+		runtime.context.signal("a").set(new F64(5));
+		const el = document.querySelector("button") as HTMLButtonElement;
+		const before = runtime.page.contentScope.regions.get("aa")?.scope;
+
+		runtime.page.applySwap("aa", `${declaration("a", 0)}${button}<p>two</p>`);
+
+		expect(document.body.innerHTML).toBe(
+			`<p>outside</p><!--::topcoat::region::start(aa)-->${declaration("a", 0)}${button}<p>two</p><!--::topcoat::region::end(aa)-->`,
+		);
+		// The client's value survives, and the region owns it again.
+		expect((runtime.registry.read("a") as F64).dehydrate()).toBe(5);
+		expect(runtime.registry.has("b")).toBe(false);
+		const region = runtime.page.contentScope.regions.get("aa");
+		expect(region?.scope).not.toBe(before);
+		expect(before?.isDisposed).toBe(true);
+		expect(region?.scope.signalIds).toEqual(new Set(["a"]));
+		expect(runtime.page.contentScope.signalIds).toEqual(new Set());
+
+		// The morph kept the button; only the new content's handler is attached.
+		expect(document.querySelector("button")).toBe(el);
+		el.click();
+		await Promise.resolve();
+		expect((runtime.registry.read("a") as F64).dehydrate()).toBe(6);
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
+it("a swap for a region the content does not have is ignored", () => {
+	const runtime = mountRegion(`<p>outside</p>`, `<p>one</p>`);
+	try {
+		const before = document.body.innerHTML;
+
+		runtime.page.applySwap("zz", `<p>two</p>`);
+
+		expect(document.body.innerHTML).toBe(before);
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
+it("a dependency a swap declares re-renders the unit when it changes", async () => {
+	const stub = stubFetch(500, "Internal Server Error");
+	globalThis.location = new URL("https://app.example/") as unknown as Location;
+	const runtime = mountRegion(``, `<p>one</p>`);
+	try {
+		runtime.page.applySwap(
+			"aa",
+			`${declaration("c", 0)}<!--::topcoat::dep("c")-->`,
+		);
+		expect(runtime.page.contentScope.dependencies).toEqual(new Set(["c"]));
+
+		runtime.context.signal("c").set(new F64(1));
+		await settle();
+
+		expect(stub.url()).toBe("https://app.example/");
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
+/** A WebSocket the test drives by hand, installed as the global. */
+class FakeSocket extends EventTarget {
+	static opened: FakeSocket[] = [];
+	readyState = 0;
+	readonly sent: { run: number; signals: Record<string, unknown> }[] = [];
+
+	constructor(
+		readonly url: string,
+		readonly protocol: string,
+	) {
+		super();
+		FakeSocket.opened.push(this);
+	}
+
+	send(data: string): void {
+		this.sent.push(JSON.parse(data));
+	}
+
+	close(): void {
+		this.readyState = 3;
+		this.dispatchEvent(new Event("close"));
+	}
+
+	open(): void {
+		this.readyState = 1;
+		this.dispatchEvent(new Event("open"));
+	}
+
+	receive(message: unknown): void {
+		this.dispatchEvent(
+			new MessageEvent("message", { data: JSON.stringify(message) }),
+		);
+	}
+}
+
+/** Installs the fake socket and a page URL, with the document loaded. */
+function installSocket(readyState = "complete") {
+	FakeSocket.opened = [];
+	vi.stubGlobal("WebSocket", FakeSocket);
+	globalThis.location = new URL(
+		"https://app.example/room?q=1",
+	) as unknown as Location;
+	vi.spyOn(document, "readyState", "get").mockReturnValue(
+		readyState as DocumentReadyState,
+	);
+}
+
+it("a page whose content asks for a connection opens one at its own URL once the document has loaded", async () => {
+	installSocket("loading");
+	const stub = stubFetch(500, "Internal Server Error");
+	document.body.innerHTML = `${declaration("a", 1)}<!--::topcoat::dep("a")--><!--::topcoat::connect--><p>1</p>`;
+	const runtime = new Runtime();
+	runtime.start(document);
+	try {
+		expect(FakeSocket.opened).toHaveLength(0);
+		window.dispatchEvent(new Event("load"));
+		expect(FakeSocket.opened).toHaveLength(1);
+		const socket = FakeSocket.opened[0] as FakeSocket;
+		expect(socket.url).toBe("wss://app.example/room?q=1");
+		expect(socket.protocol).toBe(RUNTIME_PROTOCOL);
+
+		socket.open();
+		expect(socket.sent).toEqual([{ run: 1, signals: { a: 1 } }]);
+
+		// A re-render over the open connection is a new run, not a post.
+		runtime.context.signal("a").set(new F64(2));
+		await settle();
+		expect(socket.sent).toEqual([
+			{ run: 1, signals: { a: 1 } },
+			{ run: 2, signals: { a: 2 } },
+		]);
+		expect(stub.url()).toBe(undefined);
+
+		// The run's snapshot morphs the body and keeps the connection.
+		socket.receive({ t: "run", id: 2 });
+		socket.receive({
+			t: "snapshot",
+			html: `<!doctype html><html><body>${declaration("a", 2)}<!--::topcoat::dep("a")--><!--::topcoat::connect--><p>2</p></body></html>`,
+		});
+		expect(document.querySelector("p")?.textContent).toBe("2");
+		expect(FakeSocket.opened).toHaveLength(1);
+		runtime.context.signal("a").set(new F64(3));
+		await settle();
+		expect(socket.sent).toHaveLength(3);
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
+it("a page whose content does not ask for a connection opens none", () => {
+	installSocket();
+	document.body.innerHTML = `${declaration("a", 1)}<p>1</p>`;
+	const runtime = new Runtime();
+	runtime.start(document);
+	try {
+		expect(FakeSocket.opened).toHaveLength(0);
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
+it("while the connection is not open, a re-render posts over HTTP", async () => {
+	installSocket();
+	const stub = stubFetch(500, "Internal Server Error");
+	document.body.innerHTML = `${declaration("a", 1)}<!--::topcoat::dep("a")--><!--::topcoat::connect-->`;
+	const runtime = new Runtime();
+	runtime.start(document);
+	try {
+		const socket = FakeSocket.opened[0] as FakeSocket;
+		socket.open();
+		socket.close();
+
+		runtime.context.signal("a").set(new F64(2));
+		await settle();
+
+		expect(stub.url()).toBe("https://app.example/room?q=1");
+		expect(socket.sent).toHaveLength(1);
+	} finally {
+		runtime.page.dispose();
+	}
 });
 
 it("a re-run re-evaluates the connection requirement from the new content", async () => {

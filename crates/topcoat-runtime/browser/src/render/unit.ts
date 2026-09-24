@@ -1,3 +1,5 @@
+import { morph } from "../../../../topcoat-core/browser/morph";
+import type { Effect } from "../reactivity";
 import type { Runtime } from "../runtime";
 import { Scope } from "../scope";
 import type { SignalId } from "../signal-registry";
@@ -16,6 +18,13 @@ export abstract class RenderUnit {
 	/** Names the unit in error messages. */
 	protected abstract readonly label: string;
 	private readonly requestController: RenderRequest;
+	/** The effect watching the current content's inputs. */
+	private watch: Effect | null = null;
+	/**
+	 * Set while the watch effect runs only to subscribe, so it does not
+	 * request a re-render.
+	 */
+	private subscribing = false;
 
 	constructor(
 		parent: Scope | null,
@@ -78,16 +87,30 @@ export abstract class RenderUnit {
 	startWatching(): void {
 		const { registry } = this.runtime;
 		const scope = this.contentScope;
-		let first = true;
-		scope.effect(() => {
-			this.readInputs();
-			for (const id of scope.dependencies) registry.read(id);
-			if (first) {
-				first = false;
-				return;
-			}
-			this.requestController.schedule(() => this.refresh());
-		});
+		this.subscribing = true;
+		try {
+			this.watch = scope.effect(() => {
+				this.readInputs();
+				for (const id of scope.dependencies) registry.read(id);
+				if (this.subscribing) return;
+				this.requestController.schedule(() => this.refresh());
+			});
+		} finally {
+			this.subscribing = false;
+		}
+	}
+
+	/**
+	 * Subscribes the watch effect to the inputs again, after a swap changed
+	 * the dependencies of the current content.
+	 */
+	private resubscribe(): void {
+		this.subscribing = true;
+		try {
+			this.watch?.run();
+		} finally {
+			this.subscribing = false;
+		}
 	}
 
 	/** Re-runs this unit immediately with its current inputs. */
@@ -112,6 +135,43 @@ export abstract class RenderUnit {
 		const nodes = this.prepare(html);
 		if (nodes === null) return;
 		this.replace((scope, orphans) => this.insert(nodes, scope, orphans));
+	}
+
+	/**
+	 * Replaces the content of the live region `id` with `html`, rebuilding
+	 * the region's resources around the update the way a whole replacement
+	 * does for the unit.
+	 *
+	 * A region the current content does not have is ignored: the content
+	 * changed shape since the swap was produced, and a snapshot follows.
+	 */
+	applySwap(id: string, html: string): void {
+		if (this.isDisposed) return;
+		const region = this.contentScope.findRegion(id);
+		if (region === undefined || region.end === null) return;
+		const parent = region.start.parentNode;
+		if (parent === null) return;
+		const fragment = document.createRange().createContextualFragment(html);
+		const nodes = Array.from(fragment.childNodes);
+
+		const orphans = region.scope.release();
+		region.scope = new Scope(
+			region.scope.parent,
+			this.runtime,
+			region.scope.owner,
+		);
+		morph(parent, region.start, region.end, nodes);
+		this.runtime.hydrate(
+			parent,
+			region.start,
+			region.end,
+			region.scope,
+			orphans,
+		);
+		for (const id of orphans) this.runtime.registry.delete(id);
+
+		// The swap may have declared dependencies the effect has not seen.
+		this.resubscribe();
 	}
 
 	/** Rebuilds the content's resources around a DOM update. */

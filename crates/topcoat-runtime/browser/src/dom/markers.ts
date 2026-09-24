@@ -23,6 +23,15 @@ export type CommentMarker =
 	| { kind: "expr-start"; js: string }
 	| { kind: "expr-end" }
 	| {
+			/**
+			 * A live region starts: the content up to the matching end
+			 * marker is replaced as a whole by the region's swaps.
+			 */
+			kind: "region-start";
+			id: string;
+	  }
+	| { kind: "region-end"; id: string }
+	| {
 			kind: "shard-start";
 			/** The request URL for shard renders, with route groups removed. */
 			path: string;
@@ -42,6 +51,8 @@ const DEP_RE = /^\s*::topcoat::dep\("([0-9a-f]+)"\)\s*$/;
 const CONNECT_RE = /^\s*::topcoat::connect\s*$/;
 const EXPR_START_RE = /^\s*::topcoat::expr::start\("([^"]*)"\)\s*$/;
 const EXPR_END_RE = /^\s*::topcoat::expr::end\s*$/;
+const REGION_START_RE = /^\s*::topcoat::region::start\(([0-9a-f]+)\)\s*$/;
+const REGION_END_RE = /^\s*::topcoat::region::end\(([0-9a-f]+)\)\s*$/;
 const SHARD_START_RE =
 	/^\s*::topcoat::shard::start\(("[^"]*"), ("[^"]*"), (\[[\s\S]*\])\)\s*$/;
 const SHARD_END_RE = /^\s*::topcoat::shard::end\(("[^"]+")\)\s*$/;
@@ -89,6 +100,16 @@ export function parseComment(node: Comment): CommentMarker | null {
 
 	if (EXPR_END_RE.test(text)) {
 		return { kind: "expr-end" };
+	}
+
+	const regionStart = REGION_START_RE.exec(text);
+	if (regionStart) {
+		return { kind: "region-start", id: regionStart[1] ?? "" };
+	}
+
+	const regionEnd = REGION_END_RE.exec(text);
+	if (regionEnd) {
+		return { kind: "region-end", id: regionEnd[1] ?? "" };
 	}
 
 	const start = SHARD_START_RE.exec(text);

@@ -32,6 +32,96 @@ it("parses a connection requirement", () => {
 	);
 });
 
+it("parses live region markers", () => {
+	expect(
+		parseComment(document.createComment("::topcoat::region::start(0a1b)")),
+	).toEqual({ kind: "region-start", id: "0a1b" });
+	expect(
+		parseComment(document.createComment("::topcoat::region::end(0a1b)")),
+	).toEqual({ kind: "region-end", id: "0a1b" });
+	expect(
+		parseComment(document.createComment("::topcoat::region::start(x)")),
+	).toBe(null);
+});
+
+it("a live region owns its content's signals and reports its dependencies and connection requirement to the unit", () => {
+	document.body.innerHTML = `
+		<!--::topcoat::signal({"t":"signal","id":"outside","v":1})-->
+		<!--::topcoat::region::start(ab)-->
+			<!--::topcoat::signal({"t":"signal","id":"1a","v":2})-->
+			<!--::topcoat::dep("1a")-->
+			<!--::topcoat::connect-->
+			<!--::topcoat::region::start(cd)-->
+				<!--::topcoat::signal({"t":"signal","id":"nested","v":3})-->
+			<!--::topcoat::region::end(cd)-->
+		<!--::topcoat::region::end(ab)-->
+	`;
+	const runtime = new Runtime();
+	try {
+		runtime.start(document);
+		const page = runtime.page.contentScope;
+		const outer = page.regions.get("ab");
+		if (!outer) throw new Error("Missing outer region");
+		const inner = outer.scope.regions.get("cd");
+		if (!inner) throw new Error("Missing inner region");
+
+		expect(page.signalIds).toEqual(new Set(["outside"]));
+		expect(outer.scope.signalIds).toEqual(new Set(["1a"]));
+		expect(inner.scope.signalIds).toEqual(new Set(["nested"]));
+		expect(page.dependencies).toEqual(new Set(["1a"]));
+		expect(outer.scope.dependencies).toEqual(new Set());
+		expect(runtime.page.requiresConnection).toBe(true);
+		expect(outer.scope.requiresConnection).toBe(false);
+
+		expect(outer.start.data).toBe("::topcoat::region::start(ab)");
+		expect(outer.end?.data).toBe("::topcoat::region::end(ab)");
+		expect(outer.scope.owner).toBe(page);
+		expect(inner.scope.owner).toBe(page);
+		expect(page.findRegion("cd")).toBe(inner);
+		expect(page.regions.has("cd")).toBe(false);
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
+it("a region inside a shard belongs to the shard", () => {
+	document.body.innerHTML = `
+		<!--::topcoat::shard::start("/shards/1", "0", [])-->
+			<!--::topcoat::region::start(ab)-->
+				<!--::topcoat::signal({"t":"signal","id":"e","v":0})-->
+				<!--::topcoat::dep("e")-->
+			<!--::topcoat::region::end(ab)-->
+		<!--::topcoat::shard::end("0")-->
+	`;
+	const runtime = new Runtime();
+	try {
+		runtime.start(document);
+		const page = runtime.page.contentScope;
+		const region = page.findRegion("ab");
+		if (!region) throw new Error("Missing region");
+
+		expect(page.regions.size).toBe(0);
+		expect(page.dependencies).toEqual(new Set());
+		expect(region.scope.owner).not.toBe(page);
+		expect(region.scope.owner.dependencies).toEqual(new Set(["e"]));
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
+it("unbalanced or mismatched region markers are errors", () => {
+	const runtime = new Runtime();
+	try {
+		document.body.innerHTML = `<!--::topcoat::region::end(ab)-->`;
+		expect(() => runtime.start(document)).toThrow("Unbalanced region");
+
+		document.body.innerHTML = `<!--::topcoat::region::start(ab)--><!--::topcoat::region::end(cd)-->`;
+		expect(() => runtime.start(document)).toThrow("Mismatched region");
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
 it("hydrates signal references using the runtime registry", () => {
 	const root = document.createElement("div");
 	root.innerHTML = `
