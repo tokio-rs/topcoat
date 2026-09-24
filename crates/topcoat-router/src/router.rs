@@ -1077,11 +1077,7 @@ mod tests {
     #[test]
     fn the_routers_own_values_take_precedence_over_seeded_values() {
         let router = RouterBuilder::new()
-            .route(RouteFn::new(
-                Method::GET,
-                path("/users/{id}"),
-                echo_params,
-            ))
+            .route(RouteFn::new(Method::GET, path("/users/{id}"), echo_params))
             .build();
 
         // Seeding empty path parameters must not hide the matched ones.
