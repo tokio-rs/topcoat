@@ -20,7 +20,7 @@ use topcoat::{
         error::{bad_request, redirect},
         page, to_bytes,
     },
-    runtime::{RUNTIME_PROTOCOL, RouterBuilderRuntimeExt, connected, signal},
+    runtime::{RUNTIME_PROTOCOL, RouterBuilderRuntimeExt, connected, shard, signal},
     view::{View, emit, live, view},
 };
 
@@ -65,6 +65,23 @@ async fn slow(cx: &Cx) -> Result<impl View> {
     })
 }
 
+/// Updates a live region after its first render.
+#[shard]
+async fn ticker() -> Result<impl View> {
+    Ok(view! {
+        (live! {
+            emit! { <p>"tick"</p> }?;
+            emit! { <p>"tock"</p> }
+        })
+    })
+}
+
+/// Hosts a live shard, whose updates travel over the page's connection.
+#[page("/shards")]
+async fn shards() -> Result<impl View> {
+    Ok(view! { <main>ticker()</main> })
+}
+
 /// Redirects before rendering any content.
 #[page("/away")]
 async fn away() -> Result<impl View> {
@@ -85,6 +102,7 @@ fn router() -> Router {
     Router::builder()
         .page(room)
         .page(slow)
+        .page(shards)
         .page(away)
         .page(broken)
         .runtime()
@@ -195,6 +213,37 @@ async fn a_run_renders_the_page_connected_and_streams_its_frames() {
         html.contains(&format!("::topcoat::region::start({region})")),
         "{html}"
     );
+
+    client.close(None).await.unwrap();
+    shut_down(shutdown_tx, server).await;
+}
+
+#[tokio::test]
+async fn a_live_shard_streams_its_updates_over_the_page_connection() {
+    let (addr, shutdown_tx, server) = spawn_server().await;
+    let mut client = connect(addr, "/shards").await;
+
+    request_run(&mut client, 1, "{}").await;
+
+    assert_eq!(next_json(&mut client).await["t"], "run");
+    let snapshot = next_json(&mut client).await;
+    assert_eq!(snapshot["t"], "snapshot");
+    let html = snapshot["html"].as_str().unwrap();
+    assert!(html.contains("<p>tick</p>"), "{html}");
+    assert!(!html.contains("<p>tock</p>"), "{html}");
+
+    // The shard's region updates through the page's run, and its markers
+    // lie inside the shard's, so the browser attributes it to the shard.
+    let swap = next_json(&mut client).await;
+    assert_eq!(swap["t"], "swap");
+    assert!(swap["html"].as_str().unwrap().contains("<p>tock</p>"));
+    let region = swap["region"].as_str().unwrap();
+    let region_start = html
+        .find(&format!("::topcoat::region::start({region})"))
+        .expect(html);
+    let shard_start = html.find("::topcoat::shard::start(").expect(html);
+    let shard_end = html.find("::topcoat::shard::end(").expect(html);
+    assert!(shard_start < region_start && region_start < shard_end, "{html}");
 
     client.close(None).await.unwrap();
     shut_down(shutdown_tx, server).await;

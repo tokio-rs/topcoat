@@ -24,10 +24,15 @@ use crate::{
     response::{AsyncIntoResponse, IntoResponse, Response},
 };
 
+/// The media type of a framed view response.
+const FRAMES_MEDIA_TYPE: &str = "application/x-ndjson";
+
 /// The format used to send a view response to the browser.
 ///
-/// Add this value to the request context to choose a format. The default
-/// is [`Html`](Self::Html). Both formats use the view's status code and
+/// Add this value to the request context to choose a format. Without one,
+/// a request whose `Accept` header lists `application/x-ndjson` gets
+/// [`Frames`](Self::Frames) and any other request gets
+/// [`Html`](Self::Html). Both formats use the view's status code and
 /// headers. A redirect or error before the view produces any content
 /// becomes a normal HTTP redirect or error response.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -51,13 +56,29 @@ pub enum ViewResponseDelivery {
 
 /// Returns the view response format for this request.
 ///
-/// Returns [`ViewResponseDelivery::Html`] if none is set in the request
-/// context.
+/// A format set in the request context wins. Otherwise the request's
+/// `Accept` header decides: [`ViewResponseDelivery::Frames`] when it lists
+/// `application/x-ndjson`, and [`ViewResponseDelivery::Html`] when it does
+/// not or there is no request.
 #[must_use]
 pub fn view_response_delivery(cx: &Cx) -> ViewResponseDelivery {
-    try_request_context::<ViewResponseDelivery>(cx)
-        .copied()
-        .unwrap_or_default()
+    if let Some(delivery) = try_request_context::<ViewResponseDelivery>(cx) {
+        return *delivery;
+    }
+    let accepts_frames = try_request_context::<http::request::Parts>(cx)
+        .and_then(|parts| parts.headers.get(http::header::ACCEPT))
+        .and_then(|accept| accept.to_str().ok())
+        .is_some_and(|accept| {
+            accept.split(',').any(|entry| {
+                let media_type = entry.split(';').next().unwrap_or(entry).trim();
+                media_type.eq_ignore_ascii_case(FRAMES_MEDIA_TYPE)
+            })
+        });
+    if accepts_frames {
+        ViewResponseDelivery::Frames
+    } else {
+        ViewResponseDelivery::Html
+    }
 }
 
 impl ViewResponseDelivery {
@@ -65,7 +86,7 @@ impl ViewResponseDelivery {
     fn content_type(self) -> HeaderValue {
         HeaderValue::from_static(match self {
             Self::Html => "text/html; charset=utf-8",
-            Self::Frames => "application/x-ndjson",
+            Self::Frames => FRAMES_MEDIA_TYPE,
         })
     }
 
@@ -963,6 +984,68 @@ mod tests {
         assert_eq!(
             view_response_delivery(&Cx::default().with(ViewResponseDelivery::Frames)),
             ViewResponseDelivery::Frames
+        );
+    }
+
+    /// Requests `/p` with the given `Accept` header, with `render` as its
+    /// page handler.
+    async fn send_page_accepting(render: crate::PageRenderFn, accept: &str) -> Response {
+        let router = RouterBuilder::new()
+            .page(PageFn::new(Method::GET, "/p", render))
+            .build();
+        let request = http::Request::builder()
+            .method(Method::GET)
+            .uri("/p")
+            .header(http::header::ACCEPT, accept)
+            .body(Body::empty())
+            .unwrap();
+        router.handle(request).await
+    }
+
+    #[tokio::test]
+    async fn a_request_accepting_frames_gets_them() {
+        let response =
+            send_page_accepting(render_thrice_emitting_page, "text/html, application/x-ndjson;q=0.9")
+                .await;
+        assert_eq!(
+            response.headers().get(CONTENT_TYPE).unwrap(),
+            "application/x-ndjson"
+        );
+        let frames = json_frames(response.into_body()).await;
+        assert_eq!(frames[0]["t"], "snapshot");
+        assert_eq!(frames.len(), 3, "{frames:?}");
+    }
+
+    #[tokio::test]
+    async fn a_request_accepting_only_html_gets_html() {
+        let response = send_page_accepting(render_settled_region_page, "text/html").await;
+        assert_eq!(
+            response.headers().get(CONTENT_TYPE).unwrap(),
+            "text/html; charset=utf-8"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_delivery_in_the_context_wins_over_the_accept_header() {
+        let router = RouterBuilder::new()
+            .page(PageFn::new(
+                Method::GET,
+                "/p",
+                render_settled_region_page,
+            ))
+            .build();
+        let request = http::Request::builder()
+            .method(Method::GET)
+            .uri("/p")
+            .header(http::header::ACCEPT, "application/x-ndjson")
+            .body(Body::empty())
+            .unwrap();
+        let response = router
+            .handle_with(request, (ViewResponseDelivery::Html,))
+            .await;
+        assert_eq!(
+            response.headers().get(CONTENT_TYPE).unwrap(),
+            "text/html; charset=utf-8"
         );
     }
 

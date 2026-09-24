@@ -48,7 +48,7 @@ export class ShardUnit extends RenderUnit {
 		for (const compute of this.computes) compute(context);
 	}
 
-	protected request(signal: AbortSignal): Promise<Response> {
+	protected request(signal: AbortSignal, accept: string): Promise<Response> {
 		const { context } = this.runtime;
 		// The signals the current content created travel with the request,
 		// so the server resumes them instead of starting them over.
@@ -59,6 +59,7 @@ export class ShardUnit extends RenderUnit {
 		return fetch(this.path, {
 			method: "POST",
 			headers: {
+				Accept: accept,
 				"Content-Type": "application/json",
 				"X-Topcoat-Identity": this.identity,
 			},

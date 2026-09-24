@@ -1,25 +1,14 @@
 import type { DehydratedSurrogate } from "../expression/serialized";
 import type { SignalId } from "../signal-registry";
+import { applyFrame, type FrameTarget, type ServerMessage } from "./frames";
 
 /** The WebSocket subprotocol used by the runtime. */
 export const RUNTIME_PROTOCOL = "topcoat-runtime";
 
-/** A message received from the server. */
-type ServerMessage =
-	| { t: "run"; id: number }
-	| { t: "snapshot"; html: string }
-	| { t: "swap"; region: string; html: string }
-	| { t: "redirect"; location: string }
-	| { t: "error"; status: number };
-
 /** Receives rendered content and supplies signal values for new renders. */
-export interface ConnectionTarget {
+export interface ConnectionTarget extends FrameTarget {
 	/** Collects the signal values to send with a render request. */
 	collectSignals(): Record<SignalId, DehydratedSurrogate>;
-	/** Replaces the content with the render's initial HTML. */
-	replaceContent(html: string): void;
-	/** Updates one live region. */
-	applySwap(region: string, html: string): void;
 	reportError(error: unknown): void;
 }
 
@@ -133,25 +122,9 @@ export class Connection {
 			}
 			// Ignore output if we have already requested a newer run.
 			if (this.receiving !== this.requested) return;
-			this.apply(message);
+			applyFrame(this.target, message, "Connected");
 		} catch (error) {
 			this.target.reportError(error);
-		}
-	}
-
-	private apply(message: Exclude<ServerMessage, { t: "run" }>): void {
-		switch (message.t) {
-			case "snapshot":
-				this.target.replaceContent(message.html);
-				break;
-			case "swap":
-				this.target.applySwap(message.region, message.html);
-				break;
-			case "redirect":
-				location.assign(message.location);
-				break;
-			case "error":
-				throw new Error(`Connected render failed: ${message.status}`);
 		}
 	}
 }

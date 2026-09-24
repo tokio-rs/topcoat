@@ -7,6 +7,8 @@
 //! id on both paths. A signal passed as an argument arrives as its id and
 //! current value, and the endpoint rebuilds it from them.
 
+use std::{future::poll_fn, pin::pin};
+
 use topcoat::{
     Result,
     context::Cx,
@@ -77,19 +79,44 @@ async fn grouped(query: String) -> Result<impl View> {
     Ok(view! { <p>(query)</p> })
 }
 
+/// A shard whose content updates a live region after its first render.
 #[shard]
 async fn region_probe() -> Result<impl View> {
-    // Shards require settled views. Capture the region's first content to
-    // compare its identity across the two shard entry points.
-    let first = view! {
+    Ok(view! {
         (live! {
             emit! { <p>"first"</p> }?;
             emit! { <p>"second"</p> }
         })
+    })
+}
+
+/// Renders `view`'s first content, then drives it to completion and
+/// collects the region id and HTML of every update in order.
+async fn drive(cx: &Cx, view: impl View) -> (String, Vec<(String, String)>) {
+    let mut view = pin!(view);
+    let first = poll_fn(|task| view.as_mut().poll_first(task))
+        .await
+        .unwrap();
+    let html = first.content.render(cx);
+    let mut swaps = Vec::new();
+    if first.live {
+        while let Some(swap) = poll_fn(|task| view.as_mut().poll_swap(task))
+            .await
+            .unwrap()
+        {
+            swaps.push((swap.region.to_string(), swap.replacement.render(cx)));
+        }
     }
-    .first()
-    .await?;
-    Ok(view! { (first) })
+    (html, swaps)
+}
+
+/// Extracts the id of the first live region declared in `html`.
+fn region_id(html: &str) -> &str {
+    let start = html
+        .split_once("<!--::topcoat::region::start(")
+        .expect(html)
+        .1;
+    start.split_once(")-->").expect(html).0
 }
 
 /// Extracts the endpoint URL and invocation identity from a shard start marker.
@@ -115,10 +142,22 @@ fn last_signal_id(html: &str) -> &str {
 /// Requests a shard render at its served URL and supplies its invocation
 /// identity through the request header.
 async fn endpoint(shard: &'static impl Route, identity: &str, body: Body) -> Response {
+    endpoint_accepting(shard, identity, body, "text/html").await
+}
+
+/// Requests a shard render like [`endpoint`], accepting the given media
+/// types for the response.
+async fn endpoint_accepting(
+    shard: &'static impl Route,
+    identity: &str,
+    body: Body,
+    accept: &str,
+) -> Response {
     let request = http::Request::builder()
         .method("POST")
         .uri(shard.path().to_matchit_path().as_ref())
         .header("content-type", "application/json")
+        .header("accept", accept)
         .header(IDENTITY_HEADER, identity)
         .body(body)
         .unwrap();
@@ -147,25 +186,84 @@ async fn rerender(identity: &str, signals: &str) -> String {
 }
 
 #[tokio::test]
-async fn a_region_keeps_its_id_when_the_shard_reruns() {
+async fn a_live_shard_streams_its_updates_through_the_enclosing_content() {
     let cx = &Cx::default();
-    let inline = view! { cx => region_probe() }
-        .single()
-        .await
-        .unwrap()
-        .render(cx);
-    let (_, identity) = scope_marker(&inline);
-    let start = inline
-        .split_once("<!--::topcoat::region::start(")
-        .unwrap()
-        .1;
-    let region = start.split_once(")-->").unwrap().0;
-    assert_eq!(region.len(), 32);
+    let (html, swaps) = drive(cx, view! { cx => region_probe() }).await;
 
+    // The first content shows the first emission only, with its region
+    // inside the shard's markers so the browser attributes the region's
+    // updates to the shard.
+    assert!(html.contains("<p>first</p>"), "{html}");
+    assert!(!html.contains("<p>second</p>"), "{html}");
+    let shard_start = html.find("::topcoat::shard::start(").expect(&html);
+    let shard_end = html.find("::topcoat::shard::end(").expect(&html);
+    let region_start = html.find("::topcoat::region::start(").expect(&html);
+    assert!(shard_start < region_start && region_start < shard_end, "{html}");
+
+    // The later emission follows as an update to that region.
+    let region = region_id(&html);
+    assert_eq!(region.len(), 32, "{html}");
+    let [(swapped, replacement)] = swaps.as_slice() else {
+        panic!("expected one update, got {swaps:?}");
+    };
+    assert_eq!(swapped, region);
+    assert!(replacement.contains("<p>second</p>"), "{replacement}");
+}
+
+#[tokio::test]
+async fn a_live_shard_streams_its_updates_through_its_endpoint() {
+    let cx = &Cx::default();
+    let (inline, _) = drive(cx, view! { cx => region_probe() }).await;
+    let (_, identity) = scope_marker(&inline);
+    let region = region_id(&inline);
+
+    // The re-render derives the same region id, so its update targets the
+    // region the browser already shows, and streams the update after the
+    // first content.
     let rerendered = rerender_with(&region_probe, identity, "[]", "{}").await;
-    assert!(rerendered.contains(&format!("<!--::topcoat::region::start({region})-->")));
-    assert!(rerendered.contains(&format!("<!--::topcoat::region::end({region})-->")));
-    assert!(rerendered.contains("<p>first</p>"));
+    assert!(
+        rerendered.contains(&format!("<!--::topcoat::region::start({region})-->")),
+        "{rerendered}"
+    );
+    let first = rerendered.find("<p>first</p>").expect(&rerendered);
+    let swap = rerendered
+        .find(&format!("data-topcoat-swap=\"{region}\""))
+        .expect(&rerendered);
+    assert!(first < swap, "{rerendered}");
+    assert!(rerendered[swap..].contains("<p>second</p>"), "{rerendered}");
+}
+
+#[tokio::test]
+async fn a_live_shard_endpoint_sends_frames_to_a_request_accepting_them() {
+    let cx = &Cx::default();
+    let (inline, _) = drive(cx, view! { cx => region_probe() }).await;
+    let (_, identity) = scope_marker(&inline);
+    let region = region_id(&inline);
+
+    let body = Body::from(r#"{"args":[],"signals":{}}"#);
+    let response =
+        endpoint_accepting(&region_probe, identity, body, "application/x-ndjson").await;
+    assert_eq!(response.status(), http::StatusCode::OK);
+    assert_eq!(
+        response.headers().get("content-type").unwrap(),
+        "application/x-ndjson"
+    );
+    let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let text = String::from_utf8(bytes.to_vec()).unwrap();
+    let frames: Vec<serde_json::Value> = text
+        .lines()
+        .map(|line| serde_json::from_str(line).expect(line))
+        .collect();
+
+    let [snapshot, swap] = frames.as_slice() else {
+        panic!("expected a snapshot and one swap, got {text}");
+    };
+    assert_eq!(snapshot["t"], "snapshot");
+    let html = snapshot["html"].as_str().expect(&text);
+    assert!(html.contains("<p>first</p>"), "{html}");
+    assert_eq!(swap["t"], "swap");
+    assert_eq!(swap["region"], region);
+    assert!(swap["html"].as_str().expect(&text).contains("<p>second</p>"));
 }
 
 #[tokio::test]

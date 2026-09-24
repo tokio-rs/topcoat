@@ -200,16 +200,20 @@ it("a page replacement releases nested shards and adopts surviving signals", asy
 	const pendingShard = new Promise<Response>((resolve) => {
 		finishShard = resolve;
 	});
+	const snapshot = (html: string) =>
+		`${JSON.stringify({ t: "snapshot", html })}\n`;
 	const fetch = vi.fn((url: string, _init: RequestInit) =>
 		url.includes("/shards/")
 			? pendingShard
 			: Promise.resolve(
-					new Response(`
+					new Response(
+						snapshot(`
 						<body>
 							<!--::topcoat::signal({"t":"signal","id":"a","v":99})-->
 							<p>replacement</p>
 						</body>
 					`),
+					),
 				),
 	);
 	vi.stubGlobal("fetch", fetch);
@@ -231,7 +235,7 @@ it("a page replacement releases nested shards and adopts surviving signals", asy
 		expect((runtime.registry.read("a") as F64).dehydrate()).toBe(7);
 		expect(runtime.page.contentScope.children.size).toBe(0);
 
-		finishShard(new Response("<p>stale shard</p>"));
+		finishShard(new Response(snapshot("<p>stale shard</p>")));
 		await new Promise((resolve) => setTimeout(resolve, 0));
 		expect(document.querySelector("p")?.textContent).toBe("replacement");
 	} finally {

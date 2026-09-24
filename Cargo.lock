@@ -3483,6 +3483,7 @@ name = "topcoat-runtime"
 version = "0.8.1"
 dependencies = [
  "futures-util",
+ "pin-project-lite",
  "ref-cast",
  "serde",
  "serde_json",

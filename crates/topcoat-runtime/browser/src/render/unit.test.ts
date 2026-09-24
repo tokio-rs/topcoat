@@ -7,6 +7,7 @@ import type { Scope } from "../scope";
 import type { SignalId } from "../signal-registry";
 import { F64 } from "../surrogate";
 import { RUNTIME_PROTOCOL } from "./connection";
+import type { ServerMessage } from "./frames";
 import { RUNTIME_HEADER } from "./request";
 import { ShardUnit } from "./shard";
 import { RenderUnit } from "./unit";
@@ -37,6 +38,16 @@ function stubFetch(status: number, statusText: string, body = "") {
 		return new Response(body, { status, statusText });
 	}) as typeof fetch;
 	return { url: () => url, request: () => request, calls: () => calls };
+}
+
+/** Encodes a frame as the line the server sends it as. */
+function frame(message: ServerMessage): string {
+	return `${JSON.stringify(message)}\n`;
+}
+
+/** A response body holding one snapshot of `html`. */
+function snapshot(html: string): string {
+	return frame({ t: "snapshot", html });
 }
 
 /** Waits for scheduled effects and the fetches they queue to settle. */
@@ -88,6 +99,7 @@ it("a shard sends the identity in a header and the arguments and signal values i
 	expect(stub.url()).toBe("/shards/1");
 	const headers = stub.request()?.headers as Record<string, string>;
 	expect(headers["X-Topcoat-Identity"]).toBe("0");
+	expect(headers.Accept).toBe("application/x-ndjson");
 	expect(JSON.parse(stub.request()?.body as string)).toEqual({
 		args: [],
 		signals: { s1: 3 },
@@ -111,7 +123,11 @@ it("a shard keeps the rendered content when the server responds with an error", 
 });
 
 it("a shard re-run morphs its content, keeping a focused input and the markers", async () => {
-	stubFetch(200, "OK", `<input value="shoes"><ul><li>shoes</li></ul>`);
+	stubFetch(
+		200,
+		"OK",
+		snapshot(`<input value="shoes"><ul><li>shoes</li></ul>`),
+	);
 	const { fetchAndReplace } = mountShard(
 		`<input value="sho"><ul><li>shoe</li><li>shorts</li></ul>`,
 	);
@@ -138,7 +154,7 @@ it("a shard re-run morphs its content, keeping a focused input and the markers",
 it("a re-run attaches each event handler once", async () => {
 	const clicks = "globalThis.clicks = (globalThis.clicks ?? 0) + 1";
 	const button = `<button data-topcoat-on:click="() => { ${clicks}; }">go</button>`;
-	stubFetch(200, "OK", button);
+	stubFetch(200, "OK", snapshot(button));
 	const { fetchAndReplace } = mountShard(button);
 	const el = document.querySelector("button") as HTMLButtonElement;
 
@@ -179,6 +195,7 @@ it("a page posts the values of every signal in the document to its own URL", asy
 	expect(stub.request()?.method).toBe("POST");
 	const headers = stub.request()?.headers as Record<string, string>;
 	expect(headers[RUNTIME_HEADER]).toBe("true");
+	expect(headers.Accept).toBe("application/x-ndjson");
 	expect(JSON.parse(stub.request()?.body as string)).toEqual({
 		signals: { p1: 1, s1: 2 },
 	});
@@ -215,7 +232,9 @@ it("a page re-run morphs the body, keeping a focused input", async () => {
 	stubFetch(
 		200,
 		"OK",
-		`<!doctype html><html><head><title>t</title></head><body><input><p>2 results</p></body></html>`,
+		snapshot(
+			`<!doctype html><html><head><title>t</title></head><body><input><p>2 results</p></body></html>`,
+		),
 	);
 	globalThis.location = new URL("https://app.example/") as unknown as Location;
 	document.body.innerHTML = `<input><p>1 result</p>`;
@@ -250,7 +269,7 @@ class ScriptedUnit extends RenderUnit {
 
 	protected request(): Promise<Response> {
 		this.requests.push(this.requests.length);
-		return Promise.resolve(new Response("", { status: 200 }));
+		return Promise.resolve(new Response(snapshot(""), { status: 200 }));
 	}
 
 	protected prepare(): Node[] | null {
@@ -493,7 +512,7 @@ it("a swap parses its content in the region's context, so table rows survive", (
 });
 
 it("a shard re-run parses its content in the shard's context, so table rows survive", async () => {
-	stubFetch(200, "OK", `<tr><td>two</td></tr>`);
+	stubFetch(200, "OK", snapshot(`<tr><td>two</td></tr>`));
 	document.body.innerHTML = `<table><tbody><!--::topcoat::shard::start("/shards/1", "0", [])--><tr><td>one</td></tr><!--::topcoat::shard::end("0")--></tbody></table>`;
 	const runtime = new Runtime();
 	runtime.start(document);
@@ -504,6 +523,50 @@ it("a shard re-run parses its content in the shard's context, so table rows surv
 
 		expect(document.querySelectorAll("tr")).toHaveLength(1);
 		expect(document.querySelector("td")?.textContent).toBe("two");
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
+it("a shard re-run applies the swaps streamed after its snapshot", async () => {
+	const region = (html: string) =>
+		`<!--::topcoat::region::start(aa)-->${html}<!--::topcoat::region::end(aa)-->`;
+	stubFetch(
+		200,
+		"OK",
+		snapshot(region(`<p>one</p>`)) +
+			frame({ t: "swap", region: "aa", html: `<p>two</p>` }),
+	);
+	const { fetchAndReplace, shard } = mountShard(`<p>stale</p>`);
+
+	await fetchAndReplace();
+
+	expect(document.body.innerHTML).toBe(
+		`<p>outside</p><!--::topcoat::shard::start("/shards/1", "0", [])-->${region(`<p>two</p>`)}<!--::topcoat::shard::end("0")-->`,
+	);
+	// The region belongs to the shard's new content, so later swaps and
+	// dependencies keep going to the shard.
+	expect(shard.contentScope.findRegion("aa")).toBeDefined();
+});
+
+it("a page re-run applies the swaps streamed after its snapshot", async () => {
+	stubFetch(
+		200,
+		"OK",
+		snapshot(
+			`<!doctype html><html><body><!--::topcoat::region::start(aa)--><p>one</p><!--::topcoat::region::end(aa)--></body></html>`,
+		) + frame({ t: "swap", region: "aa", html: `<p>two</p>` }),
+	);
+	globalThis.location = new URL("https://app.example/") as unknown as Location;
+	document.body.innerHTML = `<p>stale</p>`;
+	const runtime = new Runtime();
+	runtime.start(document);
+	try {
+		await refetch(runtime.page)();
+
+		expect(document.body.innerHTML).toBe(
+			`<!--::topcoat::region::start(aa)--><p>two</p><!--::topcoat::region::end(aa)-->`,
+		);
 	} finally {
 		runtime.page.dispose();
 	}
@@ -676,7 +739,7 @@ it("while the connection is not open, a re-render posts over HTTP", async () => 
 });
 
 it("a re-run re-evaluates the connection requirement from the new content", async () => {
-	stubFetch(200, "OK", `<p>quiet</p>`);
+	stubFetch(200, "OK", snapshot(`<p>quiet</p>`));
 	const { fetchAndReplace, shard } = mountShard(
 		`<p>text</p><!--::topcoat::connect-->`,
 	);
@@ -685,7 +748,7 @@ it("a re-run re-evaluates the connection requirement from the new content", asyn
 	await fetchAndReplace();
 	expect(shard.requiresConnection).toBe(false);
 
-	stubFetch(200, "OK", `<p>live</p><!--::topcoat::connect-->`);
+	stubFetch(200, "OK", snapshot(`<p>live</p><!--::topcoat::connect-->`));
 	await fetchAndReplace();
 	expect(shard.requiresConnection).toBe(true);
 });

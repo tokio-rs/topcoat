@@ -4,6 +4,7 @@ import type { Effect } from "../reactivity";
 import type { Runtime } from "../runtime";
 import { Scope } from "../scope";
 import type { SignalId } from "../signal-registry";
+import { applyFrame, FRAMES_MEDIA_TYPE } from "./frames";
 import { RenderRequest } from "./request";
 
 /**
@@ -60,8 +61,14 @@ export abstract class RenderUnit {
 	 */
 	protected abstract readInputs(): void;
 
-	/** Requests the unit's content from the server with its current inputs. */
-	protected abstract request(signal: AbortSignal): Promise<Response>;
+	/**
+	 * Requests the unit's content from the server with its current inputs,
+	 * accepting a response of the `accept` media type.
+	 */
+	protected abstract request(
+		signal: AbortSignal,
+		accept: string,
+	): Promise<Response>;
 
 	/**
 	 * Parses `html` into the nodes the content becomes, or returns `null` to
@@ -113,11 +120,15 @@ export abstract class RenderUnit {
 		}
 	}
 
-	/** Re-runs this unit immediately with its current inputs. */
+	/**
+	 * Re-runs this unit immediately with its current inputs. The response
+	 * arrives as frames: a snapshot replacing the content, then a swap for
+	 * each later update of a live region.
+	 */
 	refresh(): Promise<void> {
 		return this.requestController.run(
-			(signal) => this.request(signal),
-			(html) => this.replaceContent(html),
+			(signal) => this.request(signal, FRAMES_MEDIA_TYPE),
+			(frame) => applyFrame(this, frame, this.label),
 			this.label,
 		);
 	}

@@ -36,7 +36,7 @@ Ok(view! {
 # }
 ```
 
-The initial page render includes the shard's content. It does not need a separate request.
+The initial page render includes the shard's content. It does not need a separate request. Live content inside a shard, such as a [`live!`] region, streams its updates with the page on that render and with the shard's own response on a re-render.
 
 When `query` changes, the browser sends the current arguments to the server and updates the shard with the returned HTML. Existing elements are updated in place to preserve focus and input state. The rest of the page is unchanged.
 
@@ -170,5 +170,6 @@ The path follows the router's [path syntax](../router/index.html#paths). Groups 
 [`signal`]: fn.signal.html
 [`Signal<T>`]: struct.Signal.html
 [`expr!`]: macro.expr.html
+[`live!`]: ../view/macro.live.html
 [`view!`]: ../view/macro.view.html
 [`View`]: ../view/trait.View.html

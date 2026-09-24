@@ -1,3 +1,5 @@
+import { readFrames, type ServerMessage } from "./frames";
+
 /** Identifies a page rerun when set to "true" on a POST request. */
 export const RUNTIME_HEADER = "X-Topcoat-Runtime";
 
@@ -29,9 +31,14 @@ export class RenderRequest {
 		});
 	}
 
+	/**
+	 * Sends a render request and applies each frame of its response as it
+	 * arrives. A newer run, disposal, or a replacement of the content from
+	 * elsewhere stops the remaining frames from applying.
+	 */
 	async run(
 		request: (signal: AbortSignal) => Promise<Response>,
-		replace: (html: string) => void,
+		apply: (frame: ServerMessage) => void,
 		label: string,
 	): Promise<void> {
 		if (this.lifetime.aborted) return;
@@ -53,10 +60,16 @@ export class RenderRequest {
 					`${label} request failed: ${response.status} ${response.statusText}`,
 				);
 			}
-			const html = await response.text();
-			if (!current()) return;
-			this.controller = null;
-			replace(html);
+			for await (const frame of readFrames(response)) {
+				if (!current()) return;
+				// Applying a frame can replace the content, which cancels the
+				// request in flight. Step aside for that cancel, then take the
+				// run back unless something else started one meanwhile.
+				this.controller = null;
+				apply(frame);
+				if (this.controller !== null) return;
+				this.controller = controller;
+			}
 		} catch (error) {
 			if (controller.signal.aborted || this.lifetime.aborted) return;
 			throw error;

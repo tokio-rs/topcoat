@@ -193,6 +193,32 @@ async fn a_rerun_resumes_the_page_signals_from_the_values_it_carries() {
 }
 
 #[tokio::test]
+async fn a_rerun_accepting_frames_gets_its_page_as_a_snapshot_frame() {
+    let router = router();
+    let request = http::Request::builder()
+        .method("POST")
+        .uri("/search?q=1")
+        .header("content-type", "application/json")
+        .header("accept", "application/x-ndjson")
+        .header(RUNTIME_HEADER.as_str(), "true")
+        .body(Body::from("{}"))
+        .unwrap();
+    let response = router.handle(request).await;
+    assert_eq!(response.status(), 200);
+    assert_eq!(
+        response.headers().get("content-type").unwrap(),
+        "application/x-ndjson"
+    );
+
+    let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let text = String::from_utf8(bytes.to_vec()).unwrap();
+    let frame: serde_json::Value = serde_json::from_str(text.trim_end()).expect(&text);
+    assert_eq!(frame["t"], "snapshot");
+    let html = frame["html"].as_str().expect(&text);
+    assert!(html.contains("<p>GET /search?q=1</p>"), "{html}");
+}
+
+#[tokio::test]
 async fn the_root_page_reruns_at_its_own_url() {
     let router = router();
     let (status, html) = rerun(&router, "/", "{}").await;

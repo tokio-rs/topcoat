@@ -117,6 +117,10 @@ impl ToTokens for Shard {
         // re-render request, where the router installs it on the context, so
         // identities derived inside the shard body match between the inline
         // render and a re-render.
+        //
+        // The scope stays a view rather than settling the handler's content,
+        // so a live shard body keeps streaming its updates through the
+        // enclosing content.
         let path = EndpointPath::resolve(self.attr.path.as_ref(), SHARD_ROUTE_PREFIX);
         let url = EndpointPath::url(&path);
         let docs = item.attrs.iter().filter(|attr| attr.path().is_ident("doc"));
@@ -128,19 +132,15 @@ impl ToTokens for Shard {
                 #(
                     let (#value_idents, #js_idents) = #value_idents.into_evaluated_and_js();
                 )*
-                let __placeholder = #topcoat_view::ViewExt::single(
-                    #topcoat_view::HoistView::new(#topcoat_view::internal::ThenView::new(
-                        #ident::handler(__cx, #(#call_args),*),
-                    )),
-                )
-                .await?;
-                let __scope = #topcoat_runtime::ShardScope::new(
+                #topcoat_error::Result::Ok(#topcoat_runtime::ShardScope::new(
+                    __cx,
                     __identity,
                     #url,
                     ::std::vec![#(#js_idents),*],
-                    __placeholder,
-                );
-                #topcoat_error::Result::Ok(#topcoat_view_macro::view! { (__scope) })
+                    #topcoat_view::HoistView::new(#topcoat_view::internal::ThenView::new(
+                        #ident::handler(__cx, #(#call_args),*),
+                    )),
+                ))
             }
         };
 
@@ -164,7 +164,8 @@ impl ToTokens for Shard {
         // handler deserializes the surrogate argument tuple and the signal
         // values from the request body, installs the values, forwards the
         // arguments to the handler positionally, and responds with the
-        // rendered view.
+        // rendered view. The view streams like a page's, so a live shard
+        // body's later updates follow its first content in the response.
         let route = quote! {
             impl #topcoat_router::Route for #ident {
                 fn id(&self) -> #topcoat_router::RouteId {
@@ -199,17 +200,27 @@ impl ToTokens for Shard {
                             #topcoat_runtime::Surrogate::into_real(__args);
                         // Signals created while the handler runs resume from
                         // the values the client sent.
-                        let cx = &cx.with(__signals);
-                        // The handler's view is the outermost view of this
-                        // request's build, so its content is self-contained.
-                        let __view = #topcoat_view::HoistView::new(
-                            #topcoat_view::internal::ThenView::new(
-                                #ident::handler(cx, #(#call_args),*),
-                            ),
-                        );
-                        let __view = #topcoat_view::internal::ScopeView::new(__view);
-                        let __view = #topcoat_view::ViewExt::single(__view).await?;
-                        #topcoat_router::response::IntoResponse::into_response(__view, cx)
+                        let cx = cx.with(__signals);
+                        // The response body outlives the handler, so the
+                        // view owns a copy of the request context and
+                        // drives itself in place as the outermost view of
+                        // the build, whose content is self-contained.
+                        let __owned = cx.clone();
+                        let __view = #topcoat_view::internal::MoveView::new(async move {
+                            let cx = &__owned;
+                            let __view = #topcoat_view::internal::ScopeView::new(
+                                #topcoat_view::HoistView::new(
+                                    #topcoat_view::internal::ThenView::new(
+                                        #ident::handler(cx, #(#call_args),*),
+                                    ),
+                                ),
+                            );
+                            #topcoat_view::internal::MoveView::drive(__view).await
+                        });
+                        #topcoat_router::response::AsyncIntoResponse::async_into_response(
+                            __view, &cx,
+                        )
+                        .await
                     })
                 }
             }
