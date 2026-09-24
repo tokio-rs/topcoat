@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cli-v0.8.1...topcoat-cli-v0.9.0) - 2026-09-24
+
+### Added
+
+- *(cli)* stateful hot reload ([#421](https://github.com/tokio-rs/topcoat/pull/421))
+
+### Other
+
+- rewrite all docs 3 ([#439](https://github.com/tokio-rs/topcoat/pull/439))
+- rewrite all docs ([#435](https://github.com/tokio-rs/topcoat/pull/435))
+
 ## [0.7.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cli-v0.6.2...topcoat-cli-v0.7.0) - 2026-09-04
 
 ### Added

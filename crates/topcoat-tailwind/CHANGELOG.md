@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0](https://github.com/tokio-rs/topcoat/compare/topcoat-tailwind-v0.8.1...topcoat-tailwind-v0.9.0) - 2026-09-24
+
+### Other
+
+- rewrite all docs 3 ([#439](https://github.com/tokio-rs/topcoat/pull/439))
+- rewrite all docs ([#435](https://github.com/tokio-rs/topcoat/pull/435))
+
 ## [0.2.0](https://github.com/tokio-rs/topcoat/compare/topcoat-tailwind-v0.1.3...topcoat-tailwind-v0.2.0) - 2026-07-19
 
 ### Other

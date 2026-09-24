@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0](https://github.com/tokio-rs/topcoat/compare/topcoat-router-v0.8.1...topcoat-router-v0.9.0) - 2026-09-24
+
+### Added
+
+- *(runtime)* support streaming for shards ([#444](https://github.com/tokio-rs/topcoat/pull/444))
+- *(runtime)* add WebSocket connections for streaming live updates ([#443](https://github.com/tokio-rs/topcoat/pull/443))
+- *(runtime)* rewrite pages reruns without changing the URL ([#440](https://github.com/tokio-rs/topcoat/pull/440))
+- *(view)* stable region IDs across rerenders ([#427](https://github.com/tokio-rs/topcoat/pull/427))
+- *(router)* `client_ip(cx)` accessor and trusted proxies ([#425](https://github.com/tokio-rs/topcoat/pull/425))
+- *(router)* serving a file directory with `DirectoryRoute`, `.serve_dir()`, and `.public_dir()` ([#424](https://github.com/tokio-rs/topcoat/pull/424))
+- *(view)* [**breaking**] new way to specify identities (`#[key(...)]` and `cx.keyed(...)`) ([#410](https://github.com/tokio-rs/topcoat/pull/410))
+- *(core)* [**breaking**] make Error cheap to clone ([#396](https://github.com/tokio-rs/topcoat/pull/396))
+
+### Fixed
+
+- *(router)* strip prefix layer ([#397](https://github.com/tokio-rs/topcoat/pull/397))
+
+### Other
+
+- rewrite all docs 3 ([#439](https://github.com/tokio-rs/topcoat/pull/439))
+- rewrite all docs ([#435](https://github.com/tokio-rs/topcoat/pull/435))
+- *(router)* `RouteWithLayers`, `handle_inner` ([#426](https://github.com/tokio-rs/topcoat/pull/426))
+
 ## [0.8.1](https://github.com/tokio-rs/topcoat/compare/topcoat-router-v0.8.0...topcoat-router-v0.8.1) - 2026-09-13
 
 ### Added

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0](https://github.com/tokio-rs/topcoat/compare/topcoat-ui-registry-v0.8.1...topcoat-ui-registry-v0.9.0) - 2026-09-24
+
+### Added
+
+- *(ui)* form field components ([#420](https://github.com/tokio-rs/topcoat/pull/420))
+- *(ui)* sidebar component ([#419](https://github.com/tokio-rs/topcoat/pull/419))
+- *(runtime)* better reactivity support for (Topcoat-) UI components ([#418](https://github.com/tokio-rs/topcoat/pull/418))
+- *(ui)* minor design improvements ([#417](https://github.com/tokio-rs/topcoat/pull/417))
+
+### Other
+
+- rewrite all docs 3 ([#439](https://github.com/tokio-rs/topcoat/pull/439))
+- rewrite all docs ([#435](https://github.com/tokio-rs/topcoat/pull/435))
+
 ## [0.7.0](https://github.com/tokio-rs/topcoat/compare/topcoat-ui-registry-v0.6.2...topcoat-ui-registry-v0.7.0) - 2026-09-04
 
 ### Added
