@@ -5,7 +5,7 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time"] }
 topcoat.workspace = true
 
 [lints]
