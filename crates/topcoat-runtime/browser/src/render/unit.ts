@@ -1,4 +1,5 @@
 import { morph } from "../../../../topcoat-core/browser/morph";
+import { parseChildren } from "../dom/fragment";
 import type { Effect } from "../reactivity";
 import type { Runtime } from "../runtime";
 import { Scope } from "../scope";
@@ -151,8 +152,7 @@ export abstract class RenderUnit {
 		if (region === undefined || region.end === null) return;
 		const parent = region.start.parentNode;
 		if (parent === null) return;
-		const fragment = document.createRange().createContextualFragment(html);
-		const nodes = Array.from(fragment.childNodes);
+		const nodes = parseChildren(parent, html);
 
 		const orphans = region.scope.release();
 		region.scope = new Scope(

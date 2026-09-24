@@ -1,4 +1,5 @@
 import { morph } from "../../../../topcoat-core/browser/morph";
+import { parseChildren } from "../dom/fragment";
 import { compile, type Expression } from "../expression/compile";
 import { dehydrate } from "../expression/dehydrate";
 import { untrack } from "../reactivity";
@@ -67,11 +68,9 @@ export class ShardUnit extends RenderUnit {
 	}
 
 	protected prepare(html: string): Node[] | null {
-		if (this.endNode === null || this.startNode.parentNode === null) {
-			return null;
-		}
-		const fragment = document.createRange().createContextualFragment(html);
-		return Array.from(fragment.childNodes);
+		const parent = this.startNode.parentNode;
+		if (this.endNode === null || parent === null) return null;
+		return parseChildren(parent, html);
 	}
 
 	protected insert(

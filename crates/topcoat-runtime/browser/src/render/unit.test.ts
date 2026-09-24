@@ -476,6 +476,39 @@ it("a dependency a swap declares re-renders the unit when it changes", async () 
 	}
 });
 
+it("a swap parses its content in the region's context, so table rows survive", () => {
+	document.body.innerHTML = `<table><tbody><!--::topcoat::region::start(aa)--><tr><td>one</td></tr><!--::topcoat::region::end(aa)--></tbody></table>`;
+	const runtime = new Runtime();
+	runtime.start(document);
+	try {
+		runtime.page.applySwap("aa", `<tr><td>two</td></tr>`);
+
+		expect(document.querySelectorAll("tr")).toHaveLength(1);
+		expect(document.querySelector("tbody")?.innerHTML).toBe(
+			`<!--::topcoat::region::start(aa)--><tr><td>two</td></tr><!--::topcoat::region::end(aa)-->`,
+		);
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
+it("a shard re-run parses its content in the shard's context, so table rows survive", async () => {
+	stubFetch(200, "OK", `<tr><td>two</td></tr>`);
+	document.body.innerHTML = `<table><tbody><!--::topcoat::shard::start("/shards/1", "0", [])--><tr><td>one</td></tr><!--::topcoat::shard::end("0")--></tbody></table>`;
+	const runtime = new Runtime();
+	runtime.start(document);
+	try {
+		const shard = runtime.page.contentScope.children.values().next().value
+			?.unit as ShardUnit;
+		await shard.refresh();
+
+		expect(document.querySelectorAll("tr")).toHaveLength(1);
+		expect(document.querySelector("td")?.textContent).toBe("two");
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
 it("a swap that removes a signal drops the dependency on it", () => {
 	const runtime = mountRegion(
 		``,
