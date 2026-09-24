@@ -5,35 +5,16 @@ use topcoat::{
     Result,
     context::{Cx, app_context},
     router::page,
-    runtime::{Event, connected, procedure, signal},
+    runtime::{Event, connected, procedure, shard, signal},
     view::{View, emit, live, view},
 };
 
-// The HTTP response shows the current messages and finishes. Calling
-// connected() makes the browser open a connection and render the page again.
-// That render waits for new messages and updates the list in each open tab.
 #[page]
 pub async fn page(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>"Chat"</h1>
 
-        (live! {
-            let chat = app_context::<Chat>(cx);
-            let mut changed = chat.subscribe();
-            loop {
-                let token = emit! {
-                    <ul>
-                        for message in chat.messages() {
-                            <li>(message)</li>
-                        }
-                    </ul>
-                }?;
-                if !connected(cx) {
-                    break Ok(token);
-                }
-                changed.recv().await.ok();
-            }
-        })
+        chat_box()
 
         let draft = signal(cx, String::new);
         <input :value=$(draft.get()) @input=$(|e: Event| draft.set(e.target.value))>
@@ -47,6 +28,30 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
         </button>
 
         <p>"Hint: open this example in two tabs."</p>
+    })
+}
+
+// The HTTP response shows the current messages and finishes. Calling
+// connected() makes the browser open a connection and render the shard again.
+// That render waits for new messages and updates the list in each open tab.
+#[shard]
+async fn chat_box(cx: &Cx) -> Result<impl View> {
+    Ok(live! {
+        let chat = app_context::<Chat>(cx);
+        let mut changed = chat.subscribe();
+        loop {
+            let token = emit! {
+                <ul>
+                    for message in chat.messages() {
+                        <li>(message)</li>
+                    }
+                </ul>
+            }?;
+            if !connected(cx) {
+                break Ok(token);
+            }
+            changed.recv().await.ok();
+        }
     })
 }
 

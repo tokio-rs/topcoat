@@ -784,7 +784,7 @@ it("a shard whose content asks for a connection opens one at its endpoint and re
 	installSocket();
 	const stub = stubFetch(500, "Internal Server Error");
 	document.body.innerHTML = `<p>outside</p>${shardMarkup(
-		`${declaration("s", 1)}<!--::topcoat::dep("s")--><!--::topcoat::connect--><p>1</p>`,
+		`${declaration("b", 1)}<!--::topcoat::dep("b")--><!--::topcoat::connect--><p>1</p>`,
 	)}`;
 	const runtime = new Runtime();
 	runtime.start(document);
@@ -796,22 +796,22 @@ it("a shard whose content asks for a connection opens one at its endpoint and re
 
 		socket.open();
 		expect(socket.sent).toEqual([
-			{ run: 1, shard: "id", args: [], signals: { s: 1 } },
+			{ run: 1, shard: "id", args: [], signals: { b: 1 } },
 		]);
 
 		// The snapshot replaces only the shard's content.
 		socket.receive({ t: "run", id: 1 });
 		socket.receive({
 			t: "snapshot",
-			html: `${declaration("s", 1)}<!--::topcoat::dep("s")--><!--::topcoat::connect--><p>2</p>`,
+			html: `${declaration("b", 1)}<!--::topcoat::dep("b")--><!--::topcoat::connect--><p>2</p>`,
 		});
 		expect(document.body.textContent).toContain("outside");
 		expect(document.querySelectorAll("p")[1]?.textContent).toBe("2");
 
-		runtime.context.signal("s").set(new F64(2));
+		runtime.context.signal("b").set(new F64(2));
 		await settle();
 		expect(socket.sent).toHaveLength(2);
-		expect(socket.sent[1]).toMatchObject({ run: 2, signals: { s: 2 } });
+		expect(socket.sent[1]).toMatchObject({ run: 2, signals: { b: 2 } });
 		expect(stub.url()).toBe(undefined);
 	} finally {
 		runtime.page.dispose();
@@ -840,7 +840,7 @@ it("a shard that needs a connection re-runs its connected page when its input ch
 	installSocket();
 	const stub = stubFetch(500, "Internal Server Error");
 	document.body.innerHTML = `${shardMarkup(
-		`${declaration("s", 1)}<!--::topcoat::dep("s")--><!--::topcoat::connect-->`,
+		`${declaration("b", 1)}<!--::topcoat::dep("b")--><!--::topcoat::connect-->`,
 	)}<!--::topcoat::connect-->`;
 	const runtime = new Runtime();
 	runtime.start(document);
@@ -849,12 +849,12 @@ it("a shard that needs a connection re-runs its connected page when its input ch
 		const socket = FakeSocket.opened[0] as FakeSocket;
 		socket.open();
 
-		runtime.context.signal("s").set(new F64(2));
+		runtime.context.signal("b").set(new F64(2));
 		await settle();
 
 		expect(socket.sent).toEqual([
-			{ run: 1, signals: { s: 1 } },
-			{ run: 2, signals: { s: 2 } },
+			{ run: 1, signals: { b: 1 } },
+			{ run: 2, signals: { b: 2 } },
 		]);
 		expect(stub.url()).toBe(undefined);
 	} finally {
