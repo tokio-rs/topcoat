@@ -373,7 +373,7 @@ it("a connection requirement anywhere in the page content belongs to the page", 
 });
 
 it("a page without a connection requirement does not require one", () => {
-	document.body.innerHTML = `<div><!--::topcoat::dep("a")--><p>text</p></div>`;
+	document.body.innerHTML = `<div><!--::topcoat::signal({"t":"signal","id":"a","v":1})--><!--::topcoat::dep("a")--><p>text</p></div>`;
 	const runtime = new Runtime();
 	try {
 		runtime.start(document);
