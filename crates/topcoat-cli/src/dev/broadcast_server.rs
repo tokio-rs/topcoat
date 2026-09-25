@@ -20,7 +20,7 @@ use topcoat_router::{
 const PORT_START: u16 = 59039;
 const PORT_RANGE: u16 = 100;
 
-const DEV_JS: &str = include_str!("dev.js");
+const DEV_JS: &str = include_str!("../../browser/dist/index.js");
 
 /// An event pushed to every browser connected to the broadcast server.
 #[derive(Clone, Copy)]
@@ -51,11 +51,8 @@ impl Event {
     }
 }
 
-/// Publishes [`Event`]s to every connected browser.
-///
-/// The bus also remembers the current status, so a page that connects
-/// mid-build (or while a failure is showing) is brought up to date
-/// immediately.
+/// Publishes events to connected browsers and sends the current status to newly
+/// connected clients.
 #[derive(Clone)]
 pub struct EventBus {
     tx: Arc<broadcast::Sender<Event>>,
@@ -104,12 +101,9 @@ pub async fn bind() -> TcpListener {
     );
 }
 
-/// Run the broadcast server.
-///
-/// Serves `/dev.js` (the client reload-and-status script) and `/ws` (the
-/// WebSocket endpoint behind it). Events published on `events` are forwarded
-/// to every connected client. When an application reports ready over the
-/// WebSocket, its address is printed and a [`Event::Reload`] is published.
+/// Serves the browser update script and WebSocket connection. Forwards events to
+/// connected clients. When the application reports readiness, prints its address and
+/// publishes a reload event.
 pub async fn run(listener: TcpListener, events: EventBus) {
     let router = Router::builder()
         .app_context(events)

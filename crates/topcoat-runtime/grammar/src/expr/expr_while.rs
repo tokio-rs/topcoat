@@ -3,13 +3,14 @@ use quote::{ToTokens, quote};
 use syn::ExprWhile;
 use topcoat_core_grammar::paths::topcoat_runtime;
 
+use super::js::Js;
 use crate::expr::{Expr, NameResolver};
 
 impl Expr {
     pub(super) fn expr_while(
         expr: &ExprWhile,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
         let mut cond = TokenStream::new();

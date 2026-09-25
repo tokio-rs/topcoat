@@ -21,12 +21,8 @@ pub enum BadgeVariant {
 }
 
 impl BadgeVariant {
-    /// The Tailwind classes for this variant.
-    ///
-    /// Each variant sets its own border color rather than inheriting a
-    /// transparent one from [`BASE`]: with two border-color classes on the
-    /// same element, stylesheet order (not class order) would decide the
-    /// winner.
+    /// Classes for the variant, including its border color. Keep border colors out of
+    /// the shared base to avoid conflicting classes.
     fn classes(self) -> StaticClass {
         match self {
             Self::Primary => class!("border-transparent bg-primary text-primary-foreground"),
@@ -39,10 +35,7 @@ impl BadgeVariant {
     }
 }
 
-/// The classes shared by every badge, regardless of variant.
-///
-/// Every badge carries a border (colored per variant) so that the `Outline`
-/// variant, which only recolors it, does not change the badge's dimensions.
+/// Classes shared by badge variants. A border reserves the same space in every variant.
 const BASE: StaticClass = class!(
     "inline-flex w-fit shrink-0 items-center justify-center gap-1 rounded-md \
      border px-2 py-0.5 text-xs font-medium whitespace-nowrap",
@@ -62,20 +55,17 @@ pub fn badge_variants(variant: BadgeVariant) -> Class<(StaticClass, StaticClass)
     class!(BASE, variant.classes())
 }
 
-/// A badge component: a small inline pill for statuses, counts, and tags.
+/// A small label for a status or count.
 ///
-/// The `variant` parameter selects the styling, defaulting to `Primary`. The
-/// `attrs` (such as `class` or `title`) are forwarded to the underlying
-/// `<span>`; a `class` among them is appended to the computed classes. Child
-/// nodes become the badge's content.
+/// `variant` defaults to `Primary`. Pass the label as children and extra attributes
+/// through `attrs`. Attributes go on the `<span>`, with classes added to its classes.
+/// Use [`badge_variants`] to apply the same styling to another element.
 ///
 /// ```ignore
 /// view! {
 ///     badge(variant: BadgeVariant::Destructive, "Failed")
 /// }
 /// ```
-///
-/// To style another element like a badge, use [`badge_variants`] directly.
 #[component]
 pub async fn badge(
     #[default] variant: BadgeVariant,

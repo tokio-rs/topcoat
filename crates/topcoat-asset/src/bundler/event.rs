@@ -68,10 +68,9 @@ impl fmt::Display for BundleEvent {
 /// A consumer of [`BundleEvent`]s, registered with
 /// [`BundlerConfig::subscribe`](super::BundlerConfig::subscribe).
 ///
-/// Implemented for any `Fn(&BundleEvent) + Send + Sync + 'static`, so a
-/// closure is usually all you need. Handlers run inline on the bundler's
-/// worker threads: keep them cheap, and hand off to a channel or a
-/// background thread for anything slow.
+/// A `Fn(&BundleEvent) + Send + Sync + 'static` closure can be a subscriber.
+/// Callbacks run on bundler threads. Hand slow work to a channel or background
+/// thread.
 pub trait BundleSubscriber: Send + Sync + 'static {
     /// Handle a single event.
     fn handle(&self, event: &BundleEvent);
@@ -88,8 +87,7 @@ where
 
 /// The set of [`BundleSubscriber`]s a bundler reports to.
 ///
-/// Every subscriber sees every event, so a bundle run can drive a
-/// progress bar, a log, and a channel at the same time.
+/// Every subscriber receives every emitted event.
 #[derive(Clone, Default)]
 pub struct BundleEvents(Vec<Arc<dyn BundleSubscriber>>);
 

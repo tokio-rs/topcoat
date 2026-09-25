@@ -1,3 +1,5 @@
 import { Runtime } from "./runtime";
 
-new Runtime().start(document);
+const runtime = new Runtime();
+runtime.start(document);
+runtime.page.listenForDevRefresh();

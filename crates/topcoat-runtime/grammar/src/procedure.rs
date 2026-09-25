@@ -6,16 +6,29 @@ use syn::{
     parse_quote,
     spanned::Spanned,
 };
-use topcoat_core_grammar::paths::{
-    topcoat_context, topcoat_error, topcoat_internal, topcoat_inventory, topcoat_router,
-    topcoat_runtime,
+use topcoat_core_grammar::{
+    ParseOption,
+    paths::{
+        topcoat_context, topcoat_error, topcoat_internal, topcoat_inventory, topcoat_router,
+        topcoat_runtime,
+    },
 };
 
-pub struct ProcedureAttr {}
+use crate::common::EndpointPath;
+
+/// The path prefix for procedures without an explicit path.
+const PROCEDURE_ROUTE_PREFIX: &str = "/_topcoat/runtime/procedures";
+
+/// The optional endpoint path in `#[procedure("/api/double")]`.
+pub struct ProcedureAttr {
+    pub path: Option<EndpointPath>,
+}
 
 impl Parse for ProcedureAttr {
-    fn parse(_input: ParseStream) -> syn::Result<Self> {
-        Ok(Self {})
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        Ok(Self {
+            path: input.call(EndpointPath::parse_option)?,
+        })
     }
 }
 
@@ -80,7 +93,7 @@ impl ToTokens for Procedure {
         let docs = item.attrs.iter().filter(|attr| attr.path().is_ident("doc"));
 
         // Marker: the value users register and reference. A unit struct, so
-        // `#ident` stays a value usable directly in `router.procedure(...)`
+        // `#ident` stays a value usable directly in `router.route(...)`
         // and capturable in runtime expressions. `Copy` lets the surrogate
         // hand the marker back out of its `&'static` reference.
         let marker = quote! {
@@ -143,7 +156,8 @@ impl ToTokens for Procedure {
                     #inner
 
                     type Surrogate = <(#(#arg_tys,)*) as #topcoat_runtime::Surrogated>::Surrogate;
-                    let #topcoat_router::content::Json(args) = <#topcoat_router::content::Json<Surrogate> as #topcoat_router::request::FromRequest>::from_request(cx, body).await?;
+                    let #topcoat_router::content::Json(#topcoat_runtime::Arguments(args)) =
+                        <#topcoat_router::content::Json<#topcoat_runtime::Arguments<Surrogate>> as #topcoat_router::request::FromRequest>::from_request(cx, body).await?;
                     let (#(#args,)*) = #topcoat_runtime::Surrogate::into_real(args);
                     let response = #topcoat_runtime::Surrogated::into_surrogate(#ident(#(#args_with_cx),*).await?);
                     #topcoat_router::response::IntoResponse::into_response(#topcoat_router::content::Json(response), cx)
@@ -151,19 +165,32 @@ impl ToTokens for Procedure {
             }
         };
 
-        // The trait implementation dispatching calls to the bridge.
-        let id = uuid::Uuid::new_v4().to_string();
-        let procedure = quote! {
-            impl #topcoat_runtime::Procedure for #ident {
-                fn id(&self) -> #topcoat_runtime::ProcedureId {
-                    #topcoat_runtime::ProcedureId::new(#id)
+        // The route serving calls at the endpoint's path, dispatching them to
+        // the bridge.
+        let path = EndpointPath::resolve(self.0.path.as_ref(), PROCEDURE_ROUTE_PREFIX);
+        let url = EndpointPath::url(&path);
+        let route = quote! {
+            impl #topcoat_router::Route for #ident {
+                fn id(&self) -> #topcoat_router::RouteId {
+                    *ID
+                }
+
+                fn methods(&self) -> #topcoat_router::Methods<'_> {
+                    const METHODS: #topcoat_router::Methods<'static> =
+                        #topcoat_router::Methods::Only(&[#topcoat_router::Method::POST]);
+                    METHODS
+                }
+
+                fn path(&self) -> &#topcoat_router::Path {
+                    const PATH: &#topcoat_router::Path = #topcoat_router::Path::new(#path);
+                    PATH
                 }
 
                 fn handle<'cx>(
                     &'cx self,
                     cx: &'cx #topcoat_context::Cx,
                     body: #topcoat_router::Body,
-                ) -> #topcoat_runtime::ProcedureFuture<'cx> {
+                ) -> #topcoat_router::RouteFuture<'cx> {
                     ::std::boxed::Box::pin(#ident::handler(cx, body))
                 }
             }
@@ -171,7 +198,8 @@ impl ToTokens for Procedure {
 
         // Runtime expressions capture the marker as a typed surrogate, so
         // calls in `expr!` bodies check their arguments against the declared
-        // parameter types.
+        // parameter types. The surrogate carries the endpoint's URL, where
+        // the browser posts calls.
         let ReturnType::Type(_, return_ty) = &item.sig.output else {
             unreachable!("validated by ProcedureItem")
         };
@@ -187,24 +215,27 @@ impl ToTokens for Procedure {
 
                 fn into_surrogate(self) -> Self::Surrogate {
                     static SURROGATE: #topcoat_runtime::ProcedureSurrogate<#ident> =
-                        #topcoat_runtime::ProcedureSurrogate::new(#ident);
+                        #topcoat_runtime::ProcedureSurrogate::new(#ident, #url);
                     &SURROGATE
                 }
             }
         };
 
-        // Discovery collects the marker erased behind its trait.
+        // Discovery collects the marker as a route.
         let submit = cfg!(feature = "discover").then(|| {
-            quote! { #topcoat_inventory::submit! { &#ident as &'static dyn #topcoat_runtime::Procedure } }
+            quote! { #topcoat_inventory::submit! { &#ident as &'static dyn #topcoat_router::Route } }
         });
 
         quote! {
             #marker
 
             const _: () = {
+                static ID: ::std::sync::LazyLock<#topcoat_router::RouteId> =
+                    ::std::sync::LazyLock::new(#topcoat_router::RouteId::new);
+
                 #handler
 
-                #procedure
+                #route
 
                 #typed
 
@@ -217,6 +248,8 @@ impl ToTokens for Procedure {
 
 #[cfg(test)]
 mod tests {
+    use quote::quote;
+
     use super::*;
 
     fn parse_err(source: &str) -> String {
@@ -256,5 +289,40 @@ mod tests {
     fn rejects_self_receiver() {
         let err = parse_err("async fn double(&self) -> Result<f64> {}");
         assert!(err.contains("cannot take a `self` receiver"));
+    }
+
+    #[test]
+    fn a_named_path_replaces_the_default_route() {
+        let procedure = Procedure::parse(
+            quote! { "/api/double" },
+            quote! { async fn double(value: f64) -> Result<f64> { todo!() } },
+        )
+        .unwrap();
+        let out = procedure.to_token_stream().to_string();
+        assert!(out.contains(r#""/api/double""#), "{out}");
+        assert!(!out.contains(PROCEDURE_ROUTE_PREFIX), "{out}");
+    }
+
+    #[test]
+    fn a_procedure_without_a_path_is_served_below_the_default_prefix() {
+        let procedure = Procedure::parse(
+            TokenStream::new(),
+            quote! { async fn double(value: f64) -> Result<f64> { todo!() } },
+        )
+        .unwrap();
+        let out = procedure.to_token_stream().to_string();
+        assert!(out.contains(PROCEDURE_ROUTE_PREFIX), "{out}");
+    }
+
+    #[test]
+    fn the_surrogate_carries_the_url_without_group_segments() {
+        let procedure = Procedure::parse(
+            quote! { "/(api)/double" },
+            quote! { async fn double(value: f64) -> Result<f64> { todo!() } },
+        )
+        .unwrap();
+        let out = procedure.to_token_stream().to_string();
+        assert!(out.contains(r#""/double""#), "{out}");
+        assert!(out.contains(r#""/(api)/double""#), "{out}");
     }
 }

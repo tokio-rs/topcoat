@@ -5,8 +5,8 @@
 ///
 /// Downloadable attachments ([`Attachment::new`]) are presented to the
 /// recipient as files. Inline attachments ([`Attachment::inline`]) are
-/// addressed from the HTML body by content id -- `<img src="cid:logo">`
-/// displays the inline attachment with content id `logo`.
+/// referenced by a `cid:` URL. For example, `<img src="cid:logo">` displays
+/// the inline attachment with content ID `logo`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Attachment {
     disposition: Disposition,

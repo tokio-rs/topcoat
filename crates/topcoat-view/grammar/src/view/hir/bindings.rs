@@ -1,13 +1,13 @@
 use proc_macro2::TokenStream;
-use quote::ToTokens;
+use quote::{ToTokens, quote};
 use syn::{Expr, Ident, Pat, Token};
+use topcoat_core_grammar::paths::topcoat_view;
 
 /// The bindings a control-flow pattern introduces into its body's scope.
 ///
 /// A body's view must own these values, because they die with the branch or
 /// iteration that produced them while the view lives on.
-/// [`Scope::emit_captured`](super::Scope::emit_captured) moves them into the
-/// view through `Capture`.
+/// [`Self::emit_capture`] moves them into the view through `Capture`.
 pub(crate) struct Bindings(Vec<Binding>);
 
 impl Bindings {
@@ -46,6 +46,19 @@ impl Bindings {
     /// the `Capture` inside the view's body.
     pub(crate) fn rebinds(&self) -> impl Iterator<Item = &Binding> {
         self.0.iter()
+    }
+
+    /// Emits a view that owns these bindings and runs `body` with them in scope.
+    pub(crate) fn emit_capture(&self, body: &TokenStream) -> TokenStream {
+        let idents = self.idents();
+        let rebinds = self.rebinds();
+        quote! {{
+            let __captured = #topcoat_view::internal::Capture((#(#idents,)*));
+            #topcoat_view::internal::MoveView::new(async {
+                let (#(#rebinds,)*) = __captured.take();
+                #body
+            })
+        }}
     }
 
     fn collect_condition(&mut self, expr: &Expr) {

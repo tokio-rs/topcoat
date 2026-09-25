@@ -1,5 +1,4 @@
-//! Type-keyed values registered for a single request and dropped when it
-//! ends.
+//! Values identified by type and shared within a request context scope.
 
 use std::{
     any::{Any, TypeId, type_name},
@@ -14,10 +13,8 @@ use crate::context::{BindingId, ContextRead, Cx};
 /// Returns a reference to the request context value of type `T` registered on
 /// the current request's [`Cx`], or `None` if no such value has been registered.
 ///
-/// The lookup is keyed by `T`'s [`TypeId`], so each type may have at most one
-/// registered value per request. Request context lives only for the duration
-/// of the request that owns it; once the request completes, every value is
-/// dropped.
+/// The requested type must exactly match the registered type. A child scope
+/// can replace an inherited value without changing what its parent sees.
 ///
 /// # Examples
 ///
@@ -35,8 +32,8 @@ pub fn try_request_context<T>(cx: &Cx) -> Option<&T>
 where
     T: Any + Send + Sync,
 {
-    let binding = cx.request_context.lookup::<T>();
-    if let Some(tracker) = &cx.tracker {
+    let binding = cx.state.request_context.lookup::<T>();
+    if let Some(tracker) = &cx.state.tracker {
         tracker.record(ContextRead::new::<T>(binding.map(|(id, _)| id)));
     }
     binding.map(|(_, value)| value)
@@ -45,10 +42,8 @@ where
 /// Returns a reference to the request context value of type `T` registered on
 /// the current request's [`Cx`].
 ///
-/// The lookup is keyed by `T`'s [`TypeId`], so each type may have at most one
-/// registered value per request. Request context lives only for the duration
-/// of the request that owns it; once the request completes, every value is
-/// dropped.
+/// The requested type must exactly match the registered type. A child scope
+/// can replace an inherited value without changing what its parent sees.
 ///
 /// # Panics
 ///
@@ -83,12 +78,9 @@ where
 
 /// The type-keyed values registered for one scope of a request.
 ///
-/// Each value is stored under its [`TypeId`], so a given type can hold one
-/// value per scope, and is tagged with the [`BindingId`] issued when it was
-/// registered, giving every binding a distinct identity. Cloning a
-/// `RequestContext` shares the values, which is how a child scope inherits
-/// them. Within a request, values are retrieved with [`request_context`] or
-/// [`try_request_context`].
+/// Stores one value per Rust type. Clones share the registered values until
+/// one scope replaces a binding. Read values through [`request_context`] or
+/// [`try_request_context`] so context tracking observes the lookup.
 #[derive(Default, Debug, Clone)]
 pub struct RequestContext {
     entries: HashMap<TypeId, Binding, BuildHasherDefault<TypeIdHasher>>,
@@ -156,11 +148,17 @@ impl RequestContext {
 /// Values that [`Cx::with_many`](crate::context::Cx::with_many) registers on a
 /// request context in one step.
 ///
-/// Implemented for tuples of context values, so several types can be
-/// registered without deriving a scope per value.
+/// Implemented for tuples of context values and [`RequestContext`], so
+/// several types can be registered without deriving a scope per value.
 pub trait ContextValues {
     /// Registers every value on `context`.
     fn install(self, context: &mut RequestContext);
+}
+
+impl ContextValues for RequestContext {
+    fn install(self, context: &mut RequestContext) {
+        context.entries.extend(self.entries);
+    }
 }
 
 macro_rules! impl_context_values {

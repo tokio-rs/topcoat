@@ -1,10 +1,7 @@
 use console::strip_ansi_codes;
 
-/// How much of the stream to keep for reporting a failure.
-///
-/// Cargo redraws its progress bar in place, so most of a long build's stderr
-/// is renders that were immediately overwritten. Keeping only the tail bounds
-/// that without losing the error report, which cargo prints last.
+/// Maximum retained tail of Cargo's stderr. This bounds memory use while keeping recent
+/// failure output.
 const CAPTURE_LIMIT: usize = 256 * 1024;
 
 /// The tail of cargo's stderr, captured while a build runs.
@@ -28,15 +25,10 @@ impl StderrTail {
         }
     }
 
-    /// Cargo's own error report, extracted from the stderr it interleaves
-    /// with status lines and progress bar renders.
+    /// Extracts Cargo's error report from stderr.
     ///
-    /// Cargo redraws the progress bar in place with carriage returns rather
-    /// than newlines, so only the text after the last `\r` of a line was ever
-    /// visible; the report itself runs from the first `error` line to the end
-    /// of the stream. When there is no such line the build died without
-    /// reporting anything (killed by a signal, say), and the status lines are
-    /// all there is to go on.
+    /// Discards overwritten progress-bar text and returns the text from the first error
+    /// onward. If there is no error line, returns the remaining status output.
     pub(super) fn error_output(&self) -> String {
         let stderr = String::from_utf8_lossy(&self.captured);
         let lines: Vec<String> = stderr

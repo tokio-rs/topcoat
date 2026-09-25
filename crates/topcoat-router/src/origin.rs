@@ -9,19 +9,14 @@ use crate::{
 
 /// The cross-origin request policy the router applies to every request.
 ///
-/// Browsers attach cookies to cross-origin requests, and an intranet or
-/// localhost server is reachable by any page open in the browser, so a
-/// malicious page can send requests the application cannot tell apart from
-/// its own. By default the router rejects state-changing cross-origin browser
-/// requests (cross-site request forgery) and cross-origin WebSocket
-/// handshakes (cross-site WebSocket hijacking) unless the application
-/// explicitly trusts the origin.
+/// By default, rejects state-changing browser requests and WebSocket
+/// handshakes from untrusted origins. This helps protect against cross-site
+/// request forgery and cross-site WebSocket hijacking.
 ///
-/// Same-origin requests, direct navigations, and requests from non-browser
-/// clients (which carry no ambient credentials) always pass. Register a
-/// policy with [`RouterBuilder::origin_policy`](crate::RouterBuilder::origin_policy)
-/// to trust cross-origin peers, to exempt individual routes, or to opt out of
-/// verification.
+/// Requests identified as same-origin or direct navigations pass. Requests
+/// without origin or fetch metadata headers also pass. Register a policy with
+/// [`RouterBuilder::origin_policy`](crate::RouterBuilder::origin_policy) to
+/// trust origins, exempt paths, or disable verification.
 ///
 /// # Examples
 ///
@@ -191,7 +186,7 @@ impl OriginPolicy {
                     };
                 }
 
-                // Ther request had neither an "origin" nor a "sec-fetch-site" header.
+                // The request had neither an "origin" nor a "sec-fetch-site" header.
                 // We assume it comes from a non-browser client and allow the request.
                 OriginVerdict::Allow
             }

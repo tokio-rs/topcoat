@@ -7,7 +7,6 @@ mod css;
 mod format;
 mod hoist;
 mod html;
-pub mod identity;
 mod props;
 mod region;
 mod string;

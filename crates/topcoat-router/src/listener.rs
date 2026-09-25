@@ -16,16 +16,18 @@ pub trait Listener: Send + 'static {
     /// The I/O stream of an accepted connection.
     type Io: AsyncRead + AsyncWrite + Unpin + Send + 'static;
 
-    /// The peer address of an accepted connection.
-    type Addr: Send;
-
-    /// Accepts the next inbound connection, yielding its I/O stream and the
-    /// peer's address.
+    /// Accepts the next connection and returns its I/O stream and the remote
+    /// IP address and port, if available.
+    ///
+    /// Topcoat stores the address as [`RemoteAddr`](crate::RemoteAddr) in
+    /// every request received over the connection. Return `None` for
+    /// connections without an IP address, such as Unix sockets.
     ///
     /// # Errors
     ///
     /// Returns an I/O error if accepting the connection fails.
-    fn accept(&mut self) -> impl Future<Output = io::Result<(Self::Io, Self::Addr)>> + Send;
+    fn accept(&mut self)
+    -> impl Future<Output = io::Result<(Self::Io, Option<SocketAddr>)>> + Send;
 
     /// The local TCP address the listener is bound to, when it has one.
     ///
@@ -39,10 +41,10 @@ pub trait Listener: Send + 'static {
 
 impl Listener for TcpListener {
     type Io = tokio::net::TcpStream;
-    type Addr = SocketAddr;
 
-    async fn accept(&mut self) -> io::Result<(Self::Io, Self::Addr)> {
-        TcpListener::accept(self).await
+    async fn accept(&mut self) -> io::Result<(Self::Io, Option<SocketAddr>)> {
+        let (stream, addr) = TcpListener::accept(self).await?;
+        Ok((stream, Some(addr)))
     }
 
     fn tcp_addr(&self) -> Option<SocketAddr> {
@@ -52,6 +54,11 @@ impl Listener for TcpListener {
 
 /// Serves over a Unix domain socket, typically behind a reverse proxy that
 /// forwards HTTP to the socket path.
+///
+/// Unix socket connections have no IP address, so requests have no
+/// [`RemoteAddr`](crate::RemoteAddr). If a reverse proxy connects through
+/// this socket, use [`TrustedProxies::nearest`](crate::TrustedProxies::nearest)
+/// to trust it and read the client's IP address from its headers.
 ///
 /// Binding fails with `AddrInUse` if the socket file already exists, and
 /// dropping the listener does not remove it, so remove any stale file from a
@@ -69,9 +76,9 @@ impl Listener for TcpListener {
 #[cfg(unix)]
 impl Listener for UnixListener {
     type Io = tokio::net::UnixStream;
-    type Addr = tokio::net::unix::SocketAddr;
 
-    async fn accept(&mut self) -> io::Result<(Self::Io, Self::Addr)> {
-        UnixListener::accept(self).await
+    async fn accept(&mut self) -> io::Result<(Self::Io, Option<SocketAddr>)> {
+        let (stream, _addr) = UnixListener::accept(self).await?;
+        Ok((stream, None))
     }
 }

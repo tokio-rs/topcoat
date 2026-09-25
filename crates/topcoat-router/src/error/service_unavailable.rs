@@ -6,16 +6,9 @@ use crate::response::{IntoResponse, Response};
 /// Builds a service-unavailable (HTTP 503) response carrying a `Retry-After`
 /// hint, in seconds.
 ///
-/// Return this when the server is temporarily at capacity: load shedding,
-/// admission control, or a saturated dependency. It is deliberately distinct
-/// from [`internal_server_error`](crate::error::internal_server_error), which
-/// tells a client, a load balancer, and an on-call engineer that something is
-/// broken. Answering "broken" when the truth is "busy" reads as an outage to
-/// everything automated downstream.
-///
-/// `Retry-After` is why the constructor takes an argument. A bare 503 tells a
-/// caller to go away without saying when to come back, so every well-behaved
-/// client invents its own backoff and they all synchronize.
+/// Return this when the service is temporarily unable to accept a request.
+/// The `Retry-After` header tells the client how long to wait before trying
+/// again.
 ///
 /// # Examples
 ///
@@ -41,7 +34,7 @@ pub fn service_unavailable(retry_after_secs: u64) -> ServiceUnavailableError {
 /// `Result`.
 ///
 /// Construct one with [`service_unavailable`].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ServiceUnavailableError {
     retry_after_secs: u64,
 }

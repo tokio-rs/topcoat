@@ -1,28 +1,21 @@
-import type { Context } from "../context";
+import type { Context } from "../expression/context";
+import { dehydrate } from "../expression/dehydrate";
 import { Future } from "./future";
 
 export class Procedure<A extends unknown[] = unknown[], R = unknown> {
 	constructor(
 		private readonly cx: Context,
-		private readonly id: string,
+		/** The request URL for procedure calls, with route groups removed. */
+		private readonly path: string,
 	) {}
 
 	call(...args: A): Future<R> {
 		return new Future(async () => {
-			const response = await fetch(
-				`/_topcoat/runtime/procedures/${encodeURIComponent(this.id)}`,
-				{
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify(
-						args.length === 0
-							? null
-							: args.map((arg) =>
-									(arg as { dehydrate: () => unknown }).dehydrate(),
-								),
-					),
-				},
-			);
+			const response = await fetch(this.path, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(args.map(dehydrate)),
+			});
 			if (!response.ok) {
 				throw new Error(
 					`Procedure call failed: ${response.status} ${response.statusText}`,
@@ -33,7 +26,7 @@ export class Procedure<A extends unknown[] = unknown[], R = unknown> {
 		});
 	}
 
-	dehydrate(): { t: "Procedure"; id: string } {
-		return { t: "Procedure", id: this.id };
+	dehydrate(): { t: "Procedure"; path: string } {
+		return { t: "Procedure", path: this.path };
 	}
 }

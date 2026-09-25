@@ -1,6 +1,6 @@
 # Datastar
 
-A counter driven by Datastar: the browser sends its signals to the server, which answers with server-sent events that patch the signal and append an element.
+A counter updated with Datastar. The browser sends signals to the server, which returns updates over server-sent events.
 
 Run it with:
 

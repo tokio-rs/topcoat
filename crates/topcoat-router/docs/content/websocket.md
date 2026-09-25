@@ -1,10 +1,10 @@
-WebSocket support for topcoat routes.
+WebSocket connections for Topcoat routes.
 
-A WebSocket starts as an ordinary `GET` request that asks the server to switch protocols. This module (behind the `websocket` feature) handles that handshake and the framing that follows: [`WebSocketUpgrade`] validates the request and completes the upgrade, and the resulting [`WebSocket`] exchanges [`Message`]s with the client for as long as the connection lives.
+A WebSocket lets a client and server exchange messages over a persistent connection. Enable the `websocket` feature to accept upgrade requests with [`WebSocketUpgrade`] and exchange messages through [`WebSocket`].
 
 # Upgrading a request
 
-A route becomes a WebSocket endpoint by taking a [`WebSocketUpgrade`] parameter and returning the response its [`on_upgrade`](WebSocketUpgrade::on_upgrade) builds. The callback passed to `on_upgrade` receives the [`WebSocket`] once the client has switched protocols, and runs on its own task; the handler itself completes immediately with the handshake response.
+Accept a [`WebSocketUpgrade`] parameter and return the response from [`on_upgrade`](WebSocketUpgrade::on_upgrade). Its callback receives the upgraded [`WebSocket`] and runs in a separate task. The handler returns the handshake response without waiting for that task to finish.
 
 ```rust
 use topcoat::{
@@ -30,7 +30,7 @@ async fn echo(upgrade: WebSocketUpgrade) -> Result<Response> {
 }
 ```
 
-A request that is not a conforming WebSocket handshake is rejected before the handler's callback is involved: a non-`GET` method with `405 Method Not Allowed`, and missing or malformed handshake headers with `400 Bad Request`. Because the extractor runs inside the handler like any other, request-scoped functions (a session check, `cookies(cx)`) compose with it as usual -- reject the request by returning an error before calling `on_upgrade`.
+The extractor rejects non-`GET` requests with `405 Method Not Allowed` and invalid handshake headers with `400 Bad Request`. Perform application checks, such as authentication, before calling `on_upgrade`. Return an error to reject the connection.
 
 # Reading the request context
 
@@ -75,4 +75,4 @@ let (mut sender, mut receiver) = socket.split();
 
 # Subprotocols and limits
 
-[`protocols`](WebSocketUpgrade::protocols) declares the subprotocols the endpoint speaks; the first one the client also requested is selected, echoed in the handshake response, and reported by [`WebSocket::protocol`]. Further builder methods bound the connection. [`max_message_size`](WebSocketUpgrade::max_message_size) and [`max_frame_size`](WebSocketUpgrade::max_frame_size) protect against oversized input, and [`max_write_buffer_size`](WebSocketUpgrade::max_write_buffer_size) bounds memory when a client stops reading. See [`WebSocketUpgrade`] for the rest.
+Pass supported subprotocols to [`protocols`](WebSocketUpgrade::protocols) in preference order. Topcoat selects the first one also requested by the client. Read the result with [`WebSocket::protocol`]. Use the [`WebSocketUpgrade`] builder to set message, frame, and write buffer limits.

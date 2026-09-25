@@ -1,6 +1,6 @@
 Customizes how a module contributes to module-router URLs.
 
-`segment!(...)` is placed at the top of a non-root route module to override the URL segment the module contributes to a [`module_router!`](macro.module_router.html): by default the kebab-cased module name, or no segment for `_`-prefixed modules (groups). The module containing `module_router!` is the route root and contributes no segment. `segment!` has no effect on a regular [`Router`](struct.Router.html), nor on items whose attribute carries an explicit path.
+Place `segment!(...)` in a non-root route module to change its segment under [`module_router!`](macro.module_router.html). Regular modules default to their kebab-cased name. Modules starting with `_` default to groups, which add no URL segment. The root module adds no segment. This macro does not affect handlers with absolute paths or a regular [`Router`](struct.Router.html).
 
 # Attributes
 

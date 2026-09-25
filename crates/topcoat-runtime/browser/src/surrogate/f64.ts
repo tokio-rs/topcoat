@@ -1,4 +1,4 @@
-import type { AttributeValueViewParts, NodeViewParts } from "../view";
+import type { AttributeValueViewParts, NodeViewParts } from "../dom/view";
 import { Bool } from "./bool";
 
 const BITS = new DataView(new ArrayBuffer(8));
@@ -37,19 +37,16 @@ function tiedBelow(v: number, digits: string, scale: number): boolean {
 	return left === right;
 }
 
-// Render a number the way Rust's `Display` for `f64` does, which is how the
-// server renders it (`ViewPart::F64`). `Number.prototype.toString` differs on
-// five kinds of value (#237):
+// Formats an f64 like Rust's Display. JavaScript number formatting differs:
 //
-// - Outside 1e-7..1e21 it switches to exponential notation. Rust never does:
-//   it writes `1e21` as 22 digits and `5e-324` as 326 characters.
+// - It can use exponential notation. Rust uses decimal notation.
 // - It spells the infinities `Infinity` and `-Infinity`, Rust `inf` and `-inf`.
 // - It drops the sign of negative zero, Rust keeps it.
 // - On an exact tie between two equally short digit strings it picks the even
 //   final digit, Rust the value further from zero.
 //
-// Otherwise both pick the same shortest digits that round-trip, so the rest is
-// moving the decimal point.
+// Both otherwise choose the same shortest digits that round-trip. Adjust
+// the tie case, then place the decimal point.
 export function display(v: number): string {
 	if (Number.isNaN(v)) return "NaN";
 	if (v === Number.POSITIVE_INFINITY) return "inf";

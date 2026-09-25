@@ -4,8 +4,7 @@ use serde::Deserialize;
 
 use super::{artifacts::Artifact, stderr::StderrTail};
 
-/// The messages cargo wrote to stdout during a build, one JSON object per
-/// line: rustc's diagnostics and the artifacts of every compiled crate.
+/// Diagnostics and artifacts read from Cargo's JSON build output.
 pub(super) struct Messages(Vec<Message>);
 
 impl Messages {
@@ -20,15 +19,10 @@ impl Messages {
         )
     }
 
-    /// The error output to show for a build cargo reported as failed.
+    /// Returns diagnostics for a failed build.
     ///
-    /// rustc reports its diagnostics as JSON on stdout, but cargo's own
-    /// failures never reach it: a build script that exits non-zero, an
-    /// unresolvable dependency, a malformed manifest, or a `--bin` that names
-    /// no target are only ever written to stderr as text, leaving stdout
-    /// without a single error-level diagnostic (and often empty altogether).
-    /// Which stream holds the failure is therefore decided by whether rustc
-    /// reported an error at all, rather than by how the build was invoked.
+    /// Uses compiler diagnostics when rustc reported an error. Otherwise, uses Cargo's
+    /// stderr, since Cargo failures may not appear in the JSON output.
     pub(super) fn failure_diagnostics(&self, stderr: &StderrTail) -> String {
         let diagnostics = if self.has_compiler_error() {
             self.rendered_diagnostics()
@@ -38,9 +32,7 @@ impl Messages {
         diagnostics.trim_end().to_string()
     }
 
-    /// Whether rustc reported an error, as opposed to only warnings or
-    /// nothing at all. Every level it fails a build with starts with `error`:
-    /// plain `error`, and `error: internal compiler error` for an ICE.
+    /// Whether rustc reported an error, including an internal compiler error.
     fn has_compiler_error(&self) -> bool {
         self.diagnostics().any(Diagnostic::is_error)
     }
@@ -75,9 +67,8 @@ impl Messages {
     }
 }
 
-/// One line of cargo's JSON output. Messages other than diagnostics and
-/// artifacts (build script output, the build-finished summary) carry nothing
-/// a build result needs and parse as [`Message::Other`].
+/// A Cargo JSON message. Output unrelated to diagnostics or artifacts is parsed as
+/// [`Message::Other`].
 #[derive(Deserialize)]
 #[serde(tag = "reason")]
 enum Message {

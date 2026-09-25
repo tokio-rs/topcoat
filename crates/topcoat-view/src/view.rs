@@ -9,18 +9,16 @@ use topcoat_core::error::Result;
 
 use crate::{RegionId, buffer::ViewHandle};
 
-/// A [`View`]'s first content, resolved from [`View::poll_first`].
+/// The initial content returned by [`View::poll_first`].
 #[derive(Debug)]
 pub struct ViewFirst {
     /// The content, ready to render with the surrounding document.
     pub content: ViewHandle,
-    /// Whether the view can still change the content through
-    /// [`View::poll_swap`] after it went out.
+    /// Whether [`View::poll_swap`] can produce updates to this content.
     pub live: bool,
 }
 
-/// A replacement for a live region of content that already went out,
-/// yielded by [`View::poll_swap`].
+/// An update to a live region, returned by [`View::poll_swap`].
 #[derive(Debug)]
 pub struct ViewSwap {
     /// The region the replacement belongs to.
@@ -29,22 +27,19 @@ pub struct ViewSwap {
     pub replacement: ViewHandle,
 }
 
-/// The value a live region's body returns to show it emitted content.
+/// The return token for a live region's body.
 ///
-/// The `emit!` macro evaluates to a [`Result`] carrying this token, and a
-/// `live!` body returns one, so ending the body with an emission is the
-/// natural way to satisfy the type. The `live!` guide describes the token
-/// and how to construct one when the body does not end with an emission.
+/// `emit!` returns a [`Result`] containing this token, so a `live!` body can
+/// end with an emission. Constructing the token directly does not emit
+/// content. The body must still emit at least once.
 #[derive(Debug)]
 pub struct EmitToken;
 
 /// A piece of HTML that can keep changing while a response streams.
 ///
-/// A view is polled in two phases. [`poll_first`](Self::poll_first)
-/// resolves once, to the content that renders with the surrounding
-/// document. When that content reports itself as live,
-/// [`poll_swap`](Self::poll_swap) takes over and yields replacements for
-/// regions of it until the view is done.
+/// First, [`poll_first`](Self::poll_first) returns the initial content.
+/// If it is live, call [`poll_swap`](Self::poll_swap) for region updates
+/// until it returns `None`.
 ///
 /// The `view!` and `live!` macros build implementations of this trait;
 /// application code composes those rather than implementing it by hand.
@@ -64,8 +59,7 @@ pub trait View: Send {
 pub trait ViewExt: View {
     /// Resolves the view's first content and discards the view.
     ///
-    /// Replacements a live view would stream afterwards never happen; the
-    /// content stays as it first resolved.
+    /// Later updates from a live view are discarded.
     fn first(self) -> impl Future<Output = Result<ViewHandle>> + Send
     where
         Self: Sized,
@@ -77,8 +71,7 @@ pub trait ViewExt: View {
         }
     }
 
-    /// Resolves the content of a view that does not change after it went
-    /// out.
+    /// Resolves the content of a view that has no live updates.
     ///
     /// # Panics
     ///
@@ -95,11 +88,10 @@ pub trait ViewExt: View {
         }
     }
 
-    /// Erases the view's concrete type behind a boxed one.
+    /// Boxes the view to give different view types a common return type.
     ///
-    /// Every `view!` invocation has its own anonymous type, so a function
-    /// returning `impl View` from multiple `return` sites must box each view
-    /// to give them a common type.
+    /// Use this when a function returns different `view!` expressions, or
+    /// when a recursive component needs a view type with a known size.
     fn boxed<'a>(self) -> BoxView<'a>
     where
         Self: Sized + 'a,

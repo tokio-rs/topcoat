@@ -17,7 +17,7 @@ When a feature is already best explained in detail by another part of the docume
 
 ## General
 
-* Use simple, concise language, no fancy words.
+* Write in plain english. No fancy sentence structure.
 * Avoid exhaustively listing specific implementations or uses that could evolve over time and go stale.
 * Use only ASCII characters in both code and documentation, e.g. `->` instead of unicode arrow or `...` instead of ellipsis character.
 * Avoid em-dashes entirely. Use colons and semicolons sparingly.

@@ -1,10 +1,10 @@
-import { effect, root, signal, tick } from "@maverick-js/signals";
 import { expect, it } from "vitest";
 
+import { Effect, flushEffects, signal } from "../reactivity";
 import { Bool } from "./bool";
 import { F64 } from "./f64";
 import { WriteSignal } from "./signal";
-import { Str, String } from "./string";
+import { String as RuntimeString, Str } from "./string";
 
 function write<T>(value: T): WriteSignal<T> {
 	return new WriteSignal("test", signal(value));
@@ -32,7 +32,7 @@ it("increment and decrement move by one, including across zero", () => {
 });
 
 it("push_str appends and leaves the previous value untouched", () => {
-	const before = new String("hi");
+	const before = new RuntimeString("hi");
 	const s = write(before);
 
 	s.push_str(new Str("!"));
@@ -46,11 +46,11 @@ it("push_str appends and leaves the previous value untouched", () => {
 // read inside the shard depends on, and the id alone would leave the server
 // nothing to read.
 it("dehydrates to its id and current value", () => {
-	const s = new WriteSignal("abc", signal<unknown>(new String("shoes")));
+	const s = new WriteSignal("abc", signal<unknown>(new RuntimeString("shoes")));
 
 	expect(s.dehydrate()).toEqual({ t: "Signal", id: "abc", v: "shoes" });
 
-	s.set(new String("boots"));
+	s.set(new RuntimeString("boots"));
 	expect(s.dehydrate()).toEqual({ t: "Signal", id: "abc", v: "boots" });
 });
 
@@ -58,26 +58,26 @@ it("dehydrates to its id and current value", () => {
 // change detection is identity based, so a future refactor that mutates in
 // place would silently stop notifying subscribers.
 it("each write notifies subscribers exactly once", () => {
-	root((dispose) => {
-		const inner = signal<unknown>(new F64(0));
-		const s = new WriteSignal("test", inner);
+	const inner = signal<unknown>(new F64(0));
+	const s = new WriteSignal("test", inner);
 
-		let runs = 0;
-		effect(() => {
-			inner();
-			runs += 1;
-		});
-		tick();
+	let runs = 0;
+	const effect = new Effect(() => {
+		inner();
+		runs += 1;
+	});
+	try {
+		effect.run();
 		expect(runs).toBe(1);
 
 		s.increment();
-		tick();
+		flushEffects();
 		expect(runs).toBe(2);
 
 		s.decrement();
-		tick();
+		flushEffects();
 		expect(runs).toBe(3);
-
-		dispose();
-	});
+	} finally {
+		effect.dispose();
+	}
 });

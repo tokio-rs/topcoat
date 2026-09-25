@@ -6,22 +6,25 @@ use std::{
     task::Poll,
 };
 
-use topcoat_core::context::{AppContext, Cx, try_request_context};
+use topcoat_core::{
+    context::{AppContext, ContextValues, Cx, RequestContext, try_request_context, with_identity},
+    error::Result,
+};
 
 use crate::{
-    Endpoint, EndpointIndex, Endpoints, Layer, Next, OriginLayer, RawPathParams, Route, RouteId,
-    RouteIndex, RouterBuilder, Routes, Terminal,
-    error::{REWRITE_LIMIT, RewriteError, RewriteLoopError, internal_server_response, respond},
+    Body, Endpoint, EndpointIndex, Endpoints, Layer, Next, OriginLayer, RawPathParams, Route,
+    RouteId, RouteIndex, RouterBuilder, Routes, Terminal, TrustedProxies,
+    error::{RewriteChain, RewriteError, internal_server_response, respond},
+    proxy::ClientIp,
     request::{OriginalParts, Request},
-    response::Response,
+    response::{Response, ResponseHeaders, response_headers},
 };
 
 /// A finalized Topcoat routing table.
 ///
-/// Build one with [`Router::builder`], register pages, layouts, layers, routes,
-/// and app context values on the returned [`RouterBuilder`], then call
-/// [`RouterBuilder::build`]. Most applications use the `topcoat` facade and
-/// pass the finished router to `topcoat::start`.
+/// Configure a [`RouterBuilder`] from [`Router::builder`], then call
+/// [`RouterBuilder::build`]. Pass the finished router to `topcoat::start` to
+/// serve requests, or call [`handle`](Self::handle) directly.
 ///
 /// # Examples
 ///
@@ -35,6 +38,9 @@ use crate::{
 /// # Ok(())
 /// # }
 /// ```
+///
+/// Clones share the same routing tables, so cloning is cheap.
+#[derive(Clone)]
 pub struct Router {
     /// The routing tables, shared with every request context this router
     /// creates.
@@ -65,7 +71,28 @@ impl Router {
     /// while processing the request becomes a `500 Internal Server Error`
     /// response.
     pub async fn handle(&self, request: Request) -> Response {
-        let mut future = pin!(self.handle_inner(request));
+        self.handle_with(request, RequestContext::new()).await
+    }
+
+    /// Handles a request with additional values in its request context.
+    ///
+    /// Works like [`handle`](Self::handle). Pass a tuple of values or a
+    /// [`RequestContext`]. Routes and layers can read these values with
+    /// [`request_context`](topcoat_core::context::request_context).
+    ///
+    /// Each request and internal rewrite gets a fresh context containing
+    /// these values. A rewrite can replace a value by supplying another
+    /// of the same type. The router's own values, such as request parts
+    /// and path parameters, always take precedence.
+    ///
+    /// A route or layer can call this to handle another request. The new
+    /// request has its own context, with only the values explicitly passed
+    /// here. Its response is returned to the caller.
+    pub async fn handle_with<V>(&self, request: Request, values: V) -> Response
+    where
+        V: ContextValues,
+    {
+        let mut future = pin!(self.handle_inner(request, RewriteChain::carrying(values)));
 
         poll_fn(|cx| {
             // The whole request and its context are discarded after a panic,
@@ -79,68 +106,36 @@ impl Router {
         .await
     }
 
-    /// Handles one request inside the panic isolation boundary.
-    async fn handle_inner(&self, request: Request) -> Response {
+    /// Handles a request using the context values in `chain`.
+    /// The caller catches panics from this future.
+    async fn handle_inner(&self, request: Request, mut chain: RewriteChain) -> Response {
         let inner = &*self.inner;
+        // Resolve the client's address once from the original request,
+        // before any rewrite can replace its headers.
+        let client_ip = ClientIp(inner.trusted_proxies.resolve(&request));
         let (mut parts, mut body) = request.into_parts();
-
-        // The paths this request has already been dispatched under, filled in
-        // only once a rewrite happens; a request served in one dispatch never
-        // touches it.
-        let mut visited: Vec<String> = Vec::new();
-        // The parts of the first dispatch, carried on every rewritten
-        // dispatch's context so its handler can read the request as the
-        // client sent it.
-        let mut original: Option<http::request::Parts> = None;
-        // The context a rewrite handed over for the dispatches after it, if
-        // any; a dispatch otherwise starts from an empty request context.
-        let mut base: Option<Cx> = None;
+        let original = OriginalParts(Arc::new(parts.clone()));
 
         let (cx, result) = loop {
-            // The chain's terminal and the layer stack wrapping it: a matched
-            // route carries its own precomputed stack, while a request that
-            // matched no route resolves to a 404 or 405 through the layers
-            // without a path, which wrap every request.
-            let cx = match &base {
-                Some(base) => base.clone(),
-                None => Cx::new(Arc::clone(&inner.app_context)),
-            };
-            let cx = cx.with(Arc::clone(&self.inner));
-            let cx = match &original {
-                Some(parts) => cx.with(OriginalParts(parts.clone())),
-                None => cx,
-            };
-            let (terminal, layer_stack, cx) = match inner.endpoints.at(parts.uri.path()) {
-                Some((endpoint_index, endpoint, params)) => {
-                    let path_params = RawPathParams::from_match(
-                        endpoint.path(),
-                        params.iter().map(|(_, value)| value),
-                    );
-                    let route_index = endpoint.get(&parts.method).or_else(|| endpoint.any());
-                    let (terminal, layer_stack) = match route_index {
-                        Some(index) => {
-                            let registered = &inner.routes[index];
-                            (Terminal::Route(&*registered.route), &*registered.layers)
-                        }
-                        None => (Terminal::MethodNotAllowed(endpoint), &*inner.always_layers),
-                    };
-                    let matched = Matched {
-                        endpoint: endpoint_index,
-                        route: route_index,
-                    };
-                    (
-                        terminal,
-                        layer_stack,
-                        cx.with_many((matched, path_params, parts)),
-                    )
-                }
-                None => (Terminal::NotFound, &*inner.always_layers, cx.with(parts)),
+            // Rewrites start with a fresh context. Keep only the values
+            // passed by the caller or a rewrite, and discard any other
+            // request state. Add the router's values last so they win.
+            let cx = Cx::new(Arc::clone(&inner.app_context))
+                .with_many(chain.context().clone())
+                .with_many((
+                    Arc::clone(&self.inner),
+                    ResponseHeaders::new(),
+                    RawPathParams::default(),
+                    original.clone(),
+                    client_ip,
+                    parts,
+                ));
+            let cx = match crate::request::initial_identity(&cx) {
+                Ok(identity) => with_identity(cx, identity),
+                Err(error) => break (cx, Err(error)),
             };
 
-            // The origin layer wraps the whole chain, denying untrusted
-            // cross-origin requests before anything else runs.
-            let next = Next::new(layer_stack, terminal);
-            let result = inner.origin.handle(&cx, body, next).await;
+            let (cx, result) = self.dispatch(cx, body).await;
 
             // A rewrite bubbling out of the chain discards this dispatch,
             // response and request context both, and goes around again with
@@ -149,55 +144,56 @@ impl Router {
                 Ok(response) => break (cx, Ok(response)),
                 Err(error) => match error.downcast::<RewriteError>() {
                     Ok(rewrite) => rewrite,
-                    Err(error) => break (cx, Err(error)),
+                    Err(failed) => break (cx, Err(failed.into_error())),
                 },
             };
-            let rewrite = rewrite.into_parts();
-            let target = rewrite.path_and_query;
-
-            let previous = try_request_context::<http::request::Parts>(&cx)
-                .expect("a dispatched request carries its parts");
-            visited.push(dispatched_path(&previous.uri));
-            if visited.iter().any(|path| path == target.as_str()) {
-                let error = RewriteLoopError::cycle(&visited, target.as_str());
-                break (cx, Err(error.into()));
-            }
-            if visited.len() > REWRITE_LIMIT {
-                let error = RewriteLoopError::limit(&visited, target.as_str());
-                break (cx, Err(error.into()));
-            }
-
-            // The next dispatch keeps the headers, and the method unless the
-            // rewrite changes it, swapping the path and query into the URI.
-            let mut next_parts = previous.clone();
-            if original.is_none() {
-                original = Some(previous.clone());
-            }
-            let mut uri_parts = std::mem::take(&mut next_parts.uri).into_parts();
-            uri_parts.path_and_query = Some(target);
-            next_parts.uri = http::Uri::from_parts(uri_parts)
-                .expect("replacing the path of a valid request uri keeps it valid");
-            if let Some(method) = rewrite.method {
-                next_parts.method = method;
-            }
-            if let Some(cx) = rewrite.cx {
-                base = Some(cx);
-            }
-            parts = next_parts;
-            body = rewrite.body;
+            (parts, body) = match chain.follow(crate::request::parts(&cx), rewrite) {
+                Ok(request) => request.into_parts(),
+                Err(error) => break (cx, Err(error)),
+            };
         };
-        let response = respond(&cx, result);
+        let mut response = respond(&cx, result);
+        response_headers(&cx).apply(response.headers_mut());
 
         // Compression runs outside every layer, so layers see uncompressed
         // bodies. The negotiation reads the request headers as the layers
         // left them.
         #[cfg(feature = "compression")]
-        let response = match try_request_context::<http::request::Parts>(&cx) {
-            Some(parts) => inner.compression.compress(&parts.headers, response).await,
-            None => response,
-        };
+        let response = inner
+            .compression
+            .compress(crate::request::headers(&cx), response)
+            .await;
 
         response
+    }
+
+    /// Matches and runs one dispatch, retaining its context for the response.
+    async fn dispatch(&self, cx: Cx, body: Body) -> (Cx, Result<Response>) {
+        let inner = &*self.inner;
+        let parts = crate::request::parts(&cx);
+        let (cx, next) = match inner.endpoints.at(parts.uri.path()) {
+            Some((endpoint_index, endpoint, params)) => {
+                let path_params = RawPathParams::from_match(
+                    endpoint.path(),
+                    params.iter().map(|(_, value)| value),
+                );
+                let route_index = endpoint.get(&parts.method).or_else(|| endpoint.any());
+                let next = match route_index {
+                    Some(index) => Next::new(&[], Terminal::Route(&inner.routes[index])),
+                    None => Next::new(&inner.always_layers, Terminal::MethodNotAllowed(endpoint)),
+                };
+                let matched = Matched {
+                    endpoint: endpoint_index,
+                    route: route_index,
+                };
+                (cx.with_many((matched, path_params)), next)
+            }
+            None => (cx, Next::new(&inner.always_layers, Terminal::NotFound)),
+        };
+
+        // The origin check precedes all route and pathless layers.
+        let result = inner.origin.handle(&cx, body, next).await;
+        (cx, result)
     }
 }
 
@@ -221,17 +217,11 @@ pub(crate) struct RouterInner {
     pub(crate) app_context: Arc<AppContext>,
     /// The origin policy wrapping every request as the outermost layer.
     pub(crate) origin: OriginLayer,
+    /// The proxies trusted to report the client's address.
+    pub(crate) trusted_proxies: TrustedProxies,
     /// The compression applied to responses on their way out.
     #[cfg(feature = "compression")]
     pub(crate) compression: crate::Compression,
-}
-
-/// The path and query a request was dispatched under, as recorded in a
-/// rewrite chain.
-fn dispatched_path(uri: &http::Uri) -> String {
-    uri.path_and_query()
-        .map_or(uri.path(), http::uri::PathAndQuery::as_str)
-        .to_owned()
 }
 
 /// What a request was dispatched to, stored on its context.
@@ -242,6 +232,34 @@ pub(crate) struct Matched {
     /// The route serving the request, or `None` when the path matched but no
     /// route accepts the method (a 405).
     route: Option<RouteIndex>,
+}
+
+/// Returns the router handling this request.
+///
+/// This is a cheap clone of the router. A route or layer can use it to
+/// [`handle`](Router::handle) another request. That request gets a fresh
+/// context, and its response is returned to the caller.
+///
+/// # Panics
+///
+/// Panics if the context does not belong to a router request.
+#[must_use]
+#[track_caller]
+pub fn router(cx: &Cx) -> Router {
+    match try_router(cx) {
+        Some(router) => router,
+        None => panic!("the request was not dispatched by a router"),
+    }
+}
+
+/// Returns the router handling this request, or `None` if the context does
+/// not belong to a router request.
+#[must_use]
+pub fn try_router(cx: &Cx) -> Option<Router> {
+    let inner = try_request_context::<Arc<RouterInner>>(cx)?;
+    Some(Router {
+        inner: Arc::clone(inner),
+    })
 }
 
 /// Reads the router and dispatch record off a matched request's context.
@@ -312,7 +330,7 @@ pub fn route(cx: &Cx) -> &dyn Route {
 #[must_use]
 pub fn try_route(cx: &Cx) -> Option<&dyn Route> {
     let (router, matched) = try_matched(cx)?;
-    Some(&*router.routes[matched.route?].route)
+    Some(&router.routes[matched.route?])
 }
 
 /// Returns the endpoint serving the route registered under `id` on the router
@@ -322,8 +340,8 @@ pub fn try_route(cx: &Cx) -> Option<&dyn Route> {
 #[must_use]
 pub fn route_endpoint(cx: &Cx, id: RouteId) -> Option<&Endpoint> {
     let router = try_request_context::<Arc<RouterInner>>(cx)?;
-    let index = router.routes.index_of(id)?;
-    Some(&router.endpoints[router.routes[index].endpoint])
+    let index = router.routes.endpoint(id)?;
+    Some(&router.endpoints[index])
 }
 
 /// Builds the request context of a request matched to an endpoint at `path`,
@@ -342,6 +360,7 @@ pub(crate) fn test_matched_cx(path: &crate::Path) -> Cx {
         always_layers: Box::new([]),
         app_context: Arc::new(AppContext::new()),
         origin: OriginLayer::new(OriginPolicy::new()),
+        trusted_proxies: TrustedProxies::new(),
         #[cfg(feature = "compression")]
         compression: crate::Compression::new(),
     };
@@ -373,10 +392,10 @@ mod tests {
     use super::*;
     use crate::{
         Body, HrefTarget, LayerFn, LayerFuture, LayoutFn, Method, Methods, OriginPolicy, PageFn,
-        Path, Route, RouteFn, RouteFuture, Slot,
+        Path, RemoteAddr, Route, RouteFn, RouteFuture, Slot, TrailingSlash,
         error::rewrite,
         raw_path_params,
-        request::{Bytes, method, original_method, original_uri, uri},
+        request::{Bytes, client_ip, method, original_method, original_uri, uri},
         response::IntoResponse,
         to_bytes,
     };
@@ -782,19 +801,54 @@ mod tests {
         Box::pin(async move { format!("{} {}", method(cx), original_method(cx)).into_response(cx) })
     }
 
-    /// A value a rewrite hands to the handler at its target.
-    struct Carried(&'static str);
+    /// Changes the request method to `GET` while keeping the `/same` path.
+    fn rewrite_to_same_as_get(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { Err(rewrite("/same", Body::empty()).method(Method::GET).into()) })
+    }
 
-    /// Rewrites to `/carried`, handing over a context carrying a value.
-    fn rewrite_with_cx(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+    /// Repeats `GET /same` to create a rewrite cycle.
+    fn rewrite_to_same(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { Err(rewrite("/same", Body::empty()).into()) })
+    }
+
+    /// Removes `x-dropped` and sets `x-added` before rewriting to `/echo-headers`.
+    fn rewrite_with_headers(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move {
-            Err(rewrite("/carried", Body::empty())
-                .cx(cx.with(Carried("handed over")))
+            let mut headers = crate::request::headers(cx).clone();
+            headers.remove("x-dropped");
+            headers.insert("x-added", http::HeaderValue::from_static("yes"));
+            Err(rewrite("/echo-headers", Body::empty())
+                .headers(headers)
                 .into())
         })
     }
 
-    /// Rewrites on to `/carried-again` without a context of its own.
+    /// Returns the `x-` request headers as `name=value` pairs separated by `&`.
+    fn echo_headers(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move {
+            crate::request::headers(cx)
+                .iter()
+                .filter(|(name, _)| name.as_str().starts_with("x-"))
+                .map(|(name, value)| format!("{name}={}", value.to_str().unwrap()))
+                .collect::<Vec<_>>()
+                .join("&")
+                .into_response(cx)
+        })
+    }
+
+    /// A value a rewrite hands to the handler at its target.
+    struct Carried(&'static str);
+
+    /// Rewrites to `/carried`, handing over a value.
+    fn rewrite_with_value(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move {
+            Err(rewrite("/carried", Body::empty())
+                .with(Carried("handed over"))
+                .into())
+        })
+    }
+
+    /// Rewrites on to `/carried-again` without carrying another value.
     fn rewrite_onward(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move { Err(rewrite("/carried-again", Body::empty()).into()) })
     }
@@ -895,9 +949,9 @@ mod tests {
     }
 
     #[test]
-    fn a_rewrite_carries_its_context_through_the_rest_of_the_chain() {
+    fn a_rewrite_carries_its_values_through_the_rest_of_the_chain() {
         let router = RouterBuilder::new()
-            .route(RouteFn::new(Method::GET, path("/old"), rewrite_with_cx))
+            .route(RouteFn::new(Method::GET, path("/old"), rewrite_with_value))
             .route(RouteFn::new(Method::GET, path("/carried"), rewrite_onward))
             .route(RouteFn::new(
                 Method::GET,
@@ -915,6 +969,191 @@ mod tests {
         // starts from an empty context.
         let (_, _, body) = send(&router, Method::GET, "/carried-again");
         assert_eq!(&body[..], b"none");
+    }
+
+    #[test]
+    fn later_rewrites_replace_values_of_the_same_type_and_keep_other_values() {
+        fn start(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+            Box::pin(async {
+                Err(rewrite("/replace", Body::empty())
+                    .with(Carried("superseded"))
+                    .with(Carried("first"))
+                    .with(42u32)
+                    .into())
+            })
+        }
+
+        fn replace(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+            Box::pin(async move {
+                assert_eq!(request_context::<Carried>(cx).0, "first");
+                Err(rewrite("/inspect", Body::empty())
+                    .with(Carried("second"))
+                    .into())
+            })
+        }
+
+        fn inspect(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+            Box::pin(async move {
+                assert_eq!(*request_context::<u32>(cx), 42);
+                request_context::<Carried>(cx).0.into_response(cx)
+            })
+        }
+
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/start"), start))
+            .route(RouteFn::new(Method::GET, path("/replace"), replace))
+            .route(RouteFn::new(Method::GET, path("/inspect"), inspect))
+            .build();
+
+        let (status, _, body) = send(&router, Method::GET, "/start");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"second");
+    }
+
+    /// Sends a request with context values and reads its full response.
+    fn send_with(
+        router: &Router,
+        method: Method,
+        path: &str,
+        values: impl ContextValues,
+    ) -> (StatusCode, HeaderMap, Bytes) {
+        let response = block_on(router.handle_with(request(method, path), values));
+        let (parts, body) = response.into_parts();
+        let bytes = block_on(to_bytes(body, usize::MAX)).unwrap();
+        (parts.status, parts.headers, bytes)
+    }
+
+    #[test]
+    fn a_seeded_dispatch_hands_its_values_to_the_route() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(
+                Method::GET,
+                path("/carried-again"),
+                echo_carried,
+            ))
+            .build();
+
+        let (status, _, body) =
+            send_with(&router, Method::GET, "/carried-again", (Carried("seeded"),));
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"seeded");
+
+        // A separate request must not inherit these values.
+        let (_, _, body) = send(&router, Method::GET, "/carried-again");
+        assert_eq!(&body[..], b"none");
+    }
+
+    #[test]
+    fn seeded_values_survive_rewrites_and_yield_to_values_a_rewrite_carries() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/old"), rewrite_with_value))
+            .route(RouteFn::new(Method::GET, path("/carried"), rewrite_onward))
+            .route(RouteFn::new(
+                Method::GET,
+                path("/carried-again"),
+                echo_carried,
+            ))
+            .build();
+
+        // Rewrites preserve values unless they explicitly replace them.
+        let (_, _, body) = send_with(&router, Method::GET, "/carried", (Carried("seeded"),));
+        assert_eq!(&body[..], b"seeded");
+
+        // A new value of the same type overrides the original value.
+        let (_, _, body) = send_with(&router, Method::GET, "/old", (Carried("seeded"),));
+        assert_eq!(&body[..], b"handed over");
+    }
+
+    #[test]
+    fn the_routers_own_values_take_precedence_over_seeded_values() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/users/{id}"), echo_params))
+            .build();
+
+        // The matched path parameters must override the supplied empty ones.
+        let (_, _, body) = send_with(
+            &router,
+            Method::GET,
+            "/users/42",
+            (RawPathParams::default(),),
+        );
+        assert_eq!(&body[..], b"id=42");
+    }
+
+    #[test]
+    fn a_route_can_dispatch_an_independent_request_through_its_router() {
+        /// Sends context values to `/carried-again` and returns its body.
+        /// Checks that the nested request leaves this context unchanged.
+        fn nested(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+            Box::pin(async move {
+                let response = router(cx)
+                    .handle_with(request(Method::GET, "/carried-again"), (Carried("nested"),))
+                    .await;
+                let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+                assert!(try_request_context::<Carried>(cx).is_none());
+                String::from_utf8(body.to_vec()).unwrap().into_response(cx)
+            })
+        }
+
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/outer"), nested))
+            .route(RouteFn::new(
+                Method::GET,
+                path("/carried-again"),
+                echo_carried,
+            ))
+            .build();
+
+        let (status, _, body) = send(&router, Method::GET, "/outer");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"nested");
+    }
+
+    #[test]
+    fn a_request_outside_a_router_has_no_router() {
+        assert!(try_router(&Cx::default()).is_none());
+    }
+
+    #[test]
+    fn carrying_values_does_not_carry_dispatch_state() {
+        use topcoat_core::context::{CxId, identity, memoize_cache};
+
+        fn cached_id(cx: &Cx) -> CxId {
+            *memoize_cache(cx).memoize(cx, (), (), |cx, ()| cx.id())
+        }
+
+        fn start(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+            Box::pin(async move {
+                let cx = cx.with(Carried("local")).keyed("local");
+                response_headers(&cx).append(
+                    http::HeaderName::from_static("x-abandoned"),
+                    http::HeaderValue::from_static("yes"),
+                );
+                Err(rewrite("/inspect", Body::empty())
+                    .with(cached_id(&cx))
+                    .into())
+            })
+        }
+
+        fn inspect(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+            Box::pin(async move {
+                assert_ne!(*request_context::<CxId>(cx), cx.id());
+                assert_eq!(cached_id(cx), cx.id());
+                assert!(try_request_context::<Carried>(cx).is_none());
+                assert_eq!(identity(cx), crate::request::initial_identity(cx)?);
+                "fresh".into_response(cx)
+            })
+        }
+
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/start"), start))
+            .route(RouteFn::new(Method::GET, path("/inspect"), inspect))
+            .build();
+
+        let (status, headers, body) = send(&router, Method::GET, "/start");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"fresh");
+        assert!(!headers.contains_key("x-abandoned"));
     }
 
     #[test]
@@ -952,6 +1191,18 @@ mod tests {
 
         let (_, _, body) = send(&router, Method::GET, "/new?q=2");
         assert_eq!(&body[..], b"/new?q=2 /new?q=2");
+    }
+
+    #[test]
+    fn stripping_a_prefix_keeps_the_original_uri_without_a_rewrite() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/res/{*file}"), echo_uris))
+            .layer(crate::StripPrefixLayer::new("/res"))
+            .build();
+
+        let (status, _, body) = send(&router, Method::GET, "/res/logo.svg?v=2");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"/logo.svg?v=2 /res/logo.svg?v=2");
     }
 
     #[test]
@@ -998,6 +1249,61 @@ mod tests {
         assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
         // The chain never leaks to the client.
         assert_eq!(&body[..], b"internal server error");
+    }
+
+    #[test]
+    fn a_rewrite_to_the_same_path_with_another_method_is_a_fresh_dispatch() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(
+                Method::POST,
+                path("/same"),
+                rewrite_to_same_as_get,
+            ))
+            .route(RouteFn::new(Method::GET, path("/same"), echo_methods))
+            .build();
+
+        let (status, _, body) = send(&router, Method::POST, "/same");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"GET POST");
+    }
+
+    #[test]
+    fn a_rewrite_to_the_same_method_and_path_is_a_cycle() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/same"), rewrite_to_same))
+            .build();
+
+        let (status, _, body) = send(&router, Method::GET, "/same");
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(&body[..], b"internal server error");
+    }
+
+    #[test]
+    fn a_rewrite_can_replace_the_headers() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(
+                Method::GET,
+                path("/old"),
+                rewrite_with_headers,
+            ))
+            .route(RouteFn::new(
+                Method::GET,
+                path("/echo-headers"),
+                echo_headers,
+            ))
+            .build();
+
+        let request = http::Request::builder()
+            .method(Method::GET)
+            .uri("/old")
+            .header("x-kept", "1")
+            .header("x-dropped", "2")
+            .body(Body::empty())
+            .unwrap();
+        let response = block_on(router.handle(request));
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = block_on(to_bytes(response.into_body(), usize::MAX)).unwrap();
+        assert_eq!(&body[..], b"x-kept=1&x-added=yes");
     }
 
     #[test]
@@ -1137,6 +1443,79 @@ mod tests {
             .unwrap();
         let response = block_on(router.handle(request));
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    // -- Router::handle: client address --
+
+    /// Echoes the client address, or `none`.
+    fn echo_client_ip(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move {
+            client_ip(cx)
+                .map_or_else(|| "none".to_owned(), |ip| ip.to_string())
+                .into_response(cx)
+        })
+    }
+
+    /// Dispatches a request that arrived from `remote` with an
+    /// `X-Forwarded-For` header, reading the body.
+    fn send_forwarded(router: &Router, remote: &str, forwarded_for: &str) -> Bytes {
+        let request = http::Request::builder()
+            .method(Method::GET)
+            .uri("/ip")
+            .header("x-forwarded-for", forwarded_for)
+            .extension(RemoteAddr(remote.parse().unwrap()))
+            .body(Body::empty())
+            .unwrap();
+        let response = block_on(router.handle(request));
+        block_on(to_bytes(response.into_body(), usize::MAX)).unwrap()
+    }
+
+    #[test]
+    fn the_client_ip_is_the_peer_without_trusted_proxies() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/ip"), echo_client_ip))
+            .build();
+        let body = send_forwarded(&router, "10.0.0.1:4242", "198.51.100.1");
+        assert_eq!(&body[..], b"10.0.0.1");
+
+        // A request without a peer address has no client address either.
+        let (_, _, body) = send(&router, Method::GET, "/ip");
+        assert_eq!(&body[..], b"none");
+    }
+
+    /// A pathless layer that hands the chain the request without its
+    /// forwarding header, as middleware rewriting headers would.
+    fn strip_forwarded<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+        let mut parts = request_context::<http::request::Parts>(cx).clone();
+        parts.headers.remove("x-forwarded-for");
+        let cx = cx.with(parts);
+        Box::pin(async move { next.run(&cx, body).await })
+    }
+
+    #[test]
+    fn the_client_ip_is_resolved_as_the_request_arrives() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/ip"), echo_client_ip))
+            .layer(LayerFn::new(None::<&Path>, strip_forwarded))
+            .trusted_proxies(TrustedProxies::new().networks(["10.0.0.0/8"]))
+            .build();
+        // The layer's edit to the headers changes nothing about the client.
+        let body = send_forwarded(&router, "10.0.0.1:4242", "198.51.100.1");
+        assert_eq!(&body[..], b"198.51.100.1");
+    }
+
+    #[test]
+    fn the_client_ip_resolves_through_trusted_proxies() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/ip"), echo_client_ip))
+            .trusted_proxies(TrustedProxies::new().networks(["10.0.0.0/8"]))
+            .build();
+        let body = send_forwarded(&router, "10.0.0.1:4242", "198.51.100.1");
+        assert_eq!(&body[..], b"198.51.100.1");
+
+        // The header of a request from an untrusted peer is not read.
+        let body = send_forwarded(&router, "203.0.113.9:4242", "198.51.100.1");
+        assert_eq!(&body[..], b"203.0.113.9");
     }
 
     // -- Router::handle: method sets --
@@ -1288,9 +1667,8 @@ mod tests {
                 .layer(LayerFn::new(Some(path("/admin")), trace_admin)),
         );
 
-        // A trailing slash is a different URL: the route does not match, and
-        // no route means no path layers, the root path included.
-        let (status, _, _) = send(&router, Method::GET, "/admin/x/");
+        // No route means no path layers, the root path included.
+        let (status, _, _) = send(&router, Method::GET, "/admin/missing");
         assert_eq!(status, StatusCode::NOT_FOUND);
         assert!(trace.lock().unwrap().is_empty());
     }
@@ -1316,6 +1694,44 @@ mod tests {
         let (status, _, body) = send(&router, Method::GET, "/missing");
         assert_eq!(status, StatusCode::OK);
         assert_eq!(&body[..], b"replaced");
+    }
+
+    /// A pathless layer that defers a header onto whatever response the
+    /// request ends with, before it knows whether the chain will succeed.
+    fn tag_response<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+        Box::pin(async move {
+            response_headers(cx).append(
+                http::HeaderName::from_static("x-tag"),
+                http::HeaderValue::from_static("layer"),
+            );
+            next.run(cx, body).await
+        })
+    }
+
+    #[test]
+    fn deferred_headers_land_on_a_success_response() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/x"), say_route))
+            .layer(LayerFn::new(None::<&Path>, tag_response))
+            .build();
+
+        let (status, headers, _) = send(&router, Method::GET, "/x");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(headers.get("x-tag").unwrap(), "layer");
+    }
+
+    /// The error's response is built after every layer has returned, which is
+    /// too late for a layer to set a header on it directly.
+    #[test]
+    fn deferred_headers_land_on_an_error_response() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/x"), say_route))
+            .layer(LayerFn::new(None::<&Path>, tag_response))
+            .build();
+
+        let (status, headers, _) = send(&router, Method::GET, "/missing");
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(headers.get("x-tag").unwrap(), "layer");
     }
 
     #[test]
@@ -1439,6 +1855,148 @@ mod tests {
         let (status, _, _) = send(&router, Method::POST, "/x");
         assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
         assert_eq!(*trace.lock().unwrap(), vec!["always"]);
+    }
+
+    // -- Router::handle: trailing slash --
+
+    /// A router with routes at a slash-less path, a slashed path, a
+    /// parameter path, a catch-all, and the root, under `policy`.
+    fn trailing_slash_router(policy: TrailingSlash) -> Router {
+        RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/"), say_route))
+            .route(RouteFn::new(Method::GET, path("/bare"), say_route))
+            .route(RouteFn::new(Method::GET, path("/slashed/"), say_route))
+            .route(RouteFn::new(Method::GET, path("/users/{id}"), echo_params))
+            .route(RouteFn::new(
+                Method::GET,
+                path("/files/{*rest}"),
+                echo_params,
+            ))
+            .route(RouteFn::new(Method::POST, path("/echo-body"), echo_body))
+            .trailing_slash(policy)
+            .build()
+    }
+
+    #[test]
+    fn the_declared_form_is_served() {
+        for policy in [
+            TrailingSlash::Redirect,
+            TrailingSlash::Serve,
+            TrailingSlash::Strict,
+        ] {
+            let router = trailing_slash_router(policy);
+            for requested in ["/", "/bare", "/slashed/", "/users/42", "/files/a/b"] {
+                let (status, _, _) = send(&router, Method::GET, requested);
+                assert_eq!(status, StatusCode::OK, "for `{requested}` under {policy:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn redirect_sends_the_other_form_to_the_declared_form() {
+        let router = trailing_slash_router(TrailingSlash::Redirect);
+        for (requested, declared) in [
+            ("/bare/", "/bare"),
+            ("/slashed", "/slashed/"),
+            ("/users/42/", "/users/42"),
+            ("/bare/?a=1&b=2", "/bare?a=1&b=2"),
+            ("/slashed?a=1", "/slashed/?a=1"),
+        ] {
+            let (status, headers, _) = send(&router, Method::GET, requested);
+            assert_eq!(status, StatusCode::PERMANENT_REDIRECT, "for `{requested}`");
+            assert_eq!(headers["location"], declared, "for `{requested}`");
+        }
+    }
+
+    #[test]
+    fn redirect_applies_to_every_method() {
+        // The 308 tells the client to resubmit with the same method and body,
+        // so the method is not checked before redirecting.
+        let router = trailing_slash_router(TrailingSlash::Redirect);
+        let (status, headers, _) = send(&router, Method::POST, "/echo-body/");
+        assert_eq!(status, StatusCode::PERMANENT_REDIRECT);
+        assert_eq!(headers["location"], "/echo-body");
+        let (status, _, _) = send(&router, Method::DELETE, "/bare/");
+        assert_eq!(status, StatusCode::PERMANENT_REDIRECT);
+    }
+
+    #[test]
+    fn a_catch_all_captures_the_trailing_slash_itself() {
+        let router = trailing_slash_router(TrailingSlash::Redirect);
+        let (status, _, body) = send(&router, Method::GET, "/files/a/");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"rest=a/");
+    }
+
+    #[test]
+    fn redirect_runs_the_pathless_layers_only() {
+        let (router, trace) = trace_router(
+            RouterBuilder::new()
+                .route(RouteFn::new(Method::GET, path("/admin/x"), say_route))
+                .layer(LayerFn::new(None::<&Path>, trace_always))
+                .layer(LayerFn::new(Some(path("/admin")), trace_admin)),
+        );
+        let (status, _, _) = send(&router, Method::GET, "/admin/x/");
+        assert_eq!(status, StatusCode::PERMANENT_REDIRECT);
+        assert_eq!(*trace.lock().unwrap(), vec!["always"]);
+    }
+
+    #[test]
+    fn serve_handles_both_forms() {
+        let router = trailing_slash_router(TrailingSlash::Serve);
+        for (requested, expected) in [
+            ("/bare/", "route"),
+            ("/slashed", "route"),
+            ("/users/42/", "id=42"),
+        ] {
+            let (status, _, body) = send(&router, Method::GET, requested);
+            assert_eq!(status, StatusCode::OK, "for `{requested}`");
+            assert_eq!(&body[..], expected.as_bytes(), "for `{requested}`");
+        }
+    }
+
+    #[test]
+    fn serve_keeps_the_requested_uri() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/x"), echo_uris))
+            .route(RouteFn::new(Method::GET, path("/y"), echo_endpoint_path))
+            .trailing_slash(TrailingSlash::Serve)
+            .build();
+        let (_, _, body) = send(&router, Method::GET, "/x/");
+        assert_eq!(&body[..], b"/x/ /x/");
+        // The endpoint is the one registered for the other form.
+        let (_, _, body) = send(&router, Method::GET, "/y/");
+        assert_eq!(&body[..], b"/y/");
+    }
+
+    #[test]
+    fn serve_checks_the_method_on_the_other_form() {
+        let router = trailing_slash_router(TrailingSlash::Serve);
+        let (status, _, _) = send(&router, Method::POST, "/bare/");
+        assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    #[test]
+    fn strict_leaves_the_other_form_unmatched() {
+        let router = trailing_slash_router(TrailingSlash::Strict);
+        for requested in ["/bare/", "/slashed", "/users/42/"] {
+            let (status, _, _) = send(&router, Method::GET, requested);
+            assert_eq!(status, StatusCode::NOT_FOUND, "for `{requested}`");
+        }
+    }
+
+    #[test]
+    fn routes_at_both_forms_are_left_alone() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/x"), echo_endpoint_path))
+            .route(RouteFn::new(Method::GET, path("/x/"), echo_endpoint_path))
+            .build();
+        let (status, _, body) = send(&router, Method::GET, "/x");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"/x");
+        let (status, _, body) = send(&router, Method::GET, "/x/");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"/x/");
     }
 
     // -- Router::handle: pages and layouts --

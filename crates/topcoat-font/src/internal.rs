@@ -1,8 +1,6 @@
 //! Implementation details exposed only for this crate's macros.
 //!
-//! Nothing here is part of the public API; it exists so macros like
-//! [`register_font!`](crate::register_font) can reach dependencies through
-//! `$crate`.
+//! Not part of the public API.
 
 #[cfg(feature = "discover")]
 pub use inventory;

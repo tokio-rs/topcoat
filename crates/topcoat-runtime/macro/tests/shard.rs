@@ -7,12 +7,14 @@
 //! id on both paths. A signal passed as an argument arrives as its id and
 //! current value, and the endpoint rebuilds it from them.
 
+use std::{future::poll_fn, pin::pin};
+
 use topcoat::{
     Result,
-    context::{Cx, CxTestBuilder},
-    router::{Body, request::IDENTITY_HEADER},
-    runtime::{Shard, Signal, shard, signal},
-    view::{View, ViewExt, component, view},
+    context::Cx,
+    router::{Body, Route, Router, request::IDENTITY_HEADER, response::Response, to_bytes},
+    runtime::{Signal, shard, signal},
+    view::{View, ViewExt, component, emit, live, view},
 };
 
 #[shard]
@@ -41,14 +43,84 @@ async fn by_signal(query: Signal<String>) -> Result<impl View> {
 #[component]
 async fn signal_host(cx: &Cx) -> Result<impl View> {
     let query = signal(cx, || String::from("shoes"));
-    Ok(view! { by_signal(query: $(query)) })
+    Ok(view! { by_signal(query: query) })
 }
 
-/// The shard id and identity arguments of the scope start marker in `html`.
+#[shard]
+async fn search_results(query: String, limit: usize) -> Result<impl View> {
+    Ok(view! {
+        <p>
+            (query)
+            " "
+            (limit)
+        </p>
+    })
+}
+
+#[component]
+async fn search_host(cx: &Cx) -> Result<impl View> {
+    let query = signal(cx, || String::from("shoes"));
+    Ok(view! { search_results(query: $(query.get()), limit: 20) })
+}
+
+#[shard]
+async fn without_arguments(cx: &Cx) -> Result<impl View> {
+    let page = signal(cx, || 1usize);
+    Ok(view! { <p>(page.get())</p> })
+}
+
+#[shard("/search/results")]
+async fn at_path(query: String) -> Result<impl View> {
+    Ok(view! { <p>(query)</p> })
+}
+
+#[shard("/(api)/grouped")]
+async fn grouped(query: String) -> Result<impl View> {
+    Ok(view! { <p>(query)</p> })
+}
+
+/// A shard whose content updates a live region after its first render.
+#[shard]
+async fn region_probe() -> Result<impl View> {
+    Ok(view! {
+        (live! {
+            emit! { <p>"first"</p> }?;
+            emit! { <p>"second"</p> }
+        })
+    })
+}
+
+/// Renders `view`'s first content, then drives it to completion and
+/// collects the region id and HTML of every update in order.
+async fn drive(cx: &Cx, view: impl View) -> (String, Vec<(String, String)>) {
+    let mut view = pin!(view);
+    let first = poll_fn(|task| view.as_mut().poll_first(task))
+        .await
+        .unwrap();
+    let html = first.content.render(cx);
+    let mut swaps = Vec::new();
+    if first.live {
+        while let Some(swap) = poll_fn(|task| view.as_mut().poll_swap(task)).await.unwrap() {
+            swaps.push((swap.region.to_string(), swap.replacement.render(cx)));
+        }
+    }
+    (html, swaps)
+}
+
+/// Extracts the id of the first live region declared in `html`.
+fn region_id(html: &str) -> &str {
+    let start = html
+        .split_once("<!--::topcoat::region::start(")
+        .expect(html)
+        .1;
+    start.split_once(")-->").expect(html).0
+}
+
+/// Extracts the endpoint URL and invocation identity from a shard start marker.
 fn scope_marker(html: &str) -> (&str, &str) {
     let start = html.find("::topcoat::shard::start(").expect(html);
     // The marker's quoted arguments alternate with the separators between
-    // them: the shard id, then the identity.
+    // them: the shard path, then the identity.
     let mut args = html[start..].split('"');
     let shard = args.nth(1).expect(html);
     let identity = args.nth(1).expect(html);
@@ -64,30 +136,156 @@ fn last_signal_id(html: &str) -> &str {
     &html[start..end]
 }
 
-/// Builds the context of a JSON request to the shard endpoint naming
-/// `identity` in the identity header.
-fn endpoint_cx(identity: &str) -> Cx {
-    let (parts, ()) = http::Request::builder()
+/// Requests a shard render at its served URL and supplies its invocation
+/// identity through the request header.
+async fn endpoint(shard: &'static impl Route, identity: &str, body: Body) -> Response {
+    endpoint_accepting(shard, identity, body, "text/html").await
+}
+
+/// Requests a shard render like [`endpoint`], accepting the given media
+/// types for the response.
+async fn endpoint_accepting(
+    shard: &'static impl Route,
+    identity: &str,
+    body: Body,
+    accept: &str,
+) -> Response {
+    let request = http::Request::builder()
+        .method("POST")
+        .uri(shard.path().to_matchit_path().as_ref())
         .header("content-type", "application/json")
+        .header("accept", accept)
         .header(IDENTITY_HEADER, identity)
-        .body(())
-        .unwrap()
-        .into_parts();
-    CxTestBuilder::new().request_context(parts).build()
+        .body(body)
+        .unwrap();
+    Router::builder().route(shard).build().handle(request).await
 }
 
 /// Renders `shard` through its endpoint at `identity`, carrying the JSON
 /// array `args` of arguments and the JSON object `signals` of signal values.
-async fn rerender_with(shard: &impl Shard, identity: &str, args: &str, signals: &str) -> String {
-    let cx = &endpoint_cx(identity);
+async fn rerender_with(
+    shard: &'static impl Route,
+    identity: &str,
+    args: &str,
+    signals: &str,
+) -> String {
     let body = Body::from(format!(r#"{{"args":{args},"signals":{signals}}}"#));
-    shard.render(cx, body).await.unwrap().render(cx)
+    let response = endpoint(shard, identity, body).await;
+    assert_eq!(response.status(), http::StatusCode::OK);
+    let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    String::from_utf8(bytes.to_vec()).unwrap()
 }
 
 /// Renders the `stateful` shard through its endpoint at `identity`,
 /// carrying the JSON object `signals` of signal values.
 async fn rerender(identity: &str, signals: &str) -> String {
     rerender_with(&stateful, identity, r#"["a"]"#, signals).await
+}
+
+#[tokio::test]
+async fn a_live_shard_streams_its_updates_through_the_enclosing_content() {
+    let cx = &Cx::default();
+    let (html, swaps) = drive(cx, view! { cx => region_probe() }).await;
+
+    // The first content shows the first emission only, with its region
+    // inside the shard's markers so the browser attributes the region's
+    // updates to the shard.
+    assert!(html.contains("<p>first</p>"), "{html}");
+    assert!(!html.contains("<p>second</p>"), "{html}");
+    let shard_start = html.find("::topcoat::shard::start(").expect(&html);
+    let shard_end = html.find("::topcoat::shard::end(").expect(&html);
+    let region_start = html.find("::topcoat::region::start(").expect(&html);
+    assert!(
+        shard_start < region_start && region_start < shard_end,
+        "{html}"
+    );
+
+    // The later emission follows as an update to that region.
+    let region = region_id(&html);
+    assert_eq!(region.len(), 32, "{html}");
+    let [(swapped, replacement)] = swaps.as_slice() else {
+        panic!("expected one update, got {swaps:?}");
+    };
+    assert_eq!(swapped, region);
+    assert!(replacement.contains("<p>second</p>"), "{replacement}");
+}
+
+#[tokio::test]
+async fn a_live_shard_streams_its_updates_through_its_endpoint() {
+    let cx = &Cx::default();
+    let (inline, _) = drive(cx, view! { cx => region_probe() }).await;
+    let (_, identity) = scope_marker(&inline);
+    let region = region_id(&inline);
+
+    // The re-render derives the same region id, so its update targets the
+    // region the browser already shows, and streams the update after the
+    // first content.
+    let rerendered = rerender_with(&region_probe, identity, "[]", "{}").await;
+    assert!(
+        rerendered.contains(&format!("<!--::topcoat::region::start({region})-->")),
+        "{rerendered}"
+    );
+    let first = rerendered.find("<p>first</p>").expect(&rerendered);
+    let swap = rerendered
+        .find(&format!("data-topcoat-swap=\"{region}\""))
+        .expect(&rerendered);
+    assert!(first < swap, "{rerendered}");
+    assert!(rerendered[swap..].contains("<p>second</p>"), "{rerendered}");
+}
+
+#[tokio::test]
+async fn a_live_shard_endpoint_sends_frames_to_a_request_accepting_them() {
+    let cx = &Cx::default();
+    let (inline, _) = drive(cx, view! { cx => region_probe() }).await;
+    let (_, identity) = scope_marker(&inline);
+    let region = region_id(&inline);
+
+    let body = Body::from(r#"{"args":[],"signals":{}}"#);
+    let response = endpoint_accepting(&region_probe, identity, body, "application/x-ndjson").await;
+    assert_eq!(response.status(), http::StatusCode::OK);
+    assert_eq!(
+        response.headers().get("content-type").unwrap(),
+        "application/x-ndjson"
+    );
+    let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let text = String::from_utf8(bytes.to_vec()).unwrap();
+    let frames: Vec<serde_json::Value> = text
+        .lines()
+        .map(|line| serde_json::from_str(line).expect(line))
+        .collect();
+
+    let [snapshot, swap] = frames.as_slice() else {
+        panic!("expected a snapshot and one swap, got {text}");
+    };
+    assert_eq!(snapshot["t"], "snapshot");
+    let html = snapshot["html"].as_str().expect(&text);
+    assert!(html.contains("<p>first</p>"), "{html}");
+    assert_eq!(swap["t"], "swap");
+    assert_eq!(swap["region"], region);
+    assert!(
+        swap["html"]
+            .as_str()
+            .expect(&text)
+            .contains("<p>second</p>")
+    );
+}
+
+#[tokio::test]
+async fn a_shard_without_arguments_accepts_the_browser_request() {
+    let cx = &Cx::default();
+    let inline = view! { cx => without_arguments() }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+    let (_, identity) = scope_marker(&inline);
+    let id = last_signal_id(&inline);
+    let signals = format!(
+        r#"{{"{id}":{{"t":"usize","bits":{},"v":"2"}}}}"#,
+        usize::BITS,
+    );
+    let rerendered = rerender_with(&without_arguments, identity, "[]", &signals).await;
+    assert!(rerendered.contains("<p>2</p>"), "{rerendered}");
 }
 
 #[tokio::test]
@@ -99,7 +297,7 @@ async fn a_signal_argument_is_read_inline_and_rebuilt_from_its_value() {
         .unwrap()
         .render(cx);
     let (shard, identity) = scope_marker(&inline);
-    assert_eq!(shard, by_signal.id().as_str(), "{inline}");
+    assert_eq!(shard, by_signal.path().as_str(), "{inline}");
     assert!(inline.contains("<p>shoes</p>"), "{inline}");
     // The tracked read inside the shard depends on the caller's signal.
     let id = last_signal_id(&inline);
@@ -119,21 +317,63 @@ async fn a_signal_argument_is_read_inline_and_rebuilt_from_its_value() {
 }
 
 #[tokio::test]
+async fn a_static_argument_keeps_its_javascript_for_rerenders() {
+    let cx = &Cx::default();
+    let inline = view! { cx => stateful(label: String::from("constant")) }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+    let (_, identity) = scope_marker(&inline);
+
+    assert!(
+        inline.contains("cx.hydrate(&quot;constant&quot;)"),
+        "{inline}"
+    );
+    assert!(inline.contains("<p>constant "), "{inline}");
+
+    let rerendered = rerender_with(&stateful, identity, r#"["constant"]"#, "{}").await;
+    assert!(rerendered.contains("<p>constant "), "{rerendered}");
+}
+
+#[tokio::test]
+async fn fixed_and_reactive_arguments_render_together() {
+    let cx = &Cx::default();
+    let inline = view! { cx => search_host() }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+    let (_, identity) = scope_marker(&inline);
+
+    assert!(inline.contains("<p>shoes 20</p>"), "{inline}");
+    assert!(inline.contains(".get()"), "{inline}");
+    assert!(inline.contains("&quot;v&quot;:&quot;20&quot;"), "{inline}");
+
+    let args = format!(
+        r#"["boots",{{"t":"usize","bits":{},"v":"20"}}]"#,
+        usize::BITS,
+    );
+    let rerendered = rerender_with(&search_results, identity, &args, "{}").await;
+    assert!(rerendered.contains("<p>boots 20</p>"), "{rerendered}");
+}
+
+#[tokio::test]
 async fn a_signal_argument_without_a_value_is_rejected() {
-    let cx = &endpoint_cx(&"A".repeat(22));
     let body = Body::from(format!(
         r#"{{"args":[{{"t":"Signal","id":"{}"}}]}}"#,
         "0".repeat(32)
     ));
-    assert!(by_signal.render(cx, body).await.is_err());
+    let response = endpoint(&by_signal, &"A".repeat(22), body).await;
+    assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]
 async fn a_rerender_derives_the_same_signal_id_as_the_inline_render() {
-    let cx = &Cx::default();
+    let cx = &Cx::default().keyed("host");
     let inline = view! { cx => host() }.single().await.unwrap().render(cx);
     let (shard, identity) = scope_marker(&inline);
-    assert_eq!(shard, stateful.id().as_str(), "{inline}");
+    assert_eq!(shard, stateful.path().as_str(), "{inline}");
 
     let rerendered = rerender(identity, "{}").await;
 
@@ -146,7 +386,7 @@ async fn a_rerender_derives_the_same_signal_id_as_the_inline_render() {
 
 #[tokio::test]
 async fn a_rerender_resumes_signals_from_the_values_it_carries() {
-    let cx = &Cx::default();
+    let cx = &Cx::default().keyed("host");
     let inline = view! { cx => host() }.single().await.unwrap().render(cx);
     let (_, identity) = scope_marker(&inline);
     let id = last_signal_id(&inline);
@@ -173,8 +413,51 @@ async fn a_rerender_at_another_identity_derives_another_signal_id() {
 }
 
 #[tokio::test]
+async fn a_shard_without_a_path_is_served_below_the_runtime_prefix() {
+    let path = stateful.path().as_str();
+    let tail = path.strip_prefix("/_topcoat/runtime/shards/").expect(path);
+    assert_eq!(tail.len(), 32, "{path}");
+    assert!(tail.bytes().all(|b| b.is_ascii_hexdigit()), "{path}");
+    assert_ne!(stateful.path(), by_signal.path());
+}
+
+#[tokio::test]
+async fn a_shard_with_a_path_is_served_there_and_names_it_in_its_marker() {
+    assert_eq!(at_path.path().as_str(), "/search/results");
+
+    let cx = &Cx::default();
+    let inline = view! { cx => at_path(query: String::from("shoes")) }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+    let (shard, identity) = scope_marker(&inline);
+    assert_eq!(shard, "/search/results", "{inline}");
+
+    let rerendered = rerender_with(&at_path, identity, r#"["boots"]"#, "{}").await;
+    assert!(rerendered.contains("<p>boots</p>"), "{rerendered}");
+}
+
+#[tokio::test]
+async fn a_grouped_path_names_the_served_url_in_its_marker() {
+    let cx = &Cx::default();
+    let inline = view! { cx => grouped(query: String::from("shoes")) }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+    let (shard, identity) = scope_marker(&inline);
+    // The router strips the group from the URL it serves, so the browser
+    // must request the stripped form.
+    assert_eq!(shard, "/grouped", "{inline}");
+
+    let rerendered = rerender_with(&grouped, identity, r#"["boots"]"#, "{}").await;
+    assert!(rerendered.contains("<p>boots</p>"), "{rerendered}");
+}
+
+#[tokio::test]
 async fn a_malformed_identity_is_rejected() {
-    let cx = &endpoint_cx("not base64");
     let body = Body::from(r#"{"args":["a"]}"#);
-    assert!(stateful.render(cx, body).await.is_err());
+    let response = endpoint(&stateful, "not base64", body).await;
+    assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
 }

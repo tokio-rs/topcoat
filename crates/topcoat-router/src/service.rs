@@ -1,6 +1,7 @@
 use std::{
     convert::Infallible,
     future::Future,
+    net::SocketAddr,
     pin::{Pin, pin},
     sync::Arc,
     time::Duration,
@@ -13,7 +14,7 @@ use hyper_util::{
 };
 use tokio::sync::watch;
 
-use crate::{Body, Listener, Router, request::Request, response::Response};
+use crate::{Body, Listener, RemoteAddr, Router, request::Request, response::Response};
 
 /// A [`Router`] together with the configuration it is served with.
 ///
@@ -30,12 +31,15 @@ use crate::{Body, Listener, Router, request::Request, response::Response};
 ///     RouterService::new(Router::builder().build()).shutdown_timeout(Duration::from_secs(5));
 /// ```
 ///
-/// The wrapped [`Router`] is shared behind an [`Arc`], so the service is cheap
-/// to clone. One clone is handed to each accepted connection.
+/// Clones share the router. Served requests carry the connection's
+/// [`RemoteAddr`] when one is available.
 #[derive(Clone)]
 pub struct RouterService {
     router: Arc<Router>,
     pub(crate) shutdown_timeout: Duration,
+    /// The peer address of the connection this clone serves, stamped on each
+    /// of its requests.
+    remote_addr: Option<SocketAddr>,
 }
 
 impl RouterService {
@@ -48,6 +52,15 @@ impl RouterService {
         Self {
             router: Arc::new(router),
             shutdown_timeout: DEFAULT_SHUTDOWN_TIMEOUT,
+            remote_addr: None,
+        }
+    }
+
+    /// The clone serving one connection, accepted from `remote_addr`.
+    fn for_connection(&self, remote_addr: Option<SocketAddr>) -> Self {
+        Self {
+            remote_addr,
+            ..self.clone()
         }
     }
 
@@ -76,8 +89,11 @@ impl Service<Request<Incoming>> for RouterService {
     type Error = Infallible;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
-    fn call(&self, request: Request<Incoming>) -> Self::Future {
+    fn call(&self, mut request: Request<Incoming>) -> Self::Future {
         let router = self.router.clone();
+        if let Some(addr) = self.remote_addr {
+            request.extensions_mut().insert(RemoteAddr(addr));
+        }
         Box::pin(async move { Ok(router.handle(request.map(Body::new)).await) })
     }
 }
@@ -85,13 +101,10 @@ impl Service<Request<Incoming>> for RouterService {
 /// Serves a [`RouterService`] on an already-bound [`Listener`] until
 /// `shutdown` completes.
 ///
-/// This is the low-level accept loop, with no dev-server integration: it
-/// accepts connections in a loop, serving each on its own task. When the
-/// `shutdown` future completes, the listener is dropped and every open
-/// connection finishes its in-flight request (up to the service's shutdown
-/// timeout) before the call returns. Applications typically use the facade's
-/// `serve`/`start` helpers, which layer a default shutdown signal and
-/// dev-server readiness notification on top of this.
+/// When `shutdown` completes, the server stops accepting connections and
+/// waits for active requests up to the service's shutdown timeout. Use the
+/// facade's `serve` or `start` helpers for default shutdown handling and
+/// development server integration.
 ///
 /// # Errors
 ///
@@ -120,9 +133,9 @@ pub async fn internal_serve(
             accepted = listener.accept() => accepted,
             () = &mut shutdown => break,
         };
-        let (stream, _remote) = accepted?;
+        let (stream, remote_addr) = accepted?;
         let io = TokioIo::new(stream);
-        let service = service.clone();
+        let service = service.for_connection(remote_addr);
 
         let mut drain_rx = drain_rx.clone();
         let mut cutoff_rx = cutoff_rx.clone();
@@ -206,7 +219,7 @@ mod tests {
     use super::*;
     use crate::{
         Body, Method, Path, RouteFn, RouteFuture, RouteHandlerFn, Router,
-        request::Bytes,
+        request::{Bytes, remote_addr},
         response::{IntoResponse, Response},
     };
 
@@ -223,6 +236,15 @@ mod tests {
 
     fn say_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move { "served".into_response(cx) })
+    }
+
+    /// Echoes the peer address the request arrived from, or `none`.
+    fn echo_remote_addr(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move {
+            remote_addr(cx)
+                .map_or_else(|| "none".to_owned(), |addr| addr.to_string())
+                .into_response(cx)
+        })
     }
 
     fn panic_route(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
@@ -320,6 +342,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn requests_carry_the_peer_address_of_their_connection() {
+        let service = RouterService::new(router_with(echo_remote_addr));
+        let (addr, shutdown_tx, server) = spawn_server(service).await;
+
+        let response = get(addr, "/x").await;
+        assert!(response.contains("200 OK"));
+        // The loopback peer, on whatever port the client connected from.
+        let body = response.rsplit("\r\n\r\n").next().unwrap();
+        let peer: SocketAddr = body.parse().expect("body should be the peer address");
+        assert_eq!(peer.ip(), addr.ip());
+
+        shutdown_tx.send(()).unwrap();
+        shut_down(server).await;
+    }
+
+    #[tokio::test]
     async fn handler_panic_returns_500_and_server_keeps_running() {
         let router = Router::builder()
             .route(RouteFn::new(
@@ -386,7 +424,7 @@ mod tests {
     async fn serves_over_a_unix_socket() {
         use tokio::net::{UnixListener, UnixStream};
 
-        let service = RouterService::new(router_with(say_route));
+        let service = RouterService::new(router_with(echo_remote_addr));
         let path = std::env::temp_dir().join(format!("topcoat-serve-{}.sock", std::process::id()));
         let _ = std::fs::remove_file(&path);
         let listener = UnixListener::bind(&path).unwrap();
@@ -404,7 +442,8 @@ mod tests {
         let mut response = String::new();
         stream.read_to_string(&mut response).await.unwrap();
         assert!(response.contains("200 OK"));
-        assert!(response.ends_with("served"));
+        // A Unix socket peer has no socket address.
+        assert!(response.ends_with("none"));
 
         shutdown_tx.send(()).unwrap();
         shut_down(server).await;

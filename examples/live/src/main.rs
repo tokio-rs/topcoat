@@ -1,20 +1,40 @@
-use std::time::Duration;
+mod chat;
+mod error_handling;
+mod progress;
+mod suspense;
 
 use topcoat::{
     Result,
-    router::{Router, RouterBuilderDiscoverExt, Slot, href, layout, page},
-    view::{View, component, emit, live, view},
+    asset::{AssetBundle, RouterBuilderAssetExt},
+    context::Cx,
+    router::{RouterBuilderDiscoverExt, Slot, error::redirect, href, layout, module_router, page},
+    runtime::RouterBuilderRuntimeExt,
+    view::{View, view},
 };
+
+use crate::chat::Chat;
 
 #[tokio::main]
 async fn main() {
-    topcoat::start(Router::builder().discover().build())
-        .await
-        .unwrap();
+    topcoat::start(
+        module_router!()
+            .assets(AssetBundle::load().unwrap())
+            .app_context(Chat::default())
+            .discover()
+            .runtime()
+            .build(),
+    )
+    .await
+    .unwrap();
 }
 
-#[layout("/")]
-async fn shell(slot: Slot<'_>) -> Result<impl View> {
+#[page]
+async fn page(cx: &Cx) -> Result<()> {
+    Err(redirect(href!(suspense::page).resolve(cx)).into())
+}
+
+#[layout]
+async fn layout(slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>
@@ -23,92 +43,22 @@ async fn shell(slot: Slot<'_>) -> Result<impl View> {
 
                 // Reloads the browser when the dev server rebuilds the app.
                 topcoat::dev::script()
+
+                // Load the browser runtime for chat connections and button handlers.
+                topcoat::runtime::script()
             </head>
             <body>
                 <nav>
-                    <a href=(href!(quote))>"Quote"</a>
+                    <a href=(href!(suspense::page))>"Suspense"</a>
                     " | "
-                    <a href=(href!(progress))>"Progress"</a>
+                    <a href=(href!(progress::page))>"Progress"</a>
                     " | "
-                    <a href=(href!(weather))>"Weather"</a>
+                    <a href=(href!(error_handling::page))>"Error handling"</a>
+                    " | "
+                    <a href=(href!(chat::page))>"Chat"</a>
                 </nav>
                 (slot)
             </body>
         </html>
     })
-}
-
-// The browser receives the shell with the loading message right away, and the
-// quote replaces it in place once the lookup finishes.
-#[page("/")]
-async fn quote() -> Result<impl View> {
-    Ok(view! {
-        <h1>"Quote of the day"</h1>
-        (live! {
-            emit! { <p>"Loading..."</p> }?;
-            let quote = fetch_quote().await;
-            emit! { <blockquote>(quote)</blockquote> }
-        })
-    })
-}
-
-// Stands in for a slow database query or upstream request.
-async fn fetch_quote() -> &'static str {
-    tokio::time::sleep(Duration::from_secs(2)).await;
-    "Simplicity is prerequisite for reliability."
-}
-
-// Every emit replaces the previous one, so the page can narrate a long-running
-// task as it happens.
-#[page("/progress")]
-async fn progress() -> Result<impl View> {
-    Ok(view! {
-        <h1>"Progress"</h1>
-        (live! {
-            for percent in 0..100 {
-                emit! {
-                    <p>
-                        "Working... "
-                        (percent)
-                        "%"
-                    </p>
-                }?;
-                tokio::time::sleep(Duration::from_millis(20)).await;
-            }
-            emit! { <p>"Done!"</p> }
-        })
-    })
-}
-
-// A failed emission comes back as an Err instead of ending the stream, so
-// matching on it lets the region emit a fallback in its place.
-#[page("/weather")]
-async fn weather() -> Result<impl View> {
-    Ok(view! {
-        <h1>"Weather"</h1>
-        (live! {
-            emit! { <p>"Loading..."</p> }?;
-            match emit! { forecast() } {
-                Err(error) => emit! {
-                    <p>
-                        "The forecast is unavailable: "
-                        (error.to_string())
-                    </p>
-                },
-                emitted => emitted,
-            }
-        })
-    })
-}
-
-#[component]
-async fn forecast() -> Result<impl View> {
-    let forecast = fetch_forecast().await?;
-    Ok(view! { <p>(forecast)</p> })
-}
-
-// Stands in for a weather service that is down.
-async fn fetch_forecast() -> Result<&'static str> {
-    tokio::time::sleep(Duration::from_secs(1)).await;
-    Err(std::io::Error::other("the weather service is unreachable").into())
 }

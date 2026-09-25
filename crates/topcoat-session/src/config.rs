@@ -4,12 +4,11 @@ use topcoat_core::context::{Cx, app_context};
 
 use crate::TokenStore;
 
-/// Session configuration, registered on the app context (with the router's
-/// `sessions` extension method).
+/// The token transport and lifetime for sessions.
 ///
-/// Assemble one with [`SessionConfig::builder`]; `SessionConfig::default()` is the
-/// all-defaults configuration, carrying the token in the default cookie
-/// store.
+/// Register it with the router's `sessions` method. Use
+/// [`SessionConfig::builder`] to customize it, or `SessionConfig::default()`
+/// to use the default cookie transport and lifetime.
 pub struct SessionConfig {
     pub(crate) token_store: Box<dyn TokenStore>,
     pub(crate) lifetime: Duration,
@@ -53,9 +52,8 @@ impl SessionConfigBuilder {
 
     /// Overrides how long a session lives without being refreshed.
     ///
-    /// The lifetime becomes the time to live of every issued token, and
-    /// [`start`](crate::start), [`refresh`](crate::refresh), and
-    /// [`rotate`](crate::rotate) derive the session's `expires_at` from it.
+    /// This sets the token's time to live and the expiry returned for the
+    /// application to store.
     #[must_use]
     pub fn lifetime(mut self, lifetime: Duration) -> Self {
         self.lifetime = lifetime;

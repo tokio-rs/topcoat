@@ -15,11 +15,9 @@ use crate::iconify::suggest::did_you_mean;
 /// The staged sets parsed by this process, by staged file path.
 static CACHE: OnceLock<Mutex<HashMap<PathBuf, &'static IconSet>>> = OnceLock::new();
 
-/// Loads the staged icon set `prefix` of the crate whose macros are being
-/// expanded, located through the `OUT_DIR` its build script staged into.
+/// Loads the calling crate's staged icon set `prefix` from `OUT_DIR`.
 ///
-/// Sets are parsed once per process and cached by path, since the proc-macro
-/// server expands many invocations in one process.
+/// Caches parsed sets by path for reuse within the process.
 pub(crate) fn staged_set(prefix: &str, span: Span) -> syn::Result<&'static IconSet> {
     let error = |message| Err(syn::Error::new(span, message));
 
@@ -66,8 +64,7 @@ pub(crate) fn staged_set(prefix: &str, span: Span) -> syn::Result<&'static IconS
     Ok(set)
 }
 
-/// The message for a prefix that no staged file exists for: near misses among
-/// the staged sets, what is staged, and how to stage more.
+/// Explains that a set is missing and suggests similar names and staging steps.
 fn unknown_set(prefix: &str, dir: &Path) -> String {
     let staged = staged_prefixes(dir);
     if staged.is_empty() {

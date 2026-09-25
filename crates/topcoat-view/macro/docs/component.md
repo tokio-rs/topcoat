@@ -1,4 +1,4 @@
-Components are async functions annotated with [`#[component]`][`component`]. They return a value implementing [`View`] through the usual Topcoat [`Result`] type, and can take typed parameters like any other Rust function.
+The [`#[component]`][`component`] attribute defines an async function that returns a view. Components accept typed parameters and return [`Result<impl View>`][`Result`].
 
 ```rust
 use topcoat::{
@@ -18,7 +18,7 @@ async fn badge(label: &str, tone: &str) -> Result<impl View> {
 
 # Calling Components
 
-Call components inside [`view!`] with a call syntax similar to function calls, but with named parameter syntax:
+Call components inside [`view!`] with named arguments:
 
 ```rust
 # use topcoat::{Result, view::*};
@@ -36,8 +36,6 @@ Ok(view! {
 })
 # }
 ```
-
-The name `key` is reserved: a `key:` argument keys the invocation's identity instead of setting a prop, so a component cannot declare a `key` parameter. See the keys section of the [`view!`] guide.
 
 # Child Content
 
@@ -79,14 +77,14 @@ Ok(view! {
 # }
 ```
 
-The trailing child nodes desugar to a `child` parameter whose value is a [`view! { ... }`][`view!`] containing those nodes.
+You can also pass a view explicitly as the `child` argument.
 
 # Parameter attributes
 
-A component's properties can be modified with attributes:
+A parameter can have these attributes:
 
-- `#[default]` makes the parameter optional; when not passed, it is set to `Default::default()`. Use `#[default(expr)]` to supply a custom fallback instead, evaluated only when the parameter is omitted. The type need not implement `Default` in that case.
-- `#[into]` lets callers pass anything that converts via `Into`. While you could use `impl Into<T>` instead, using `#[into]` calls `.into()` outside of your function body and prevents many monomorphizations of the function itself.
+- `#[default]` uses `Default::default()` when the caller omits the argument. `#[default(expr)]` uses a custom fallback instead. The fallback runs only when the argument is omitted and does not require the type to implement `Default`.
+- `#[into]` accepts any value that converts to the parameter's type through `Into`. The component receives the converted value.
 
 ```rust
 # use topcoat::{Result, view::{View, component, view}};
@@ -121,7 +119,7 @@ async fn shout(label: impl Into<String> + Send) -> Result<impl View> {
 }
 ```
 
-Prefer the `#[into]` attribute over `impl Into<T>` to reduce generic instantiations of your component body.
+Prefer `#[into]` when the component only needs the converted value.
 
 # Request Context
 
@@ -146,7 +144,7 @@ async fn current_path(cx: &Cx) -> Result<impl View> {
 
 # Recursive Components
 
-A component returns an anonymous view type, so a component calling itself, directly or indirectly, describes a type that contains itself. Break the cycle by erasing the view type of one component in it: box the view with [`boxed`](trait.ViewExt.html#method.boxed).
+A recursive component needs to box its view with [`boxed`](trait.ViewExt.html#method.boxed). This gives the view a type with a known size:
 
 ```rust
 use topcoat::{
@@ -166,7 +164,7 @@ async fn countdown(n: u32) -> Result<impl View> {
 }
 ```
 
-The other components in a cycle keep returning `impl View` as they are; one erased type is enough for all of them.
+For mutually recursive components, boxing one view in the cycle is enough.
 
 [`Cx`]: ../context/struct.Cx.html
 [`Result`]: ../type.Result.html

@@ -36,6 +36,8 @@ fn registry() -> Registry {
     registry.register_macro::<View>("view");
     registry.register_macro::<topcoat_view_grammar::attributes::Attributes>("attributes");
     registry.register_macro::<topcoat_view_grammar::class::Class>("class");
+    registry.register_macro::<topcoat_view_grammar::live::Live>("live");
+    registry.register_macro::<topcoat_view_grammar::live::Emit>("emit");
     registry
 }
 
@@ -110,6 +112,7 @@ fixture_test!(inline_expressions);
 fixture_test!(if_else);
 fixture_test!(if_else_if_else);
 fixture_test!(for_loop);
+fixture_test!(keyed_for_loop);
 fixture_test!(match_expr);
 
 // -- Components --------------------------------------------------------------
@@ -134,6 +137,12 @@ fixture_test!(class_macro_in_view);
 
 fixture_test!(local_binding);
 fixture_test!(local_binding_typed);
+
+// -- Live regions --------------------------------------------------------------
+
+fixture_test!(live_single_emit);
+fixture_test!(live_statements);
+fixture_test!(live_explicit_cx);
 
 // -- DOCTYPE -----------------------------------------------------------------
 

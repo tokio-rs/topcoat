@@ -18,11 +18,7 @@ pub enum SeparatorOrientation {
 }
 
 impl SeparatorOrientation {
-    /// The Tailwind classes for this orientation.
-    ///
-    /// The rule is a hairline in one direction and stretches along the other,
-    /// so it takes its length from the container: a horizontal separator
-    /// spans the container's width, a vertical one its height.
+    /// Classes that set the rule's thickness and stretch it along its orientation.
     fn classes(self) -> StaticClass {
         match self {
             Self::Horizontal => class!("h-px w-full"),
@@ -40,23 +36,14 @@ impl SeparatorOrientation {
     }
 }
 
-/// The classes shared by both orientations.
-///
-/// The rule is painted as a background rather than a border, which is what
-/// lets one set of classes cover both orientations; the border an `<hr>`
-/// carries by default is cleared for it. It never shrinks, so it survives in
-/// a crowded flex row.
+/// Classes for a separator that keeps its thickness in a flex layout.
 const SEPARATOR: StaticClass = class!("shrink-0 border-0 bg-border");
 
-/// A separator component: a hairline rule between groups of content.
+/// A thin rule between groups of content.
 ///
-/// The rule is an `<hr>`, which assistive technology already announces as a
-/// separator. It takes its length from its container, so a vertical separator
-/// needs a container that gives it a height, such as a flex row whose items
-/// stretch. The `attrs` (such as `class`) are forwarded to the `<hr>`; a
-/// `class` among them is appended to the computed classes. A rule that is
-/// only decoration can be hidden from assistive technology with an
-/// `aria-hidden` attribute among them.
+/// Uses an `<hr>` element. Its length comes from its container, so a vertical separator
+/// needs a container with a height. Pass `aria-hidden="true"` for a purely decorative
+/// rule. `attrs` are forwarded to the `<hr>`, with extra classes added to its classes.
 ///
 /// ```ignore
 /// view! {

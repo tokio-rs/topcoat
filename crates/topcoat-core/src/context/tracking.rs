@@ -122,7 +122,7 @@ mod tests {
     /// Observes what `cx`'s scope currently resolves `T` to, for building
     /// expected reads.
     fn expected<T: Any>(cx: &Cx) -> ContextRead {
-        observe::<T>(&cx.request_context)
+        observe::<T>(&cx.state.request_context)
     }
 
     #[test]

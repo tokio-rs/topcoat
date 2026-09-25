@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use topcoat_core_grammar::paths::topcoat_view;
+use topcoat_core_grammar::paths::{topcoat_context, topcoat_view};
 
 use super::{
     Bindings, Node, StaticSegment,
@@ -39,25 +39,16 @@ impl Scope {
         }
     }
 
-    /// Emits a top-level `view!` invocation: a `ScopeView` around a
-    /// `MoveView` whose `async move` body builds the scope's view and drives
-    /// it in place.
+    /// Emits a top-level view with a buffer scope and an `async move` body.
     ///
-    /// The block captures every value the template uses, so the view owns its
-    /// data and the expressions inside borrow from the block. The built view
-    /// is driven inside the block that evaluates the template, so what its
-    /// expressions borrow from that block is still alive.
+    /// The body owns captured values and drives the view before dropping
+    /// them, keeping the view's borrows valid.
     ///
-    /// With `owns_cx`, the block expects an owned `__cx` context in scope and
-    /// captures it, rebinding `__cx` to a borrow of it inside; the view then
-    /// does not borrow the caller's context.
+    /// With `owns_cx`, the block takes ownership of `__cx` and borrows it
+    /// as `&Cx` inside. Otherwise it uses the enclosing body's `&Cx`.
     pub fn emit_view(&self, owns_cx: bool) -> TokenStream {
         let prologue = borrow_cx(owns_cx);
-        let inner = self.emit_inner(|view| {
-            quote! {
-                #topcoat_view::internal::MoveView::drive(#view).await
-            }
-        });
+        let inner = self.emit_driven();
         quote! {
             #topcoat_view::internal::ScopeView::new(
                 #topcoat_view::internal::MoveView::new(async move {
@@ -68,15 +59,11 @@ impl Scope {
         }
     }
 
-    /// Emits an `emit!` invocation: the scope's view, built inline in a
-    /// `ScopeView` of its own.
+    /// Emits a view with its own buffer for an `emit!` invocation.
     ///
-    /// The view always owns a buffer, so its content renders anywhere even
-    /// when it is emitted inside another build. The body builds inside a
-    /// closure the scope evaluates with that buffer installed, so the blocks
-    /// it hoists land in the buffer its polls run against. Nothing is moved
-    /// into an async block: the caller awaits the view where it is emitted,
-    /// so the template borrows from the enclosing block as it stands.
+    /// Construction and polling use the same buffer, so emitted content
+    /// is self-contained. The caller awaits the view in place. Its
+    /// expressions can therefore borrow from the enclosing block.
     ///
     /// With `owns_cx`, an owned `__cx` context is in scope and the view
     /// borrows it.
@@ -91,14 +78,11 @@ impl Scope {
         }
     }
 
-    /// Emits this scope as an inert view value: a block expression that
-    /// evaluates the scope's expressions in source order and builds its
-    /// `JoinView`.
+    /// Emits a block that evaluates expressions in source order and
+    /// constructs a `JoinView` without polling it.
     ///
-    /// The view owns the evaluated values; whatever the expressions borrow
-    /// from the environment, it borrows. Nothing is moved into an async
-    /// block, so a scope nested in an enclosing one leaves that scope's
-    /// bindings borrowed rather than taking them.
+    /// The view owns the results but can borrow from the surrounding scope.
+    /// There is no `async move` block to capture that scope's bindings.
     pub(crate) fn emit_inert(&self) -> TokenStream {
         self.emit_inner(|view| view)
     }
@@ -108,22 +92,16 @@ impl Scope {
             return self.emit_inert();
         }
 
-        let idents = bindings.idents();
-        let rebinds = bindings.rebinds();
+        bindings.emit_capture(&self.emit_driven())
+    }
 
-        let inner = self.emit_inner(|view| {
+    /// Builds and drives the view in the same block, keeping its borrows alive.
+    pub(crate) fn emit_driven(&self) -> TokenStream {
+        self.emit_inner(|view| {
             quote! {
                 #topcoat_view::internal::MoveView::drive(#view).await
             }
-        });
-
-        quote! {{
-            let __captured = #topcoat_view::internal::Capture((#(#idents,)*));
-            #topcoat_view::internal::MoveView::new(async {
-                let (#(#rebinds,)*) = __captured.take();
-                #inner
-            })
-        }}
+        })
     }
 
     fn emit_inner(&self, tail: impl FnOnce(TokenStream) -> TokenStream) -> TokenStream {
@@ -135,12 +113,11 @@ impl Scope {
     }
 }
 
-/// Rebinds an owned `__cx` context to a borrow of it, so the template reads
-/// the same `&Cx` it would from an ambient context. Empty when the context is
-/// already borrowed.
+/// Borrows a captured `__cx` as `&Cx`, whether the supplied value is owned
+/// or borrowed. Empty when the template uses the ambient context directly.
 fn borrow_cx(owns_cx: bool) -> TokenStream {
     if owns_cx {
-        quote! { let __cx = &__cx; }
+        quote! { let __cx: &#topcoat_context::Cx = &__cx; }
     } else {
         TokenStream::new()
     }
@@ -150,11 +127,10 @@ fn borrow_cx(owns_cx: bool) -> TokenStream {
 mod tests {
     use proc_macro2::Span;
     use quote::quote;
-    use syn::Expr;
 
     use super::*;
     use crate::view::{
-        NamedArg, NamedArgValue, Nodes,
+        Nodes,
         hir::{ExprKind, ViewBuilder},
     };
 
@@ -168,23 +144,7 @@ mod tests {
 
     fn add_component_with_children(builder: &mut ViewBuilder, name: &str, children: &Nodes) {
         let path = syn::parse_str(name).unwrap();
-        builder.component(&path, Vec::new(), None, children, Span::call_site());
-    }
-
-    fn add_keyed_component(builder: &mut ViewBuilder, name: &str, key: &Expr) {
-        let path = syn::parse_str(name).unwrap();
-        let key = NamedArg {
-            ident: syn::parse_quote!(key),
-            colon: syn::token::Colon::default(),
-            value: NamedArgValue::Expr(key.clone()),
-        };
-        builder.component(
-            &path,
-            Vec::new(),
-            Some(&key),
-            &syn::parse_quote!(),
-            Span::call_site(),
-        );
+        builder.component(&path, Vec::new(), children, Span::call_site());
     }
 
     #[test]
@@ -345,11 +305,16 @@ mod tests {
     #[test]
     fn for_loop_without_node_positions_builds_each_iteration_in_place() {
         let mut builder = ViewBuilder::new();
-        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            body.str_unescaped("<b");
-            body.expr(ExprKind::AttributeUnescaped, quote! { ("id", x) });
-            body.str_unescaped("></b>");
-        });
+        builder.for_loop(
+            &syn::parse_quote!(x),
+            &syn::parse_quote!(xs),
+            None,
+            |body| {
+                body.str_unescaped("<b");
+                body.expr(ExprKind::AttributeUnescaped, quote! { ("id", x) });
+                body.str_unescaped("></b>");
+            },
+        );
         let out = rendered(builder);
         assert!(out.contains("for x in xs"), "{out}");
         assert!(out.contains("__views . push ("), "{out}");
@@ -366,9 +331,14 @@ mod tests {
     #[test]
     fn a_node_position_in_a_for_body_keeps_the_loop_joined() {
         let mut builder = ViewBuilder::new();
-        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            body.expr(ExprKind::Node, quote! { x });
-        });
+        builder.for_loop(
+            &syn::parse_quote!(x),
+            &syn::parse_quote!(xs),
+            None,
+            |body| {
+                body.expr(ExprKind::Node, quote! { x });
+            },
+        );
         let out = rendered(builder);
         assert!(out.contains("LoopView :: new (__iterations)"), "{out}");
         assert!(out.contains("NodeClassify :: classify (x)"), "{out}");
@@ -378,13 +348,18 @@ mod tests {
     #[test]
     fn control_flow_inside_a_plain_for_body_builds_in_place() {
         let mut builder = ViewBuilder::new();
-        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            body.str_unescaped("<b");
-            body.if_else(&syn::parse_quote!(x.ok), |then_branch, _| {
-                then_branch.expr(ExprKind::AttributeUnescaped, quote! { ("id", x.name) });
-            });
-            body.str_unescaped("></b>");
-        });
+        builder.for_loop(
+            &syn::parse_quote!(x),
+            &syn::parse_quote!(xs),
+            None,
+            |body| {
+                body.str_unescaped("<b");
+                body.if_else(&syn::parse_quote!(x.ok), |then_branch, _| {
+                    then_branch.expr(ExprKind::AttributeUnescaped, quote! { ("id", x.name) });
+                });
+                body.str_unescaped("></b>");
+            },
+        );
         let out = rendered(builder);
         assert!(out.contains("let __expr0 = if x . ok"), "{out}");
         assert!(out.contains("__b . attribute_unescaped (__expr0)"), "{out}");
@@ -432,9 +407,9 @@ mod tests {
         builder.str_unescaped("<hr>");
         let out = rendered(builder);
         assert!(out.contains("let __expr0 = {"));
-        assert!(out.contains(
-            "IdentityView :: new (__identity , :: topcoat_view :: HoistView :: new (:: topcoat_view :: internal :: ThenView :: new (__future"
-        ));
+        assert!(
+            out.contains("HoistView :: new (:: topcoat_view :: internal :: MoveView :: new (async")
+        );
         assert!(out.contains("Component :: render"));
         assert!(out.contains("JoinUnit :: new (__expr0 , ())"));
     }
@@ -469,7 +444,7 @@ mod tests {
         let mut builder = ViewBuilder::new();
         add_component(&mut builder, "solo");
         let out = rendered(builder);
-        assert!(out.contains("IdentityGuard :: enter ("));
+        assert!(out.contains("identity_raw (__cx) . child ("));
         assert!(out.contains("SiteKey :: new"));
         assert!(out.contains("file ! ()"));
     }
@@ -489,84 +464,117 @@ mod tests {
     }
 
     #[test]
-    fn a_keyed_component_mixes_the_key_into_its_identity() {
+    fn a_keyed_loop_mixes_the_key_into_its_identity() {
         let mut builder = ViewBuilder::new();
-        add_keyed_component(&mut builder, "card", &syn::parse_quote!(item.id));
+        builder.for_loop(
+            &syn::parse_quote!(item),
+            &syn::parse_quote!(items),
+            Some(syn::parse_quote!(item.id)),
+            |body| add_component(body, "card"),
+        );
         let out = rendered(builder);
-        assert!(out.contains("IdentityGuard :: enter_keyed"));
+        assert!(out.contains(". keyed_child ("));
         assert!(out.contains("item . id"));
+        assert!(!out.contains(". ambiguous_child ("));
     }
 
     #[test]
-    fn an_unkeyed_component_in_a_for_body_is_ambiguous() {
+    fn an_unkeyed_loop_enters_an_ambiguous_identity() {
         let mut builder = ViewBuilder::new();
-        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            add_component(body, "card");
-        });
+        builder.for_loop(
+            &syn::parse_quote!(x),
+            &syn::parse_quote!(xs),
+            None,
+            |body| {
+                add_component(body, "card");
+            },
+        );
         let out = rendered(builder);
-        assert!(out.contains("IdentityGuard :: enter_ambiguous"));
-        assert!(out.contains("\"`card`\""));
+        assert!(out.contains(". ambiguous_child ("));
+        assert!(out.contains("\"`for` loop at \""));
     }
 
     #[test]
-    fn a_keyed_component_in_a_for_body_is_not_ambiguous() {
+    fn an_unkeyed_loop_without_components_is_ambiguous() {
         let mut builder = ViewBuilder::new();
-        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            add_keyed_component(body, "card", &syn::parse_quote!(x));
-        });
+        builder.for_loop(
+            &syn::parse_quote!(x),
+            &syn::parse_quote!(xs),
+            None,
+            |body| {
+                body.str_unescaped("<br>");
+            },
+        );
         let out = rendered(builder);
-        assert!(out.contains("IdentityGuard :: enter_keyed"));
-        assert!(!out.contains("IdentityGuard :: enter_ambiguous"));
+        assert!(out.contains(". ambiguous_child ("));
     }
 
     #[test]
     fn branches_inside_a_for_body_still_repeat() {
         let mut builder = ViewBuilder::new();
-        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            body.if_else(&syn::parse_quote!(cond), |then_branch, _| {
-                add_component(then_branch, "card");
-            });
-        });
+        builder.for_loop(
+            &syn::parse_quote!(x),
+            &syn::parse_quote!(xs),
+            None,
+            |body| {
+                body.if_else(&syn::parse_quote!(cond), |then_branch, _| {
+                    add_component(then_branch, "card");
+                });
+            },
+        );
         let out = rendered(builder);
-        assert!(out.contains("IdentityGuard :: enter_ambiguous"));
+        assert!(out.contains(". ambiguous_child ("));
     }
 
     #[test]
     fn children_derive_below_their_component_instead_of_repeating() {
         let mut builder = ViewBuilder::new();
-        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            add_component_with_children(body, "wrapper", &syn::parse_quote!(inner()));
-        });
+        builder.for_loop(
+            &syn::parse_quote!(x),
+            &syn::parse_quote!(xs),
+            None,
+            |body| {
+                add_component_with_children(body, "wrapper", &syn::parse_quote!(inner()));
+            },
+        );
         let out = rendered(builder);
-        // The wrapper repeats unkeyed, but its child does not repeat
-        // relative to it; the wrapper's ambiguity poisons the child at
-        // runtime instead.
-        assert_eq!(out.matches("IdentityGuard :: enter_ambiguous").count(), 1);
-        assert_eq!(out.matches("IdentityGuard :: enter (").count(), 1);
+        // The loop introduces ambiguity; both components derive normally.
+        assert_eq!(out.matches(". ambiguous_child (").count(), 1);
+        assert_eq!(out.matches("identity_raw (__cx) . child (").count(), 2);
     }
 
     #[test]
     fn for_loop_with_component_body_pins_each_iteration() {
         let mut builder = ViewBuilder::new();
-        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            add_component(body, "item");
-        });
+        builder.for_loop(
+            &syn::parse_quote!(x),
+            &syn::parse_quote!(xs),
+            None,
+            |body| {
+                add_component(body, "item");
+            },
+        );
         let out = rendered(builder);
         assert!(
             out.contains("__iterations . push (:: std :: boxed :: Box :: pin ("),
             "{out}"
         );
         assert!(out.contains("LoopView :: new (__iterations)"), "{out}");
-        assert!(out.contains("ThenView :: new"), "{out}");
+        assert!(out.contains("MoveView :: new"), "{out}");
         assert!(out.contains("JoinUnit :: new (__expr0 , ())"), "{out}");
     }
 
     #[test]
     fn a_for_loop_body_borrows_everything_but_its_bindings() {
         let mut builder = ViewBuilder::new();
-        builder.for_loop(&syn::parse_quote!(x), &syn::parse_quote!(xs), |body| {
-            add_component(body, "item");
-        });
+        builder.for_loop(
+            &syn::parse_quote!(x),
+            &syn::parse_quote!(xs),
+            None,
+            |body| {
+                add_component(body, "item");
+            },
+        );
         let out = rendered(builder);
         // Only the root stream owns its captures; the iteration streams
         // borrow their environment, apart from the captured bindings.
@@ -598,7 +606,7 @@ mod tests {
             add_component(then_branch, "conditional");
         });
         let out = rendered(builder);
-        assert!(!out.contains("Capture"));
+        assert_eq!(out.matches("Capture (").count(), 2);
     }
 
     #[test]
@@ -616,7 +624,7 @@ mod tests {
         let out = rendered(builder);
         assert!(out.contains("Capture ((status ,))"));
         // The binding-free arm needs no capture.
-        assert_eq!(out.matches("Capture (").count(), 1);
+        assert_eq!(out.matches("Capture (").count(), 4);
     }
 
     #[test]

@@ -10,28 +10,18 @@ use sha2::{Digest, Sha256};
 /// The manifest file naming the components within a registry.
 pub const MANIFEST_FILE: &str = "registry.toml";
 
-/// The `registry.toml` format version this build understands. Stored in the
-/// manifest's `version` field so older and newer formats can be told apart; a
-/// manifest declaring a newer version than this is rejected.
+/// The newest supported registry manifest version. Manifests declaring a newer version
+/// are rejected.
 pub const MANIFEST_VERSION: u32 = 1;
 
-/// The registry name used when a project does not specify one. It is also the
-/// name under which the built-in registry is recorded in a project's install
-/// state and given on the `topcoat ui` command line. It is an alias for the
-/// [`DEFAULT_REGISTRY_CRATE`] crate, which the `topcoat` facade pulls in under
-/// its `ui` feature.
+/// The command-line and install-state name of the built-in registry.
 pub const DEFAULT_REGISTRY: &str = "topcoat";
 
-/// The crate that provides the built-in registry. It is referred to by the name
-/// [`DEFAULT_REGISTRY`] everywhere a registry is named, and, unlike other
-/// registries, need not be a direct dependency of the project: the `topcoat`
-/// facade pulls it in transitively under its `ui` feature.
+/// The crate providing the built-in registry. It is available through Topcoat's `ui`
+/// feature without a separate direct dependency.
 pub const DEFAULT_REGISTRY_CRATE: &str = "topcoat-ui-registry";
 
-/// The parsed `registry.toml` manifest. Written by hand: it records no hashes,
-/// since a component's hash is computed from its source (see [`content_hash`]).
-/// The registry's identity is its crate name, so the manifest names only the
-/// format version and the components.
+/// A registry manifest describing available themes and component sources.
 #[derive(Deserialize)]
 struct Manifest {
     /// The manifest format version (see [`MANIFEST_VERSION`]).
@@ -73,8 +63,7 @@ pub struct Registry {
 }
 
 impl Registry {
-    /// Loads a registry by reading and parsing the `registry.toml` in `dir` (a
-    /// registry crate's declared registry directory).
+    /// Loads the `registry.toml` manifest in `dir`.
     ///
     /// # Errors
     ///
@@ -147,8 +136,7 @@ impl Component<'_> {
         self.name
     }
 
-    /// Computes the component's content hash by reading and hashing its source
-    /// (see [`content_hash`]).
+    /// Returns the content hash of the component's source.
     ///
     /// # Errors
     ///
@@ -183,8 +171,7 @@ impl Component<'_> {
     }
 }
 
-/// A single theme within a [`Registry`]: a CSS file that becomes a project's
-/// Tailwind input, copied into the project at `init` time.
+/// A registry theme whose CSS can be installed as a project's Tailwind input.
 pub struct Theme<'a> {
     name: &'a str,
     entry: &'a ThemeEntry,
@@ -198,16 +185,13 @@ impl Theme<'_> {
         self.name
     }
 
-    /// The file name written into the user's project. Every theme installs to
-    /// the same `styles.css` (it becomes the project's Tailwind input), rather
-    /// than carrying its registry source name (e.g. `neutral.css`) into the project.
+    /// The destination file name for an installed theme, `styles.css`.
     #[must_use]
     pub fn file_name(&self) -> &'static str {
         "styles.css"
     }
 
-    /// Computes the theme's content hash by reading and hashing its source (see
-    /// [`content_hash`]).
+    /// Returns the content hash of the theme's source.
     ///
     /// # Errors
     ///
@@ -227,11 +211,8 @@ impl Theme<'_> {
     }
 }
 
-/// Computes the content hash recorded for a component, the sha256 of its source
-/// prefixed with `sha256:`. Hashing the same source always yields the same
-/// value, so a project can tell its installed component apart from an updated
-/// one by comparing the hash it recorded against a fresh hash of the registry's
-/// current source.
+/// Returns the SHA-256 hash of `source`, prefixed with `sha256:`. Identical source
+/// produces the same hash.
 #[must_use]
 pub fn content_hash(source: &str) -> String {
     format!("sha256:{}", hex(Sha256::digest(source.as_bytes()).as_ref()))

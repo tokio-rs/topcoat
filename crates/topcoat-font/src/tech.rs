@@ -1,11 +1,9 @@
 //! Font technologies for the `tech()` hint on a CSS `@font-face` `src`
 //! descriptor.
 
-/// A font technology, as named by the `tech()` hint of a CSS `@font-face`
-/// `src` descriptor.
+/// A font technology for a CSS `tech()` hint.
 ///
-/// Displays as the CSS technology keyword used inside `tech(...)`
-/// (`color-colrv1`, `features-opentype`, `variations`, ...).
+/// Displays as its CSS keyword, such as `variations`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FontTech {
     /// Color bitmap data tables, CSS `color-cbdt`.
@@ -27,11 +25,9 @@ pub enum FontTech {
     FeaturesOpenType,
     /// Incremental font loading, CSS `incremental`.
     Incremental,
-    /// Font palettes by means of `font-palette` to select one of many color
-    /// palettes in the font, CSS `palettes`.
+    /// Color palette selection through `font-palette`, CSS `palettes`.
     Palettes,
-    /// Font variations in TrueType and OpenType fonts to control the font axis,
-    /// weight, glyphs, etc., CSS `variations`.
+    /// Variable font axes, CSS `variations`.
     Variations,
 }
 

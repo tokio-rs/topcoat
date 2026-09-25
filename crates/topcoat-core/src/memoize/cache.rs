@@ -14,19 +14,14 @@ use crate::context::Cx;
 
 /// The per-request store backing `#[memoize]`.
 ///
-/// An entry's identity is a 128 bit SipHash over the memoized function's `TypeId` and its
-/// arguments, computed through the standard `Hash` trait. The hash is the whole key: the
-/// cache keeps no owned copy of the arguments and runs no equality check. At 128 bits a
-/// collision within a request is vanishingly unlikely, and the per-process random hash keys
-/// keep colliding arguments from being crafted offline.
+/// Entries are identified by a 128-bit hash of the function's type and arguments.
+/// The cache does not retain arguments or compare them for equality.
 ///
-/// This trades on the `Hash` contract in one place: an impl that feeds identical bytes for
-/// values its `Eq` distinguishes would make those values share an entry. Derived and standard
-/// library impls distinguish everything they compare.
+/// Argument hashes must include every part of the value that affects the result.
+/// Distinct values with identical hashes share an entry.
 ///
-/// Request context is not part of the hash. An entry instead holds one variant per set of
-/// context bindings its body was observed under, validated against the caller's scope on
-/// every lookup.
+/// Each entry can hold results for different request context bindings. A lookup
+/// reuses a result only if its observed bindings match the caller's scope.
 #[derive(Default)]
 #[doc(hidden)]
 pub struct MemoizeCache {

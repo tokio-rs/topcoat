@@ -8,22 +8,22 @@ use futures_util::TryFutureExt;
 use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
-use super::yielder::{DriveFuture, Yield, poll_body};
-use crate::{EmitToken, RegionId, View, ViewBufferScope, ViewFirst, ViewSwap};
+use super::yielder::DriveFuture;
+use crate::{
+    EmitToken, RegionId, View, ViewBufferScope, ViewFirst, ViewSwap,
+    internal::yielder::{poll_first, poll_swap},
+};
 
 pin_project! {
-    /// A `live!` region as a [`View`]: a body future whose emissions become
-    /// the region's content.
+    /// A `live!` region whose body yields its content through `emit!`.
     ///
-    /// The body reports each emission out of band while it runs. The first
-    /// one becomes the view's first content; when the body is already done
-    /// at that point the content is final and needs no markers. Otherwise
-    /// the content is framed with the markers of a freshly allocated region
-    /// and every later emission becomes a swap of that region.
+    /// The first emission renders in place. If the body has more updates,
+    /// region markers surround that content and later emissions replace it.
     pub struct LiveView<Fut> {
         #[pin]
         body: Fut,
-        region: Option<RegionId>,
+        region: RegionId,
+        // A swap produced while checking whether the body is still live.
         stash: Option<ViewSwap>,
     }
 }
@@ -32,24 +32,27 @@ impl<Fut> LiveView<Fut>
 where
     Fut: Future<Output = Result<EmitToken>>,
 {
+    /// Creates a live body whose later emissions replace `region`.
     #[doc(hidden)]
-    pub fn new(body: Fut) -> Self {
+    pub fn new(region: RegionId, body: Fut) -> Self {
         Self {
             body,
-            region: None,
+            region,
             stash: None,
         }
     }
 }
 
 impl LiveView<Ready<Result<EmitToken>>> {
-    /// Drives `view` inside a live body: the future an `emit!` awaits.
+    /// Drives an emitted view until it has no more updates.
     ///
-    /// The view's first content and every swap after it are handed to the
-    /// enclosing poll as emissions, and the future resolves to the token
-    /// once the view has no further updates.
-    pub fn drive<V: View>(view: V) -> impl Future<Output = Result<EmitToken>> {
-        DriveFuture::new(view).map_ok(|()| EmitToken)
+    /// Its first content becomes the body's first emission or a replacement
+    /// of `region`, depending on whether the body has already emitted.
+    /// Swaps from the emitted view keep their own target regions. The future
+    /// resolves to an emission token once the view finishes, or propagates
+    /// its rendering error so the body can handle it.
+    pub fn drive<V: View>(region: RegionId, view: V) -> impl Future<Output = Result<EmitToken>> {
+        DriveFuture::new(EmitView::new(region, view)).map_ok(|()| EmitToken)
     }
 }
 
@@ -59,46 +62,30 @@ where
 {
     fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
         let mut this = self.project();
-
-        match poll_body(this.body.as_mut(), cx) {
-            (Poll::Pending, Some(Yield::First(first))) => {
-                // Poll again to determine liveness. If the second poll returns pending, we
-                // expect this view to yield again in the future.
-                let (poll, yielded) = poll_body(this.body, cx);
-
-                if let Poll::Ready(Err(e)) = poll {
-                    return Poll::Ready(Err(e));
+        match poll_first(this.body.as_mut(), cx) {
+            (Poll::Pending, Some(first)) => {
+                // The emitted child can be settled while its body still has
+                // more emissions. Poll the body again to determine liveness.
+                let (poll, yielded) = poll_swap(this.body, cx);
+                if let Poll::Ready(Err(error)) = poll {
+                    return Poll::Ready(Err(error));
                 }
-
+                *this.stash = yielded;
                 let live = poll.is_pending();
-                if !live {
-                    // The body is done, so nothing will replace this content and it needs no
-                    // markers.
-                    return Poll::Ready(Ok(ViewFirst {
-                        content: first.content,
-                        live,
-                    }));
-                }
-
-                let region = *this.region.get_or_insert_with(RegionId::next);
-                *this.stash = yielded.map(|yielded| yielded.into_swap(region));
-
-                let first = ViewFirst {
-                    content: ViewBufferScope::with(|buffer| {
+                let content = if live {
+                    ViewBufferScope::with(|buffer| {
                         buffer.block(|parts| {
-                            parts.push_region_start(region);
+                            parts.push_region_start(*this.region);
                             parts.push_view_handle(first.content);
-                            parts.push_region_end(region);
+                            parts.push_region_end(*this.region);
                         })
-                    }),
-                    live,
+                    })
+                } else {
+                    first.content
                 };
-                Poll::Ready(Ok(first))
+                Poll::Ready(Ok(ViewFirst { content, live }))
             }
             (Poll::Pending, None) => Poll::Pending,
-            (Poll::Pending, Some(Yield::Swap(_))) => {
-                panic!("live view future yielded a swap before its first content")
-            }
             (Poll::Ready(_), Some(_)) => {
                 panic!("live view future yielded without returning pending")
             }
@@ -112,20 +99,94 @@ where
     fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
         let this = self.project();
 
-        if let Some(stash) = this.stash.take() {
-            return Poll::Ready(Ok(Some(stash)));
+        if let Some(swap) = this.stash.take() {
+            return Poll::Ready(Ok(Some(swap)));
         }
 
-        let region = (*this.region).expect("live view polled for a swap before its first content");
-
-        match poll_body(this.body, cx) {
-            (Poll::Pending, Some(yielded)) => Poll::Ready(Ok(Some(yielded.into_swap(region)))),
+        match poll_swap(this.body, cx) {
+            (Poll::Pending, Some(swap)) => Poll::Ready(Ok(Some(swap))),
             (Poll::Pending, None) => Poll::Pending,
             (Poll::Ready(_), Some(_)) => {
                 panic!("live view future yielded without returning pending")
             }
-            (Poll::Ready(Err(e)), None) => Poll::Ready(Err(e)),
-            (Poll::Ready(Ok(_)), None) => Poll::Ready(Ok(None)),
+            (Poll::Ready(result), None) => Poll::Ready(result.map(|_| None)),
+        }
+    }
+}
+
+pin_project! {
+    /// Adapts a new view's first content to the enclosing region's lifecycle.
+    ///
+    /// A later emission or error fallback starts during swap polling, so its
+    /// first content becomes a replacement. Subsequent child swaps pass through.
+    /// The child itself always receives a first-content poll before any swaps.
+    ///
+    /// Completion is remembered, including when the child's first content is
+    /// not live, so further swap polls do not poll a finished child again.
+    pub struct EmitView<V> {
+        #[pin]
+        view: V,
+        region: RegionId,
+        first: bool,
+        done: bool,
+    }
+}
+
+impl<V> EmitView<V> {
+    /// Wraps a view whose first content can replace `region` during swap polling.
+    pub fn new(region: RegionId, view: V) -> Self {
+        Self {
+            view,
+            region,
+            first: true,
+            done: false,
+        }
+    }
+}
+
+impl<V> View for EmitView<V>
+where
+    V: View,
+{
+    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
+        let this = self.project();
+        match this.view.poll_first(cx) {
+            Poll::Ready(Ok(first)) => {
+                *this.first = false;
+                *this.done = !first.live;
+                Poll::Ready(Ok(first))
+            }
+            Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+
+    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
+        let this = self.project();
+        if *this.done {
+            return Poll::Ready(Ok(None));
+        }
+        if *this.first {
+            match this.view.poll_first(cx) {
+                Poll::Ready(Ok(first)) => {
+                    *this.first = false;
+                    *this.done = !first.live;
+                    Poll::Ready(Ok(Some(ViewSwap {
+                        region: *this.region,
+                        replacement: first.content,
+                    })))
+                }
+                Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
+                Poll::Pending => Poll::Pending,
+            }
+        } else {
+            match this.view.poll_swap(cx) {
+                Poll::Ready(Ok(None)) => {
+                    *this.done = true;
+                    Poll::Ready(Ok(None))
+                }
+                poll => poll,
+            }
         }
     }
 }

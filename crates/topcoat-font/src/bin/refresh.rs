@@ -2,16 +2,12 @@
 //!
 //! Run with `cargo run -p topcoat-font --features fontsource-refresh --bin refresh`.
 //!
-//! The catalog list (`/v1/fonts`) already carries every field the build script
-//! needs except the per-subset unicode ranges, which only appear in each
-//! family's detail (`/v1/fonts/{id}`). This fetches the list, augments each
-//! entry with its `unicodeRange`, and writes a trimmed, deduplicated catalog.
+//! Fetches the family list and each family's Unicode ranges, then writes a
+//! compact catalog.
 //!
-//! The same range string repeats across thousands of families, so the ranges
-//! are interned: distinct range specs are collected into a top-level `ranges`
-//! table and each family references them by index. The numbered CJK subset
-//! blocks (`[0]`, `[1]`, ...) are dropped: their ranges are per-font and opaque,
-//! and keeping them would bloat the catalog many times over.
+//! Families refer to a shared range table by index. Numbered CJK subsets are
+//! omitted because their font-specific ranges would greatly increase the
+//! catalog size.
 
 use std::{
     collections::{BTreeMap, HashMap},

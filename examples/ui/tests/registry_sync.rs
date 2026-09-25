@@ -1,12 +1,6 @@
-//! Guards that the theme and components vendored into this example stay in
-//! sync with the built-in registry, which lives in the same workspace. Two
-//! things can drift: the installed files, which are a verbatim copy of the
-//! registry source, and the hashes `components.toml` records for them, which
-//! `topcoat ui list` compares against the registry to report component
-//! updates. A stale hash offers an update for a file that already carries it.
-//! When a registry source changes (or the registry gains a component this
-//! example does not showcase yet), these tests fail until the example is
-//! refreshed against the registry.
+//! Checks that the showcase includes the registry's components and theme.
+//! Installed files and their recorded hashes must match the registry source.
+//! Refresh the example when registry files change.
 
 use std::path::{Path, PathBuf};
 
@@ -15,8 +9,7 @@ use topcoat_ui::{
     manage::{InstallStatus, Package, list},
 };
 
-/// This example package's root, where `topcoat ui` installed the theme and
-/// components.
+/// The example package's root directory.
 fn package_root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
 }
@@ -27,8 +20,7 @@ fn registry() -> Registry {
     Registry::load(dir).expect("the workspace's built-in registry loads")
 }
 
-/// Reads an installed file, failing with `hint`, where there is one saying how
-/// to put the file back.
+/// Reads an installed file and includes the optional repair hint on failure.
 fn read_installed(path: &PathBuf, hint: Option<&str>) -> String {
     std::fs::read_to_string(path).unwrap_or_else(|error| match hint {
         Some(hint) => panic!("cannot read {}: {error}; {hint}", path.display()),

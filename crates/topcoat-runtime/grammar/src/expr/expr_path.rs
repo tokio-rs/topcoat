@@ -3,6 +3,7 @@ use quote::{ToTokens, quote};
 use syn::{ExprPath, PathArguments, PathSegment};
 use topcoat_core_grammar::paths::topcoat_runtime;
 
+use super::js::Js;
 use crate::expr::{
     Expr,
     name_resolver::{NameResolver, ResolvedIdent},
@@ -12,7 +13,7 @@ impl Expr {
     pub(super) fn expr_path(
         path: &ExprPath,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
         let segment = if path.qself.is_none()
@@ -55,18 +56,19 @@ impl Expr {
         }
 
         let resolved = names.resolve(ident);
-        let (js_name, rust_ident) = match resolved {
+        let rust_ident = match resolved {
             ResolvedIdent::Local {
                 js_name,
                 rust_ident,
+            } => {
+                js.push_str(&js_name);
+                rust_ident
             }
-            | ResolvedIdent::External {
-                js_name,
-                rust_ident,
-            } => (js_name, rust_ident),
+            ResolvedIdent::External { rust_ident } => {
+                js.expression(&rust_ident);
+                rust_ident
+            }
         };
-
-        js.push_str(&js_name);
         rust_ident.to_tokens(rust);
         Ok(())
     }

@@ -1,11 +1,17 @@
 use syn::parse::{Parse, ParseStream};
+use topcoat_core_grammar::ParseOption;
 
-/// Arguments passed to the `#[shard]` attribute itself. Currently reserved:
-/// the macro accepts no arguments today.
-pub struct ShardAttr {}
+use crate::common::EndpointPath;
+
+/// The optional endpoint path in `#[shard("/search")]`.
+pub struct ShardAttr {
+    pub path: Option<EndpointPath>,
+}
 
 impl Parse for ShardAttr {
-    fn parse(_input: ParseStream) -> syn::Result<Self> {
-        Ok(Self {})
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        Ok(Self {
+            path: input.call(EndpointPath::parse_option)?,
+        })
     }
 }

@@ -23,16 +23,13 @@ use crate::{
     response::Response,
 };
 
-/// WebSocket handshake extractor: validates the upgrade request and hands the
-/// connection to a callback.
+/// Validates a WebSocket handshake and passes the upgraded connection to a callback.
 ///
-/// A route handler takes a `WebSocketUpgrade` parameter to become a WebSocket
-/// endpoint. The extractor validates the handshake (a `GET` request with the
-/// `Upgrade: websocket` headers of [RFC 6455]); the handler then calls
-/// [`on_upgrade`](Self::on_upgrade) with the callback that speaks to the
-/// client, and returns the response that completes the handshake. Before
-/// upgrading, the builder methods can negotiate a subprotocol and bound
-/// message sizes.
+/// Accept this as a route parameter to handle WebSocket connections. The
+/// extractor checks the method and headers required by [RFC 6455]. Call
+/// [`on_upgrade`](Self::on_upgrade) with a callback, then return its response
+/// to complete the handshake. Use the builder methods before `on_upgrade`
+/// to choose subprotocols and connection limits.
 ///
 /// [RFC 6455]: https://datatracker.ietf.org/doc/html/rfc6455
 ///
@@ -63,8 +60,7 @@ use crate::{
 /// ```
 ///
 /// The callback outlives the handler, so it cannot borrow the request context.
-/// Clone the [`Cx`] and move the owned handle in to read the context from the
-/// socket task:
+/// Clone [`Cx`] and move it into the callback to read context there:
 ///
 /// ```rust
 /// use topcoat::{
@@ -145,9 +141,9 @@ impl WebSocketUpgrade {
 
     /// Declares the subprotocols the endpoint speaks, in order of preference.
     ///
-    /// The first declared protocol that the client also requested (via the
-    /// `Sec-WebSocket-Protocol` header) is selected, echoed in the handshake
-    /// response, and reported by
+    /// Selects the first protocol also present in the client's
+    /// `Sec-WebSocket-Protocol` header. The selected protocol appears in the
+    /// response and is available through
     /// [`WebSocket::protocol`](crate::content::websocket::WebSocket::protocol).
     pub fn protocols<I>(mut self, protocols: I) -> Self
     where
@@ -169,9 +165,8 @@ impl WebSocketUpgrade {
     /// Completes the handshake, calling `callback` with the [`WebSocket`] once
     /// the client connection has switched protocols.
     ///
-    /// The returned response must be the handler's return value; sending it
-    /// performs the protocol switch. The callback runs on its own task, which
-    /// owns the connection for as long as it runs.
+    /// Return the response from the handler to perform the protocol switch.
+    /// The callback runs in a separate task and owns the connection.
     ///
     /// # Errors
     ///

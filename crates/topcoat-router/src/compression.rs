@@ -15,11 +15,10 @@ use crate::{Body, response::Response};
 /// [`RouterBuilder::compression`](crate::RouterBuilder::compression) to tune
 /// or disable it.
 ///
-/// A response is passed through unchanged when the client accepts no enabled
-/// algorithm, or when compressing it would be wasteful or incorrect: it is
-/// already encoded (`Content-Encoding`), it is a range (`Content-Range`), its
-/// content type is an image (except SVG), a gRPC message, or an event stream,
-/// or its body is known to be smaller than [`min_size`](Self::min_size).
+/// Responses remain unchanged when the client accepts no enabled algorithm,
+/// the body is below [`min_size`](Self::min_size), or its headers indicate
+/// that it should not be compressed. This includes already encoded responses,
+/// range responses, and content types unsuitable for compression.
 ///
 /// # Examples
 ///
@@ -172,11 +171,9 @@ impl Default for Compression {
 pub enum CompressionLevel {
     /// The fastest quality, usually producing the biggest output.
     Fastest,
-    /// A speed-leaning quality suited to compressing responses on the fly.
+    /// A quality suited to compressing responses as they are served.
     ///
-    /// This is deliberately not each algorithm's own default: brotli's is its
-    /// highest quality, tuned for compressing assets ahead of time, and far
-    /// too slow to run per response.
+    /// Balances output size against the CPU time needed for each response.
     #[default]
     Balanced,
     /// The best quality, usually producing the smallest output. With brotli
@@ -190,9 +187,7 @@ pub enum CompressionLevel {
 impl CompressionLevel {
     /// Maps the level onto the middleware's equivalent.
     fn into_tower(self) -> tower_http::CompressionLevel {
-        /// The quality [`CompressionLevel::Balanced`] encodes with: level 4
-        /// for both gzip (of 0-9) and brotli (of 0-11) compresses at
-        /// rendering speed while brotli still beats gzip's best ratio.
+        /// The encoding quality used for [`CompressionLevel::Balanced`].
         const BALANCED_QUALITY: i32 = 4;
 
         match self {

@@ -10,19 +10,16 @@ use topcoat_core::{base_url::BaseUrl, context::AppContext};
 
 use crate::{
     Endpoint, EndpointIndex, Endpoints, Layer, Layout, Methods, OriginLayer, OriginPolicy, Page,
-    PageWithLayouts, Path, Route, Router, RouterInner, Routes, layers_for_path,
+    PageWithLayouts, Path, Route, Router, RouterInner, Routes, TrailingSlash, TrustedProxies,
+    layers_for_path,
 };
 
 /// Builds a [`Router`] for a Topcoat application.
 ///
-/// This is the common construction surface used by manual routing,
-/// auto-discovery, `module_router!`, and builder extension traits. Register
-/// [`page`](Self::page), [`layout`](Self::layout), [`layer`](Self::layer), and
-/// [`route`](Self::route) handlers directly, or let a discovery helper add
-/// them, then call [`build`](Self::build) once at the end.
+/// Register handlers directly or through discovery, configure the application,
+/// then call [`build`](Self::build).
 ///
-/// Builder extension traits add application-wide behavior before finalization,
-/// such as assets, cookies, or typed [`app_context`](Self::app_context) values.
+/// Integrations can provide extension traits with additional setup methods.
 ///
 /// # Examples
 ///
@@ -51,6 +48,8 @@ pub struct RouterBuilder {
     layers: Vec<Arc<dyn Layer>>,
     context: AppContext,
     origin_policy: OriginPolicy,
+    trusted_proxies: TrustedProxies,
+    trailing_slash: TrailingSlash,
     #[cfg(feature = "compression")]
     compression: crate::Compression,
 }
@@ -69,6 +68,8 @@ impl RouterBuilder {
             layers: Vec::new(),
             context,
             origin_policy: OriginPolicy::new(),
+            trusted_proxies: TrustedProxies::new(),
+            trailing_slash: TrailingSlash::default(),
             #[cfg(feature = "compression")]
             compression: crate::Compression::new(),
         }
@@ -183,12 +184,9 @@ impl RouterBuilder {
     /// Registers every layer annotated with `#[layer]` and collected at link
     /// time.
     ///
-    /// Unlike [`layer`](Self::layer), at most one discovered layer is allowed
-    /// per path. Link-time collection order is non-deterministic, so two
-    /// discovered layers sharing a path would have an undefined run order; this
-    /// rejects that rather than pick an arbitrary one. To stack several layers
-    /// on one path, register them explicitly with [`layer`](Self::layer), whose
-    /// order is well-defined.
+    /// Discovered layers must have unique paths because discovery does not
+    /// define their order. To stack layers at one path, register them explicitly
+    /// with [`layer`](Self::layer).
     ///
     /// # Panics
     ///
@@ -220,6 +218,29 @@ impl RouterBuilder {
         self
     }
 
+    /// Configures which reverse proxies can report the client's IP address.
+    ///
+    /// By default, [`client_ip`](crate::request::client_ip) returns the IP address of
+    /// the direct connection. Behind a reverse proxy, that is the proxy's
+    /// address. Use this method to trust your proxies so Topcoat can read the
+    /// client's address from their HTTP headers. See [`TrustedProxies`] for
+    /// how to choose the proxies and header to use.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use topcoat::router::{Router, TrustedProxies};
+    ///
+    /// let router = Router::builder()
+    ///     .trusted_proxies(TrustedProxies::new().networks(["10.0.0.0/8"]))
+    ///     .build();
+    /// ```
+    #[must_use]
+    pub fn trusted_proxies(mut self, trusted_proxies: TrustedProxies) -> Self {
+        self.trusted_proxies = trusted_proxies;
+        self
+    }
+
     /// Configures the compression applied to responses.
     ///
     /// By default the router compresses each response with the algorithm
@@ -242,16 +263,34 @@ impl RouterBuilder {
         self
     }
 
+    /// Configures how a request for the other trailing-slash form of a
+    /// route's path is handled.
+    ///
+    /// By default such a request is redirected to the form the route
+    /// declares: `/users/` to a page at `/users`, and `/users` to a page at
+    /// `/users/`. See [`TrailingSlash`] for the other policies.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use topcoat::router::{Router, TrailingSlash};
+    ///
+    /// let router = Router::builder()
+    ///     .trailing_slash(TrailingSlash::Serve)
+    ///     .build();
+    /// ```
+    #[must_use]
+    pub fn trailing_slash(mut self, trailing_slash: TrailingSlash) -> Self {
+        self.trailing_slash = trailing_slash;
+        self
+    }
+
     /// Registers the base URL the application is publicly reachable at, like
     /// `https://example.com`.
     ///
-    /// Relative URLs work anywhere within the site, but rendered content
-    /// that leaves it (e.g. links and images in emails, feeds, or sitemaps)
-    /// needs the absolute form. The base URL is stored on the app context;
-    /// read it back with [`base_url`](topcoat_core::base_url::base_url) (or
-    /// [`try_base_url`](topcoat_core::base_url::try_base_url)) and resolve
-    /// paths against it with
-    /// [`BaseUrl::join`](topcoat_core::base_url::BaseUrl::join).
+    /// This base is used when rendering absolute URLs. Read it with
+    /// [`base_url`](topcoat_core::base_url::base_url) and resolve application
+    /// paths against it with [`BaseUrl::join`](topcoat_core::base_url::BaseUrl::join).
     ///
     /// Accepts anything convertible into a [`BaseUrl`]. A string is parsed,
     /// so it must be an absolute `http` or `https` URL without a query or
@@ -279,10 +318,9 @@ impl RouterBuilder {
         }
     }
 
-    /// Registers a unique value that is accessible to every request sent to
-    /// this router by its type `T`. The top-level
-    /// [`app_context`](topcoat_core::context::app_context) function can be used to
-    /// retrieve a reference to this value via a request context.
+    /// Shares a value of type `T` across this router's requests.
+    ///
+    /// Borrow it with [`app_context`](topcoat_core::context::app_context).
     ///
     /// # Panics
     ///
@@ -336,8 +374,7 @@ impl RouterBuilder {
     /// [`app_context`](Self::app_context), or `None` if none has been
     /// registered.
     ///
-    /// Lets code that registers a shared value lazily check for it first, rather
-    /// than tripping the duplicate-registration panic on a second call.
+    /// Use this to check for an existing value before registering one.
     #[must_use]
     pub fn get_app_context<T>(&self) -> Option<&T>
     where
@@ -411,7 +448,7 @@ impl RouterBuilder {
                 });
 
             let route_index = routes.push(route, endpoint_index, layer_stack);
-            let route = &routes[route_index].route;
+            let route = &routes[route_index];
             let endpoint = &mut endpoints[endpoint_index];
 
             // An any-method route shares its path with specific-method routes
@@ -471,12 +508,16 @@ impl RouterBuilder {
             .cloned()
             .collect();
 
+        self.trailing_slash
+            .register_twins(&mut endpoints, &mut routes, &always_layers);
+
         Router::new(RouterInner {
             routes,
             endpoints,
             always_layers,
             app_context: Arc::new(self.context),
             origin: OriginLayer::new(self.origin_policy),
+            trusted_proxies: self.trusted_proxies,
             #[cfg(feature = "compression")]
             compression: self.compression,
         })

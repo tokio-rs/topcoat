@@ -138,8 +138,28 @@ jobs:
           cache: yarn
           cache-dependency-path: crates/topcoat-runtime/browser/yarn.lock
       - run: yarn install --frozen-lockfile
-      # Rebuild the bundle and fail if it drifts from the committed
-      # `dist/index.js` that the runtime crate serves via `asset!`.
+      - run: yarn lint
+      # Rebuild the browser and coherence bundles and reject stale artifacts.
+      - run: yarn build
+      - run: git diff --exit-code -- dist/index.js dist/coherence.js
+      - run: yarn test
+
+  dev:
+    name: dev
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crates/topcoat-cli/browser
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: crates/topcoat-cli/browser/yarn.lock
+      - run: yarn install --frozen-lockfile
+      - run: yarn lint
+      # The CLI embeds this bundle, so reject stale artifacts.
       - run: yarn build
       - run: git diff --exit-code -- dist/index.js
       - run: yarn test
@@ -163,7 +183,7 @@ jobs:
   release-plz-release:
     name: release
     runs-on: ubuntu-latest
-    needs: [release-pr-merge, test, clippy, fmt, docs, features, wasm, runtime, udeps]
+    needs: [release-pr-merge, test, clippy, fmt, docs, features, wasm, runtime, dev, udeps]
     if: >-
       github.repository == 'tokio-rs/topcoat'
       && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
@@ -248,7 +268,7 @@ jobs:
   release-plz-pr:
     name: release PR
     runs-on: ubuntu-latest
-    needs: [test, clippy, fmt, docs, features, wasm, runtime, udeps]
+    needs: [test, clippy, fmt, docs, features, wasm, runtime, dev, udeps]
     if: >-
       github.repository == 'tokio-rs/topcoat'
       && github.event_name == 'push'

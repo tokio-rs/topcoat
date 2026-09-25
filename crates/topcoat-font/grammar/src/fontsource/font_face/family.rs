@@ -10,8 +10,7 @@ use topcoat_font::fontsource::Family;
 /// A Fontsource font family, written as the name of its
 /// [`families`](topcoat_font::fontsource::families) constant (e.g. `ROBOTO`).
 ///
-/// Emits the constant's path, keeping the written ident's span so the compiler
-/// reports unknown names on it and editors autocomplete the catalog.
+/// Preserves the identifier's span for compiler errors and editor completion.
 pub struct FamilyName(Ident);
 
 impl FamilyName {
@@ -21,9 +20,7 @@ impl FamilyName {
         &self.0
     }
 
-    /// The catalog family the written name refers to, or `None` when there is
-    /// no [`families`](topcoat_font::fontsource::families) constant of that name: the
-    /// emitted path then fails to resolve and the compiler reports it.
+    /// Returns the named family, or `None` if it is absent from the catalog.
     #[must_use]
     pub fn family(&self) -> Option<&'static Family> {
         Family::by_ident(&self.0.to_string())

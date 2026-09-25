@@ -1,4 +1,4 @@
-A shard is a special type of component that can re-run whenever its inputs change in the browser. Arguments are runtime [expressions](macro.expr.html): the browser tracks the signals they read, and when one changes it requests a fresh render from the server and swaps the result into the DOM. A signal the shard body reads on the server counts as an input too. Shards are exposed as API endpoints from your server; arguments **must not be trusted**.
+A shard is a component that re-renders on the server when its inputs change in the browser. Pass fixed values or runtime [expressions](macro.expr.html) as arguments. Changes to signals read by those expressions, or by the shard body, trigger a render. Each shard has an HTTP endpoint, so **validate its inputs and authorize access inside the shard**.
 
 ```rust
 use topcoat::{Result, context::Cx, runtime::shard, view::{View, view}};
@@ -17,7 +17,7 @@ async fn search_results(cx: &Cx, query: String) -> Result<impl View> {
 
 # Calling Shards
 
-Inside a [`view!`] body, call a shard like a component, passing a runtime expression for each parameter:
+Inside a [`view!`] body, call a shard like a component. Each parameter accepts its declared type `T` or an `Expr<T>`, with conversion handled automatically:
 
 ```rust
 # use topcoat::{Result, context::Cx, view::*, runtime::{shard, signal, Event}};
@@ -31,17 +31,20 @@ Ok(view! {
     <input :value=$(query.get()) @input=$(|e: Event| query.set(e.target.value))>
 
     search_results(query: $(query.get()))
+    search_results(query: "shoes".to_owned())
 })
 # }
 ```
 
-During the page render the shard runs inline like any component: the server evaluates each argument expression once and embeds the resulting view in the page. No extra request happens.
+The initial page render includes the shard's content. It does not need a separate request. Live content inside a shard, such as a [`live!`] region, streams its updates with the page on that render and with the shard's own response on a re-render.
 
-When the `query` signal changes, the current argument values are sent to the server, the shard function runs again, and the returned HTML is morphed into the shard's previous content: elements that still exist are updated in place, so focus and what the user typed survive, and the rest of the page is untouched. Elements are matched by position and tag, and an `id` pins the match, so give the items of a list that can reorder an `id` and the morph follows each item to its new position instead of rewriting the items in between. Several signal changes in the same tick coalesce into one request, and starting a request aborts any earlier one still in flight, so the latest arguments win.
+When `query` changes, the browser sends the current arguments to the server and updates the shard with the returned HTML. Existing elements are updated in place to preserve focus and input state. The rest of the page is unchanged.
+
+Elements are matched by position and tag, or by `id` when present. Give items in a reorderable list stable IDs so each element follows its item. Signal changes in the same tick share one request. A new request aborts any earlier pending request, so the latest arguments win.
 
 # Shard State
 
-A shard's content is a full view: the shard can create signals, attach event handlers, and contain nested shards. A re-render rebuilds that content from the server's HTML, but the signals created in the shard body keep their values: their current values travel with every re-render request, and [`signal`] resumes from them instead of starting over. Those values are user input and **must not be trusted**, like the shard's arguments.
+A shard supports the same content as a component. Signals created in its body keep their values across re-renders. The browser sends those values with each request, and [`signal`] restores them. **Treat restored values as user input**, just like shard arguments.
 
 Reading one of those signals on the server with `.get()` or `.read()` makes the shard depend on it, so a change in the browser re-renders only that shard, not the entire page:
 
@@ -50,7 +53,7 @@ use topcoat::{Result, context::Cx, runtime::{shard, signal}, view::{View, view}}
 
 #[shard]
 async fn paginated(cx: &Cx) -> Result<impl View> {
-    let page = signal(cx, || 1.0);
+    let page = signal(cx, || 1usize);
     let items = load_page(cx, page.get()).await?;
 
     Ok(view! {
@@ -58,18 +61,22 @@ async fn paginated(cx: &Cx) -> Result<impl View> {
             <div>(item)</div>
         }
 
-        <button @click=$(|_e| page.decrement())>"previous"</button>
+        <button @click=$(|_e| {
+            if page.get() > 1 {
+                page.decrement()
+            }
+        })>"previous"</button>
         <button @click=$(|_e| page.increment())>"next"</button>
     })
 }
-# async fn load_page(_cx: &Cx, _page: f64) -> Result<Vec<String>> { Ok(vec![]) }
+# async fn load_page(_cx: &Cx, _page: usize) -> Result<Vec<String>> { Ok(vec![]) }
 ```
 
-The [runtime guide](../runtime/index.html#reading-signals-on-the-server) covers server-side reads in full, including the untracked variants and what a read outside any shard does to the page.
+See [Reading signals on the server](../runtime/index.html#reading-signals-on-the-server) for tracking rules.
 
 # Guards
 
-A shard has its own endpoint, and a request to it runs the shard function alone. Guards applied by the page or its layouts never run, so a shard that renders private content resolves authorization itself. The caller picks the argument values, so that check covers them too: confirm the current user may see the data the arguments select.
+A request to a shard's endpoint runs the shard without its page or layouts. Their guards do not protect it. Check authorization inside the shard, including whether the user may access the data selected by its arguments.
 
 ```rust
 use topcoat::{Result, context::Cx, runtime::shard, view::{View, view}};
@@ -96,15 +103,15 @@ The [`context`] module covers writing guards as functions on [`Cx`].
 
 Argument types must belong to the shared vocabulary of [`expr!`], since their values cross between Rust and JavaScript. The return type is a [`Result`] of a value implementing [`View`], like a component's.
 
-A parameter named `cx` borrowing [`Cx`] is special: just like in a component, it is filled from the request context on the server and does not take an argument at the call site.
+A parameter named `cx` of type `&Cx` receives the server request context. Callers omit this argument.
 
-A signal can also be passed as an argument, to a parameter typed [`Signal<T>`]. The argument is the signal handle, which does not change when its value does, so the shard does not re-render on a change unless its body reads the signal tracked. This is how to pass an input the shard does not track directly:
+A parameter typed [`Signal<T>`] accepts a signal handle. Passing the handle alone does not make the shard depend on its value. A tracked read in the shard body creates that dependency. Use an untracked read to use the value without triggering renders when it changes:
 
 ```rust
 # use topcoat::{Result, context::Cx, view::*, runtime::{shard, signal, Signal}};
-# async fn search_products(_cx: &Cx, _query: &str, _limit: f64) -> Result<Vec<String>> { Ok(vec![]) }
+# async fn search_products(_cx: &Cx, _query: &str, _limit: usize) -> Result<Vec<String>> { Ok(vec![]) }
 #[shard]
-async fn search_results(cx: &Cx, query: String, limit: Signal<f64>) -> Result<impl View> {
+async fn search_results(cx: &Cx, query: String, limit: Signal<usize>) -> Result<impl View> {
     // A new limit takes effect on the next re-render, but does not cause one.
     let products = search_products(cx, &query, limit.get_untracked()).await?;
 
@@ -118,30 +125,51 @@ async fn search_results(cx: &Cx, query: String, limit: Signal<f64>) -> Result<im
 # #[component]
 # async fn example(cx: &Cx) -> Result<impl View> {
 # let query = signal(cx, String::new);
-# let limit = signal(cx, || 10.0);
+# let limit = signal(cx, || 10usize);
 # Ok(view! {
-search_results(query: $(query.get()), limit: $(limit))
+search_results(query: $(query.get()), limit: limit)
 # })
 # }
 ```
 
 # Registration
 
-Each shard is served by a route on the [`Router`]. `.discover()` registers every shard linked into the binary; alternatively, mount shards individually:
+Register a shard on the [`Router`] so the browser can request new content. It implements [`Route`], so pass its name to `.route()`:
 
 ```rust
-# use topcoat::{Result, router::Router, runtime::{shard, RouterBuilderShardExt}, view::{View, view}};
+# use topcoat::{Result, router::Router, runtime::shard, view::{View, view}};
 # #[shard]
 # async fn search_results(query: String) -> Result<impl View> { Ok(view! { (query) }) }
-let router = Router::builder().shard(search_results).build();
+let router = Router::builder().route(search_results).build();
 ```
+
+With the `discover` feature enabled, `.discover()` registers all shards linked into the application.
+
+# Path
+
+Topcoat generates an internal path for each shard. This path can change between builds. To choose a stable endpoint, pass an absolute path to `#[shard]`:
+
+```rust
+use topcoat::{Result, runtime::shard, view::{View, view}};
+
+#[shard("/search/results")]
+async fn search_results(query: String) -> Result<impl View> {
+    Ok(view! { <p>"Results for " (query)</p> })
+}
+```
+
+The browser re-renders this shard with a `POST` request to `/search/results`. Arguments and signal values are sent in the request body, so the path cannot contain dynamic or catch-all parameters.
+
+The path follows the router's [path syntax](../router/index.html#paths). Groups affect layer matching but are omitted from the URL. For example, `#[shard("/(api)/search/results")]` serves re-render requests at `/search/results`.
 
 [`context`]: ../context/index.html
 [`Cx`]: ../context/struct.Cx.html
 [`Result`]: ../type.Result.html
+[`Route`]: ../router/trait.Route.html
 [`Router`]: ../router/struct.Router.html
 [`signal`]: fn.signal.html
 [`Signal<T>`]: struct.Signal.html
 [`expr!`]: macro.expr.html
+[`live!`]: ../view/macro.live.html
 [`view!`]: ../view/macro.view.html
 [`View`]: ../view/trait.View.html

@@ -1,24 +1,24 @@
 # Contributing to Topcoat
 
-Thanks for your interest in Topcoat. This guide is the short, human-facing version of how a change gets from your machine into the repository.
+This guide explains how to prepare and submit a change to Topcoat.
 
 ## Fixes are welcome, features need a conversation first
 
-If you found a bug and have a fix, or spotted a mistake, a broken link, or a confusing paragraph in the documentation, just open a pull request. You do not need to ask first, file an issue first, or wait for anyone.
+Open a pull request for a bug fix or documentation improvement. You do not need to discuss it first.
 
 If you want to build a feature, please talk to us in the [Tokio Discord](https://discord.gg/tokio) before you write the code.
 
-Topcoat is early in its development and we have a clear picture of where we want it to go. That means we have to be critical of every feature that lands: it has to fit the design, earn the API surface it adds, and be something we can maintain for years. Plenty of otherwise reasonable proposals do not clear that bar, and finding that out after you already wrote the code is the worst outcome for everyone. A short conversation up front is cheap, a rejected weekend of work is not.
+New features need to fit the framework's design and be maintainable over time. Discussing a proposal first helps you avoid writing code we cannot accept.
 
-The same goes for AI-assisted contributions. Using an agent to help write a change is fine, we do it too. But treat the result as your own work: read the code it touches, read the diff it produced, and be ready to explain and defend every line. If nobody has read a change before it arrives, we could have prompted for it ourselves, and all that is left for us is the review. Reviewing is the expensive part, and it does not scale.
+AI-assisted contributions are welcome. You are responsible for the result. Read the affected code and the full diff, verify the change, and be ready to explain it. Review the agent's work before asking a maintainer to review it.
 
-Small, focused pull requests are much easier to accept than large ones. If a change grows past a fix, that is usually the signal to open a conversation.
+Keep pull requests focused. If a fix grows into a new feature or a broader redesign, discuss the scope before continuing.
 
 ## Local setup
 
 Topcoat is a plain Cargo workspace. The framework crates live in `crates/`, small single-feature examples in `examples/`, and complete demo applications in `demos/`.
 
-A stable toolchain is enough to build and test everything. `rust-toolchain.toml` pins stable, and a nightly toolchain is required for the formatter and the doc check:
+Use the toolchain selected by `rust-toolchain.toml` to build and test. Formatting and documentation checks also need nightly:
 
 ```sh
 git clone https://github.com/tokio-rs/topcoat
@@ -34,7 +34,7 @@ Install the CLI from the workspace so `topcoat fmt` and the dev server match the
 cargo install --path crates/topcoat-cli
 ```
 
-The examples are the fastest way to try a change against a real app. Each one is a workspace member, so `topcoat dev` inside `examples/hello-world` (or any other example directory) builds and serves it. An example covers one feature; a demo in `demos/` is a whole application that puts many of them together, which is the better place to see how a change holds up in context.
+Try framework changes in an example or demo. Run `topcoat dev` in an example directory to build and serve it. Examples focus on individual features, while demos show how features work together in an app.
 
 ## Fork and branch
 
@@ -48,7 +48,7 @@ Pull requests are squash-merged, so you do not need to tidy up your commit histo
 
 ## Formatting, linting, and testing
 
-Run this before every pull request. It mirrors what CI does, so it saves you a round-trip:
+Run these checks before opening a pull request:
 
 ```sh
 cargo +nightly fmt --all # nightly is required, CI checks formatting with it
@@ -58,7 +58,7 @@ cargo test --workspace --all-features
 RUSTDOCFLAGS="--cfg docsrs -Dwarnings" cargo +nightly doc --workspace --all-features --no-deps --locked
 ```
 
-CI runs a few more jobs that are slower to reproduce locally. Run them if your change is likely to affect them:
+Run these additional checks when your change affects feature combinations or dependencies:
 
 ```sh
 # feature combinations that do not build (needs cargo-hack)
@@ -68,25 +68,27 @@ cargo hack clippy --workspace --each-feature --exclude-features stage-icons --no
 cargo +nightly udeps --workspace --all-targets --all-features --locked
 ```
 
-If you touched `crates/topcoat-runtime/browser`, the prebuilt browser bundle has to be rebuilt and committed alongside your source change. CI fails if it drifts:
+For browser changes, run the following commands from `crates/topcoat-runtime/browser` or `crates/topcoat-cli/browser`, depending on the project you changed. Changes to the shared code in `crates/topcoat-core/browser` need both projects checked and rebuilt. CI checks formatting, linting, tests, and that the committed bundles match their source:
 
 ```sh
-cd crates/topcoat-runtime/browser
 yarn install --frozen-lockfile
+yarn lint
 yarn build
 yarn test
 ```
+
+Commit the regenerated `dist/index.js` with the source changes. The runtime also builds `dist/coherence.js`, which must be committed when it changes.
 
 The full check list, including when each command is needed, is in the [`check`](.agents/skills/check/SKILL.md) skill.
 
 ## Code and documentation style
 
-Two conventions are worth knowing up front, because they show up in almost every diff:
+Follow these rules throughout the project:
 
 - Plain ASCII everywhere, in code, docs, and commit messages. Write `->` instead of an arrow character and `...` instead of an ellipsis, and avoid em dashes.
-- No `unsafe`, unless it comes from a reputable dependency.
+- Do not add unsafe code.
 
-Beyond that, match the code around you. The [`style`](.agents/skills/style/SKILL.md) skill covers the rest (module layout, dependency declarations, documentation wording), the [`prose`](.agents/skills/prose/SKILL.md) skill covers the guides in each crate's `docs/` directory, and the [`macro`](.agents/skills/macro/SKILL.md) skill covers the proc-macro crates.
+Match the surrounding code and follow the [`style`](.agents/skills/style/SKILL.md) skill. For guides, also read the [`prose`](.agents/skills/prose/SKILL.md) skill. For procedural macros, read the [`macro`](.agents/skills/macro/SKILL.md) skill.
 
 ## Commits and pull requests
 
@@ -96,21 +98,21 @@ Commit messages and pull request titles follow [Conventional Commits](https://ww
 <type>(<scope>): <subject>
 ```
 
-The type is one of `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`. The optional scope is the area you touched, usually a crate name with the `topcoat-` prefix dropped (`view`, `router`, `runtime`, `cli`, ..). The subject is imperative present tense, lowercase, with no trailing period:
+Choose a type that describes the change. Use an optional scope for the affected area, usually the crate name without `topcoat-`. Write the subject in lowercase imperative form, with no trailing period:
 
 ```
 fix(router): isolate request panics
 ```
 
-A CI job enforces this format on pull request titles, and since pull requests are squash-merged, the title becomes the landed commit and the changelog entry. `release-plz` derives version bumps from it, so pick the type deliberately: `feat` is a minor bump, `fix` a patch, and a `!` after the type or scope marks a breaking change, which also needs a `BREAKING CHANGE:` footer explaining how to migrate.
+CI checks pull request titles. The title becomes the squash commit message and determines how release tooling classifies the change. Mark a breaking change with `!` after the type or scope and add a `BREAKING CHANGE:` footer that explains how to migrate.
 
-There is no pull request template. Describe the whole diff rather than your last commit, say how you verified it, and reference any issue it closes (`Closes #123`). If you used an AI agent, mention which model and what it did. Reviewers know Topcoat and Rust, so keep the description short and high-signal.
+Describe the complete change, explain how you verified it, and reference any issue it closes (`Closes #123`). If you used an AI agent, name the model and describe its work. Keep the description concise and include what reviewers need to assess the change.
 
 More detail is in the [`commit`](.agents/skills/commit/SKILL.md) and [`pr`](.agents/skills/pr/SKILL.md) skills.
 
 ## Where to find things
 
-- [README](README.md): what Topcoat is, a guide index, and the roadmap.
+- [README](README.md): an introduction to Topcoat and an index of guides.
 - [`crates/topcoat/docs/getting_started.md`](crates/topcoat/docs/getting_started.md): building an app with Topcoat, which is worth doing before changing the framework.
 - [Tokio Discord](https://discord.gg/tokio): questions, feature discussions, and everything else.
 

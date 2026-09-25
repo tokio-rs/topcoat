@@ -1,22 +1,31 @@
 mod _bool;
 mod _f64;
 mod _str;
+mod array;
 mod event;
+mod integer;
 mod option;
 mod result;
+mod sequence;
 mod signal;
+mod slice;
 mod string;
 mod tuple;
+mod vec;
 
 pub use _bool::*;
 pub use _f64::*;
 pub use _str::*;
+pub use array::*;
 pub use event::*;
+pub use integer::*;
 pub use option::*;
 pub use result::*;
 use serde::{Deserialize, Serialize, de};
 pub use signal::*;
+pub use slice::*;
 pub use string::*;
+pub use vec::*;
 
 pub trait Surrogated {
     type Surrogate: Surrogate<Real = Self>;

@@ -10,14 +10,12 @@ use super::Builder;
 use crate::{View, ViewFirst, ViewHandle, ViewSwap};
 
 pin_project! {
-    /// A template as a [`View`]: its dynamic node positions driven
-    /// concurrently, and its instruction block built from their contents.
+    /// A [`View`] that renders dynamic nodes concurrently.
     ///
-    /// Every unit is driven toward its content; once all have resolved, the
-    /// burst runs, pushing the template's block into the buffer of the
-    /// build in one synchronous burst that splices the contents in position
-    /// order. After that the units' updates merge into one stream of swaps,
-    /// collected round-robin so one busy unit cannot starve its siblings.
+    /// Once every node has initial content, `burst` writes the template's
+    /// instruction block synchronously, inserting content in source order.
+    /// Later updates are polled round-robin so a busy node cannot starve
+    /// its siblings.
     pub struct JoinView<'cx, U, F> {
         cx: &'cx Cx,
         #[pin]
@@ -94,12 +92,10 @@ where
     }
 }
 
-/// The units a [`JoinView`] drives: one level of the template's position
-/// list.
+/// A list of views polled concurrently by [`JoinView`].
 ///
-/// The positions build different view types, so the expansion nests a
-/// [`JoinUnit`] per position, terminated by `()`. The contents come back in
-/// the same nested shape, destructured by the burst.
+/// Each [`JoinUnit`] holds one view and the rest of the list, ending in
+/// `()`. Resolved contents use the same nested structure.
 pub trait JoinUnits {
     /// The number of units in the list.
     const LEN: usize;
@@ -108,8 +104,7 @@ pub trait JoinUnits {
     /// `(ViewHandle, ...)` pairs terminated by `()`.
     type Contents;
 
-    /// Polls every unit still waiting toward its content; ready when all
-    /// have resolved, or with the first unit's error.
+    /// Polls pending units until all have initial content or one fails.
     fn poll_contents(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>>;
 
     /// Takes the resolved contents out of the units.
@@ -118,9 +113,8 @@ pub trait JoinUnits {
     /// Whether any unit may still update.
     fn is_live(&self) -> bool;
 
-    /// Polls the units at positions `from..to` for the next swap, yielded
-    /// with its position, or for `None` once every unit in the range has no
-    /// further updates.
+    /// Polls units in `from..to` for an update and returns its position.
+    /// Returns `None` when every unit in the range has finished.
     fn poll_swap_range(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -272,8 +266,10 @@ where
 mod tests {
     use std::task::Waker;
 
+    use topcoat_core::identity::{Identity, SiteKey};
+
     use super::*;
-    use crate::{RegionId, region::RegionScope};
+    use crate::RegionId;
 
     /// A live view that delivers one swap for its region per poll, a fixed
     /// number of times.
@@ -308,9 +304,12 @@ mod tests {
 
     #[test]
     fn swaps_are_collected_round_robin() {
-        let mut counter = 1;
-        let _regions = RegionScope::new(&mut counter);
-        let (a, b, c) = (RegionId::next(), RegionId::next(), RegionId::next());
+        let [a, b, c] = [0, 1, 2].map(|ordinal| {
+            RegionId::new(
+                Identity::ROOT,
+                SiteKey::new(file!(), line!(), column!(), ordinal),
+            )
+        });
 
         let ticker = |region, remaining| Ticker { region, remaining };
         let units = JoinUnit::new(

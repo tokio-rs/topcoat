@@ -5,9 +5,8 @@ use topcoat_core::fnv1a::Fnv1a;
 
 /// A font weight: an integer in `100..=900`.
 ///
-/// These are the standard CSS `font-weight` values, from `100` (Thin) to `900`
-/// (Black), in steps of `100`. Intermediate values are also permitted for
-/// variable fonts. [`FontWeight::default`] is `400` (Normal).
+/// Named constants cover weights in steps of `100`. Intermediate values are
+/// also accepted for variable fonts. The default is `400` (Normal).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FontWeight(u16);
 

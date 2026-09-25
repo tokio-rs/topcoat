@@ -25,10 +25,13 @@ quote.workspace = true
 syn = { workspace = true, features = ["full"] }
 
 [dev-dependencies]
-topcoat = { workspace = true, features = ["asset", "router", "runtime", "view"] }
+topcoat = { workspace = true, features = ["asset", "router", "runtime", "view", "websocket"] }
 
+futures-util.workspace = true
 http.workspace = true
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+serde_json.workspace = true
+tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread"] }
+tokio-tungstenite = { workspace = true, features = ["connect"] }
 
 [lints]
 workspace = true

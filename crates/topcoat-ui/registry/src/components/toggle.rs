@@ -12,15 +12,12 @@ pub enum ToggleKind {
     /// A toggle that presses and unpresses on its own, like a checkbox.
     #[default]
     Independent,
-    /// A toggle of which only one in its group can be pressed, like a radio
-    /// button. This is the segmented control: pressing one lets go of the
-    /// rest.
+    /// A radio-style toggle. Only one toggle with the same name can be selected.
     Exclusive,
 }
 
 impl ToggleKind {
-    /// The `type` of the underlying `<input>`, which is what makes the
-    /// browser keep the pressed state this kind calls for.
+    /// The native input type that manages this toggle's selection behavior.
     fn input_type(self) -> PromotedStr {
         match self {
             Self::Independent => PromotedStr(&"checkbox"),
@@ -45,27 +42,20 @@ pub enum ToggleSize {
 }
 
 impl ToggleSize {
-    /// The Tailwind classes for this size.
-    ///
-    /// The sizes line up with the button's, so a toggle sits in a row of
-    /// buttons without standing out.
+    /// Classes for the toggle dimensions.
     fn classes(self) -> StaticClass {
         match self {
-            Self::Sm => class!("h-8 gap-1.5 rounded-md px-2 text-xs"),
-            Self::Md => class!("h-9 gap-2 rounded-lg px-3 text-sm"),
-            Self::Lg => class!("h-10 gap-2 rounded-lg px-4 text-base"),
+            Self::Sm => class!("h-8 gap-1.5 rounded-md px-2"),
+            Self::Md => class!("h-9 gap-2 rounded-lg px-3"),
+            Self::Lg => class!("h-10 gap-2 rounded-lg px-4"),
         }
     }
 }
 
-/// The classes shared by every toggle, regardless of size.
-///
-/// The state lives in an `<input>` the label wraps, so the label styles
-/// itself from the state of the control inside it: tinted while pressed, rung
-/// while the control has keyboard focus, and faded while it is disabled.
+/// Classes that style the label from its input's checked, focused, and disabled states.
 const BASE: StaticClass = class!(
     "inline-flex shrink-0 cursor-pointer items-center justify-center border \
-     border-transparent font-medium whitespace-nowrap transition-colors select-none \
+     border-transparent text-sm font-medium whitespace-nowrap transition-colors select-none \
      text-muted-foreground hover:bg-foreground/5 hover:text-foreground \
      has-[:checked]:bg-foreground/10 has-[:checked]:text-foreground \
      has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring \
@@ -73,16 +63,14 @@ const BASE: StaticClass = class!(
      has-[:disabled]:pointer-events-none has-[:disabled]:opacity-50",
 );
 
-/// A toggle component: a button that stays pressed.
+/// A control that stays pressed when selected.
 ///
-/// The pressed state is the browser's to keep: the toggle is a `<label>`
-/// around a hidden `<input>`, so it needs no scripting and submits with the
-/// form around it. The `kind` decides which input that is, and so whether the
-/// toggle presses on its own or lets go of the others in its group; the
-/// `name` among the `attrs` is what forms the group. Child nodes become the
-/// toggle's content, and the `attrs` (such as `name`, `value`, `checked`, or
-/// `disabled`) are forwarded to the `<input>`; a `class` among them is
-/// appended to the label's computed classes.
+/// The native input manages selection without JavaScript and submits its value with the
+/// surrounding form. Use `kind` to choose independent or exclusive selection. Exclusive
+/// toggles form a group through a shared `name` attribute.
+///
+/// Pass the label as children and input attributes through `attrs`. Classes apply to
+/// the wrapping label, while other attributes go on the `<input>`.
 ///
 /// ```ignore
 /// view! {
@@ -119,11 +107,10 @@ pub async fn toggle(
     })
 }
 
-/// A row of [`toggle`]s that belong together.
+/// A row of related toggles.
 ///
-/// The group is a rail the toggles sit in, which reads as one control rather
-/// than as loose buttons. It only lays them out: what ties exclusive toggles
-/// together is still the `name` they share.
+/// This component only arranges the controls. Give exclusive toggles the same `name`
+/// attribute to make them a selection group.
 ///
 /// ```ignore
 /// view! {
@@ -147,8 +134,7 @@ pub async fn toggle_group(
     Ok(view! {
         <div
             class=(class!(
-                "inline-flex w-fit items-center gap-1 rounded-lg border border-border p-1 \
-                 shadow-xs",
+                "inline-flex w-fit items-center gap-1 rounded-lg border border-border p-1",
                 attrs.remove("class"),
             ))
             (attrs)

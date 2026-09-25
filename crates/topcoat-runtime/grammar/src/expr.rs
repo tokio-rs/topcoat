@@ -19,27 +19,30 @@ mod expr_path;
 mod expr_return;
 mod expr_unary;
 mod expr_while;
+mod js;
 mod name_resolver;
 mod pat;
 mod stmt;
 
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use topcoat_core_grammar::paths::topcoat_runtime;
 
-use crate::expr::name_resolver::NameResolver;
+use crate::expr::{js::Js, name_resolver::NameResolver};
 
-/// The top-level `expr! { ... }` AST. A thin wrapper around `syn::Expr`; the
-/// whitelist of supported shapes is enforced when lowering to tokens.
+/// A parsed `expr! { ... }` body. Lowering checks which expression forms
+/// are supported.
 pub struct Expr {
-    inner: syn::Expr,
+    pub inner: syn::Expr,
+    pub comma_token: Option<syn::Token![,]>,
 }
 
 impl Parse for Expr {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
             inner: input.parse()?,
+            comma_token: input.parse()?,
         })
     }
 }
@@ -53,7 +56,7 @@ impl Expr {
     /// local binding cannot be resolved.
     pub fn expr_to_tokens(&self) -> syn::Result<TokenStream> {
         let mut rust = TokenStream::new();
-        let mut js = String::new();
+        let mut js = Js::default();
         let mut names = NameResolver::default();
         Self::dispatch(&self.inner, &mut rust, &mut js, &mut names)?;
 
@@ -61,64 +64,27 @@ impl Expr {
             rust = quote! { #topcoat_runtime::Surrogate::into_real(#rust) }
         }
 
-        // Identifiers referenced but not declared by the expression are
-        // captured from the surrounding Rust scope. Their values are encoded
-        // into the JavaScript source at runtime as `const` bindings, declared
-        // ahead of the returned expression.
-        //
-        // A capture is cloned into the expression, so the surrounding scope
-        // keeps its value and any number of expressions can capture the
-        // same one. Every vocabulary type is cheap to clone, and a signal
-        // shares its value between clones.
+        // Clone each capture once. Its JavaScript is inlined at each use;
+        // its cached server value becomes an ordinary surrogate local.
         let externals = names.externals();
+        let captures = externals.iter().map(|binding| {
+            let ident = &binding.rust_ident;
+            let value = &binding.value;
+            quote! { let #ident = #value; }
+        });
+        let values = externals.iter().map(|binding| {
+            let ident = &binding.rust_ident;
+            quote! { let #ident = #ident.into_captured_value(); }
+        });
 
-        if externals.is_empty() {
-            Ok(quote! {
-                #topcoat_runtime::Expr::new(#rust, #topcoat_runtime::Js::source(#js))
-            })
-        } else {
-            let rust_external_idents = externals.iter().map(|binding| &binding.rust_ident);
-            let rust_external_values = externals.iter().map(|binding| {
-                let ident = &binding.original_ident;
-                quote! {
-                    #topcoat_runtime::Surrogated::into_surrogate(
-                        ::core::clone::Clone::clone(&#ident),
-                    )
-                }
-            });
-
-            let mut js_head = "(() => { const [".to_owned();
-            for (index, binding) in externals.iter().enumerate() {
-                js_head += &binding.js_name;
-                if index < externals.len() - 1 {
-                    js_head += ", ";
-                }
-            }
-            js_head += "] = [";
-
-            let mut js_externals = TokenStream::new();
-            for (index, binding) in externals.iter().enumerate() {
-                let rust_ident = &binding.rust_ident;
-                quote! { .surrogate(&#rust_ident) }.to_tokens(&mut js_externals);
-                if index < externals.len() - 1 {
-                    quote! { .raw(", ") }.to_tokens(&mut js_externals);
-                }
-            }
-
-            let js_tail = "]; return ".to_owned() + &js + "; })()";
-
-            Ok(quote! {{
-                let (#(#rust_external_idents,)*) = (#(#rust_external_values,)*);
-                // The source serializes the surrogates by reference, so it
-                // is built before the Rust expression consumes them.
-                let __js = #topcoat_runtime::Js::builder()
-                    .raw(#js_head)
-                    #js_externals
-                    .source(#js_tail)
-                    .build();
-                #topcoat_runtime::Expr::new(#rust, __js)
-            }})
-        }
+        Ok(quote! {{
+            #(#captures)*
+            let __js = #js;
+            #topcoat_runtime::Expr::evaluate(|| {
+                #(#values)*
+                #rust
+            }, __js)
+        }})
     }
 
     /// Lowers a single `syn::Expr` into a Rust value (`rust`) and the
@@ -126,12 +92,12 @@ impl Expr {
     fn dispatch(
         expr: &syn::Expr,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
         match expr {
             syn::Expr::Await(inner) => Self::expr_await(inner, rust, js, names)?,
-            syn::Expr::Lit(inner) => Self::expr_lit(inner, rust, js)?,
+            syn::Expr::Lit(inner) => Self::expr_lit(inner, rust, js, names)?,
             syn::Expr::Paren(inner) => Self::expr_paren(inner, rust, js, names)?,
             syn::Expr::Binary(inner) => Self::expr_binary(inner, rust, js, names)?,
             syn::Expr::Unary(inner) => Self::expr_unary(inner, rust, js, names)?,
@@ -152,5 +118,37 @@ impl Expr {
             other => return Err(syn::Error::new_spanned(other, "unsupported expression")),
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn optional_trailing_comma_preserves_the_expression() {
+        for source in [
+            "true",
+            "if dark.get() { \"Light\" } else { \"Dark\" }",
+            "|_e| open.toggle()",
+            "async |_e| submit().await",
+        ] {
+            let plain: Expr = syn::parse_str(source).unwrap();
+            let trailing: Expr = syn::parse_str(&format!("{source},")).unwrap();
+
+            assert!(plain.comma_token.is_none());
+            assert!(trailing.comma_token.is_some());
+            assert_eq!(
+                plain.expr_to_tokens().unwrap().to_string(),
+                trailing.expr_to_tokens().unwrap().to_string(),
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_missing_or_multiple_expressions() {
+        for source in ["", ",", "true, false", "true,,", "true;"] {
+            assert!(syn::parse_str::<Expr>(source).is_err(), "{source}");
+        }
     }
 }

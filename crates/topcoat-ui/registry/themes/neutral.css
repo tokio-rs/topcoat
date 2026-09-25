@@ -6,6 +6,10 @@
 
      --background              the page background
      --foreground              text and iconography on the background
+     --card                    cards and panel backgrounds
+     --card-foreground         text and iconography on cards and panels
+     --popover                 floating menu and popover backgrounds
+     --popover-foreground      text and iconography on floating surfaces
      --muted-foreground        secondary text: captions, descriptions, placeholders
      --primary                 the emphasis color: primary actions, selection, highlights
      --primary-foreground      text on a primary-filled surface
@@ -13,12 +17,20 @@
      --destructive-foreground  text on a destructive-filled surface
      --border                  hairline borders and dividers
      --ring                    the focus ring
-     --shadow-xs               a subtle shadow for controls: buttons, inputs
+     --sidebar                 the sidebar background
+     --sidebar-foreground      sidebar text and icons
+     --sidebar-primary         primary actions inside the sidebar
+     --sidebar-primary-foreground  text on sidebar primary actions
+     --sidebar-accent          sidebar hover and selected backgrounds
+     --sidebar-accent-foreground   text on sidebar accents
+     --sidebar-border          sidebar borders and dividers
+     --sidebar-ring            sidebar focus rings
+     --shadow-xs               a subtle shadow for raised controls
      --shadow-sm               a shadow for raised surfaces: cards, menus
 
-   Interactive states (hover, press) have no tokens of their own: components
-   derive them by applying the fill or foreground color at reduced opacity,
-   which adapts to both color schemes automatically.
+   Components derive hover and press states from their fill or foreground
+   color at reduced opacity. The sidebar has its own accent token for
+   interactive rows, so it can be themed independently.
 
    The Geist font is not bundled here; provide it with topcoat-font. */
 
@@ -39,6 +51,10 @@
   --font-sans: "Geist", sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
   --color-muted-foreground: var(--muted-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
@@ -46,13 +62,25 @@
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
   --shadow-xs: var(--shadow-xs);
   --shadow-sm: var(--shadow-sm);
 }
 
 :root {
-  --background: oklch(0.995 0.003 260);
+  --background: oklch(0.9875 0.003 260);
   --foreground: oklch(0.24 0.012 260);
+  --card: oklch(0.995 0.003 260);
+  --card-foreground: oklch(0.24 0.012 260);
+  --popover: oklch(0.995 0.003 260);
+  --popover-foreground: oklch(0.24 0.012 260);
   --muted-foreground: oklch(0.51 0.014 260);
   --primary: oklch(0.21 0.02 260);
   --primary-foreground: oklch(0.985 0.003 260);
@@ -60,6 +88,14 @@
   --destructive-foreground: oklch(0.99 0.012 27);
   --border: oklch(0.9 0.008 260);
   --ring: oklch(0.32 0.02 260);
+  --sidebar: oklch(0.995 0.003 260);
+  --sidebar-foreground: oklch(0.24 0.012 260);
+  --sidebar-primary: oklch(0.21 0.02 260);
+  --sidebar-primary-foreground: oklch(0.985 0.003 260);
+  --sidebar-accent: color-mix(in oklab, var(--sidebar-foreground) 10%, var(--sidebar));
+  --sidebar-accent-foreground: oklch(0.24 0.012 260);
+  --sidebar-border: oklch(0.9 0.008 260);
+  --sidebar-ring: oklch(0.32 0.02 260);
   --shadow-xs: 0 1px 2px oklch(0.24 0.02 260 / 12%);
   --shadow-sm:
     0 1px 2px oklch(0.24 0.02 260 / 10%),
@@ -69,6 +105,10 @@
 .dark {
   --background: oklch(0.17 0.012 260);
   --foreground: oklch(0.93 0.006 260);
+  --card: oklch(0.22 0.012 260);
+  --card-foreground: oklch(0.93 0.006 260);
+  --popover: oklch(0.22 0.012 260);
+  --popover-foreground: oklch(0.93 0.006 260);
   --muted-foreground: oklch(0.68 0.012 260);
   --primary: oklch(0.92 0.008 260);
   --primary-foreground: oklch(0.21 0.015 260);
@@ -76,6 +116,14 @@
   --destructive-foreground: oklch(0.14 0.02 25);
   --border: oklch(0.3 0.012 260);
   --ring: oklch(0.6 0.02 260);
+  --sidebar: oklch(0.22 0.012 260);
+  --sidebar-foreground: oklch(0.93 0.006 260);
+  --sidebar-primary: oklch(0.92 0.008 260);
+  --sidebar-primary-foreground: oklch(0.21 0.015 260);
+  --sidebar-accent: color-mix(in oklab, var(--sidebar-foreground) 10%, var(--sidebar));
+  --sidebar-accent-foreground: oklch(0.93 0.006 260);
+  --sidebar-border: oklch(0.3 0.012 260);
+  --sidebar-ring: oklch(0.6 0.02 260);
   --shadow-xs: 0 1px 2px oklch(0 0 0 / 35%);
   --shadow-sm:
     0 1px 2px oklch(0 0 0 / 35%),

@@ -1,17 +1,12 @@
-//! Hoisted parts: content a body pushes while it runs, emitted ahead of the
-//! content the enclosing view resolves next.
+//! Hoisted parts render before the enclosing view's next content.
 //!
-//! A body sometimes produces markup that belongs at the start of its
-//! content rather than at the point the body reached: a marker declaring
-//! state, say, that has to come before everything reading it. [`hoist`]
-//! takes such a part while a body runs, and the [`HoistView`] around the
-//! body prepends everything hoisted to the next content it resolves: its
-//! first content, or the replacement of a later swap.
+//! Call [`hoist`] while rendering to collect a part. The enclosing
+//! [`HoistView`] places collected parts before its initial content or
+//! next replacement, in the order they were collected.
 //!
-//! The collecting view travels through a thread local installed for exactly
-//! the duration of each poll, the way an identity does, so views that
-//! interleave on one task never collect each other's parts, and a part goes
-//! to the innermost view collecting when it is hoisted.
+//! Each part belongs to the innermost active collection. Collections are
+//! active only during their view's polls, so interleaved views do not
+//! collect each other's parts.
 
 use std::{
     cell::Cell,
@@ -33,9 +28,8 @@ type HoistedPart = Box<dyn FnOnce(&mut PartsWriter<'_>) + Send>;
 
 /// The key of a part hoisted at most once per content.
 ///
-/// A key is the 128-bit hash of any hashable value. Parts of different
-/// kinds keep their keys apart by hashing something that names the kind
-/// next to the id, such as a type id or a tag string.
+/// Include a type or tag in the key to distinguish different kinds of part
+/// that happen to share an id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HoistKey(u128);
 
@@ -72,18 +66,14 @@ thread_local! {
 
 /// Hoists a part into the content of the enclosing view.
 ///
-/// `build` pushes the part through the writer of the node position it lands
-/// in, so a comment marker goes through
-/// [`push_comment`](PartsWriter::push_comment) and text through
-/// [`push_str`](PartsWriter::push_str). The part renders ahead of the next
-/// content the enclosing [`HoistView`] resolves, in the order the parts were
-/// hoisted.
+/// `build` receives a writer for node content. Use its methods to select
+/// the appropriate HTML context. The part renders before the enclosing
+/// [`HoistView`]'s next content, in the order parts were hoisted.
 ///
 /// # Panics
 ///
-/// Panics if no view is collecting hoisted parts, which is the case outside
-/// a page, layout, component, or shard body, and inside work those bodies
-/// spawn onto another task.
+/// Panics if no view is collecting hoisted parts. Spawned tasks do not
+/// inherit the collection.
 #[track_caller]
 pub fn hoist(build: impl FnOnce(&mut PartsWriter<'_>) + Send + 'static) {
     with_collecting(|hoisted| hoisted.parts.push(Box::new(build)));
@@ -92,12 +82,9 @@ pub fn hoist(build: impl FnOnce(&mut PartsWriter<'_>) + Send + 'static) {
 /// Hoists a part into the content of the enclosing view unless a part with
 /// the same key was already hoisted into that content.
 ///
-/// This is for a part whose repetition carries no information, such as a
-/// marker that the content depends on some state: however many times the
-/// body reaches it, the content renders it once. The content a later swap
-/// resolves starts fresh, so the same key hoists again into the swap's
-/// replacement. `build` runs only when the part is hoisted; otherwise the
-/// rules of [`hoist`] apply.
+/// Use this when repeated parts have the same meaning. Each replacement
+/// starts a fresh collection, so the same key may appear in a later update.
+/// `build` runs only for a part that is kept. Otherwise, [`hoist`]'s rules apply.
 ///
 /// # Panics
 ///
@@ -161,13 +148,9 @@ pin_project! {
     /// Collects the parts hoisted while a view polls and prepends them to
     /// the content it resolves.
     ///
-    /// A body wrapped in one, together with the view it returns, may call
-    /// [`hoist`] at any point. Parts hoisted before the first content
-    /// resolves render ahead of that content; parts hoisted later render
-    /// ahead of the next swap's replacement. Each poll installs the
-    /// collection for exactly its duration, so a nested `HoistView` polled
-    /// inside collects its own parts and hands the outer one back
-    /// afterwards.
+    /// Calls to [`hoist`] during a poll add parts to this view's collection.
+    /// They render before the next initial content or replacement.
+    /// A nested `HoistView` collects its own parts while it is being polled.
     pub struct HoistView<V> {
         #[pin]
         view: V,
@@ -254,7 +237,10 @@ mod tests {
         task::Waker,
     };
 
-    use topcoat_core::context::Cx;
+    use topcoat_core::{
+        context::Cx,
+        identity::{Identity, SiteKey},
+    };
 
     use super::*;
     use crate::{RegionId, internal::ScopeView};
@@ -317,7 +303,7 @@ mod tests {
             // A swap resolves after the first content was sealed, with no
             // build running, so its replacement is self-contained.
             Poll::Ready(Ok(Some(ViewSwap {
-                region: RegionId::next(),
+                region: RegionId::new(Identity::ROOT, SiteKey::new(file!(), line!(), column!(), 0)),
                 replacement: ViewBuffer::build(|writer| {
                     writer.push_static_str("replacement");
                 }),
@@ -546,7 +532,7 @@ mod tests {
             }
             Self::hoist_twice();
             Poll::Ready(Ok(Some(ViewSwap {
-                region: RegionId::next(),
+                region: RegionId::new(Identity::ROOT, SiteKey::new(file!(), line!(), column!(), 0)),
                 replacement: ViewBuffer::build(|writer| {
                     writer.push_static_str("replacement");
                 }),

@@ -3,16 +3,8 @@ use topcoat::{
     view::{Attributes, StaticClass, View, class, component, view},
 };
 
-/// The classes for the [`progress`] bar.
-///
-/// The element is a native `<progress>`, restyled through its
-/// vendor-prefixed pseudo-elements so it looks the same across browsers: the
-/// track is the element itself (the `::-webkit-progress-bar` layer is
-/// cleared to let it show through), and the filled portion is rounded and
-/// painted with the primary color. Browsers styled through the
-/// `::-webkit-*` pseudo-elements only expose the filled portion while a
-/// value is set, so the indeterminate state renders as a static empty track
-/// there; Firefox keeps its animated bar.
+/// Classes for the native progress track and fill. Indeterminate animation depends on
+/// the browser and may appear as an empty track.
 const PROGRESS: StaticClass = class!(
     "h-2 w-full appearance-none overflow-hidden rounded-full \
      bg-foreground/10 [&::-webkit-progress-bar]:bg-transparent \
@@ -21,14 +13,14 @@ const PROGRESS: StaticClass = class!(
      [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-primary",
 );
 
-/// A progress component: a themed native `<progress>` bar.
+/// A native progress bar.
 ///
-/// `value` is the completed amount, out of `max` (defaulting to 100, so a
-/// plain value reads as a percentage). Omitting `value` renders the
-/// indeterminate state, for work whose extent is unknown. The `attrs` (such
-/// as `class` or `aria-label`) are forwarded to the `<progress>`; a `class`
-/// among them is appended to the computed classes. The bar fills its
-/// container, so size it through the container or with a width class.
+/// `value` is the completed amount out of `max`, which defaults to 100. Omit `value`
+/// when the total work is unknown. The indeterminate appearance depends on the browser.
+///
+/// `attrs` are forwarded to the `<progress>`, with extra classes added to its classes.
+/// Give it an accessible label through `aria-label` or an associated label element. The
+/// bar fills its container by default.
 ///
 /// ```ignore
 /// view! {

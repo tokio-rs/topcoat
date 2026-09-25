@@ -1,16 +1,10 @@
 //! Aborting a future early with a value.
 //!
-//! Sometimes work running deep inside a future needs to stop the whole future
-//! and hand a value back to its caller, without threading that value up through
-//! the `Output` type of every intermediate future. This module makes that
-//! possible:
-//!
-//! - [`WatchAbort`] wraps a future and watches a shared [`AbortStore`].
-//! - Any code running inside that future calls [`abort`] to stash a value in the store and stop
-//!   making progress.
-//! - The wrapping [`WatchAbort`] then resolves to [`MaybeAborted::Aborted`] carrying that value,
-//!   dropping the rest of the wrapped future. If no abort happens, it resolves to
-//!   [`MaybeAborted::Completed`] with the future's normal output.
+//! Wrap a future in [`WatchAbort`] and give it an [`AbortStore`]. Code inside
+//! the future can call [`abort`] with the same store to stop the work and
+//! return a value through [`MaybeAborted::Aborted`]. The wrapped future is
+//! dropped. If the work finishes normally, the result is
+//! [`MaybeAborted::Completed`].
 //!
 //! The value travels as a type-erased `Box<dyn Any>`, so the watcher recovers
 //! the concrete type with [`downcast`](Box::downcast).
@@ -61,9 +55,8 @@ pub enum MaybeAborted<T> {
 /// A one-shot slot shared between a [`WatchAbort`] and the [`abort`] calls
 /// running inside it.
 ///
-/// It holds the value handed over by an abort until the watching [`WatchAbort`]
-/// takes it out. Aborting the same store more than once before it is observed is
-/// a bug and panics.
+/// Holds an abort value until [`WatchAbort`] takes it. A second abort before
+/// the value is taken panics.
 #[derive(Default)]
 pub struct AbortStore {
     inner: Mutex<Option<Box<dyn Any + Send + Sync>>>,
@@ -137,9 +130,8 @@ where
 /// A future that stores `value` into the [`AbortStore`] and then never
 /// completes.
 ///
-/// On its first poll it deposits the value and yields, leaving the surrounding
-/// [`WatchAbort`] to observe the abort and resolve. This is the building block
-/// behind [`abort`].
+/// The first poll stores the value and yields. [`WatchAbort`] then observes
+/// the value and stops the wrapped future.
 pub struct Abort<'a> {
     store: &'a AbortStore,
     value: Option<Box<dyn Any + Send + Sync>>,
@@ -167,9 +159,9 @@ impl Future for Abort<'_> {
 
 /// Abort the surrounding [`WatchAbort`] with `value`.
 ///
-/// Stashes `value` in `store` and yields so the watching [`WatchAbort`] can pick
-/// it up and resolve to [`MaybeAborted::Aborted`]. This call never returns: the
-/// future it lives in stops at this point and is dropped.
+/// Stores `value` and yields to [`WatchAbort`], which returns
+/// [`MaybeAborted::Aborted`]. This call never returns. The surrounding future
+/// stops here and is dropped by the watcher.
 pub async fn abort(store: &AbortStore, value: Box<dyn Any + Send + Sync>) -> ! {
     match Abort::new(store, value).await {}
 }

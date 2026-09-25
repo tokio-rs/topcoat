@@ -2,19 +2,18 @@ use std::path::{Path, PathBuf};
 
 use super::state::STATE_FILE;
 
-/// The cargo crate a management operation acts on. Every relative path in the
-/// install state (the components directory and installed file paths) is relative
-/// to the crate root (the directory that holds `components.toml`), so operations
-/// behave the same regardless of the working directory.
+/// The Cargo package whose components are being managed. Install-state paths are
+/// relative to its root, independent of the working directory.
 pub struct Package {
     root: PathBuf,
 }
 
 impl Package {
-    /// Locates the crate root. When `package` names a workspace member (like
-    /// `cargo -p`), its manifest directory is used; otherwise the cargo crate
-    /// root containing the current directory is used, falling back to the
-    /// current directory itself when it is not inside a crate.
+    /// Locates the package root.
+    ///
+    /// If `package` is set, selects that workspace member. Otherwise, uses the crate
+    /// containing the current directory, or the current directory itself when outside a
+    /// crate.
     ///
     /// # Errors
     ///
@@ -104,8 +103,7 @@ struct MetadataPackage {
     manifest_path: PathBuf,
 }
 
-/// The root of the cargo crate containing `dir`, if it is inside one. Uses
-/// `cargo locate-project` so no JSON parsing or async runtime is required.
+/// Finds the Cargo crate containing `dir`, if any.
 fn crate_root(dir: &Path) -> Option<PathBuf> {
     let output = std::process::Command::new("cargo")
         .args(["locate-project", "--message-format", "plain"])

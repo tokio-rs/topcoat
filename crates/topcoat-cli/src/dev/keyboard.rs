@@ -3,12 +3,10 @@ use std::{future::pending, thread};
 use console::{Key, Term};
 use tokio::sync::mpsc;
 
-/// Listens for the manual reload key on the terminal.
+/// Reports presses of the manual rebuild key, `r`.
 ///
-/// Reads single keys from stdin on a background thread and reports each press
-/// of `r`, the manual reload shortcut. Active only when attached to an
-/// interactive terminal; otherwise [`Self::reload_requested`] never resolves,
-/// leaving the event loop driven entirely by file changes.
+/// Only listens on an interactive terminal. Without one, [`Self::reload_requested`]
+/// remains pending.
 pub struct Keyboard {
     /// `None` when there is no terminal to read keys from.
     presses: Option<mpsc::UnboundedReceiver<()>>,
@@ -40,20 +38,15 @@ impl Keyboard {
         }
     }
 
-    /// Whether keypresses are being listened for, and so the shortcut is worth
-    /// announcing.
+    /// Whether an interactive terminal is available for keypresses.
     pub fn is_listening(&self) -> bool {
         self.presses.is_some()
     }
 
-    /// Wait until the manual reload key (`r`) is pressed.
+    /// Waits for the manual rebuild key, `r`.
     ///
-    /// Resolves once per press. Never resolves when there is no terminal, or
-    /// once the reader thread has stopped (its stdin closed), so the branch
-    /// stays quietly pending rather than spinning the event loop.
-    ///
-    /// Cancel-safe: a press arriving before cancellation is queued by the
-    /// reader thread and reported by the next call.
+    /// Remains pending when terminal input is unavailable or has closed. Cancellation
+    /// preserves queued keypresses for the next call.
     pub async fn reload_requested(&mut self) {
         let press = match &mut self.presses {
             Some(presses) => presses.recv().await,

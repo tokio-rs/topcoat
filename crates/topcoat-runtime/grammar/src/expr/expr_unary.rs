@@ -2,15 +2,30 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{ExprUnary, UnOp};
 
+use super::js::Js;
 use crate::expr::{Expr, name_resolver::NameResolver};
 
 impl Expr {
     pub(super) fn expr_unary(
         unary: &ExprUnary,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
+        if matches!(unary.op, UnOp::Neg(_)) {
+            let mut inner = &*unary.expr;
+            while let syn::Expr::Paren(paren) = inner {
+                inner = &paren.expr;
+            }
+            if let syn::Expr::Lit(syn::ExprLit {
+                lit: syn::Lit::Int(literal),
+                ..
+            }) = inner
+            {
+                return Self::integer_literal(literal, true, rust, js, names);
+            }
+        }
+
         let op = match unary.op {
             UnOp::Deref(_) => "deref",
             UnOp::Not(_) => "not",

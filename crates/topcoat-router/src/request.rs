@@ -1,3 +1,8 @@
+use std::{
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+};
+
 /// Byte-buffer types re-exported for use as request body extractors and as
 /// response bodies.
 pub use bytes::{Bytes, BytesMut};
@@ -5,25 +10,22 @@ use http::request::Parts;
 use topcoat_core::{
     context::{Cx, request_context, try_request_context},
     error::Result,
+    identity::Identity,
 };
-use topcoat_view::identity::Identity;
 
-use crate::{Body, body_limit, error::bad_request, to_bytes};
+use crate::{Body, RemoteAddr, body_limit, error::bad_request, proxy::ClientIp, to_bytes};
 
 /// An incoming HTTP request, carrying a [`Body`] by default.
 pub type Request<T = Body> = http::Request<T>;
 
 /// A type that can be built from an incoming request.
 ///
-/// A page or route handler may take a single `FromRequest` value as its request
-/// body parameter, optionally alongside `cx: &Cx`. The built-in extractors
-/// ([`Json`](crate::content::Json), [`Form`](crate::content::Form), [`Bytes`],
-/// [`String`], [`Body`], and more) all implement this trait; implement it
-/// yourself for request-specific parsing the built-ins don't cover.
+/// A page or route may accept one `FromRequest` body parameter alongside an
+/// optional `cx: &Cx`. Use a built-in extractor or implement this trait for
+/// custom parsing.
 ///
-/// Because the body is a stream that can only be read once, a handler may have
-/// at most one `FromRequest` parameter. This is the request-side counterpart of
-/// [`IntoResponse`](crate::response::IntoResponse).
+/// A handler accepts only one body parameter because the body can be consumed
+/// only once.
 ///
 /// An implementation that buffers the body should delegate the buffering to
 /// [`Bytes`], which enforces the request's
@@ -151,9 +153,8 @@ where
 
 /// Returns the [`Parts`] of the current request.
 ///
-/// Use this when you need access to multiple components of the request at
-/// once. For individual fields, prefer the dedicated accessors
-/// ([`method`], [`uri`], [`version`], [`headers`], [`extensions`]).
+/// Use this to read several request fields at once. For one field, use its
+/// accessor, such as [`method`] or [`headers`].
 ///
 /// # Examples
 ///
@@ -296,18 +297,92 @@ pub fn extensions(cx: &Cx) -> &http::Extensions {
     &parts(cx).extensions
 }
 
-/// The parts a rewritten request originally arrived with, stored on the
-/// request context of every dispatch reached through a rewrite.
+/// Returns the IP address and port of the direct connection for this request,
+/// or `None` when they are unknown.
+///
+/// Behind a reverse proxy, this returns the proxy's address. Use
+/// [`client_ip`] to read the client's IP address instead.
+/// Returns `None` if the request has no [`RemoteAddr`] in its extensions,
+/// as is normally the case for Unix socket connections, or if the context
+/// was not created by a router.
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::{context::Cx, router::request::remote_addr};
+///
+/// fn peer_port(cx: &Cx) -> Option<u16> {
+///     remote_addr(cx).map(|addr| addr.port())
+/// }
+/// ```
+#[inline]
+#[must_use]
+pub fn remote_addr(cx: &Cx) -> Option<SocketAddr> {
+    let parts = try_request_context::<Parts>(cx)?;
+    parts.extensions.get::<RemoteAddr>().map(|remote| remote.0)
+}
+
+/// Returns the client's IP address for this request, or `None`
+/// when it cannot be determined.
+///
+/// By default, this returns the IP address from [`remote_addr`]. Behind a
+/// reverse proxy, that is the proxy's address. Configure
+/// [`TrustedProxies`](crate::TrustedProxies) on the router to read the
+/// client's address from the proxy's header.
+///
+/// For a header that lists multiple addresses, Topcoat starts with the direct
+/// connection and reads the list from right to left. It skips trusted proxies
+/// and returns the first address it does not trust. If every address is
+/// trusted, it returns the leftmost address. If the list is empty or missing,
+/// it uses the direct connection's address.
+///
+/// Returns `None` if the direct connection's address is unknown and it is not
+/// trusted through [`TrustedProxies::nearest`](crate::TrustedProxies::nearest),
+/// or if an address needed from the header cannot be parsed. Headers
+/// containing a single address follow the rules in
+/// [`ForwardedHeader::Single`](crate::ForwardedHeader::Single). IPv4-mapped
+/// IPv6 addresses are returned as IPv4.
+///
+/// The router determines the address before running any layers. Later changes
+/// to request headers do not change this result. Returns `None` if the context
+/// was not created by a router.
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::{
+///     Result,
+///     context::Cx,
+///     router::{error::forbidden, request::client_ip},
+/// };
+///
+/// # fn is_banned(_ip: std::net::IpAddr) -> bool { false }
+/// fn reject_banned(cx: &Cx) -> Result<()> {
+///     match client_ip(cx) {
+///         Some(ip) if is_banned(ip) => Err(forbidden().into()),
+///         _ => Ok(()),
+///     }
+/// }
+/// ```
+#[must_use]
+#[track_caller]
+pub fn client_ip(cx: &Cx) -> Option<IpAddr> {
+    try_request_context::<ClientIp>(cx)?.0
+}
+
+/// The parts the request arrived with, shared by every dispatch.
 #[derive(Debug, Clone)]
-pub(crate) struct OriginalParts(pub(crate) Parts);
+pub(crate) struct OriginalParts(pub(crate) Arc<Parts>);
 
 /// Returns the [`Parts`] of the request as the client sent it, before any
-/// rewrite.
+/// rewrite or changes made by layers.
 ///
 /// A handler reached through a [`rewrite`](crate::error::rewrite) sees the
 /// rewritten request in [`parts`], which may differ in its URI and method;
-/// this accessor returns the parts the request arrived with. For a request
-/// that was never rewritten the two are the same.
+/// this accessor returns the parts the request arrived with. Layers can
+/// also change the current parts without a rewrite. For example,
+/// [`StripPrefixLayer`](crate::StripPrefixLayer) changes the current URI
+/// while leaving the original URI intact.
 ///
 /// # Examples
 ///
@@ -358,7 +433,8 @@ pub fn original_method(cx: &Cx) -> &http::Method {
 /// A handler reached through a [`rewrite`](crate::error::rewrite) sees the
 /// rewritten URI in [`uri`]; this accessor returns the URI the request
 /// arrived with, for example to render a form that posts back to the visible
-/// URL. For a request that was never rewritten the two are the same.
+/// URL. Layers such as [`StripPrefixLayer`](crate::StripPrefixLayer) can
+/// also change the current URI without changing this original URI.
 ///
 /// [`Uri`]: http::Uri
 ///
@@ -436,7 +512,7 @@ pub fn original_extensions(cx: &Cx) -> &http::Extensions {
     &original_parts(cx).extensions
 }
 
-/// The header naming the identity a request's build starts at.
+/// The header naming the identity the router installs on a request's context.
 pub const IDENTITY_HEADER: &str = "x-topcoat-identity";
 
 /// Returns the identity the current request's build starts at.
@@ -455,7 +531,7 @@ pub const IDENTITY_HEADER: &str = "x-topcoat-identity";
 ///
 /// ```rust
 /// use topcoat::{
-///     Result, context::Cx, router::request::initial_identity, view::identity::Identity,
+///     Result, context::Cx, core::identity::Identity, router::request::initial_identity,
 /// };
 ///
 /// async fn is_page_request(cx: &Cx) -> Result<bool> {

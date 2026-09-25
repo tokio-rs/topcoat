@@ -42,7 +42,7 @@ pub fn bad_request_at(
 /// A bad-request response carried as the `Err` variant of a handler `Result`.
 ///
 /// Construct one with [`bad_request`].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BadRequestError {
     path: Option<String>,
     description: String,

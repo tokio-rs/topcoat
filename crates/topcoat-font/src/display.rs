@@ -1,16 +1,13 @@
 //! Font display strategies for the `font-display` descriptor on `@font-face`
 //! rules.
 
-/// How a font face is displayed while it loads, as named by the CSS
-/// `font-display` descriptor of an `@font-face` rule.
+/// How text appears while a font loads, set by CSS `font-display`.
 ///
-/// The strategy governs the *block* period (during which text renders
-/// invisibly, awaiting the face) and the *swap* period (during which a fallback
-/// renders but is swapped for the face once it loads). [`FontDisplay::default`]
-/// is [`Auto`](FontDisplay::Auto), matching CSS.
+/// During the block period, text is invisible while the browser waits for the
+/// font. During the swap period, a fallback font is visible and is replaced if
+/// the font finishes loading. The default is [`Auto`](Self::Auto).
 ///
-/// Displays as the CSS keyword (`auto`, `block`, `swap`, `fallback`,
-/// `optional`).
+/// Displays as its CSS keyword.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum FontDisplay {
     /// The font display strategy is defined by the user agent, CSS `auto`.

@@ -3,24 +3,17 @@ use topcoat::{
     view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
-/// The classes for a [`kbd`] key cap.
-///
-/// The key is drawn like a physical cap: a tinted, hairline-bordered box just
-/// wide enough for its label, and at least as wide as it is tall so that a
-/// single character stays square. Browsers set a monospace family on `<kbd>`,
-/// which `font-sans` takes back so the label matches the surrounding text.
+/// Classes that draw a key label in a bordered box.
 const KBD: StaticClass = class!(
     "inline-flex h-5 w-fit min-w-5 shrink-0 items-center justify-center gap-1 \
      rounded-sm border border-border bg-foreground/5 px-1.5 font-sans text-xs font-medium \
      text-muted-foreground",
 );
 
-/// A keyboard key component: a `<kbd>` drawn as a key cap.
+/// A keyboard key label rendered as `<kbd>`.
 ///
-/// Child nodes become the key's label, a character or a key name. The `attrs`
-/// (such as `class`) are forwarded to the `<kbd>`; a `class` among them is
-/// appended to the computed classes. Group several keys of a shortcut with
-/// [`kbd_group`].
+/// Pass the key name as children and use [`kbd_group`] for a shortcut with several
+/// keys. `attrs` are forwarded to the `<kbd>`, with extra classes added to its classes.
 ///
 /// ```ignore
 /// view! {
@@ -35,10 +28,7 @@ pub async fn kbd(
     Ok(view! { <kbd class=(class!(KBD, attrs.remove("class"))) (attrs)>(child)</kbd> })
 }
 
-/// A row of [`kbd`] keys making up one shortcut.
-///
-/// The keys keep an even gap and stay on one line, so a chord reads as a
-/// single unit next to the action it triggers.
+/// A row of key labels for one keyboard shortcut. The keys stay on one line.
 #[component]
 pub async fn kbd_group(
     #[default] mut attrs: Attributes,

@@ -56,7 +56,7 @@ pub(crate) fn internal_server_response() -> Response {
 fn error_into_response(cx: &Cx, error: Error) -> Response {
     macro_rules! try_downcast {
         ($ident:ident as $ty:ty) => {
-            match $ident.downcast::<$ty>() {
+            match $ident.downcast_cloned::<$ty>() {
                 Ok(error) => return into_response_or_500(cx, error),
                 Err(error) => error,
             }
@@ -110,9 +110,8 @@ impl IntoResponse for Error {
 ///
 /// Implemented for [`Option`] (where `None` becomes the configured error)
 /// and [`core::result::Result`] (where any `Err` is replaced, discarding the
-/// original error). Designed to be combined with `?` so a handler can return a
-/// redirect, not-found, unauthorized, forbidden, or bad-request response when
-/// required state is missing or invalid.
+/// original error). Use the returned `Result` with `?` to propagate the
+/// selected response from a handler.
 ///
 /// # Examples
 ///
@@ -274,9 +273,7 @@ mod tests {
 
     use super::*;
 
-    /// The mapping is a closed list of downcasts, so an error type that is not
-    /// on it degrades to a 500 no matter what its own `IntoResponse` says. A
-    /// shed answered as "broken" rather than "busy" is the failure this guards.
+    /// Ensures overload errors retain their status during error conversion.
     #[test]
     fn a_service_unavailable_error_maps_to_503_not_500() {
         let error: Error = service_unavailable(2).into();
@@ -293,8 +290,7 @@ mod tests {
         );
     }
 
-    /// The 429 mirror: a rate limit answered as "the server is broken" is the
-    /// failure this guards.
+    /// Ensures rate-limit errors retain their status during error conversion.
     #[test]
     fn a_too_many_requests_error_maps_to_429_not_500() {
         let error: Error = too_many_requests(60).into();
@@ -329,5 +325,20 @@ mod tests {
         let response = error_into_response(&Cx::default(), error);
 
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    /// A memoized loader keeps its error in the request cache while the
+    /// handler returns a clone, so the mapping must recover the status from
+    /// a shared error too. A cached "not found" answered as "broken" is the
+    /// failure this guards.
+    #[test]
+    fn a_shared_error_still_maps_to_its_status() {
+        let error: Error = not_found().into();
+        let cached = error.clone();
+
+        let response = error_into_response(&Cx::default(), error);
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        drop(cached);
     }
 }

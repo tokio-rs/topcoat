@@ -6,23 +6,18 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
-use crate::{RegionScope, View, ViewBuffer, ViewBufferScope, ViewFirst, ViewSwap};
+use crate::{View, ViewBuffer, ViewBufferScope, ViewFirst, ViewSwap};
 
 pin_project! {
-    /// Installs the build environment around a [`View`]: a buffer for its
-    /// content and a counter for its region ids.
+    /// Installs a buffer for a [`View`]'s content while it is polled.
     ///
-    /// A scope first polled with no build running owns its buffer and seals
-    /// its first content with it, making the content self-contained. Polled
-    /// inside a running build it defers to that build's buffer, and its
-    /// content splices into the enclosing view. The region counter persists
-    /// across polls, so a swap names the same region its content was framed
-    /// with.
+    /// On its first poll, a scope uses the active build's buffer if there
+    /// is one. Otherwise, it creates a buffer and returns self-contained
+    /// initial content.
     pub struct ScopeView<V> {
         #[pin]
         view: V,
         buffer: Option<Box<ViewBuffer>>,
-        regions: u64,
         polled: bool,
     }
 }
@@ -35,7 +30,6 @@ impl<V> ScopeView<V> {
         Self {
             view,
             buffer: None,
-            regions: 1,
             polled: false,
         }
     }
@@ -54,7 +48,6 @@ impl<V> ScopeView<V> {
         Self {
             view,
             buffer,
-            regions: 1,
             polled: false,
         }
     }
@@ -72,7 +65,6 @@ where
         }
         *this.polled = true;
 
-        let _regions = RegionScope::new(this.regions);
         let poll = if this.buffer.is_some() {
             let _buffer = ViewBufferScope::new(this.buffer);
             this.view.poll_first(cx)
@@ -96,7 +88,6 @@ where
 
     fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
         let this = self.project();
-        let _regions = RegionScope::new(this.regions);
         this.view.poll_swap(cx)
     }
 }

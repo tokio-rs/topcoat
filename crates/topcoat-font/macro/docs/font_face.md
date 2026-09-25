@@ -1,4 +1,4 @@
-Constructs a [`FontFace`] using CSS [`@font-face`] syntax. Descriptors are written `name: value`, separated by semicolons, and may appear in any order. `font-family` and `src` are required.
+Creates a [`FontFace`] with CSS [`@font-face`] syntax. Write descriptors as `name: value;` in any order. Include at least `font-family` and `src`:
 
 ```rust
 # use topcoat::font::*;
@@ -10,7 +10,7 @@ font_face! {
 # }
 ```
 
-Literal values are validated at compile time: weights outside `100..=900`, malformed angles, code points beyond `U+10FFFF`, and unknown `format()` or `tech()` keywords are all rejected before your program builds.
+Literal values are checked at compile time. Invalid values, such as an out-of-range weight or an unknown format, cause a compile error.
 
 # Descriptors
 
@@ -32,7 +32,7 @@ Learn more on [MDN][mdn-font-family].
 
 ## `src`
 
-`src` lists one or more sources, in preference order, separated by commas. Each entry is either `local("Family Name")`, naming a font already installed on the visitor's system, or `url("...")`, a font file to download with optional `format(...)` and `tech(...)` hints the browser uses to skip files it cannot use.
+List sources in preference order, separated by commas. Use `local("Family Name")` for an installed font or `url("...")` for a font file to download. Optional `format(...)` and `tech(...)` hints help the browser skip unsupported files:
 
 ```rust
 # use topcoat::font::*;
@@ -44,9 +44,9 @@ font_face! {
 # }
 ```
 
-`format(...)` and `tech(...)` are each optional and may be written in either order. Their keywords are checked at compile time against the CSS-defined values, so a typo like `format("wof2")` fails to build.
+The `format(...)` and `tech(...)` hints may appear in either order. Literal keywords are checked at compile time.
 
-The argument to `local(...)` and `url(...)`, and the `format(...)` and `tech(...)` hints, can each be a Rust expression instead of a literal: resolving to the family name, URL, [`FontFormat`], or [`FontTech`] respectively. A `url(...)` argument may also be an [`Asset`], whose content-hashed URL is filled in when the face is rendered. A `src` list that uses any such expression is built at run time rather than as a `const`.
+These arguments also accept Rust expressions. Pass a family name to `local(...)`, a URL to `url(...)`, a [`FontFormat`] to `format(...)`, or a [`FontTech`] to `tech(...)`. A `url(...)` argument can also be an [`Asset`], resolved when the face is rendered. Sources containing expressions are built at runtime.
 
 ```rust
 # use topcoat::font::*;
@@ -75,7 +75,7 @@ font_face! {
 # }
 ```
 
-A range covers every weight a variable font carries:
+A range declares the weights available from a variable font:
 
 ```rust
 # use topcoat::font::*;
@@ -94,7 +94,7 @@ Learn more on [MDN][mdn-font-weight].
 
 ## `font-style`
 
-`normal`, `italic`, or `oblique`. An oblique face may carry a slant angle, or an angle range for variable fonts. Angles are validated to `-90deg..=90deg`:
+Use `normal`, `italic`, or `oblique`. An oblique face can include a slant angle or, for a variable font, an angle range. Angles must be within `-90deg..=90deg`:
 
 ```rust
 # use topcoat::font::*;
@@ -124,7 +124,7 @@ Learn more on [MDN][mdn-font-style].
 
 ## `font-display`
 
-How the face is shown while it loads: `auto`, `block`, `swap`, `fallback`, or `optional`. Each keyword trades off how long text is held invisible against how long a fallback may be shown before the face swaps in:
+Controls how text appears while the font loads. For example, `swap` lets the browser show fallback text until the font is ready:
 
 ```rust
 # use topcoat::font::*;
@@ -158,7 +158,16 @@ Learn more on [MDN][mdn-unicode-range].
 
 # Rust Expressions
 
-Any descriptor value can be a Rust expression instead of the literal CSS form, letting a face be assembled from runtime data. The expression must resolve to the runtime type for that descriptor: a family name convertible into [`String`] for `font-family`, a value convertible into [`FontSources`] (such as a `Vec<`[`FontSource`]`>`) for `src`, a [`FontWeightRange`] for `font-weight`, a [`FontStyle`] for `font-style`, a [`FontDisplay`] for `font-display`, and a [`UnicodeRanges`] for `unicode-range`.
+Use Rust expressions to build descriptors from runtime data. Each expression must match the descriptor's type:
+
+| Descriptor | Type |
+|---|---|
+| `font-family` | A value convertible into [`String`] |
+| `src` | A value convertible into [`FontSources`], such as `Vec<FontSource>` |
+| `font-weight` | [`FontWeightRange`] |
+| `font-style` | [`FontStyle`] |
+| `font-display` | [`FontDisplay`] |
+| `unicode-range` | [`UnicodeRanges`] |
 
 ```rust
 # use topcoat::font::*;

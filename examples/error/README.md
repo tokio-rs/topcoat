@@ -1,6 +1,6 @@
 # Error
 
-How handler errors become HTTP responses, and how an error boundary in a layout catches them and renders branded error pages instead. Covers a missing post, an unparsable path parameter, a forbidden area, and a catch-all for unrouted URLs.
+Handler errors rendered as HTTP responses and custom error pages. A layout catches errors and chooses what to show.
 
 Run it with:
 

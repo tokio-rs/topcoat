@@ -1,11 +1,9 @@
 //! Font file formats for the `format()` hint on a CSS `@font-face` `src`
 //! descriptor.
 
-/// A font file format, as named by the `format()` hint of a CSS `@font-face`
-/// `src` descriptor.
+/// A font file format for a CSS `format()` hint.
 ///
-/// Displays as the CSS format keyword used inside `format(...)` (`woff2`,
-/// `opentype`, `embedded-opentype`, ...).
+/// Displays as its CSS keyword, such as `woff2`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FontFormat {
     /// OpenType Collection (`.otc`, `.ttc`), CSS `collection`.

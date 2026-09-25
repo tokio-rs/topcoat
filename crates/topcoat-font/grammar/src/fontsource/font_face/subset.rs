@@ -77,9 +77,8 @@ impl topcoat_core_grammar::pretty::PrettyPrint for SubsetKey {
 
 /// A single subset, written as a bare variant name (`Latin`).
 ///
-/// Emits the [`Subset`](runtime::Subset) variant's path, keeping the written
-/// ident's span so the compiler reports unknown variants on it and editors
-/// autocomplete them.
+/// Emits a [`Subset`](runtime::Subset) variant path while preserving the identifier's
+/// span for compiler errors and editor completion.
 pub struct SubsetValue(Ident);
 
 impl SubsetValue {
@@ -89,9 +88,7 @@ impl SubsetValue {
         &self.0
     }
 
-    /// The subset the written variant names, or `None` when it is not a
-    /// [`Subset`](runtime::Subset) variant: the compiler reports those on the
-    /// emitted variant.
+    /// Returns the named subset, or `None` for an unknown variant.
     #[must_use]
     pub fn subset(&self) -> Option<runtime::Subset> {
         runtime::Subset::from_variant(&self.0.to_string())

@@ -11,8 +11,10 @@ categories.workspace = true
 rust-version.workspace = true
 
 [features]
-discover = ["dep:inventory"]
 router = [
+	"dep:futures-util",
+	"dep:pin-project-lite",
+	"dep:tokio",
 	"dep:topcoat-router",
 ]
 
@@ -22,10 +24,16 @@ topcoat-core.workspace = true
 topcoat-router = { workspace = true, optional = true }
 topcoat-view.workspace = true
 
-inventory = { workspace = true, optional = true }
+pin-project-lite = { workspace = true, optional = true }
 ref-cast.workspace = true
-serde.workspace = true
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+topcoat-router = { workspace = true, optional = true, features = ["websocket"] }
+
+futures-util = { workspace = true, optional = true, features = ["sink"] }
+tokio = { workspace = true, optional = true, features = ["rt", "sync"] }
 
 [dev-dependencies]
 # We cannot use `workspace = true` with `default-features = false`.

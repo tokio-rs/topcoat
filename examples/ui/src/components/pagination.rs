@@ -6,14 +6,11 @@ use topcoat::{
 
 use super::button::{ButtonSize, ButtonVariant, button_variants};
 
-/// A pagination component: the links stepping through a list too long for one
-/// page.
+/// Navigation links for a list split across pages.
 ///
-/// Every part of it is a link, so which page the reader is on is a matter of
-/// the URL and the server decides what a page holds. The trail is a `<nav>`
-/// labelled for assistive technology, holding a [`pagination_content`] list of
-/// [`pagination_item`]s. The `attrs` (such as `class`) are forwarded to the
-/// `<nav>`; a `class` among them is appended to the computed classes.
+/// Place links inside `pagination_content` and `pagination_item` components. Each link
+/// supplies its own destination. `attrs` are forwarded to the `<nav>`, with extra
+/// classes added to its classes.
 ///
 /// ```ignore
 /// view! {
@@ -82,12 +79,10 @@ pub async fn pagination_item(
     Ok(view! { <li class=(attrs.remove("class")) (attrs)>(child)</li> })
 }
 
-/// A link to one page of the list, usually labelled with its number.
+/// A link to a page in the list.
 ///
-/// The link is dressed as a button: an outlined one for the page being read
-/// and a ghost one for the rest, which is also what tells the two apart at a
-/// glance. The current page carries `aria-current="page"`. Pass the `href`
-/// among the `attrs`.
+/// Pass its destination as `href` in `attrs`. Set `active` for the current page to
+/// apply selected styling and `aria-current="page"`.
 #[component]
 pub async fn pagination_link(
     /// Whether this link points at the page being read.
@@ -120,14 +115,8 @@ pub async fn pagination_link(
     })
 }
 
-/// The classes for the label of [`pagination_previous`] and
-/// [`pagination_next`].
-///
-/// The label is always in the markup, so it is what names the link to
-/// assistive technology and a translated one needs nothing set alongside it.
-/// It is only shown once the [`pagination`] is wide enough for it, which is
-/// measured against the pagination itself rather than the window: the same
-/// pagination is roomy on a page of its own and cramped in a card column.
+/// Classes that hide navigation labels in narrow containers while keeping them
+/// available to assistive technology.
 const LABEL: StaticClass = class!("sr-only @xs:not-sr-only");
 
 /// The link to the page before the one being read.
@@ -180,11 +169,7 @@ pub async fn pagination_next(
     })
 }
 
-/// A stand-in for the page links left out of a long pagination.
-///
-/// It shows an ellipsis in place of the skipped pages. The glyph itself says
-/// nothing to assistive technology, so a phrase standing in for it is read out
-/// instead.
+/// An ellipsis representing omitted page links, with an accessible text label.
 #[component]
 pub async fn pagination_ellipsis(#[default] mut attrs: Attributes) -> Result<impl View> {
     Ok(view! {

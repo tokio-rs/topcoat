@@ -9,7 +9,7 @@ use crate::{
     buffer::{InstructionPtr, Renderer, ViewBuffer, ViewBufferId, ViewBufferScope},
 };
 
-/// A self-contained piece of HTML content.
+/// A handle to an HTML fragment.
 ///
 /// A view handle may contain multiple sibling nodes, but opened tags must be closed
 /// so the fragment can be nested safely inside a larger document.
@@ -23,13 +23,10 @@ use crate::{
 /// <div>Hello
 /// ```
 ///
-/// A handle is either self-contained or nested. A self-contained handle
-/// carries everything it needs to render: it can be stored, sent across
-/// tasks, spliced into another view, and rendered anywhere. The outermost
-/// view of a build resolves to one. A nested handle is what a
-/// [`View`](crate::View) inside that build resolves to: it points into the
-/// build's buffer, so it splices into the content of the enclosing views
-/// and renders only while the build is running.
+/// The outermost [`View`](crate::View) returns a self-contained handle.
+/// It can be stored, sent to another task, or inserted into another view.
+/// Nested views return handles tied to the enclosing build. Those handles
+/// can only be rendered or inserted while that build is active.
 #[derive(Debug, Default, Clone)]
 pub struct ViewHandle {
     repr: ViewRepr,

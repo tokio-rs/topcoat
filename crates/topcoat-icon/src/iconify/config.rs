@@ -8,9 +8,7 @@ use std::{
 
 use crate::iconify::{BuildError, IconSet, Result, set::STAGE_DIR};
 
-/// Builder for staging the Iconify icon sets used by the
-/// `iconify::include!` and `iconify::iconify_icon!` macros. Use from a
-/// build script:
+/// Stages Iconify icon sets for use at compile time. Call it from a build script:
 ///
 /// ```rust,no_run
 /// topcoat::icon::iconify::BuildConfig::new()
@@ -20,16 +18,11 @@ use crate::iconify::{BuildError, IconSet, Result, set::STAGE_DIR};
 ///     .unwrap();
 /// ```
 ///
-/// Each set is staged to `$OUT_DIR/topcoat-icon-iconify/<set>.json` in the
-/// `IconifyJSON` format, downloading the set's `@iconify-json/<set>` package
-/// from jsDelivr into a cache first. Once a set is cached, builds stay
-/// offline.
+/// Downloads missing sets from jsDelivr and stages them under `OUT_DIR`.
+/// Cached sets are reused without network access.
 ///
-/// The cache lives in `topcoat/cache/iconify` inside the Cargo target
-/// directory by default, shared across the workspace; pass a
-/// [`cache_dir`](Self::cache_dir) to use a directory of your own instead.
-/// Files you place in the cache yourself are picked up without downloading,
-/// so icon sets that are not on Iconify can be vendored the same way.
+/// The default cache is shared across workspace builds. Use
+/// [`cache_dir`](Self::cache_dir) to choose a directory or supply your own sets.
 #[derive(Debug, Default)]
 pub struct BuildConfig {
     cache_dir: Option<PathBuf>,
@@ -55,9 +48,8 @@ impl BuildConfig {
         self
     }
 
-    /// Stages `version` of `set`, downloading it whenever the cached copy
-    /// was cached from a different version. The version a copy was cached
-    /// from is tracked in a `<set>.version` file next to it.
+    /// Stages `version` of `set`. Downloads it if the cached version differs.
+    /// A `<set>.version` file beside the cached set records its version.
     #[must_use]
     pub fn icon_set_version(mut self, set: impl Into<String>, version: impl Into<String>) -> Self {
         self.sets.push(Set {
@@ -132,9 +124,8 @@ impl Set {
     /// `cache_dir`, or through `dir` itself when no cache directory is
     /// configured.
     ///
-    /// The cached copy is reused unless the set is pinned to a version other
-    /// than the one the copy was cached from: a latest set never goes stale,
-    /// keeping builds offline.
+    /// Reuses the cached copy unless a different version is requested.
+    /// Unpinned sets are not checked for updates.
     fn stage(self, dir: &Path, cache_dir: Option<&Path>) -> Result {
         let cache = cache_dir.unwrap_or(dir);
         let cached = cache.join(format!("{}.json", self.name));

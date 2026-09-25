@@ -5,8 +5,7 @@ use std::{
 
 use serde::Deserialize;
 
-/// A `compiler-artifact` message from cargo's JSON output: one crate it
-/// compiled and the files that produced.
+/// A Cargo artifact message describing a compiled target and its output files.
 #[derive(Deserialize)]
 pub(super) struct Artifact {
     target: Target,
@@ -15,15 +14,8 @@ pub(super) struct Artifact {
 }
 
 impl Artifact {
-    /// The final linked outputs among this artifact's files: the executable
-    /// of a bin target, or the uplifted library outputs of a `cdylib` or
-    /// `dylib` target.
-    ///
-    /// Cargo emits an artifact message for every crate it compiles, but marks
-    /// the final outputs itself: `executable` is only set for the requested
-    /// bin targets, and only the requested packages' library outputs are
-    /// uplifted out of `deps/` into the profile directory. Everything still
-    /// in `deps/` is an intermediate dependency and is skipped.
+    /// Returns the target's final executable or dynamic libraries. Skips intermediate
+    /// dependencies and build-script outputs.
     pub(super) fn final_outputs(&self) -> Vec<PathBuf> {
         if let Some(executable) = &self.executable {
             return vec![executable.clone()];
@@ -38,9 +30,8 @@ impl Artifact {
             .collect()
     }
 
-    /// Whether the artifact's target is a `cdylib` or `dylib`, as opposed to
-    /// a plain `lib` or a proc-macro (whose shared object is uplifted too
-    /// when it is a requested target, but is not a scannable application).
+    /// Whether the target produces a `cdylib` or `dylib`. Proc-macro libraries are
+    /// excluded.
     fn is_dynamic_library(&self) -> bool {
         self.target
             .crate_types
@@ -54,9 +45,7 @@ struct Target {
     crate_types: Vec<String>,
 }
 
-/// Excludes libraries in a build script output directory. Build scripts emit
-/// their own outputs into `<target>/build/<pkg>/<hash>/out/` and shouldn't
-/// be mistaken for the requested package's final output.
+/// Checks whether a path belongs to a build script's output directory.
 fn is_build_script_output(path: &Path) -> bool {
     path.ancestors()
         .any(|a| a.file_name() == Some(OsStr::new("out")))
@@ -65,10 +54,8 @@ fn is_build_script_output(path: &Path) -> bool {
             .any(|a| a.file_name() == Some(OsStr::new("build")))
 }
 
-/// Whether `path` names a final dynamic-library output: a linked library by
-/// extension (as opposed to an rlib, import library, or dep-info companion in
-/// the same `filenames` list) that cargo uplifted out of the `deps/`
-/// directory, which it only does for the build's requested targets.
+/// Whether `path` is a final dynamic library outside dependency and build-script output
+/// directories.
 fn is_final_library(path: &Path) -> bool {
     matches!(
         path.extension().and_then(|ext| ext.to_str()),

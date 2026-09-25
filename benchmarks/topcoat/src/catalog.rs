@@ -28,8 +28,7 @@ pub struct Product {
 }
 
 impl Product {
-    /// Price formatted as `$12.99`; plain integer math so every benchmark app
-    /// formats identically.
+    /// Formats a price in cents as dollars, using integer arithmetic.
     pub fn price(&self) -> String {
         format!("${}.{:02}", self.price_cents / 100, self.price_cents % 100)
     }
@@ -114,14 +113,11 @@ impl Catalog {
         self.products.iter().filter(|product| product.featured)
     }
 
-    /// One page of the (filtered, sorted) product list.
+    /// Returns a page of products after filtering and sorting.
     ///
-    /// The semantics are the parity contract shared by every benchmark app:
-    /// `category` filters by exact slug match (unknown slugs match nothing),
-    /// `sort` must already be normalized to one of `name`, `price`,
-    /// `price-desc`, or `rating` (anything else keeps ascending id order), all
-    /// sorts tie-break by ascending id, and `page` is clamped to the valid
-    /// range.
+    /// `category` matches an exact slug. Unknown slugs produce no results. Pass a
+    /// normalized `sort` value. Sorts use ascending ID to break ties, and unknown sort
+    /// values use ascending ID throughout. `page` is clamped to the valid range.
     pub fn page(
         &self,
         page: usize,

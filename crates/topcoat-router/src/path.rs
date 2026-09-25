@@ -8,7 +8,7 @@ use std::{
 
 use ref_cast::{RefCastCustom, ref_cast_custom};
 
-/// A borrowed route path, similar to [`std::path::Path`] but for URL paths.
+/// A borrowed route pattern made of `/`-separated segments.
 ///
 /// A `Path` consists of `/`-separated segments, where each segment is one of:
 /// - **`Static`**: a literal string (e.g. `users`)
@@ -17,17 +17,25 @@ use ref_cast::{RefCastCustom, ref_cast_custom};
 /// - **`Group`**: a logical grouping in parentheses (e.g. `(auth)`), stripped when converting to a
 ///   `matchit` path
 ///
-/// The root path `"/"` is normalized to an empty inner string. Use [`Path::new`] to
-/// create a `&Path` from a string slice.
+/// Create one from a string with [`Path::new`]. The root path `"/"` is stored
+/// as an empty string and has no segments.
+///
+/// A trailing slash is significant, so `/users/` and `/users` are different
+/// paths. It is represented by an empty final `Static` segment. No other
+/// segment may be empty.
 ///
 /// # Examples
 ///
 /// ```
-/// use topcoat_router::Path;
+/// use topcoat_router::{Path, PathSegment};
 ///
 /// let path = Path::new("/users/(group)/{id}");
 /// assert_eq!(path.segments().count(), 3);
 /// assert_eq!(path.to_matchit_path(), "/users/{id}");
+///
+/// let slashed = Path::new("/users/");
+/// assert_eq!(slashed.segments().last(), Some(PathSegment::Static("")));
+/// assert_eq!(slashed.to_matchit_path(), "/users/");
 /// ```
 #[derive(Debug, PartialEq, Eq, Hash, RefCastCustom)]
 #[repr(transparent)]
@@ -41,13 +49,10 @@ impl Path {
 
     /// Creates a `&Path` from a string slice.
     ///
-    /// The root path `"/"` is normalized to an empty inner representation so that
-    /// it produces zero segments, matching the convention that the root layout
-    /// applies to all pages.
+    /// The root path `"/"` is stored as an empty string with no segments.
     ///
-    /// This is the panicking counterpart of [`from_str`](Path::from_str).
-    /// Because it is a `const fn`, malformed paths handed to the routing macros
-    /// are rejected at compile time.
+    /// Use [`from_str`](Path::from_str) to receive an error instead of a panic.
+    /// This function also works in const contexts.
     ///
     /// # Panics
     ///
@@ -64,9 +69,9 @@ impl Path {
 
     /// Creates a `&Path` from a string slice, validating its segments.
     ///
-    /// The root path `"/"` is normalized to an empty inner representation. Every
-    /// other path must be a sequence of `/`-prefixed, non-empty segments, each a
-    /// valid [`PathSegment`]. Returns [`PathError`] if `s` is malformed.
+    /// The root path `"/"` is stored as an empty string. Other paths contain
+    /// `/`-prefixed [`PathSegment`]s. Only the final segment may be empty,
+    /// representing a trailing slash.
     ///
     /// # Errors
     ///
@@ -88,11 +93,14 @@ impl Path {
             return Err(PathError::MissingLeadingSlash);
         }
         // Walk the `/`-separated segments, validating each `bytes[start..end)`.
+        // The last segment may be empty, as long as it is not also the first:
+        // that would be `//`, which is not the root with a trailing slash.
         let mut start = 1;
         let mut i = 1;
         while i <= len {
             if i == len || bytes[i] == b'/' {
-                if let Err(err) = validate_segment(bytes, start, i) {
+                let trailing_slash = i == len && start == len && start > 1;
+                if !trailing_slash && let Err(err) = validate_segment(bytes, start, i) {
                     return Err(err);
                 }
                 start = i + 1;
@@ -104,11 +112,9 @@ impl Path {
 
     /// Creates a `&Path` from a string slice without validating or normalizing it.
     ///
-    /// This is a zero-cost reference cast. Unlike [`new`](Path::new), it
-    /// performs no segment validation and does *not* normalize the root path `"/"`
-    /// to an empty inner string. The caller must pass an already-valid, normalized
-    /// path string (for example one obtained from another `Path`); passing
-    /// anything else yields a `Path` that misbehaves when its segments are read.
+    /// The caller must provide a valid, normalized path, such as the string
+    /// from another `Path`. In particular, use an empty string for the root.
+    /// Other input can produce incorrect segment results.
     #[ref_cast_custom]
     #[must_use]
     pub const fn new_unchecked(s: &str) -> &Self;
@@ -181,11 +187,9 @@ impl Path {
 
     /// Returns `true` if this path starts with the given prefix path.
     ///
-    /// Comparison is done segment-by-segment using [`PathSegment`] equality.
-    /// This is used to determine which layouts apply to a given page: a layout
-    /// at `"/settings"` matches any page whose path starts with `/settings`.
-    ///
-    /// Group segments are included in the comparison.
+    /// Compares segments using [`PathSegment`] equality, including groups.
+    /// Parameters must match by name. They do not match arbitrary values as
+    /// they do in [`matches`](Self::matches).
     ///
     /// # Examples
     ///
@@ -204,6 +208,32 @@ impl Path {
         self.segments().zip(other.segments()).all(|(a, b)| a == b)
     }
 
+    /// Returns a new path with the segments of `other` appended to this one.
+    ///
+    /// Joining the root path onto either side leaves the other path unchanged.
+    /// A trailing slash on this path is dropped when segments follow it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use topcoat_router::Path;
+    ///
+    /// let base = Path::new("/settings");
+    /// assert_eq!(base.join(Path::new("/export")).as_str(), "/settings/export");
+    /// assert_eq!(base.join(Path::ROOT).as_str(), "/settings");
+    /// assert_eq!(Path::ROOT.join(base).as_str(), "/settings");
+    /// assert_eq!(
+    ///     Path::new("/settings/").join(Path::new("/export")).as_str(),
+    ///     "/settings/export"
+    /// );
+    /// ```
+    #[must_use]
+    pub fn join(&self, other: &Path) -> PathBuf {
+        let mut buf = self.to_owned();
+        buf += other;
+        buf
+    }
+
     /// Returns `true` if `url`, a concrete URL path, matches this route path
     /// exactly.
     ///
@@ -213,6 +243,9 @@ impl Path {
     /// - **`CatchAll`** segments match the remaining URL (including any `/` separators) and require
     ///   at least one segment to be present.
     /// - **`Group`** segments are ignored, as they are not part of the URL.
+    ///
+    /// A trailing `/` is significant: a path without one does not match a URL
+    /// with one, and the other way around.
     ///
     /// # Examples
     ///
@@ -228,44 +261,54 @@ impl Path {
     ///
     /// // A catch-all matches the remainder of the URL.
     /// assert!(Path::new("/files/{*rest}").matches("/files/a/b/c"));
+    ///
+    /// // A trailing slash has to match.
+    /// assert!(Path::new("/users/").matches("/users/"));
+    /// assert!(!Path::new("/users/").matches("/users"));
+    /// assert!(!Path::new("/users").matches("/users/"));
     /// ```
     #[must_use]
     pub fn matches(&self, url: &str) -> bool {
         // Splits the `/`-separated URL body into its first segment and the
-        // remainder, e.g. "users/42" into ("users", "42") and "users" into
-        // ("users", ""). Returns `None` when nothing is left to consume.
-        fn first_segment(rest: &str) -> Option<(&str, &str)> {
-            if rest.is_empty() {
-                None
-            } else {
-                Some(rest.split_once('/').unwrap_or((rest, "")))
+        // remainder after the separator, e.g. "users/42" into ("users",
+        // Some("42")) and "users" into ("users", None): the remainder is `None`
+        // once the body is used up without a separator left over.
+        fn first_segment(rest: &str) -> (&str, Option<&str>) {
+            match rest.split_once('/') {
+                Some((head, tail)) => (head, Some(tail)),
+                None => (rest, None),
             }
         }
 
         // Drop a single leading `/`; what remains is the `/`-separated body,
-        // e.g. "users/42/posts". The root URL "/" becomes an empty body.
-        let mut rest = url.strip_prefix('/').unwrap_or(url);
+        // e.g. "users/42/posts". The root URL "/" has nothing left to consume,
+        // while a trailing separator leaves an empty body behind.
+        let body = url.strip_prefix('/').unwrap_or(url);
+        let mut rest = (!body.is_empty()).then_some(body);
         for segment in self.segments() {
             match segment {
                 // Groups exist only for layout matching and never appear in a URL.
                 PathSegment::Group(_) => {}
-                PathSegment::Static(expected) => match first_segment(rest) {
+                // A trailing slash matches when the URL ended in a separator
+                // with nothing after it.
+                PathSegment::Static("") => return rest == Some(""),
+                PathSegment::Static(expected) => match rest.map(first_segment) {
                     Some((head, tail)) if head == expected => rest = tail,
                     _ => return false,
                 },
                 // A parameter matches any single non-empty segment. An empty
                 // one (as in `/users//`) never routes, so reject it here too.
-                PathSegment::Param(_) => match first_segment(rest) {
+                PathSegment::Param(_) => match rest.map(first_segment) {
                     Some((head, tail)) if !head.is_empty() => rest = tail,
                     _ => return false,
                 },
                 // A catch-all swallows the whole remainder, so nothing can
                 // follow it and there is never leftover URL to reject.
-                PathSegment::CatchAll(_) => return !rest.is_empty(),
+                PathSegment::CatchAll(_) => return rest.is_some_and(|rest| !rest.is_empty()),
             }
         }
-        // Every route segment matched; the URL must also be exhausted.
-        rest.is_empty()
+        // Every route segment matched; the URL must also be used up.
+        rest.is_none()
     }
 
     /// Returns the string backing this path.
@@ -286,10 +329,26 @@ impl Path {
         &self.inner
     }
 
+    /// Returns `true` if this path ends in a `/`, which is to say its last
+    /// segment is empty. The root path does not.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use topcoat_router::Path;
+    ///
+    /// assert!(Path::new("/users/").has_trailing_slash());
+    /// assert!(!Path::new("/users").has_trailing_slash());
+    /// assert!(!Path::new("/").has_trailing_slash());
+    /// ```
+    #[must_use]
+    pub fn has_trailing_slash(&self) -> bool {
+        self.inner.ends_with('/')
+    }
+
     /// Returns the length of the string backing this path.
     ///
-    /// This length is in bytes, not [`char`]s or graphemes. In other words,
-    /// it might not be what a human considers the length of the string.
+    /// Measures bytes, not characters.
     #[must_use]
     pub fn len(&self) -> usize {
         self.inner.len()
@@ -401,7 +460,7 @@ impl FusedIterator for PathSegments<'_> {}
 pub enum PathError {
     /// The path was non-empty but did not start with `/`.
     MissingLeadingSlash,
-    /// A segment was empty, as produced by a trailing or doubled `/`.
+    /// A segment other than the last was empty, as produced by a doubled `/`.
     EmptySegment,
     /// A `{` parameter or catch-all segment was missing its closing `}`.
     MissingClosingBrace,
@@ -446,7 +505,8 @@ impl std::error::Error for PathError {}
 /// An owned route path, similar to [`std::path::PathBuf`] but for URL paths.
 ///
 /// `PathBuf` is the owned counterpart of [`Path`]. It can be built incrementally
-/// by adding [`PathSegment`]s with `+=`, or collected from an iterator of segments.
+/// by adding [`PathSegment`]s or whole [`Path`]s with `+=`, or collected from an
+/// iterator of segments.
 ///
 /// # Examples
 ///
@@ -493,9 +553,32 @@ impl Deref for PathBuf {
     }
 }
 
+impl PathBuf {
+    /// Drops a trailing slash so that appended segments do not produce an
+    /// empty segment in the middle of the path.
+    fn pop_trailing_slash(&mut self) {
+        if self.inner.ends_with('/') {
+            self.inner.pop();
+        }
+    }
+}
+
 impl AddAssign<PathSegment<'_>> for PathBuf {
     fn add_assign(&mut self, rhs: PathSegment<'_>) {
+        self.pop_trailing_slash();
         write!(self.inner, "/{rhs}").unwrap();
+    }
+}
+
+impl AddAssign<&Path> for PathBuf {
+    fn add_assign(&mut self, rhs: &Path) {
+        if rhs.is_empty() {
+            return;
+        }
+        // Both sides hold a validated path whose root is the empty string, so
+        // appending the raw string yields a valid path again.
+        self.pop_trailing_slash();
+        self.inner.push_str(&rhs.inner);
     }
 }
 
@@ -618,11 +701,9 @@ impl<'a> PathSegment<'a> {
     /// Parses a single path segment string into a [`PathSegment`] without
     /// validating it.
     ///
-    /// Unlike [`new`](PathSegment::new) and [`from_str`](PathSegment::from_str),
-    /// this performs no validation; the caller must pass an already-valid segment
-    /// (for example one produced by [`Path::segments`]). A malformed input is
-    /// parsed on a best-effort basis and yields a nonsensical segment rather than
-    /// an error.
+    /// The caller must provide a valid segment, such as one from
+    /// [`Path::segments`]. Malformed input can produce an incorrect segment
+    /// rather than an error.
     #[must_use]
     pub fn new_unchecked(s: &'a str) -> Self {
         if let Some(inner) = s.strip_prefix('{') {
@@ -875,6 +956,22 @@ mod tests {
     }
 
     #[test]
+    fn trailing_slash_is_an_empty_last_segment() {
+        let path = Path::new("/users/{id}/");
+        let segs: Vec<_> = path.segments().collect();
+        assert_eq!(
+            segs,
+            vec![
+                PathSegment::Static("users"),
+                PathSegment::Param("id"),
+                PathSegment::Static(""),
+            ]
+        );
+        assert_eq!(path.segments().next_back(), Some(PathSegment::Static("")));
+        assert_eq!(path.as_str(), "/users/{id}/");
+    }
+
+    #[test]
     fn path_to_matchit_strips_groups() {
         let path = Path::new("/(auth)/dashboard/{id}");
         assert_eq!(path.to_matchit_path(), "/dashboard/{id}");
@@ -898,6 +995,63 @@ mod tests {
     fn path_to_matchit_no_groups() {
         let path = Path::new("/users/{id}");
         assert_eq!(path.to_matchit_path(), "/users/{id}");
+    }
+
+    #[test]
+    fn path_to_matchit_keeps_trailing_slash() {
+        assert_eq!(Path::new("/users/").to_matchit_path(), "/users/");
+        assert_eq!(
+            Path::new("/(auth)/users/{id}/").to_matchit_path(),
+            "/users/{id}/"
+        );
+        // A trailing slash after nothing but groups still addresses the root.
+        assert_eq!(Path::new("/(marketing)/").to_matchit_path(), "/");
+    }
+
+    // -- join --
+
+    #[test]
+    fn join_appends_segments() {
+        let joined = Path::new("/settings").join(Path::new("/(admin)/{id}"));
+        assert_eq!(joined.as_str(), "/settings/(admin)/{id}");
+        assert_eq!(joined.segments().count(), 3);
+    }
+
+    #[test]
+    fn join_root_on_either_side_is_identity() {
+        let path = Path::new("/settings");
+        assert_eq!(&*path.join(Path::ROOT), path);
+        assert_eq!(&*Path::ROOT.join(path), path);
+        assert!(Path::ROOT.join(Path::ROOT).is_empty());
+    }
+
+    #[test]
+    fn path_buf_add_assign_path() {
+        let mut buf = PathBuf::new();
+        buf += Path::new("/users");
+        buf += PathSegment::Param("id");
+        buf += Path::new("/posts");
+        assert_eq!(buf.as_str(), "/users/{id}/posts");
+    }
+
+    #[test]
+    fn join_drops_a_trailing_slash_when_segments_follow() {
+        let base = Path::new("/settings/");
+        assert_eq!(base.join(Path::new("/export")).as_str(), "/settings/export");
+        assert_eq!(
+            base.join(Path::new("/export/")).as_str(),
+            "/settings/export/"
+        );
+        let mut buf = base.to_owned();
+        buf += PathSegment::Param("id");
+        assert_eq!(buf.as_str(), "/settings/{id}");
+    }
+
+    #[test]
+    fn join_keeps_a_trailing_slash_when_nothing_follows() {
+        let path = Path::new("/settings/");
+        assert_eq!(&*path.join(Path::ROOT), path);
+        assert_eq!(&*Path::ROOT.join(path), path);
     }
 
     #[test]
@@ -942,6 +1096,16 @@ mod tests {
         let path = Path::new("/users/{id}/posts");
         assert!(path.starts_with(Path::new("/users/{id}")));
         assert!(!path.starts_with(Path::new("/users/{user_id}")));
+    }
+
+    #[test]
+    fn path_starts_with_trailing_slash() {
+        // A slashed path lies under its slash-less prefix, but a slashed
+        // prefix only covers itself.
+        assert!(Path::new("/users/").starts_with(Path::new("/users")));
+        assert!(Path::new("/users/").starts_with(Path::new("/users/")));
+        assert!(!Path::new("/users").starts_with(Path::new("/users/")));
+        assert!(!Path::new("/users/posts").starts_with(Path::new("/users/")));
     }
 
     #[test]
@@ -1024,9 +1188,20 @@ mod tests {
     }
 
     #[test]
-    fn matches_tolerates_trailing_slash() {
-        assert!(Path::new("/users").matches("/users/"));
+    fn matches_trailing_slash_exactly() {
+        assert!(!Path::new("/users").matches("/users/"));
+        assert!(Path::new("/users/").matches("/users/"));
+        assert!(!Path::new("/users/").matches("/users"));
+        assert!(!Path::new("/users/").matches("/users//"));
+        assert!(!Path::new("/users/").matches("/users/posts"));
+        assert!(Path::new("/users/{id}/").matches("/users/42/"));
+        assert!(!Path::new("/users/{id}/").matches("/users/42"));
         assert!(!Path::new("/users/{id}").matches("/users/"));
+    }
+
+    #[test]
+    fn matches_root_rejects_doubled_slash() {
+        assert!(!Path::new("/").matches("//"));
     }
 
     #[test]
@@ -1070,6 +1245,9 @@ mod tests {
             "/users/{id}/posts/{*rest}",
             "/(auth)/dashboard/{user_id}",
             "/{_private}",
+            "/users/",
+            "/users/{id}/",
+            "/(marketing)/",
         ] {
             assert!(Path::from_str(input).is_ok(), "rejected `{input}`");
         }
@@ -1080,7 +1258,8 @@ mod tests {
         use PathError::*;
         let cases = [
             ("users", MissingLeadingSlash),
-            ("/users/", EmptySegment),
+            ("//", EmptySegment),
+            ("/users//", EmptySegment),
             ("/users//posts", EmptySegment),
             ("/foo{bar}", UnexpectedBracket),
             ("/{id", MissingClosingBrace),
@@ -1124,6 +1303,15 @@ mod tests {
         buf += PathSegment::Static("users");
         buf += PathSegment::Param("id");
         assert_eq!(buf.to_string(), "/users/{id}");
+    }
+
+    #[test]
+    fn pathbuf_add_assign_trailing_slash() {
+        let mut buf = PathBuf::new();
+        buf += PathSegment::Static("users");
+        buf += PathSegment::Static("");
+        assert_eq!(buf.to_string(), "/users/");
+        assert_eq!(&*buf, Path::new("/users/"));
     }
 
     #[test]

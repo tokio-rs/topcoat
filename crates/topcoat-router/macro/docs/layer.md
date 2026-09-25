@@ -1,6 +1,6 @@
 Declares a layer that wraps request handling under its path.
 
-A layer wraps every page and API route whose path begins with the layer's path, following the same prefix rule as [`#[layout]`](attr.layout.html): a layer at `/admin` wraps the handlers under `/admin`, while a layer at `/` wraps them all. The layer's path is the string given to the attribute (`#[layer("/admin")]`); when omitted, it is derived from the function's enclosing module path, kebab-cased, provided the function is reachable from a [`module_router!`](macro.module_router.html).
+A layer wraps handlers whose registered path starts with its path. Set an absolute path with `#[layer("/admin")]`. Under [`module_router!`](macro.module_router.html), omit the path to derive it from the enclosing module, or use `./` to extend that path. For example, `#[layer("./v1")]` in `src/app/api.rs` wraps handlers under `/api/v1`.
 
 For a matched handler, the prefix is checked when the router is built, comparing the layer's path to the handler's registered path segment by segment; the request URL is not consulted. A handler is wrapped only when its leading segments spell out the layer's path exactly: a layer at `/docs/admin` wraps neither a page at `/docs/{something}` nor one at `/docs/{*path}`, even though both serve URLs under `/docs/admin`. A parameter segment only matches a parameter of the same name, and group segments count, so a layer at `/dashboard` does not wrap a page at `/(auth)/dashboard` although that page is served at `/dashboard`.
 
@@ -10,7 +10,7 @@ When several layers wrap a handler, they nest from least specific (outermost) to
 
 # Handler signature
 
-The function is `async` and takes [`cx: &Cx`](../context/struct.Cx.html), the request [`body: Body`](struct.Body.html), and a [`next: Next<'_>`](struct.Next.html), returning `Result<T>` where `T` implements [`AsyncIntoResponse`](response/trait.AsyncIntoResponse.html), which every [`IntoResponse`](response/trait.IntoResponse.html) type does. Call [`next.run(cx, body)`](struct.Next.html#method.run) to invoke the inner layers and ultimately the handler. Returning without calling `next.run` short-circuits the request: the layer's return value becomes the response.
+The function must be `async` and take [`cx: &Cx`](../context/struct.Cx.html), [`body: Body`](struct.Body.html), and [`next: Next<'_>`](struct.Next.html). It returns `Result<T>`, where `T` implements [`AsyncIntoResponse`](response/trait.AsyncIntoResponse.html). Every [`IntoResponse`](response/trait.IntoResponse.html) type meets this bound. Call [`next.run(cx, body)`](struct.Next.html#method.run) to run the remaining layers and handler. Return directly to answer the request without running them.
 
 # Examples
 
@@ -40,6 +40,18 @@ Module-derived path (in `src/app/api.rs` under `module_router!()`, this wraps ev
 async fn api_log(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
     let response = next.run(cx, body).await?;
     println!("API response: {}", response.status());
+    Ok(response)
+}
+```
+
+Path below the module (in `src/app/api.rs` under `module_router!()`, this wraps every request under `/api/v1`):
+
+```rust
+# use topcoat::{Result, context::Cx, router::{Body, Next, layer, response::Response}};
+#[layer("./v1")]
+async fn v1_log(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
+    let response = next.run(cx, body).await?;
+    println!("v1 response: {}", response.status());
     Ok(response)
 }
 ```

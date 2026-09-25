@@ -1,19 +1,19 @@
 use crate::{
     Error, Result,
-    view::{Child, View, component, emit, live},
+    context::{Cx, identity},
+    core::identity::SiteKey,
+    view::{Child, RegionId, View, component, internal::ErrorBoundaryView},
 };
 
 /// Shows a fallback in place of child content that fails to render.
 ///
-/// The child renders as if it stood in the boundary's place. When any part
-/// of it returns an error, the error is passed to the fallback closure and
-/// the view it returns replaces the boundary's content, leaving the rest of
-/// the page intact. Content the child already streamed out is replaced along
-/// with it.
+/// If any child content fails, the fallback closure receives the error.
+/// Its view replaces all of the boundary's content, including content
+/// already streamed to the browser. The rest of the page is unchanged.
 ///
-/// Returning `Err` from the closure rethrows: the error propagates as if
-/// there were no boundary, so an error the fallback does not handle can
-/// still reach the enclosing handler and set the response status.
+/// Returning `Err` from the closure propagates the error to the enclosing
+/// handler. The handler can change the response status only before the
+/// response starts streaming.
 ///
 /// ```rust
 /// use topcoat::{
@@ -41,16 +41,16 @@ use crate::{
 /// }
 /// ```
 ///
-/// The component is a [`live!`] region that emits the child content and
-/// matches on the result. Use [`live!`] and [`emit!`] directly for cases it
-/// does not cover, like retrying the child after an error.
+/// Use [`live!`] and [`emit!`] directly for cases the component does not
+/// cover, like retrying the child after an error.
 ///
 /// [`live!`]: macro@crate::view::live
 /// [`emit!`]: macro@crate::view::emit
 #[component]
 pub async fn error_boundary<V, F>(
-    /// Builds the view shown when the child content fails, from the error
-    /// that caused it. Returns the error itself, or another one, to rethrow.
+    cx: &Cx,
+    /// Builds a fallback from the child's error. Return `Err` to propagate
+    /// an error instead.
     fallback: F,
     /// The content the boundary guards.
     #[default]
@@ -60,13 +60,7 @@ where
     V: View,
     F: FnOnce(Error) -> Result<V> + Send,
 {
-    Ok(live! {
-        match emit! { (child) } {
-            Err(error) => {
-                let fallback = Child::new(fallback(error)?);
-                emit! { (fallback) }
-            }
-            emitted => emitted,
-        }
-    })
+    const SITE: SiteKey = SiteKey::new(file!(), line!(), column!(), 0);
+    let region = RegionId::new(identity(cx), SITE);
+    Ok(ErrorBoundaryView::new(region, fallback, child))
 }

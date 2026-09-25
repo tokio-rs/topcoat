@@ -2,6 +2,7 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::Stmt;
 
+use super::js::Js;
 use crate::expr::{
     Expr,
     name_resolver::{LocalBindingKind, NameResolver},
@@ -11,7 +12,7 @@ impl Expr {
     pub(super) fn stmt(
         stmt: &Stmt,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
         is_last: bool,
     ) -> syn::Result<()> {

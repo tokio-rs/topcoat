@@ -33,7 +33,7 @@ pub fn forbidden() -> ForbiddenError {
 ///
 /// Construct one with [`forbidden`], or derive one from an `Option` /
 /// `Result` via [`RouterErrorExt`](crate::error::RouterErrorExt).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ForbiddenError {
     _priv: (),
 }

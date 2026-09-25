@@ -1,6 +1,6 @@
 # Manual router
 
-A router built without discovery: every layout, page, and route is registered by hand, including a nested layout and a plain-text API route.
+An app whose handlers are registered explicitly on a router.
 
 Run it with:
 

@@ -8,9 +8,8 @@ use topcoat_icon::iconify::{IconSet, ResolvedIcon};
 
 use crate::iconify::{Selection, suggest::did_you_mean};
 
-/// Resolves one icon of `set` for emission. Unknown names are reported at
-/// `span` with near-miss suggestions, as are icons that resolve to a
-/// transformation, which emission does not support.
+/// Resolves one icon for emission. Reports unknown names and unsupported
+/// transformations at `span`, with similar-name suggestions when available.
 pub(crate) fn resolve_icon<'set>(
     set: &'set IconSet,
     name: &str,
@@ -77,10 +76,8 @@ pub(crate) fn const_item(
     }
 }
 
-/// The `const` items for every listed name of the selected set: icons and
-/// aliases that are not hidden, minus the transformed ones emission does not
-/// support. The consts allow `dead_code` because a set is included as a
-/// whole, not per used icon.
+/// Emits constants for visible icons and aliases without transformations.
+/// Allows `dead_code` because callers may use only part of the set.
 pub(crate) fn set_consts(selection: &Selection, set: &IconSet, vis: &Visibility) -> TokenStream {
     let names = set.icons.keys().chain(set.aliases.keys());
     let consts = names.filter_map(|name| {

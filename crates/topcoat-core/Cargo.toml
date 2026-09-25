@@ -11,12 +11,15 @@ categories.workspace = true
 rust-version.workspace = true
 
 [features]
+# Converts `anyhow::Error` into `topcoat::Error`.
+anyhow = ["dep:anyhow"]
 # Exposes the `cache` module for use from build scripts.
 build = []
 
 [dependencies]
-anyhow.workspace = true
+anyhow = { workspace = true, optional = true }
 anymap3.workspace = true
+base64.workspace = true
 elsa.workspace = true
 http.workspace = true
 pin-project-lite.workspace = true

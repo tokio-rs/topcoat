@@ -48,9 +48,6 @@ fn standard_slot(method: &Method) -> Option<usize> {
 /// The router matches a request URL to one endpoint, then picks the route
 /// registered for the request's method. Read the endpoint a request matched
 /// with [`endpoint`](crate::endpoint).
-///
-/// The standard methods occupy a fixed-size array for O(1), allocation-free
-/// lookup; the rare custom methods spill into a map that is usually empty.
 #[derive(Debug)]
 pub struct Endpoint {
     standard: [Option<RouteIndex>; STANDARD_METHODS.len()],
@@ -70,6 +67,16 @@ impl Endpoint {
             standard: [None; STANDARD_METHODS.len()],
             other: HashMap::new(),
             any: None,
+            path: path.as_str().into(),
+        }
+    }
+
+    /// Returns a copy of this endpoint's method table serving `path` instead.
+    pub(crate) fn with_path(&self, path: &Path) -> Self {
+        Self {
+            standard: self.standard,
+            other: self.other.clone(),
+            any: self.any,
             path: path.as_str().into(),
         }
     }
@@ -160,12 +167,37 @@ impl Endpoints {
     /// Panics if `path` conflicts with an already registered one.
     #[track_caller]
     pub(crate) fn push(&mut self, path: Cow<'static, str>, endpoint: Endpoint) -> EndpointIndex {
-        let index = EndpointIndex(self.endpoints.len());
-        if let Err(error) = self.matcher.insert(path, index) {
-            panic!("failed to register route: {error}");
+        match self.try_push(path, endpoint) {
+            Ok(index) => index,
+            Err(with) => {
+                panic!("failed to register route: conflicts with registered route `{with}`")
+            }
         }
-        self.endpoints.push(endpoint);
-        index
+    }
+
+    /// Registers `endpoint` under the matcher path `path`, returning the
+    /// [`EndpointIndex`] that now identifies it, or the registered path that
+    /// `path` conflicts with.
+    pub(crate) fn try_push(
+        &mut self,
+        path: Cow<'static, str>,
+        endpoint: Endpoint,
+    ) -> Result<EndpointIndex, String> {
+        let index = EndpointIndex(self.endpoints.len());
+        match self.matcher.insert(path, index) {
+            Ok(()) => {
+                self.endpoints.push(endpoint);
+                Ok(index)
+            }
+            Err(matchit::InsertError::Conflict { with }) => Err(with),
+            Err(error) => panic!("failed to register route: {error}"),
+        }
+    }
+
+    /// Iterates over the indices of the endpoints registered so far. The
+    /// iterator borrows nothing, so endpoints can be pushed while it runs.
+    pub(crate) fn indices(&self) -> impl Iterator<Item = EndpointIndex> + use<> {
+        (0..self.endpoints.len()).map(EndpointIndex)
     }
 
     /// Matches a request URL against the registered endpoints, returning the

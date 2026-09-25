@@ -557,12 +557,6 @@ impl PrettyPrint for syn::Arm {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
         self.attrs.pretty_print(printer);
         self.pat.pretty_print(printer);
-        if let Some((if_token, guard)) = &self.guard {
-            " ".pretty_print(printer);
-            if_token.pretty_print(printer);
-            " ".pretty_print(printer);
-            guard.pretty_print(printer);
-        }
         " ".pretty_print(printer);
         self.fat_arrow_token.pretty_print(printer);
         " ".pretty_print(printer);
@@ -621,10 +615,6 @@ impl PrettyPrint for syn::ExprClosure {
             constness.pretty_print(printer);
             " ".pretty_print(printer);
         }
-        if let Some(movability) = &self.movability {
-            movability.pretty_print(printer);
-            " ".pretty_print(printer);
-        }
         if let Some(asyncness) = &self.asyncness {
             asyncness.pretty_print(printer);
             " ".pretty_print(printer);
@@ -633,7 +623,7 @@ impl PrettyPrint for syn::ExprClosure {
             capture.pretty_print(printer);
             " ".pretty_print(printer);
         }
-        self.or1_token.pretty_print(printer);
+        self.inputs_begin.pretty_print(printer);
         for pair in self.inputs.pairs() {
             pair.value().pretty_print(printer);
             if let Some(punct) = pair.punct() {
@@ -641,7 +631,7 @@ impl PrettyPrint for syn::ExprClosure {
                 " ".pretty_print(printer);
             }
         }
-        self.or2_token.pretty_print(printer);
+        self.inputs_end.pretty_print(printer);
         self.output.pretty_print(printer);
 
         if let syn::Expr::Block(block) = &*self.body

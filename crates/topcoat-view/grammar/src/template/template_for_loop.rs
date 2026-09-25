@@ -1,6 +1,6 @@
 use quote::quote;
 use syn::{
-    Expr, ExprBreak, ExprContinue, Pat, Token,
+    Attribute, Expr, ExprBreak, ExprContinue, Pat, Token,
     parse::{Parse, ParseStream},
 };
 use topcoat_core_grammar::ParseOption;
@@ -14,6 +14,7 @@ use crate::{
 /// A `for pat in expr { ... }` loop in view-body position. The body is
 /// rendered once per iteration.
 pub struct TemplateForLoop<T> {
+    pub attributes: Vec<Attribute>,
     pub for_token: Token![for],
     pub pat: Box<Pat>,
     pub in_token: Token![in],
@@ -23,7 +24,7 @@ pub struct TemplateForLoop<T> {
 
 impl<T: LowerView> LowerView for TemplateForLoop<T> {
     fn lower(&self, builder: &mut ViewBuilder) {
-        builder.for_loop(&self.pat, &self.expr, |body| {
+        builder.for_loop(&self.pat, &self.expr, None, |body| {
             self.body.lower(body);
         });
     }
@@ -40,6 +41,7 @@ impl<T: LowerAttribute> LowerAttribute for TemplateForLoop<T> {
 impl<T: Parse> Parse for TemplateForLoop<T> {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
+            attributes: input.call(Attribute::parse_outer)?,
             for_token: input.parse()?,
             pat: Box::new(input.call(Pat::parse_single)?),
             in_token: input.parse()?,
@@ -51,6 +53,10 @@ impl<T: Parse> Parse for TemplateForLoop<T> {
 
 impl<T: Parse> ParseOption for TemplateForLoop<T> {
     fn peek(input: ParseStream) -> bool {
+        let input = input.fork();
+        if input.call(Attribute::parse_outer).is_err() {
+            return false;
+        }
         // `for=` is an attribute named `for`, not the start of a loop.
         input.peek(Token![for]) && !input.peek2(Token![=])
     }
@@ -61,6 +67,7 @@ impl<T: topcoat_core_grammar::pretty::PrettyPrint> topcoat_core_grammar::pretty:
     for TemplateForLoop<T>
 {
     fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.attributes.pretty_print(printer);
         self.for_token.pretty_print(printer);
         " ".pretty_print(printer);
         self.pat.pretty_print(printer);
@@ -185,6 +192,7 @@ mod tests {
     #[test]
     fn parses_simple_for_loop() {
         let loop_ = parse(r"for x in xs { (x) }");
+        assert!(loop_.attributes.is_empty());
         assert_eq!(loop_.pat.to_token_stream().to_string(), "x");
         assert_eq!(loop_.expr.to_token_stream().to_string(), "xs");
         assert_eq!(loop_.body.children.len(), 1);
@@ -194,6 +202,17 @@ mod tests {
     fn parses_tuple_pattern() {
         let loop_ = parse(r"for (k, v) in pairs { (k) }");
         assert_eq!(loop_.pat.to_token_stream().to_string(), "(k , v)");
+    }
+
+    #[test]
+    fn preserves_attributes_without_interpreting_them() {
+        let loop_ = parse(r"#[key(item.id)] #[custom] for item in items { (item) }");
+        assert_eq!(loop_.attributes.len(), 2);
+        assert_eq!(
+            loop_.attributes[0].to_token_stream().to_string(),
+            "# [key (item . id)]",
+        );
+        assert!(loop_.attributes[1].path().is_ident("custom"));
     }
 
     #[test]
@@ -242,6 +261,11 @@ mod tests {
     #[test]
     fn for_equals_is_an_attribute_not_a_loop() {
         assert!(peeks(TemplateForLoop::<Nodes>::peek, "for x in xs {}"));
+        assert!(peeks(
+            TemplateForLoop::<Nodes>::peek,
+            "#[key(x)] for x in xs {}",
+        ));
+        assert!(!peeks(TemplateForLoop::<Nodes>::peek, "#[key(x)] if x {}",));
         assert!(!peeks(TemplateForLoop::<Nodes>::peek, r#"for="email""#));
     }
 

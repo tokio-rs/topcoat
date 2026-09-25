@@ -24,6 +24,8 @@ pub mod cookie;
 
 pub mod context;
 
+pub mod core;
+
 #[cfg(feature = "datastar")]
 pub mod datastar;
 

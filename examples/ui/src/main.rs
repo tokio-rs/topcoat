@@ -21,10 +21,13 @@ use components::{
         dropdown_menu_separator, dropdown_menu_sub, dropdown_menu_sub_content,
         dropdown_menu_sub_trigger, dropdown_menu_trigger,
     },
+    field::{
+        FieldLegendVariant, FieldOrientation, field, field_content, field_description, field_error,
+        field_group, field_label, field_legend, field_separator, field_set,
+    },
     hover_card::{hover_card, hover_card_content},
     input::input,
     kbd::{kbd, kbd_group},
-    label::label,
     pagination::{
         pagination, pagination_content, pagination_ellipsis, pagination_item, pagination_link,
         pagination_next, pagination_previous,
@@ -33,7 +36,14 @@ use components::{
     radio_group::{radio_group, radio_group_item},
     select::select,
     separator::{SeparatorOrientation, separator},
-    sheet::{SheetSide, sheet, sheet_content},
+    sheet::{sheet, sheet_content},
+    sidebar::{
+        SidebarCollapsible, SidebarMenuButtonSize, SidebarVariant, sidebar, sidebar_content,
+        sidebar_footer, sidebar_group, sidebar_group_action, sidebar_group_content,
+        sidebar_group_label, sidebar_header, sidebar_inset, sidebar_menu, sidebar_menu_badge,
+        sidebar_menu_button, sidebar_menu_item, sidebar_menu_sub, sidebar_menu_sub_button,
+        sidebar_menu_sub_item, sidebar_provider, sidebar_separator, sidebar_trigger,
+    },
     skeleton::skeleton,
     spinner::spinner,
     switch::switch,
@@ -52,18 +62,17 @@ use topcoat::{
     context::Cx,
     font::fontsource::fontsource_font,
     icon::{icon, iconify::iconify_icon},
-    router::{Router, RouterBuilderDiscoverExt, page, query_params},
+    router::{Router, RouterBuilderDiscoverExt, page},
+    runtime::{Event, RouterBuilderRuntimeExt, Signal, expr, shard, signal},
     tailwind,
-    view::{Child, View, attributes, class, component, view},
+    view::{Child, View, attributes, component, view},
 };
 
 /// A stand-in portrait for the workspace's owner, served from the example's
 /// own asset bundle.
 const PORTRAIT: Asset = asset!("./portrait.svg");
 
-/// The pages this one links out to: the framework's documentation, its
-/// source, and the registry the components here were added from.
-const CRATE: &str = "https://crates.io/crates/topcoat";
+/// External destinations linked from the showcase.
 const DOCS: &str = "https://docs.rs/topcoat";
 const REPOSITORY: &str = "https://github.com/tokio-rs/topcoat";
 const REGISTRY: &str = "https://github.com/tokio-rs/topcoat/tree/main/crates/topcoat-ui/registry";
@@ -73,269 +82,19 @@ async fn main() {
     let router = Router::builder()
         .assets(AssetBundle::load().unwrap())
         .discover()
+        .runtime()
         .build();
 
     topcoat::start(router).await.unwrap();
 }
 
-/// What the page keeps in its URL.
-///
-/// Every key is optional, so a query string that makes no sense reloads the
-/// page without one rather than failing the request.
-#[query_params(error = redirect("?"))]
-struct HomeQuery {
-    tab: Option<String>,
-    page: Option<usize>,
-    per_page: Option<usize>,
-    name: Option<String>,
-    env: Option<String>,
-    status: Option<String>,
-    branch: Option<String>,
-    overlay: Option<String>,
-    side: Option<String>,
-}
-
-/// The page's state: its query string read back as the values the page has
-/// markup for.
-///
-/// Everything the page does without scripting goes through here. A link or a
-/// form sets one part of the state, the page comes back rendered for it, and
-/// the state survives a reload and can be shared as it stands.
-struct State {
-    /// The panel the project card shows.
-    tab: &'static str,
-    /// The page of the deployments table.
-    page: usize,
-    /// How many rows a page of the deployments table holds.
-    per_page: usize,
-    /// The name the project goes by.
-    name: String,
-    /// The environment the deployments table is filtered to.
-    env: Option<&'static str>,
-    /// The status the deployments table is filtered to.
-    status: Option<&'static str>,
-    /// The branch the preview builds from.
-    branch: &'static str,
-    /// The overlay covering the page.
-    overlay: Option<&'static str>,
-    /// The edge the sheet comes in from.
-    side: &'static str,
-}
-
-impl State {
-    /// Reads the state out of the request's query string.
-    ///
-    /// Every value is looked up among the ones the page has markup for, so a
-    /// query string nobody wrote cannot put the page in a state it has no way
-    /// to render.
-    fn read(cx: &Cx) -> Result<Self> {
-        let query = query_params::<HomeQuery>(cx)?;
-        let branch = query.branch.as_deref();
-
-        Ok(Self {
-            tab: one_of(query.tab.as_deref(), &TABS.map(|(value, _)| value)).unwrap_or(TABS[0].0),
-            page: query.page.unwrap_or(1).max(1),
-            per_page: one_of_numbers(query.per_page, &PER_PAGE).unwrap_or(PER_PAGE[0]),
-            name: project_name(query.name.clone()),
-            env: one_of(query.env.as_deref(), &ENVIRONMENTS),
-            status: query.status.as_deref().and_then(status_label),
-            branch: one_of(branch, &BRANCHES)
-                .or(one_of(branch, &TAGS))
-                .unwrap_or(BRANCHES[0]),
-            overlay: one_of(query.overlay.as_deref(), &OVERLAYS.map(|(value, _)| value)),
-            side: one_of(query.side.as_deref(), &SIDES.map(|(value, ..)| value))
-                .unwrap_or(SIDES[0].0),
-        })
-    }
-
-    /// The state as query parameters, leaving out whatever stands at its
-    /// default: a link to the page as it is carries no query string at all.
-    fn params(&self) -> Vec<(&'static str, String)> {
-        let mut params = Vec::new();
-
-        if self.tab != TABS[0].0 {
-            params.push(("tab", self.tab.to_owned()));
-        }
-        if self.page > 1 {
-            params.push(("page", self.page.to_string()));
-        }
-        if self.per_page != PER_PAGE[0] {
-            params.push(("per_page", self.per_page.to_string()));
-        }
-        if self.name != NAME {
-            params.push(("name", self.name.clone()));
-        }
-        if let Some(env) = self.env {
-            params.push(("env", env.to_owned()));
-        }
-        if let Some(status) = self.status {
-            params.push(("status", status.to_lowercase()));
-        }
-        if self.branch != BRANCHES[0] {
-            params.push(("branch", self.branch.to_owned()));
-        }
-        if let Some(overlay) = self.overlay {
-            params.push(("overlay", overlay.to_owned()));
-        }
-        if self.side != SIDES[0].0 {
-            params.push(("side", self.side.to_owned()));
-        }
-
-        params
-    }
-
-    /// The page's URL with `key` set to `value`, or dropped for `None`, and
-    /// the rest of the state left as it is.
-    ///
-    /// Every link on the page is built this way, which is what keeps opening a
-    /// dialog or turning a page from resetting the parts of the page it has
-    /// nothing to do with.
-    fn href(&self, key: &'static str, value: Option<&str>) -> String {
-        let mut params = self.params();
-        params.retain(|(name, _)| *name != key);
-        if let Some(value) = value {
-            params.push((key, value.to_owned()));
-        }
-
-        let query: Vec<String> = params
-            .iter()
-            .map(|(name, value)| format!("{name}={value}"))
-            .collect();
-
-        format!("?{}", query.join("&"))
-    }
-
-    /// The URL of page `number` of the deployments table.
-    fn page_href(&self, number: usize) -> String {
-        if number > 1 {
-            self.href("page", Some(&number.to_string()))
-        } else {
-            self.href("page", None)
-        }
-    }
-
-    /// The URL of the sheet lying against `side`.
-    fn side_href(&self, side: &'static str) -> String {
-        self.href("side", (side != SIDES[0].0).then_some(side))
-    }
-
-    /// The URL of the page with no overlay over it, which is what closes one.
-    fn closed(&self) -> String {
-        self.href("overlay", None)
-    }
-
-    /// Whether a deployment to `env` in `status` passes the table's filters.
-    fn shows(&self, env: &str, status: &str) -> bool {
-        self.env.is_none_or(|filter| filter == env)
-            && self.status.is_none_or(|filter| filter == status)
-    }
-
-    /// What the deployments table is filtered to, in words.
-    fn filtered(&self) -> String {
-        match (self.env, self.status) {
-            (None, None) => String::from("Every environment"),
-            (Some(env), None) => format!("Deployments to {env}"),
-            (None, Some(status)) => format!("{status} deployments"),
-            (Some(env), Some(status)) => format!("{status} deployments to {env}"),
-        }
-    }
-
-    /// The edge the sheet lies against.
-    fn sheet_side(&self) -> SheetSide {
-        SIDES
-            .iter()
-            .find(|(value, ..)| *value == self.side)
-            .map_or(SheetSide::default(), |(.., side)| *side)
-    }
-}
-
-/// The entry of `values` that `value` names, if it names one at all.
-fn one_of(value: Option<&str>, values: &[&'static str]) -> Option<&'static str> {
-    let value = value?;
-    values.iter().copied().find(|known| *known == value)
-}
-
-/// The entry of `values` that `value` names, for the numbers among the state.
-fn one_of_numbers(value: Option<usize>, values: &[usize]) -> Option<usize> {
-    let value = value?;
-    values.iter().copied().find(|known| *known == value)
-}
-
-/// The name the project goes by until it is renamed.
-const NAME: &str = "topcoat-ui";
-
-/// The name in `value`, if it is one the page's links can carry.
-///
-/// The links here build their query strings by hand, so a name is kept to
-/// what needs no escaping: letters, digits, dashes, and underscores, and no
-/// more than 32 of them. Anything else falls back to the default, the same
-/// way the rest of the state does.
-fn project_name(value: Option<String>) -> String {
-    let name = value.unwrap_or_default();
-    let carried = !name.is_empty()
-        && name.len() <= 32
-        && name
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
-
-    if carried { name } else { NAME.to_owned() }
-}
-
-/// The panels the project card tabs between: the value each goes by in the
-/// URL, and the word on its trigger. The first is the one the page opens on.
-const TABS: [(&str, &str); 3] = [
-    ("overview", "Overview"),
-    ("activity", "Activity"),
-    ("settings", "Settings"),
-];
-
-/// How many rows one page of the deployments table can hold. The first is the
-/// number it holds until another is picked.
-const PER_PAGE: [usize; 3] = [3, 6, 12];
-
-/// The environments deployments go to.
-const ENVIRONMENTS: [&str; 3] = ["production", "staging", "preview"];
-
-/// The statuses a deployment can be in, and the badge variant each shows in.
+/// Deployment statuses and their badge styles.
 const STATUSES: [(&str, BadgeVariant); 4] = [
     ("Live", BadgeVariant::Primary),
     ("Building", BadgeVariant::Secondary),
     ("Queued", BadgeVariant::Outline),
     ("Failed", BadgeVariant::Destructive),
 ];
-
-/// The branches a preview can build from. The first is the one it builds from
-/// until another is picked.
-const BRANCHES: [&str; 3] = ["main", "feature/showcase", "feature/dark-mode"];
-
-/// The tags a preview can build from instead of a branch.
-const TAGS: [&str; 3] = ["v1.2.0", "v1.1.0", "v1.0.0"];
-
-/// The overlays that can cover the page, one at a time: the value each goes
-/// by in the URL, and the word for it.
-const OVERLAYS: [(&str, &str); 3] = [
-    ("rename", "Dialog"),
-    ("reset", "Alert dialog"),
-    ("filters", "Sheet"),
-];
-
-/// The edges the sheet can come in from: the value each goes by in the URL,
-/// the word for it, and the side itself. The first is the one it comes from
-/// until another is picked.
-const SIDES: [(&str, &str, SheetSide); 4] = [
-    ("right", "Right", SheetSide::Right),
-    ("left", "Left", SheetSide::Left),
-    ("top", "Top", SheetSide::Top),
-    ("bottom", "Bottom", SheetSide::Bottom),
-];
-
-/// The word for the deployment status `value` names, whatever its case.
-fn status_label(value: &str) -> Option<&'static str> {
-    STATUSES
-        .iter()
-        .find(|(status, _)| status.eq_ignore_ascii_case(value))
-        .map(|(status, _)| *status)
-}
 
 /// The badge variant the deployment status `status` shows in.
 fn status_variant(status: &str) -> BadgeVariant {
@@ -347,114 +106,170 @@ fn status_variant(status: &str) -> BadgeVariant {
 
 #[page("/")]
 async fn home(cx: &Cx) -> Result<impl View> {
-    let state = State::read(cx)?;
+    let dark = signal(cx, || false);
+    let sidebar_open = signal(cx, || true);
+    let mobile_open = signal(cx, || false);
 
     Ok(view! {
         <!DOCTYPE html>
-        <html>
+        <html
+            :class=$(if dark.get() { "dark" } else { "" })
+            :style=$(if dark.get() {
+                "color-scheme: dark"
+            } else {
+                "color-scheme: light"
+            })
+        >
             <head>
                 <title>"Topcoat UI"</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1">
                 topcoat::dev::script()
+                topcoat::runtime::script()
                 topcoat::font::link(font: fontsource_font!(GEIST, host: Asset))
                 <link rel="stylesheet" href=(tailwind::stylesheet!())>
             </head>
             // The body's background, text color, and font come from the
             // theme's base layer in styles.css; nothing to set up here.
-            <body>
-                <main class="mx-auto max-w-6xl px-6 py-16">
-                    <header class="max-w-2xl">
-                        <h1 class="text-4xl font-bold tracking-tight">
-                            "Build your component library"
-                        </h1>
-                        <p class="mt-3 text-muted-foreground">
-                            "Accessible, themeable components vendored into your \
-                             project with "
-                            <code class="text-foreground">"topcoat ui add"</code>
-                            ". Yours to restyle, rewrite, and ship."
-                        </p>
-                        // Anything can borrow a button's looks:
-                        // `button_variants` returns the class string for a
-                        // variant and size.
-                        <div class="mt-6 flex flex-wrap items-center gap-3">
-                            <a
-                                href=(DOCS)
-                                class=(button_variants(
-                                    ButtonVariant::Primary,
-                                    ButtonSize::Lg,
-                                ))
+            <body
+                :class=$(if mobile_open.get() { "max-md:overflow-hidden" } else { "" })
+            >
+                sidebar_provider(
+                    app_sidebar(open: $(sidebar_open), mobile_open: $(mobile_open))
+                    sidebar_inset(
+                        sidebar_header(
+                            sidebar_trigger(
+                                open: $(sidebar_open.get()),
+                                attrs: attributes! {
+                                    class="max-md:hidden"
+                                    aria-controls="showcase-sidebar"
+                                    @click=$(|_e: Event| sidebar_open.toggle())
+                                }
+                            )
+                            sidebar_trigger(
+                                open: $(mobile_open.get()),
+                                attrs: attributes! {
+                                    class="md:hidden"
+                                    aria-controls="showcase-sidebar"
+                                    @click=$(|_e: Event| mobile_open.toggle())
+                                }
+                            )
+                            separator(orientation: SeparatorOrientation::Vertical)
+                            <span class="text-sm font-medium">"Component library"</span>
+
+                            let theme_label = expr!(
+                                if dark.get() {
+                                    "Switch to light theme"
+                                } else {
+                                    "Switch to dark theme"
+                                },
+                            );
+
+                            button(
+                                variant: ButtonVariant::Primary,
+                                size: ButtonSize::Md,
+                                attrs: attributes! {
+                                    type="button"
+                                    class="ml-auto"
+                                    @click=$(|_e: Event| dark.toggle())
+                                    :aria-label=(theme_label.clone())
+                                    :title=(theme_label)
+                                },
+                                <span class="contents" :hidden=$(!dark.get())>
+                                    "Light theme"
+                                    icon(data: iconify_icon!("lucide:sun"))
+                                </span>
+                                <span class="contents" :hidden=$(dark.get())>
+                                    "Dark theme"
+                                    icon(data: iconify_icon!("lucide:moon"))
+                                </span>
+                            )
+                        )
+                        <div
+                            id="overview"
+                            class="mx-auto w-full max-w-6xl scroll-mt-20 px-6 py-12"
+                        >
+                            <div
+                                class="flex flex-col-reverse items-start justify-between gap-6 sm:flex-row"
                             >
-                                "Read the docs"
-                                icon(data: iconify_icon!("lucide:arrow-right"))
-                            </a>
-                            <a
-                                href=(REPOSITORY)
-                                class=(button_variants(
-                                    ButtonVariant::Outline,
-                                    ButtonSize::Lg,
-                                ))
+                                <header class="max-w-2xl">
+                                    <h1 class="text-4xl font-bold tracking-tight">
+                                        "Build your component library"
+                                    </h1>
+                                    <p class="mt-3 text-muted-foreground">
+                                        "Accessible, themeable components vendored into your \
+                                 project with "
+                                        <code class="text-foreground">"topcoat ui add"</code>
+                                        ". Yours to restyle, rewrite, and ship."
+                                    </p>
+                                    // Anything can borrow a button's looks:
+                                    // `button_variants` returns the class string for a
+                                    // variant and size.
+                                    <div class="mt-6 flex flex-wrap items-center gap-3">
+                                        <a
+                                            href=(DOCS)
+                                            class=(button_variants(
+                                                ButtonVariant::Primary,
+                                                ButtonSize::Lg,
+                                            ))
+                                        >
+                                            "Read the docs"
+                                            icon(data: iconify_icon!("lucide:arrow-right"))
+                                        </a>
+                                        <a
+                                            href=(REPOSITORY)
+                                            class=(button_variants(
+                                                ButtonVariant::Outline,
+                                                ButtonSize::Lg,
+                                            ))
+                                        >
+                                            "View on GitHub"
+                                        </a>
+                                    </div>
+                                </header>
+                            </div>
+
+                            // A masonry of small, self-contained demos, each built
+                            // from the installed components. They run from the plainest
+                            // components to the ones assembled out of them.
+                            <div
+                                id="components"
+                                class="mt-14 scroll-mt-20 columns-1 gap-4 lg:columns-2 2xl:columns-3"
                             >
-                                "View on GitHub"
-                            </a>
+                                demo(buttons_card())
+                                demo(notices())
+                                demo(team_card())
+                                demo(status_card())
+                                demo(progress_card())
+                                demo(id: Some("forms"), form_card())
+                                demo(checks_card())
+                                demo(switches_card())
+                                demo(radios_card())
+                                demo(overview_card())
+                                demo(faq_card())
+                                demo(branches_card())
+                                demo(toolbar_card())
+                                demo(tooltip_card())
+                                demo(hover_card_demo())
+                                demo(id: Some("overlays"), dialogs_card())
+                                demo(sheet_card())
+                                demo(deployments_card())
+                                demo(breadcrumbs_card())
+                                demo(keyboard_card())
+                                demo(skeletons_card())
+                                demo(spinner_card())
+                            </div>
                         </div>
-                    </header>
-
-                    // A masonry of small, self-contained demos, each built
-                    // from the installed components. They run from the plainest
-                    // components to the ones assembled out of them.
-                    <div class="mt-14 columns-1 gap-4 sm:columns-2 xl:columns-3">
-                        demo(buttons_card())
-                        demo(notices())
-                        demo(team_card())
-                        demo(status_card())
-                        demo(form_card())
-                        demo(checks_card())
-                        demo(rows_card(state: &state))
-                        demo(overlays_card(state: &state))
-                        demo(overview_card(state: &state))
-                        demo(faq_card())
-                        demo(branches_card(state: &state))
-                        demo(toolbar_card())
-                        demo(share_card())
-                        demo(rename_card(state: &state))
-                        demo(deployments_card(state: &state))
-                        demo(docs_card())
-                        demo(pending_card())
-                        demo(deploy_card())
-                    </div>
-                </main>
-
-                // The overlays cover the page, so they stand outside the
-                // masonry rather than in the cells that open them.
-                rename_dialog(state: &state)
-                reset_dialog(state: &state)
-                filters_sheet(state: &state)
+                    )
+                )
             </body>
         </html>
     })
 }
 
-/// A masonry cell: keeps a demo from splitting across columns.
+/// A masonry cell that keeps a demo from splitting across columns.
 #[component]
-async fn demo(child: Child<'_>) -> Result<impl View> {
-    Ok(view! { <div class="mb-4 break-inside-avoid">(child)</div> })
-}
-
-/// The parts of the page's state a form does not set, carried along as hidden
-/// fields.
-///
-/// A form submitted with GET replaces the whole query string with its own
-/// fields, so without these, submitting one would reset the rest of the page.
-/// `sets` names the parameters the form has controls for, separated by spaces;
-/// those are left out, since the form submits its own values for them.
-#[component]
-async fn state_fields(state: &State, sets: &str) -> Result<impl View> {
-    Ok(view! {
-        for (key, value) in state.params() {
-            if !sets.split_whitespace().any(|set| set == key) {
-                <input type="hidden" name=(key) value=(value)>
-            }
-        }
-    })
+async fn demo(#[default] id: Option<&str>, child: Child<'_>) -> Result<impl View> {
+    Ok(view! { <div id=(id) class="mb-4 scroll-mt-20 break-inside-avoid">(child)</div> })
 }
 
 /// The button family: variants, sizes, and states at a glance.
@@ -507,8 +322,7 @@ async fn buttons_card() -> Result<impl View> {
     })
 }
 
-/// Notices standing on their own: an alert is a surface already, so it needs
-/// no card under it.
+/// Alerts displayed without a surrounding card.
 #[component]
 async fn notices() -> Result<impl View> {
     Ok(view! {
@@ -542,15 +356,14 @@ async fn notices() -> Result<impl View> {
     })
 }
 
-/// The people standing in for a roster: the initials their avatar falls back
-/// to, and the role they hold.
+/// Example people with avatar initials and roles.
 const MEMBERS: [(&str, &str, &str, &str); 3] = [
     ("Grace Hopper", "grace@example.com", "GH", "Member"),
     ("Alan Turing", "alan@example.com", "AT", "Member"),
     ("Katherine Johnson", "katherine@example.com", "KJ", "Viewer"),
 ];
 
-/// A roster: the owner in full, then everyone else with the role they hold.
+/// A roster showing each person and their role.
 #[component]
 async fn team_card() -> Result<impl View> {
     Ok(view! {
@@ -602,18 +415,16 @@ async fn team_card() -> Result<impl View> {
     })
 }
 
-/// Environment statuses told through the badge variants, and a rollout told
-/// through the progress bar.
+/// The badge variants with example deployment counts.
 #[component]
 async fn status_card() -> Result<impl View> {
+    const CRATE: &str = "https://crates.io/crates/topcoat";
+
     Ok(view! {
         card(
             card_header(
                 card_title("Badges")
-                card_description(
-                    "Every variant, counting the rows of the table below, and \
-                     a progress bar under them."
-                )
+                card_description("Status badges in every variant.")
             )
             card_content(
                 <div class="flex flex-col gap-3">
@@ -631,16 +442,6 @@ async fn status_card() -> Result<impl View> {
                         </div>
                     }
                 </div>
-                separator(attrs: attributes! { class="my-4" })
-                <div class="flex flex-col gap-2">
-                    <div class="flex items-center justify-between gap-4">
-                        <p class="text-sm text-muted-foreground">
-                            "A bar with a value"
-                        </p>
-                        <p class="text-sm font-medium">"62%"</p>
-                    </div>
-                    progress(value: 62.0)
-                </div>
             )
             card_footer(
                 <p class="text-sm text-muted-foreground">"Built with Topcoat"</p>
@@ -654,60 +455,205 @@ async fn status_card() -> Result<impl View> {
     })
 }
 
-/// The form controls, each with the label naming it.
-///
-/// Nothing is submitted here: the fields are the demo, and "Reset" is the one
-/// control that acts, which the browser does on its own.
+/// Determinate and indeterminate progress bars.
 #[component]
-async fn form_card() -> Result<impl View> {
+async fn progress_card(cx: &Cx) -> Result<impl View> {
+    let completed = signal(cx, || 62usize);
+
+    Ok(view! {
+        card(
+            card_header(
+                card_title("Progress")
+                card_description(
+                    "With a known value or an indeterminate amount of work."
+                )
+            )
+            card_content(
+                <div class="flex flex-col gap-2">
+                    <div class="flex items-center justify-between gap-4">
+                        <p class="text-sm text-muted-foreground">
+                            "A bar with a value"
+                        </p>
+                        <p class="text-sm font-medium">
+                            $(completed.get())
+                            "%"
+                        </p>
+                    </div>
+                    progress(
+                        attrs: attributes! { aria-label="Rollout progress" :value=$(completed.get()) }
+                    )
+                    <div class="flex justify-end gap-2">
+                        button(
+                            variant: ButtonVariant::Outline,
+                            size: ButtonSize::Sm,
+                            attrs: attributes! { type="button" @click=$(|_e: Event| completed.set(0)) },
+                            "Reset"
+                        )
+                        button(
+                            size: ButtonSize::Sm,
+                            attrs: attributes! {
+                                type="button"
+                                :disabled=$(completed.get() >= 100)
+                                @click=$(|_e: Event| {
+                                    let next = completed.get() + 10;
+                                    completed.set(if next > 100 { 100 } else { next });
+                                })
+                            },
+                            "Advance"
+                        )
+                    </div>
+                </div>
+                separator(attrs: attributes! { class="my-4" })
+                <div class="flex flex-col gap-2">
+                    <p class="text-sm text-muted-foreground">"Indeterminate"</p>
+                    progress(attrs: attributes! { aria-label="Indeterminate progress" })
+                </div>
+            )
+        )
+    })
+}
+
+/// Form fields with labels, descriptions, and inline validation.
+///
+/// The fields keep their values in signals. Reset restores their initial values.
+#[component]
+async fn form_card(cx: &Cx) -> Result<impl View> {
+    let name = signal(cx, String::new);
+    let region = signal(cx, || String::from("eu-central-1"));
+    let summary = signal(cx, String::new);
+    let validated = signal(cx, || false);
+    let invalid = expr!(if validated.get() {
+        name.get().trim().is_empty()
+    } else {
+        false
+    });
+
     Ok(view! {
         card(
             card_header(
                 card_title("Form controls")
-                card_description("An input, a select, a textarea, and a label each.")
+                card_description(
+                    "Grouped fields, helpful descriptions, and inline errors."
+                )
             )
             card_content(
-                <form class="flex flex-col gap-4">
-                    <div class="flex flex-col gap-2">
-                        label(attrs: attributes! { for="project-name" }, "Name")
-                        input(
-                            attrs: attributes! { id="project-name" placeholder="my-app" }
+                <form
+                    class="flex flex-col gap-4"
+                    @submit=$(|e: Event| {
+                        e.prevent_default();
+                        validated.set(true);
+                    })
+                    @reset=$(|e: Event| {
+                        e.prevent_default();
+                        name.set("".to_owned());
+                        region.set("eu-central-1".to_owned());
+                        summary.set("".to_owned());
+                        validated.set(false);
+                    })
+                >
+                    field_set(
+                        field_legend(
+                            variant: FieldLegendVariant::Label,
+                            "Project details"
                         )
-                    </div>
-                    <div class="flex flex-col gap-2">
-                        label(attrs: attributes! { for="region" }, "Region")
-                        select(
-                            attrs: attributes! { id="region" },
-                            <optgroup label="Europe">
-                                <option>"eu-central-1"</option>
-                                <option>"eu-west-2"</option>
-                            </optgroup>
-                            <optgroup label="Americas">
-                                <option>"us-east-1"</option>
-                                <option>"sa-east-1"</option>
-                            </optgroup>
+                        field_group(
+                            field(
+                                field_label(
+                                    attrs: attributes! { for="project-name" },
+                                    "Name"
+                                )
+                                input(
+                                    attrs: attributes! {
+                                        id="project-name"
+                                        name="name"
+                                        placeholder="my-app"
+                                        aria-required="true"
+                                        aria-describedby="project-name-description project-name-error"
+                                        :aria-invalid=$(if invalid { "true" } else { "false" })
+                                        :value=$(name.get())
+                                        @input=$(|e: Event| name.set(e.target.value))
+                                    }
+                                )
+                                field_description(
+                                    attrs: attributes! { id="project-name-description" },
+                                    "A name to identify this project."
+                                )
+                                field_error(
+                                    attrs: attributes! { id="project-name-error" :hidden=$(!invalid) },
+                                    $(if invalid { "Enter a project name." } else { "" })
+                                )
+                            )
+                            field(
+                                field_label(attrs: attributes! { for="region" }, "Region")
+                                select(
+                                    attrs: attributes! {
+                                        id="region"
+                                        name="region"
+                                        aria-describedby="region-description"
+                                        :value=$(region.get())
+                                        @change=$(|e: Event| region.set(e.target.value))
+                                    },
+                                    <optgroup label="Europe">
+                                        <legend>"Europe"</legend>
+                                        <option>"eu-central-1"</option>
+                                        <option>"eu-west-2"</option>
+                                    </optgroup>
+                                    <optgroup label="Americas">
+                                        <legend>"Americas"</legend>
+                                        <option>"us-east-1"</option>
+                                        <option>"sa-east-1"</option>
+                                    </optgroup>
+                                )
+                                field_description(
+                                    attrs: attributes! { id="region-description" },
+                                    "Choose the region closest to your users."
+                                )
+                            )
+                            field(
+                                field_label(
+                                    attrs: attributes! { for="summary" },
+                                    "Summary"
+                                )
+                                textarea(
+                                    attrs: attributes! {
+                                        id="summary"
+                                        name="summary"
+                                        placeholder="What this project is for."
+                                        :value=$(summary.get())
+                                        @input=$(|e: Event| summary.set(e.target.value))
+                                    }
+                                )
+                            )
+                            field_separator()
+                            field(
+                                orientation: FieldOrientation::Responsive,
+                                field_label(attrs: attributes! { for="owner" }, "Owner")
+                                // A disabled field shows a value that is not the
+                                // form's to change.
+                                field_content(
+                                    input(
+                                        attrs: attributes! {
+                                            id="owner"
+                                            value="ada@example.com"
+                                            aria-describedby="owner-description"
+                                            disabled=""
+                                        }
+                                    )
+                                    field_description(
+                                        attrs: attributes! { id="owner-description" },
+                                        "The workspace owner manages this project."
+                                    )
+                                )
+                            )
                         )
-                    </div>
-                    <div class="flex flex-col gap-2">
-                        label(attrs: attributes! { for="summary" }, "Summary")
-                        textarea(
-                            attrs: attributes! { id="summary" placeholder="What this project is for." }
-                        )
-                    </div>
-                    <div class="flex flex-col gap-2">
-                        label(attrs: attributes! { for="owner" }, "Owner")
-                        // A disabled field shows a value that is not the
-                        // form's to change.
-                        input(
-                            attrs: attributes! { id="owner" value="ada@example.com" disabled="" }
-                        )
-                    </div>
+                    )
                     <div class="flex flex-wrap justify-end gap-2">
                         button(
                             variant: ButtonVariant::Outline,
                             attrs: attributes! { type="reset" },
                             "Reset"
                         )
+                        button(attrs: attributes! { type="submit" }, "Validate")
                     </div>
                 </form>
             )
@@ -715,191 +661,190 @@ async fn form_card() -> Result<impl View> {
     })
 }
 
-/// The states a checkbox is shown in: the id it goes by, the word for the
-/// state, whether it is checked, and whether it is disabled.
-const CHECKS: [(&str, &str, bool, bool); 4] = [
-    ("check-on", "Checked", true, false),
-    ("check-off", "Unchecked", false, false),
-    ("check-on-off", "Checked and disabled", true, true),
-    ("check-off-off", "Unchecked and disabled", false, true),
-];
-
-/// The same states, shown on a switch.
-const SWITCHES: [(&str, &str, bool, bool); 3] = [
-    ("switch-on", "On", true, false),
-    ("switch-off", "Off", false, false),
-    ("switch-off-off", "Off and disabled", false, true),
-];
-
-/// The checkbox and the switch, in each of the states they can be in.
+/// Checkboxes in their checked, unchecked, and disabled states.
 ///
-/// Nothing behind them keeps a value, so every row says which state it stands
-/// in rather than naming a setting the page does not have.
+/// Each control keeps its own signal, starting in the state its row names.
 #[component]
-async fn checks_card() -> Result<impl View> {
+async fn checks_card(cx: &Cx) -> Result<impl View> {
+    // The id, label, checked state, and disabled state of each checkbox.
+    const CHECKS: [(&str, &str, bool, bool); 4] = [
+        ("check-on", "Checked", true, false),
+        ("check-off", "Unchecked", false, false),
+        ("check-on-off", "Checked and disabled", true, true),
+        ("check-off-off", "Unchecked and disabled", false, true),
+    ];
+
+    let checks: Vec<_> = CHECKS
+        .into_iter()
+        .map(|(id, text, checked, disabled)| {
+            (id, text, signal(&cx.keyed(id), || checked), disabled)
+        })
+        .collect();
+
     Ok(view! {
         card(
             card_header(
-                card_title("Checkboxes and switches")
-                card_description("Each one in the states it can be in.")
+                card_title("Checkboxes")
+                card_description("Checked, unchecked, and disabled.")
             )
             card_content(
-                <div class="flex flex-col gap-3">
-                    for (id, text, checked, disabled) in CHECKS {
-                        <div class="flex items-center gap-2">
+                field_group(
+                    attrs: attributes! { class="gap-3" },
+                    for (id, text, checked, disabled) in checks {
+                        field(
+                            orientation: FieldOrientation::Horizontal,
                             checkbox(
-                                attrs: attributes! { id=(id) checked=(checked) disabled=(disabled) }
+                                attrs: attributes! {
+                                    id=(id)
+                                    :checked=$(checked.get())
+                                    @change=$(|e: Event| checked.set(e.target.checked))
+                                    disabled=(disabled)
+                                }
                             )
-                            label(
-                                attrs: attributes! { for=(id) class=(class!("opacity-50" if disabled)) },
-                                (text)
-                            )
-                        </div>
+                            field_label(attrs: attributes! { for=(id) }, (text))
+                        )
                     }
-                </div>
-                separator(attrs: attributes! { class="my-4" })
-                <div class="flex flex-col gap-3">
-                    for (id, text, checked, disabled) in SWITCHES {
-                        <div class="flex items-center justify-between gap-4">
-                            label(
-                                attrs: attributes! { for=(id) class=(class!("opacity-50" if disabled)) },
-                                (text)
-                            )
-                            switch(
-                                attrs: attributes! { id=(id) checked=(checked) disabled=(disabled) }
-                            )
-                        </div>
-                    }
-                </div>
+                )
             )
         )
     })
 }
 
-/// A radio group that sets how many rows the table further down shows.
-///
-/// The choice reaches the server the way every other one on this page does:
-/// the group sits in a form, and the button submits it into the URL. The page
-/// is left out of the fields carried along, so a table resized by hand comes
-/// back at its first page rather than at one the rows no longer reach.
+/// Switches with an independent signal for each control.
 #[component]
-async fn rows_card(state: &State) -> Result<impl View> {
+async fn switches_card(cx: &Cx) -> Result<impl View> {
+    // The id, label, checked state, and disabled state of each switch.
+    const SWITCHES: [(&str, &str, bool, bool); 3] = [
+        ("switch-on", "On", true, false),
+        ("switch-off", "Off", false, false),
+        ("switch-off-off", "Off and disabled", false, true),
+    ];
+
+    let switches: Vec<_> = SWITCHES
+        .into_iter()
+        .map(|(id, text, checked, disabled)| {
+            (id, text, signal(&cx.keyed(id), || checked), disabled)
+        })
+        .collect();
+
+    Ok(view! {
+        card(
+            card_header(
+                card_title("Switches")
+                card_description("On, off, and disabled.")
+            )
+            card_content(
+                field_group(
+                    attrs: attributes! { class="gap-3" },
+                    for (id, text, checked, disabled) in switches {
+                        field(
+                            orientation: FieldOrientation::Horizontal,
+                            field_label(attrs: attributes! { for=(id) }, (text))
+                            switch(
+                                attrs: attributes! {
+                                    id=(id)
+                                    :checked=$(checked.get())
+                                    @change=$(|e: Event| checked.set(e.target.checked))
+                                    disabled=(disabled)
+                                }
+                            )
+                        )
+                    }
+                )
+            )
+        )
+    })
+}
+
+/// A standalone radio group whose selection is managed by the browser.
+#[component]
+async fn radios_card() -> Result<impl View> {
     Ok(view! {
         card(
             card_header(
                 card_title("Radio group")
-                card_description(
-                    "One choice at a time. This one sets how many rows the \
-                     table below shows."
-                )
+                card_description("One choice at a time, with a disabled option.")
             )
             card_content(
-                <form class="flex flex-col gap-4">
-                    state_fields(state: state, sets: "per_page page")
-                    radio_group(
-                        // The name the options share is what has the browser
-                        // let go of one when another is picked.
-                        for rows in PER_PAGE {
-                            let id = format!("rows-{rows}");
+                radio_group(
+                    attrs: attributes! { aria-label="Example options" },
+                    for (value, text, checked, disabled) in [
+                        ("one", "Option one", true, false),
+                        ("two", "Option two", false, false),
+                        ("three", "Option three (disabled)", false, true),
+                    ] {
+                        let id = format!("radio-demo-{value}");
 
-                            <div class="flex items-center gap-2">
-                                radio_group_item(
-                                    attrs: attributes! {
-                                        id=(id.as_str())
-                                        name="per_page"
-                                        value=(rows.to_string())
-                                        checked=(rows == state.per_page)
-                                    }
-                                )
-                                label(
-                                    attrs: attributes! { for=(id.as_str()) },
-                                    (format!("{rows} rows a page"))
-                                )
-                            </div>
-                        }
-                    )
-                    button(
-                        size: ButtonSize::Sm,
-                        attrs: attributes! { class="self-start" },
-                        "Apply"
-                    )
-                </form>
-            )
-        )
-    })
-}
-
-/// The overlays gathered in one place, so each can be opened without hunting
-/// for the card it belongs to.
-///
-/// A trigger is a plain link to this page with the overlay named in its query
-/// string, which is all it takes to open one: the same overlays are opened
-/// from the cards they belong to further down.
-#[component]
-async fn overlays_card(state: &State) -> Result<impl View> {
-    Ok(view! {
-        card(
-            card_header(
-                card_title("Overlays")
-                card_description(
-                    "The URL is what holds one open, so it survives a reload \
-                     and can be linked to."
-                )
-            )
-            card_content(
-                <div class="flex flex-wrap gap-2">
-                    for (overlay, name) in OVERLAYS {
-                        <a
-                            href=(state.href("overlay", Some(overlay)))
-                            class=(button_variants(
-                                ButtonVariant::Outline,
-                                ButtonSize::Sm,
-                            ))
-                        >
-                            "Open "
-                            (name.to_lowercase())
-                        </a>
+                        field(
+                            orientation: FieldOrientation::Horizontal,
+                            radio_group_item(
+                                attrs: attributes! {
+                                    id=(id.as_str())
+                                    name="radio-demo"
+                                    value=(value)
+                                    checked=(checked)
+                                    disabled=(disabled)
+                                }
+                            )
+                            field_label(
+                                attrs: attributes! { for=(id.as_str()) },
+                                (text)
+                            )
+                        )
                     }
-                </div>
+                )
             )
         )
     })
 }
 
-/// A card that tabs between panels.
-///
-/// Which panel shows is in the URL, so each trigger is a link and only the
-/// panel being read is rendered.
+/// A card that switches panels in the browser.
 #[component]
-async fn overview_card(state: &State) -> Result<impl View> {
+async fn overview_card(cx: &Cx) -> Result<impl View> {
+    // The tab values and labels. The first is selected when the page opens.
+    const TABS: [(&str, &str); 3] = [
+        ("overview", "Overview"),
+        ("activity", "Activity"),
+        ("settings", "Settings"),
+    ];
+
+    let selected = signal(cx, || TABS[0].0.to_owned());
+
     Ok(view! {
         card(
             card_header(
                 card_title("Tabs")
-                card_description("The panel being read is the one named in the URL.")
+                card_description("Switch between panels.")
             )
             card_content(
                 tabs(
                     tabs_list(
                         for (value, text) in TABS {
                             tabs_trigger(
-                                active: value == state.tab,
-                                attrs: attributes! { href=(state.href("tab", Some(value))) },
+                                active: $(selected.get() == value),
+                                attrs: attributes! {
+                                    href="#"
+                                    @click=$(|e: Event| {
+                                        e.prevent_default();
+                                        selected.set(value.to_owned());
+                                    })
+                                },
                                 (text)
                             )
                         }
                     )
-                    tabs_content(
-                        <p class="text-sm text-muted-foreground">
-                            (match state.tab {
-                                "activity" => {
-                                    "Reload the page and this same panel comes back."
-                                }
-                                "settings" => "Send the URL on and it opens here too.",
-                                _ => "This panel is in the URL as ?tab=overview.",
-                            })
-                        </p>
-                    )
+                    for (value, _) in TABS {
+                        tabs_content(
+                            attrs: attributes! { :hidden=$(selected.get() != value) },
+                            <p class="text-sm text-muted-foreground">
+                                (match value {
+                                    "activity" => "Recent activity appears here.",
+                                    "settings" => "Adjust your preferences here.",
+                                    _ => "A quick overview of your project.",
+                                })
+                            </p>
+                        )
+                    }
                 )
             )
         )
@@ -951,74 +896,106 @@ async fn faq_card() -> Result<impl View> {
     })
 }
 
-/// A branch switcher: a menu whose items reach the server, since a menu item
-/// is a button and a form around it is all it takes.
+/// A branch switcher that updates its label and closes the menu locally.
 #[component]
-async fn branches_card(state: &State) -> Result<impl View> {
+async fn branches_card(cx: &Cx) -> Result<impl View> {
+    // The first branch is selected until another branch or tag is picked.
+    const BRANCHES: [&str; 3] = ["main", "feature/showcase", "feature/dark-mode"];
+    const TAGS: [&str; 3] = ["v1.2.0", "v1.1.0", "v1.0.0"];
+
+    let selected = signal(cx, || BRANCHES[0].to_owned());
+    let open = signal(cx, || false);
+    let tags_open = signal(cx, || false);
+
     Ok(view! {
         card(
             card_header(
                 card_title("Dropdown menu")
-                card_description(
-                    "Picking an item submits the form around it, so the choice \
-                     lands in the URL."
-                )
+                card_description("Pick a branch or tag to update the selection.")
             )
             card_content(
-                // The form carries the rest of the page's state along, and the
-                // item that was clicked adds the branch it stands for; the
-                // page comes back built from that branch.
-                <form>
-                    state_fields(state: state, sets: "branch")
-                    dropdown_menu(
-                        // The trigger takes any content; this one borrows the
-                        // outline button's looks and adds a flipping chevron.
-                        dropdown_menu_trigger(
-                            attrs: attributes! {
-                                class=(button_variants(
-                                    ButtonVariant::Outline,
-                                    ButtonSize::Sm,
-                                ))
-                            },
-                            (state.branch)
-                            icon(
-                                data: iconify_icon!("lucide:chevron-down"),
-                                attrs: attributes! { class="transition-transform group-open:rotate-180" }
-                            )
+                dropdown_menu(
+                    attrs: attributes! { :open=$(open.get()) },
+                    // The trigger takes any content; this one borrows the
+                    // outline button's looks and adds a flipping chevron.
+                    dropdown_menu_trigger(
+                        attrs: attributes! {
+                            class=(button_variants(
+                                ButtonVariant::Outline,
+                                ButtonSize::Sm,
+                            ))
+                            @click=$(|e: Event| {
+                                e.prevent_default();
+                                open.toggle();
+                                tags_open.set(false);
+                            })
+                        },
+                        $(selected.get())
+                        icon(
+                            data: iconify_icon!("lucide:chevron-down"),
+                            attrs: attributes! { class="transition-transform group-open:rotate-180" }
                         )
-                        dropdown_menu_content(
-                            dropdown_menu_label("Switch branch")
-                            for branch in BRANCHES {
-                                dropdown_menu_item(
-                                    attrs: attributes! { name="branch" value=(branch) },
-                                    (branch)
-                                )
-                            }
-                            dropdown_menu_separator()
-                            // A submenu opens its own panel beside this row.
-                            dropdown_menu_sub(
-                                dropdown_menu_sub_trigger("Checkout tag")
-                                dropdown_menu_sub_content(
-                                    for tag in TAGS {
-                                        dropdown_menu_item(
-                                            attrs: attributes! { name="branch" value=(tag) },
-                                            (tag)
-                                        )
-                                    }
-                                )
+                    )
+                    dropdown_menu_content(
+                        dropdown_menu_label("Switch branch")
+                        for branch in BRANCHES {
+                            dropdown_menu_item(
+                                attrs: attributes! {
+                                    type="button"
+                                    @click=$(|_e: Event| {
+                                        selected.set(branch.to_owned());
+                                        open.set(false);
+                                        tags_open.set(false);
+                                    })
+                                },
+                                (branch)
+                            )
+                        }
+                        dropdown_menu_separator()
+                        // A submenu opens its own panel beside this row.
+                        dropdown_menu_sub(
+                            attrs: attributes! { :open=$(tags_open.get()) },
+                            dropdown_menu_sub_trigger(
+                                attrs: attributes! {
+                                    @click=$(|e: Event| {
+                                        e.prevent_default();
+                                        tags_open.toggle();
+                                    })
+                                },
+                                "Checkout tag"
+                            )
+                            dropdown_menu_sub_content(
+                                for tag in TAGS {
+                                    dropdown_menu_item(
+                                        attrs: attributes! {
+                                            type="button"
+                                            @click=$(|_e: Event| {
+                                                selected.set(tag.to_owned());
+                                                open.set(false);
+                                                tags_open.set(false);
+                                            })
+                                        },
+                                        (tag)
+                                    )
+                                }
                             )
                         )
                     )
-                </form>
+                )
             )
         )
     })
 }
 
-/// A toolbar of toggles: a segmented control where picking one lets go of the
-/// rest, and toggles that press on their own.
+/// Independent toggles and a group that allows one selection.
 #[component]
-async fn toolbar_card() -> Result<impl View> {
+async fn toolbar_card(cx: &Cx) -> Result<impl View> {
+    let range = signal(cx, || String::from("week"));
+    let bold = signal(cx, || true);
+    let italic = signal(cx, || false);
+    let underline = signal(cx, || false);
+    let live = signal(cx, || true);
+
     Ok(view! {
         card(
             card_header(
@@ -1035,15 +1012,20 @@ async fn toolbar_card() -> Result<impl View> {
                     // rule its own.
                     <div class="flex h-9 items-center gap-2">
                         toggle_group(
-                            for (value, text, picked) in [
-                                ("day", "Day", false),
-                                ("week", "Week", true),
-                                ("month", "Month", false),
+                            for (value, text) in [
+                                ("day", "Day"),
+                                ("week", "Week"),
+                                ("month", "Month"),
                             ] {
                                 toggle(
                                     kind: ToggleKind::Exclusive,
                                     size: ToggleSize::Sm,
-                                    attrs: attributes! { name="range" value=(value) checked=(picked) },
+                                    attrs: attributes! {
+                                        name="range"
+                                        value=(value)
+                                        :checked=$(range.get() == value)
+                                        @change=$(|_e: Event| range.set(value.to_owned()))
+                                    },
                                     (text)
                                 )
                             }
@@ -1051,25 +1033,38 @@ async fn toolbar_card() -> Result<impl View> {
                         separator(orientation: SeparatorOrientation::Vertical)
                         <div class="flex items-center gap-1">
                             for (name, data, text, pressed) in [
-                                ("bold", iconify_icon!("lucide:bold"), "Bold", true),
-                                ("italic", iconify_icon!("lucide:italic"), "Italic", false),
+                                ("bold", iconify_icon!("lucide:bold"), "Bold", &bold),
+                                (
+                                    "italic",
+                                    iconify_icon!("lucide:italic"),
+                                    "Italic",
+                                    &italic,
+                                ),
                                 (
                                     "underline",
                                     iconify_icon!("lucide:underline"),
                                     "Underline",
-                                    false,
+                                    &underline,
                                 ),
                             ] {
                                 toggle(
-                                    attrs: attributes! { name=(name) checked=(pressed) },
+                                    attrs: attributes! {
+                                        name=(name)
+                                        :checked=$(pressed.get())
+                                        @change=$(|e: Event| pressed.set(e.target.checked))
+                                    },
                                     icon(data: data, label: text)
                                 )
                             }
                         </div>
                     </div>
                     toggle(
-                        size: ToggleSize::Lg,
-                        attrs: attributes! { name="live" checked="" },
+                        size: ToggleSize::Md,
+                        attrs: attributes! {
+                            name="live"
+                            :checked=$(live.get())
+                            @change=$(|e: Event| live.set(e.target.checked))
+                        },
                         icon(data: iconify_icon!("lucide:activity"))
                         "Live updates"
                     )
@@ -1079,21 +1074,14 @@ async fn toolbar_card() -> Result<impl View> {
     })
 }
 
-/// The two things that show on hover: a tooltip carrying a few words, and a
-/// hover card carrying a view.
-///
-/// Both triggers are the browser's own hover and focus, so nothing here needs
-/// scripting. The tooltip's trigger is a link that goes where the hint says,
-/// since a hint is only a hint.
+/// A short hint shown on hover or focus.
 #[component]
-async fn share_card() -> Result<impl View> {
+async fn tooltip_card() -> Result<impl View> {
     Ok(view! {
         card(
             card_header(
-                card_title("Tooltip and hover card")
-                card_description(
-                    "What comes up on hover: a few words, or a whole view."
-                )
+                card_title("Tooltip")
+                card_description("A short hint on hover or focus.")
             )
             card_content(
                 <div class="flex items-center justify-between gap-4">
@@ -1114,7 +1102,21 @@ async fn share_card() -> Result<impl View> {
                         tooltip_content("Read the docs")
                     )
                 </div>
-                separator(attrs: attributes! { class="my-4" })
+            )
+        )
+    })
+}
+
+/// A preview with richer content, shown on hover or focus.
+#[component]
+async fn hover_card_demo() -> Result<impl View> {
+    Ok(view! {
+        card(
+            card_header(
+                card_title("Hover card")
+                card_description("A preview on hover or focus.")
+            )
+            card_content(
                 <div class="flex items-center gap-2 text-sm">
                     <p class="text-muted-foreground">"Hover the name"</p>
                     hover_card(
@@ -1137,7 +1139,7 @@ async fn share_card() -> Result<impl View> {
                                     </p>
                                 </div>
                             </div>
-                            <p class="text-xs text-muted-foreground">
+                            <p class="text-sm text-muted-foreground">
                                 "A hover card holds a view, where a tooltip \
                                  holds a few words."
                             </p>
@@ -1149,54 +1151,133 @@ async fn share_card() -> Result<impl View> {
     })
 }
 
-/// The name the page carries, and the two overlays that act on it.
-///
-/// Nothing about a trigger is special: opening an overlay is navigating to the
-/// URL the page renders it open for.
+/// A dialog and an alert dialog, each controlled by a local signal.
 #[component]
-async fn rename_card(state: &State) -> Result<impl View> {
+async fn dialogs_card(cx: &Cx) -> Result<impl View> {
+    let open = signal(cx, || false);
+    let confirming = signal(cx, || false);
+
     Ok(view! {
         card(
             card_header(
-                card_title("Project name")
-                card_description(
-                    "The name is part of the URL, and the dialog changes it."
-                )
+                card_title("Dialog")
+                card_description("A content panel or a confirmation prompt.")
             )
             card_content(
-                <div class="flex items-center justify-between gap-4">
-                    <p class="truncate font-mono text-sm">(&state.name)</p>
-                    <a
-                        href=(state.href("overlay", Some("rename")))
-                        class=(button_variants(ButtonVariant::Outline, ButtonSize::Sm))
-                    >
-                        "Rename"
-                    </a>
+                <div class="flex flex-wrap gap-2">
+                    button(
+                        variant: ButtonVariant::Outline,
+                        size: ButtonSize::Sm,
+                        attrs: attributes! { type="button" @click=$(|_e: Event| open.set(true)) },
+                        "Open dialog"
+                    )
+                    button(
+                        variant: ButtonVariant::Outline,
+                        size: ButtonSize::Sm,
+                        attrs: attributes! { type="button" @click=$(|_e: Event| confirming.set(true)) },
+                        "Open alert dialog"
+                    )
                 </div>
-                separator(attrs: attributes! { class="my-4" })
-                <div class="flex items-center justify-between gap-4">
-                    <p class="truncate text-sm text-muted-foreground">
-                        "Put the whole page back"
-                    </p>
-                    // Clearing the page goes through an alert dialog, so it
-                    // takes a deliberate answer rather than one stray click.
-                    <a
-                        href=(state.href("overlay", Some("reset")))
-                        class=(button_variants(
-                            ButtonVariant::Destructive,
-                            ButtonSize::Sm,
-                        ))
-                    >
-                        "Reset"
-                    </a>
-                </div>
+            )
+        )
+        dialog(
+            open: $(open.get()),
+            attrs: attributes! { aria-label="Example dialog" },
+            dialog_content(
+                dialog_header(
+                    dialog_title("Example dialog")
+                    dialog_description(
+                        "A dialog brings content into focus above the page."
+                    )
+                )
+                <p class="text-sm">
+                    "Put your content here, then close the dialog to return to the page."
+                </p>
+                dialog_footer(
+                    button(
+                        attrs: attributes! { type="button" @click=$(|_e: Event| open.set(false)) },
+                        "Close"
+                    )
+                )
+            )
+        )
+        alert_dialog(
+            open: $(confirming.get()),
+            attrs: attributes! { aria-label="Continue?" },
+            dialog_content(
+                dialog_header(
+                    dialog_title("Continue?")
+                    dialog_description(
+                        "An alert dialog asks for an explicit choice before continuing."
+                    )
+                )
+                dialog_footer(
+                    button(
+                        variant: ButtonVariant::Outline,
+                        attrs: attributes! {
+                            type="button"
+                            @click=$(|_e: Event| confirming.set(false))
+                        },
+                        "Cancel"
+                    )
+                    button(
+                        attrs: attributes! {
+                            type="button"
+                            @click=$(|_e: Event| confirming.set(false))
+                        },
+                        "Continue"
+                    )
+                )
             )
         )
     })
 }
 
-/// The deployments the table pages through: the commit, the environment it
-/// went to, and the status it is in.
+/// A sheet controlled by a local signal.
+#[component]
+async fn sheet_card(cx: &Cx) -> Result<impl View> {
+    let open = signal(cx, || false);
+
+    Ok(view! {
+        card(
+            card_header(
+                card_title("Sheet")
+                card_description("A panel that slides in from the edge of the page.")
+            )
+            card_content(
+                button(
+                    variant: ButtonVariant::Outline,
+                    attrs: attributes! { type="button" @click=$(|_e: Event| open.set(true)) },
+                    "Open sheet"
+                )
+            )
+        )
+        sheet(
+            open: $(open.get()),
+            attrs: attributes! { aria-label="Example sheet" },
+            sheet_content(
+                dialog_header(
+                    dialog_title("Example sheet")
+                    dialog_description(
+                        "Use a sheet for content that belongs beside the page."
+                    )
+                )
+                <p class="text-sm">
+                    "The rest of the page stays visible behind this panel."
+                </p>
+                dialog_footer(
+                    attrs: attributes! { class="mt-auto" },
+                    button(
+                        attrs: attributes! { type="button" @click=$(|_e: Event| open.set(false)) },
+                        "Close"
+                    )
+                )
+            )
+        )
+    })
+}
+
+/// Example deployments shown in the table.
 const DEPLOYMENTS: [(&str, &str, &str); 12] = [
     ("a1b2c3d", "production", "Live"),
     ("9f8e7d6", "staging", "Building"),
@@ -1212,59 +1293,33 @@ const DEPLOYMENTS: [(&str, &str, &str); 12] = [
     ("d4c3b2a", "staging", "Failed"),
 ];
 
-/// A table of deployments, filtered by the sheet, sized by the radio group,
-/// and paginated underneath.
-///
-/// Every one of those comes from the URL, so the links below the table are
-/// what change the rows and which page reads as the current one.
-#[component]
-async fn deployments_card(state: &State) -> Result<impl View> {
-    let rows: Vec<_> = DEPLOYMENTS
-        .into_iter()
-        .filter(|&(_, env, status)| state.shows(env, status))
-        .collect();
-    let pages = rows.len().div_ceil(state.per_page).max(1);
-    // A filter can leave fewer pages than the URL asks for, so the page being
-    // read is the last one that still has rows on it.
-    let page = state.page.min(pages);
-    let previous = state.page_href(page.saturating_sub(1).max(1));
-    let next = state.page_href((page + 1).min(pages));
+/// A table of deployments with pagination underneath.
+#[shard]
+async fn deployments_card(cx: &Cx) -> Result<impl View> {
+    const PER_PAGE: usize = 3;
+
+    let page = signal(cx, || 1usize);
+    let rows = &DEPLOYMENTS;
+    let pages = rows.len().div_ceil(PER_PAGE).max(1);
+    // Clamp the requested page to the available rows.
+    let current = page.get().clamp(1, pages);
+    let previous = current.saturating_sub(1).max(1);
+    let next = (current + 1).min(pages);
 
     Ok(view! {
-        let shown = rows.chunks(state.per_page).nth(page - 1).unwrap_or_default();
+        let shown = rows.chunks(PER_PAGE).nth(current - 1).unwrap_or_default();
 
         card(
             card_header(
                 card_title("Table")
-                card_description(
-                    "Filtered from the sheet, sized by the radio group, and \
-                     paged by the links below."
-                )
-            )
-            card_content(
-                <div class="flex items-center justify-between gap-4">
-                    <p class="truncate text-sm text-muted-foreground">
-                        (state.filtered())
-                    </p>
-                    // What the sheet holds would not fit a dialog, so it comes
-                    // in from the edge instead.
-                    <a
-                        href=(state.href("overlay", Some("filters")))
-                        class=(button_variants(ButtonVariant::Outline, ButtonSize::Sm))
-                    >
-                        icon(data: iconify_icon!("lucide:filter"))
-                        "Filters"
-                    </a>
-                </div>
+                card_description("Deployment rows with badges and pagination.")
             )
             // The card pads its sections rather than itself, so the table can
             // span its full width; the table's own padding lines the cells up
             // with the sections above and below it.
             table(
                 attrs: attributes! { class="px-3" },
-                table_caption(
-                    "Stand-in rows, so the table has something to page through."
-                )
+                table_caption("Deployments")
                 table_header(
                     table_row(
                         table_head("Commit")
@@ -1296,25 +1351,47 @@ async fn deployments_card(state: &State) -> Result<impl View> {
                 pagination(
                     pagination_content(
                         pagination_item(
-                            pagination_previous(attrs: attributes! { href=(previous) })
+                            pagination_previous(
+                                attrs: attributes! {
+                                    href="#"
+                                    @click=$(|e: Event| {
+                                        e.prevent_default();
+                                        page.set(previous);
+                                    })
+                                }
+                            )
                         )
                         for number in 1..=pages {
-                            if listed(number, page, pages) {
+                            if listed(number, current, pages) {
                                 pagination_item(
                                     pagination_link(
-                                        active: number == page,
-                                        attrs: attributes! { href=(state.page_href(number)) },
+                                        active: number == current,
+                                        attrs: attributes! {
+                                            href="#"
+                                            @click=$(|e: Event| {
+                                                e.prevent_default();
+                                                page.set(number);
+                                            })
+                                        },
                                         (number)
                                     )
                                 )
-                            } else if listed(number - 1, page, pages) {
+                            } else if listed(number - 1, current, pages) {
                                 // The first page left out of a run stands for
                                 // the whole run.
                                 pagination_item(pagination_ellipsis())
                             }
                         }
                         pagination_item(
-                            pagination_next(attrs: attributes! { href=(next) })
+                            pagination_next(
+                                attrs: attributes! {
+                                    href="#"
+                                    @click=$(|e: Event| {
+                                        e.prevent_default();
+                                        page.set(next);
+                                    })
+                                }
+                            )
                         )
                     )
                 )
@@ -1323,32 +1400,22 @@ async fn deployments_card(state: &State) -> Result<impl View> {
     })
 }
 
-/// Whether `number` gets a link of its own while `page` is the one being read:
-/// the first page, the last one, and the current one do, and the runs left
-/// between them collapse into an ellipsis.
-///
-/// Listing the current page's neighbours too, as a roomier pagination would,
-/// grows the row past the width of a card in this masonry. The pagination
-/// wraps rather than overflowing when that happens, but stepping one page at a
-/// time is what "Previous" and "Next" are already for.
+/// Whether to show a numbered link for this page. Shows the first, last, and current
+/// pages to keep the navigation compact.
 fn listed(number: usize, page: usize, pages: usize) -> bool {
     number == 1 || number == pages || number == page
 }
 
-/// The keys that move through a form, and what each one does. They are the
-/// browser's own, so they work on this page as they read here.
-const KEYS: [(&str, &[&str]); 3] = [
-    ("Move to the next control", &["Tab"]),
-    ("Move back to the one before", &["Shift", "Tab"]),
-    ("Submit the form", &["Enter"]),
-];
-
-/// A documentation page header: the trail to it, and the keys it documents.
+/// A breadcrumb trail with a collapsed middle section.
 #[component]
-async fn docs_card() -> Result<impl View> {
+async fn breadcrumbs_card() -> Result<impl View> {
     Ok(view! {
         card(
             card_header(
+                card_title("Breadcrumbs")
+                card_description("A trail of links to the current page.")
+            )
+            card_content(
                 breadcrumb(
                     breadcrumb_list(
                         breadcrumb_item(
@@ -1365,17 +1432,32 @@ async fn docs_card() -> Result<impl View> {
                             )
                         )
                         breadcrumb_separator()
-                        breadcrumb_item(breadcrumb_page("Dialog"))
+                        breadcrumb_item(breadcrumb_page("Breadcrumbs"))
                     )
                 )
-                card_title("Dialog")
-                card_description("A panel over the page for a single task.")
+            )
+        )
+    })
+}
+
+/// Individual keys and key combinations.
+#[component]
+async fn keyboard_card() -> Result<impl View> {
+    // The browser's own keys for moving through a form.
+    const KEYS: [(&str, &[&str]); 3] = [
+        ("Move to the next control", &["Tab"]),
+        ("Move back to the one before", &["Shift", "Tab"]),
+        ("Submit the form", &["Enter"]),
+    ];
+
+    Ok(view! {
+        card(
+            card_header(
+                card_title("Keyboard keys")
+                card_description("Keys shown individually or in a group.")
             )
             card_content(
-                // The section a docs page ends on: how the dialog's form is
-                // worked from the keyboard.
-                <h3 class="text-sm font-medium">"Keyboard"</h3>
-                <div class="mt-3 flex flex-col gap-3">
+                <div class="flex flex-col gap-3">
                     for (action, keys) in KEYS {
                         <div class="flex items-center justify-between gap-4">
                             <p class="text-sm text-muted-foreground">(action)</p>
@@ -1392,20 +1474,21 @@ async fn docs_card() -> Result<impl View> {
     })
 }
 
-/// The shapes a page takes while it waits: the roster before it arrives, and
-/// the two ways of saying that work is under way.
+/// Skeleton placeholders that can be replaced with loaded content.
 #[component]
-async fn pending_card() -> Result<impl View> {
+async fn skeletons_card(cx: &Cx) -> Result<impl View> {
+    let loading = signal(cx, || true);
+
     Ok(view! {
         card(
             card_header(
-                card_title("Skeletons and spinners")
-                card_description("The shapes a page takes while it waits.")
+                card_title("Skeletons")
+                card_description("Placeholders while content loads.")
             )
             card_content(
                 // The skeletons take the size of what they stand in for, so
                 // the card keeps its height once the roster lands.
-                <div class="flex flex-col gap-4">
+                <div class="flex flex-col gap-4" :hidden=$(!loading.get())>
                     for _ in 0..2 {
                         <div class="flex items-center gap-3">
                             skeleton(attrs: attributes! { class="size-8 rounded-full" })
@@ -1417,249 +1500,265 @@ async fn pending_card() -> Result<impl View> {
                         </div>
                     }
                 </div>
-                separator(attrs: attributes! { class="my-4" })
+                <div class="flex flex-col gap-4" :hidden=$(loading.get())>
+                    for (name, email, initials, role) in MEMBERS.into_iter().take(2) {
+                        <div class="flex items-center gap-3">
+                            avatar(size: AvatarSize::Sm, avatar_fallback((initials)))
+                            <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+                                <p class="truncate text-sm font-medium">(name)</p>
+                                <p class="truncate text-xs text-muted-foreground">
+                                    (email)
+                                </p>
+                            </div>
+                            badge(variant: BadgeVariant::Outline, (role))
+                        </div>
+                    }
+                </div>
+            )
+            card_footer(
+                button(
+                    variant: ButtonVariant::Outline,
+                    size: ButtonSize::Sm,
+                    attrs: attributes! { type="button" @click=$(|_e: Event| loading.toggle()) },
+                    $(if loading.get() { "Show content" } else { "Show skeletons" })
+                )
+            )
+        )
+    })
+}
+
+/// A spinner accompanying a loading message.
+#[component]
+async fn spinner_card(cx: &Cx) -> Result<impl View> {
+    let loading = signal(cx, || true);
+
+    Ok(view! {
+        card(
+            card_header(
+                card_title("Spinner")
+                card_description("An indicator while work is in progress.")
+            )
+            card_content(
                 <div class="flex flex-col gap-2">
                     <p class="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        spinner()
-                        "Work whose end is not in sight"
+                        <span class="contents" :hidden=$(!loading.get())>
+                            spinner()
+                        </span>
+                        $(if loading.get() { "Loading" } else { "Complete" })
                     </p>
-                    // Without a value the bar reads as work whose extent is
-                    // not known yet.
-                    progress()
+                    button(
+                        variant: ButtonVariant::Outline,
+                        size: ButtonSize::Sm,
+                        attrs: attributes! {
+                            type="button"
+                            class="self-end"
+                            @click=$(|_e: Event| loading.toggle())
+                        },
+                        $(if loading.get() { "Finish loading" } else { "Load again" })
+                    )
                 </div>
             )
         )
     })
 }
 
-/// A dark-scheme demo: the `dark` class on the wrapper restyles everything
-/// inside it, because components reference theme tokens instead of raw colors.
-#[component]
-async fn deploy_card() -> Result<impl View> {
-    Ok(view! {
-        <div class="dark">
-            card(
-                card_header(
-                    card_title("Dark scheme")
-                    card_description(
-                        "The same components, on a wrapper that carries the \
-                         `dark` class."
-                    )
-                )
-                card_footer(
-                    button(size: ButtonSize::Sm, "Primary")
-                    button(size: ButtonSize::Sm, variant: ButtonVariant::Ghost, "Ghost")
-                )
-            )
-        </div>
-    })
-}
-
-/// The dialog over the page, shown while the URL names it.
-///
-/// Closing it is navigating back to the page that renders it closed, which the
-/// corner button and "Cancel" do as links. "Save" submits the form, which puts
-/// the new name in the URL and leaves the overlay out of it, so the page comes
-/// back renamed with the dialog closed.
-#[component]
-async fn rename_dialog(state: &State) -> Result<impl View> {
-    Ok(view! {
-        dialog(
-            open: state.overlay == Some("rename"),
-            dialog_content(
-                // The panel is positioned, so a close control can sit in one
-                // of its corners.
-                <a
-                    href=(state.closed())
-                    class=(class!(
-                        button_variants(ButtonVariant::Ghost, ButtonSize::Icon),
-                        "absolute top-3 right-3",
-                    ))
-                >
-                    icon(data: iconify_icon!("lucide:x"), label: "Close")
-                </a>
-                <form class="flex flex-col gap-4">
-                    state_fields(state: state, sets: "overlay name")
-                    dialog_header(
-                        dialog_title("Rename project")
-                        dialog_description(
-                            "The name is carried in the query string, so it \
-                             survives a reload and travels with the link."
-                        )
-                    )
-                    <div class="flex flex-col gap-2">
-                        label(attrs: attributes! { for="rename" }, "Name")
-                        // A name the links could not carry as it stands is put
-                        // back to the default, which is what the pattern and
-                        // the length say before the form is even sent.
-                        input(
-                            attrs: attributes! {
-                                id="rename"
-                                name="name"
-                                value=(&state.name)
-                                maxlength="32"
-                                pattern="[A-Za-z0-9_-]+"
-                            }
-                        )
-                    </div>
-                    dialog_footer(
-                        <a
-                            href=(state.closed())
-                            class=(button_variants(ButtonVariant::Ghost, ButtonSize::Md))
-                        >
-                            "Cancel"
-                        </a>
-                        button("Save")
-                    )
-                </form>
-            )
-        )
-    })
-}
-
-/// The alert dialog behind the reset action: it asks the question and offers
-/// nothing but the two answers to it.
-///
-/// Resetting is a link to the page without a query string, which is the page
-/// with every choice on it back at its default.
-#[component]
-async fn reset_dialog(state: &State) -> Result<impl View> {
-    // Bound out here rather than inline: a hyphenated attribute name inside an
-    // `attributes!` nested in a `view!` currently trips `topcoat fmt`.
-    let labels = attributes! {
-        aria-labelledby="reset-title"
-        aria-describedby="reset-description"
+/// The showcase navigation, with independent desktop and mobile controls.
+#[shard]
+async fn app_sidebar(cx: &Cx, open: Signal<bool>, mobile_open: Signal<bool>) -> Result<impl View> {
+    let selected = signal(cx, || "#overview".to_owned());
+    let sections = signal(cx, || true);
+    let variant = signal(cx, || "sidebar".to_owned());
+    let sidebar_variant = match variant.get().as_str() {
+        "floating" => SidebarVariant::Floating,
+        "inset" => SidebarVariant::Inset,
+        _ => SidebarVariant::Sidebar,
     };
 
     Ok(view! {
-        alert_dialog(
-            open: state.overlay == Some("reset"),
-            attrs: labels,
-            dialog_content(
-                dialog_header(
-                    dialog_title(
-                        attrs: attributes! { id="reset-title" },
-                        "Reset this page?"
+        sidebar(
+            open: $(open.get()),
+            mobile_open: $(mobile_open.get()),
+            variant: sidebar_variant,
+            collapsible: SidebarCollapsible::Icon,
+            sheet_attrs: attributes! {
+                id="showcase-sidebar"
+                aria-label="Component library navigation"
+                @keydown=$(|e: Event| {
+                    if e.key == "Escape" {
+                        mobile_open.set(false);
+                    }
+                })
+                @click=$(|e: Event| {
+                    if e.target.id == "showcase-sidebar" {
+                        mobile_open.set(false);
+                    }
+                })
+            },
+            sidebar_header(
+                <div class="flex items-center gap-1">
+                    sidebar_menu(
+                        attrs: attributes! { class="flex-1" },
+                        sidebar_menu_item(
+                            sidebar_menu_button(
+                                size: SidebarMenuButtonSize::Lg,
+                                href: Some("#overview"),
+                                tooltip: Some("Topcoat UI"),
+                                attrs: attributes! {
+                                    @click=$(|_e: Event| {
+                                        selected.set("#overview".to_owned());
+                                        mobile_open.set(false);
+                                    })
+                                },
+                                icon(data: iconify_icon!("lucide:layers"))
+                                <span class="flex min-w-0 flex-col text-left">
+                                    <span class="font-semibold">"Topcoat UI"</span>
+                                    <span class="text-xs text-muted-foreground">
+                                        "Your component library"
+                                    </span>
+                                </span>
+                            )
+                        )
                     )
-                    dialog_description(
-                        attrs: attributes! { id="reset-description" },
-                        "The panel, the filters, the page of the table, the \
-                         branch, and the name all go back to their defaults."
+                    button(
+                        variant: ButtonVariant::Ghost,
+                        size: ButtonSize::Icon,
+                        attrs: attributes! {
+                            type="button"
+                            class="md:hidden"
+                            aria-label="Close sidebar"
+                            @click=$(|_e: Event| mobile_open.set(false))
+                        },
+                        icon(data: iconify_icon!("lucide:x"))
+                    )
+                </div>
+            )
+            sidebar_content(
+                sidebar_group(
+                    sidebar_group_label("Workspace")
+                    sidebar_group_action(
+                        attrs: attributes! {
+                            aria-label="Toggle section links"
+                            aria-controls="sidebar-section-links"
+                            :aria-expanded=$(if sections.get() {
+                                "true"
+                            } else {
+                                "false"
+                            })
+                            @click=$(|_e: Event| sections.toggle())
+                        },
+                        icon(data: iconify_icon!("lucide:chevrons-up-down"))
+                    )
+                    sidebar_group_content(
+                        sidebar_menu(
+                            sidebar_menu_item(
+                                sidebar_menu_button(
+                                    href: Some("#overview"),
+                                    tooltip: Some("Overview"),
+                                    active: $(selected.get() == "#overview"),
+                                    attrs: attributes! {
+                                        @click=$(|_e: Event| {
+                                            selected.set("#overview".to_owned());
+                                            mobile_open.set(false);
+                                        })
+                                    },
+                                    icon(data: iconify_icon!("lucide:house"))
+                                    <span>"Overview"</span>
+                                )
+                            )
+                            sidebar_menu_item(
+                                sidebar_menu_button(
+                                    href: Some("#components"),
+                                    tooltip: Some("Components"),
+                                    active: $(selected.get() == "#components"),
+                                    attrs: attributes! {
+                                        @click=$(|_e: Event| {
+                                            selected.set("#components".to_owned());
+                                            mobile_open.set(false);
+                                        })
+                                    },
+                                    icon(data: iconify_icon!("lucide:layout-grid"))
+                                    <span>"Components"</span>
+                                )
+                                sidebar_menu_badge("22")
+                                sidebar_menu_sub(
+                                    attrs: attributes! { id="sidebar-section-links" :hidden=$(!sections.get()) },
+                                    for (href, text) in [
+                                        ("#forms", "Forms"),
+                                        ("#overlays", "Overlays"),
+                                    ] {
+                                        sidebar_menu_sub_item(
+                                            sidebar_menu_sub_button(
+                                                active: $(selected.get() == href),
+                                                attrs: attributes! {
+                                                    href=(href)
+                                                    @click=$(|_e: Event| {
+                                                        selected.set(href.to_owned());
+                                                        mobile_open.set(false);
+                                                    })
+                                                },
+                                                <span>(text)</span>
+                                            )
+                                        )
+                                    }
+                                )
+                            )
+                        )
                     )
                 )
-                dialog_footer(
-                    <a
-                        href=(state.closed())
-                        class=(button_variants(ButtonVariant::Ghost, ButtonSize::Md))
-                    >
-                        "Leave it as it is"
-                    </a>
-                    <a
-                        href="?"
-                        class=(button_variants(
-                            ButtonVariant::Destructive,
-                            ButtonSize::Md,
-                        ))
-                    >
-                        "Reset the page"
-                    </a>
+                sidebar_group(
+                    sidebar_group_label("Resources")
+                    sidebar_group_content(
+                        sidebar_menu(
+                            for (href, text, data) in [
+                                (DOCS, "Documentation", iconify_icon!("lucide:book-open")),
+                                (REGISTRY, "Registry", iconify_icon!("lucide:blocks")),
+                                (REPOSITORY, "Source code", iconify_icon!("lucide:github")),
+                            ] {
+                                sidebar_menu_item(
+                                    sidebar_menu_button(
+                                        href: Some(href),
+                                        tooltip: Some(text),
+                                        icon(data: data)
+                                        <span>(text)</span>
+                                    )
+                                )
+                            }
+                        )
+                    )
                 )
             )
-        )
-    })
-}
-
-/// The sheet behind the deployments table's "Filters" link: a panel along one
-/// edge, holding what a dialog would be too small for.
-///
-/// Applying the filters is submitting the form, which puts them in the URL and
-/// leaves out the overlay, so the sheet closes on the filtered table.
-#[component]
-async fn filters_sheet(state: &State) -> Result<impl View> {
-    Ok(view! {
-        sheet(
-            open: state.overlay == Some("filters"),
-            sheet_content(
-                side: state.sheet_side(),
-                dialog_header(
-                    dialog_title("Filters")
-                    dialog_description("Narrow the deployments in the table.")
-                )
-                // A sheet can lie against any edge. The row picks which,
-                // through links, since a form would take its unsaved values
-                // along.
-                <div class="flex flex-col gap-2">
-                    <p class="text-sm font-medium">"Side"</p>
-                    tabs_list(
-                        for (value, text, _) in SIDES {
-                            tabs_trigger(
-                                active: value == state.side,
-                                attrs: attributes! { href=(state.side_href(value)) },
+            sidebar_separator()
+            sidebar_footer(
+                <div class="md:group-data-[collapsible=icon]/sidebar:hidden">
+                    toggle_group(
+                        attrs: attributes! {
+                            role="radiogroup"
+                            aria-labelledby="sidebar-variant-label"
+                        },
+                        for (value, text) in [
+                            ("sidebar", "Sidebar"),
+                            ("floating", "Floating"),
+                            ("inset", "Inset"),
+                        ] {
+                            toggle(
+                                kind: ToggleKind::Exclusive,
+                                size: ToggleSize::Sm,
+                                attrs: attributes! {
+                                    name="sidebar-variant"
+                                    value=(value)
+                                    :checked=$(variant.get() == value)
+                                    @change=$(|e: Event| variant.set(e.target.value))
+                                },
                                 (text)
                             )
                         }
                     )
                 </div>
-                <form class="flex flex-1 flex-col gap-4">
-                    state_fields(state: state, sets: "env status page overlay side")
-                    <div class="flex flex-col gap-2">
-                        label(attrs: attributes! { for="filter-env" }, "Environment")
-                        select(
-                            attrs: attributes! { id="filter-env" name="env" },
-                            <option value="">"All environments"</option>
-                            for env in ENVIRONMENTS {
-                                <option value=(env) selected=(state.env == Some(env))>
-                                    (env)
-                                </option>
-                            }
-                        )
-                    </div>
-                    <div class="flex flex-col gap-2">
-                        <p class="text-sm font-medium">"Status"</p>
-                        radio_group(
-                            <div class="flex items-center gap-2">
-                                radio_group_item(
-                                    attrs: attributes! {
-                                        id="filter-any"
-                                        name="status"
-                                        value=""
-                                        checked=(state.status.is_none())
-                                    }
-                                )
-                                label(
-                                    attrs: attributes! { for="filter-any" },
-                                    "Any status"
-                                )
-                            </div>
-                            for (status, _) in STATUSES {
-                                let value = status.to_lowercase();
-                                let id = format!("filter-{value}");
-
-                                <div class="flex items-center gap-2">
-                                    radio_group_item(
-                                        attrs: attributes! {
-                                            id=(id.as_str())
-                                            name="status"
-                                            value=(value.as_str())
-                                            checked=(state.status == Some(status))
-                                        }
-                                    )
-                                    label(attrs: attributes! { for=(id.as_str()) }, (status))
-                                </div>
-                            }
-                        )
-                    </div>
-                    dialog_footer(
-                        attrs: attributes! { class="mt-auto" },
-                        <a
-                            href=(state.closed())
-                            class=(button_variants(ButtonVariant::Ghost, ButtonSize::Md))
-                        >
-                            "Cancel"
-                        </a>
-                        button("Apply filters")
-                    )
-                </form>
+                <p
+                    class="px-2 py-1 text-xs text-muted-foreground md:group-data-[collapsible=icon]/sidebar:hidden"
+                >
+                    "Built with Topcoat. Yours to make your own."
+                </p>
             )
         )
     })

@@ -33,7 +33,7 @@ pub fn content_too_large() -> ContentTooLargeError {
 /// `Result`.
 ///
 /// Construct one with [`content_too_large`].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ContentTooLargeError {
     _priv: (),
 }

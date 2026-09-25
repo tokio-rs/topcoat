@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    DynViewPart,
+    DynViewPart, RegionId,
     buffer::{InstructionPtr, ViewBuffer},
 };
 
@@ -28,6 +28,10 @@ pub(super) struct DynPtr(usize);
 #[derive(Debug, Clone, Copy)]
 pub(super) struct ViewPtr(usize);
 
+/// The index of a region id in a [`ConstBuffer`].
+#[derive(Debug, Clone, Copy)]
+pub(super) struct RegionPtr(usize);
+
 /// The index of a header map in a [`ConstBuffer`].
 #[cfg(feature = "http")]
 #[derive(Debug, Clone, Copy)]
@@ -46,6 +50,7 @@ pub(super) struct ConstBuffer {
     strs: String,
     dyns: Vec<Box<dyn DynViewPart>>,
     views: Vec<(Arc<ViewBuffer>, InstructionPtr)>,
+    regions: Vec<RegionId>,
     #[cfg(feature = "http")]
     headers: Vec<http::HeaderMap>,
 }
@@ -126,6 +131,18 @@ impl ConstBuffer {
         (buffer, *entry)
     }
 
+    #[inline]
+    pub(super) fn push_region(&mut self, value: RegionId) -> RegionPtr {
+        self.regions.push(value);
+        RegionPtr(self.regions.len() - 1)
+    }
+
+    #[inline]
+    #[must_use]
+    pub(super) fn fetch_region(&self, ptr: RegionPtr) -> RegionId {
+        self.regions[ptr.0]
+    }
+
     #[cfg(feature = "http")]
     #[inline]
     pub(super) fn push_headers(&mut self, value: http::HeaderMap) -> HeadersPtr {
@@ -148,6 +165,7 @@ impl ConstBuffer {
         println!("  strings: {}", self.strings.len());
         println!("  strs: {} bytes", self.strs.len());
         println!("  dyns: {}", self.dyns.len());
+        println!("  regions: {}", self.regions.len());
         #[cfg(feature = "http")]
         println!("  headers: {}", self.headers.len());
         println!("}}");

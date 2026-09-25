@@ -1,6 +1,6 @@
 # Font
 
-Two ways to use a web font: one picked from the Fontsource catalog and self-hosted as a Topcoat asset, one declared by hand with `font!` and loaded from a CDN.
+A page that loads web fonts from Fontsource and from a manually declared source.
 
 Run it with:
 

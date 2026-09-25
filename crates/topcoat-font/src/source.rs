@@ -6,15 +6,13 @@ use topcoat_core::{context::Cx, fnv1a::Fnv1a};
 
 use crate::{CssString, FontFormat, FontTech};
 
-/// The location of a font file, the URL of a `url()` entry in a CSS
-/// `@font-face` `src` descriptor.
+/// The URL of a font file in a CSS `url()` entry.
 ///
-/// A [`Str`](Self::Str) is written verbatim; an [`Asset`](Self::Asset) is
-/// resolved to its hosted URL when formatted. Either is escaped as a CSS
-/// `<string>` so it is safe between the quotes of `url("...")`.
+/// An [`Asset`](Self::Asset) is resolved to its hosted URL when formatted.
+/// Both variants are escaped for use inside `url("...")`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FontSourceUrl {
-    /// A URL written as-is, such as an absolute URL or an external host.
+    /// A URL supplied directly as a string.
     Str(String),
     /// A bundled [`Asset`](topcoat_asset::Asset), resolved to its hosted URL.
     #[cfg(feature = "asset")]
@@ -242,8 +240,8 @@ impl FontSource {
 /// An ordered, non-empty list of [`FontSource`]s, the value of a CSS
 /// `@font-face` `src` descriptor.
 ///
-/// Renders as the comma-separated list CSS expects, with the browser using the
-/// first source it supports. Order from most to least preferred.
+/// The browser uses the first supported source. Put sources in preference
+/// order, starting with the most preferred.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FontSources(Vec<FontSource>);
 
@@ -286,16 +284,13 @@ impl FontSources {
         Ok(())
     }
 
-    /// Returns the sources as a slice.
-    ///
-    /// The slice is never empty, mirroring the non-empty invariant of
-    /// [`FontSources`].
+    /// Returns the sources as a non-empty slice.
     #[must_use]
     pub fn as_slice(&self) -> &[FontSource] {
         &self.0
     }
 
-    /// Builds a [`FontSources`] from `sources`, validating the non-empty invariant.
+    /// Creates a source list, rejecting an empty vector.
     fn try_from_vec(sources: Vec<FontSource>) -> Result<Self, EmptyFontSourcesError> {
         if sources.is_empty() {
             return Err(EmptyFontSourcesError);

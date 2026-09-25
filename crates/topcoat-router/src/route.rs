@@ -1,3 +1,6 @@
+#[cfg(feature = "fs")]
+mod directory;
+
 use std::{
     borrow::Cow,
     collections::HashMap,
@@ -10,10 +13,12 @@ use std::{
     },
 };
 
+#[cfg(feature = "fs")]
+pub use directory::*;
 use topcoat_core::{context::Cx, error::Result};
 
 use crate::{
-    Body, EndpointIndex, HrefTarget, IntoPath, Layer, Methods, OwnedMethods, Path,
+    Body, EndpointIndex, HrefTarget, IntoPath, Layer, Methods, Next, OwnedMethods, Path, Terminal,
     response::Response, route, route_endpoint,
 };
 
@@ -200,29 +205,45 @@ impl RouteIndex {
     }
 }
 
-/// A route registered on a router, tied to the endpoint serving its path.
-pub(crate) struct RegisteredRoute {
+/// A route paired with the layers that wrap it.
+pub(crate) struct RouteWithLayers {
     /// The route itself.
-    pub(crate) route: Box<dyn Route>,
-    /// The endpoint the route's path resolved to, where its URL path lives.
-    pub(crate) endpoint: EndpointIndex,
+    route: Box<dyn Route>,
     /// The layers wrapping this route, precomputed at build time from the
     /// route's path (group segments included) and ordered from least- to
     /// most-specific so the outermost layer runs first.
-    pub(crate) layers: Box<[Arc<dyn Layer>]>,
+    layers: Box<[Arc<dyn Layer>]>,
+}
+
+impl Route for RouteWithLayers {
+    fn id(&self) -> RouteId {
+        self.route.id()
+    }
+
+    fn methods(&self) -> Methods<'_> {
+        self.route.methods()
+    }
+
+    fn path(&self) -> &Path {
+        self.route.path()
+    }
+
+    fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
+        Next::new(&self.layers, Terminal::Route(&*self.route)).run(cx, body)
+    }
 }
 
 /// The routes registered on a router, in registration order, indexed by
 /// [`RouteIndex`].
 ///
 /// Routes are [`push`](Self::push)ed as the router is built, then only
-/// queried: [`index_of`](Self::index_of) resolves a route's [`RouteId`] to its
-/// position, and indexing by [`RouteIndex`] resolves a position back to the
-/// registration.
+/// queried: [`endpoint`](Self::endpoint) resolves a route's [`RouteId`] to the
+/// endpoint serving it, and indexing by [`RouteIndex`] resolves a position
+/// back to the route and its layers.
 #[derive(Default)]
 pub(crate) struct Routes {
-    routes: Vec<RegisteredRoute>,
-    by_id: HashMap<RouteId, RouteIndex>,
+    routes: Vec<RouteWithLayers>,
+    endpoint_lookup: HashMap<RouteId, EndpointIndex>,
 }
 
 impl Routes {
@@ -235,24 +256,20 @@ impl Routes {
         layers: Box<[Arc<dyn Layer>]>,
     ) -> RouteIndex {
         let index = RouteIndex::new(self.routes.len());
-        self.by_id.insert(route.id(), index);
-        self.routes.push(RegisteredRoute {
-            route,
-            endpoint,
-            layers,
-        });
+        self.endpoint_lookup.insert(route.id(), endpoint);
+        self.routes.push(RouteWithLayers { route, layers });
         index
     }
 
-    /// Returns the position of the route registered under `id`, or `None` if
+    /// Returns the endpoint serving the route registered under `id`, or `None` if
     /// this router holds no route with that identity.
-    pub(crate) fn index_of(&self, id: RouteId) -> Option<RouteIndex> {
-        self.by_id.get(&id).copied()
+    pub(crate) fn endpoint(&self, id: RouteId) -> Option<EndpointIndex> {
+        self.endpoint_lookup.get(&id).copied()
     }
 }
 
 impl Index<RouteIndex> for Routes {
-    type Output = RegisteredRoute;
+    type Output = RouteWithLayers;
 
     fn index(&self, index: RouteIndex) -> &Self::Output {
         &self.routes[index.get()]

@@ -4,8 +4,8 @@ use crate::{PartsWriter, PromotedStr, StaticStr, Unescaped};
 
 /// Converts a value used as an element name into view parts.
 ///
-/// When this trait is implemented on a type, it can be used in the element name position of an
-/// element in the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
+/// Implement this trait to use a type as a dynamic element name in
+/// [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html):
 ///
 /// ```rust
 /// # use topcoat::view::{View, component, view};

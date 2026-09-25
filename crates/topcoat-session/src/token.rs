@@ -5,12 +5,10 @@ pub use hash::*;
 use sha2::Digest;
 pub use store::*;
 
-/// A session token: 32 bytes of cryptographically secure randomness, held by
-/// the client as its proof of a session.
+/// A 32-byte credential identifying a session.
 ///
-/// The raw token only ever travels between the client and the [`TokenStore`].
-/// Applications persist its [`hash`](Self::hash) instead, so a leaked session
-/// database never contains a credential a client could present.
+/// Generate tokens with [`random`](Self::random). Send the token to the client
+/// through a [`TokenStore`] and persist only its [`hash`](Self::hash).
 #[derive(Clone)]
 pub struct Token([u8; 32]);
 
@@ -35,7 +33,7 @@ impl Token {
         Self::new(bytes)
     }
 
-    /// Parses a token from its URL-safe base64 [`encode`](Self::encode)d form.
+    /// Parses the URL-safe base64 form produced by [`encode`](Self::encode).
     ///
     /// # Errors
     ///
@@ -56,8 +54,7 @@ impl Token {
         Ok(Self::new(bytes))
     }
 
-    /// Encodes the token as URL-safe base64, for a [`TokenStore`] to send to
-    /// the client.
+    /// Encodes the token as URL-safe base64.
     #[must_use]
     pub fn encode(&self) -> String {
         use base64::{Engine as _, engine::general_purpose::URL_SAFE};

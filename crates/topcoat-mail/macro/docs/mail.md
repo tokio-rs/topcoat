@@ -1,6 +1,6 @@
 Declares a [`Mail`] as a list of `name: value` fields.
 
-Each field lowers to the [`MailBuilder`] method of the same name, with conversions layered on top: addresses can be written as strings or `(name, address)` pairs, and the `html` field takes an inline [`view!`] body. The macro is an expression producing `Result<Mail>`, so a field value that fails, such as an invalid address string, surfaces as an error at the invocation.
+Fields correspond to [`MailBuilder`] methods. The macro also accepts convenient forms such as address strings and inline [`view!`] markup. It returns `Result<Mail>`, so invalid field values return an error:
 
 ```rust
 # use topcoat::{Result, context::Cx};
@@ -20,11 +20,11 @@ let mail = mail! {
 # }
 ```
 
-A mail declares its content only. The MIME structure, encodings, and the envelope are assembled when the mail is passed to [`send`], which delivers it through the [`Transport`] registered in the app's [`MailConfig`].
+The macro creates the message without sending it. Call [`send`] to deliver it through the [`Transport`] registered in [`MailConfig`].
 
 # Fields
 
-Fields may appear in any order, each at most once; declaring a field twice is a compile error.
+Fields may appear in any order. Repeating a field is a compile error.
 
 - `from`: the sender, a single address.
 - `to`, `cc`, `bcc`, `reply_to`: the recipients, single addresses or collections.
@@ -38,7 +38,7 @@ Fields may appear in any order, each at most once; declaring a field twice is a 
 
 # Addresses
 
-`from` takes a single address; the recipient fields take one address or a collection. Every address position accepts a [`Mailbox`], an address string in bare (`ada@example.com`) or display-name (`Ada Lovelace <ada@example.com>`) form, or a `(name, address)` pair, and the flavors mix freely inside a collection; see [`TryIntoMailboxes`].
+`from` takes one address. Recipient fields take one address or a collection. Use a [`Mailbox`], a string such as `ada@example.com` or `Ada Lovelace <ada@example.com>`, or a `(name, address)` pair. See [`TryIntoMailboxes`] for supported collections.
 
 ```rust
 # use topcoat::Result;
@@ -56,7 +56,7 @@ let mail = mail! {
 
 # The HTML Body
 
-A braced `html` value is a [`view!`] body. Mail clients understand far less CSS than browsers do, so mail markup stays plain and carries its styles inline. When the body renders components or other markup that needs the request context, name it with a leading `cx =>`, just as in a plain-function `view!` call:
+A braced `html` value uses [`view!`] syntax. Add a leading `cx =>` when the view needs the request context:
 
 ```rust
 # use topcoat::{Result, context::Cx};
@@ -77,11 +77,11 @@ async fn welcome(cx: &Cx, name: &str) -> Result<Mail> {
 }
 ```
 
-An unbraced `html` value is an expression, so a prebuilt [`View`] can be passed as-is.
+Pass an unbraced [`View`] expression to use an existing view.
 
 # The Plain-Text Body
 
-Mail without a plain-text alternative scores worse with spam filters, so by default the text body is derived from the HTML body when the mail is assembled. Declare `text` to send your own wording instead, or pass [`TextBody::None`] to send the HTML alone:
+By default, Topcoat derives plain text from the HTML body. Set `text` to supply your own wording, or use [`TextBody::None`] to send only HTML:
 
 ```rust
 # use topcoat::{Result, context::Cx};
@@ -100,7 +100,7 @@ assert_eq!(html_alone.text(), &TextBody::None);
 
 # Attachments And Headers
 
-`attachments` takes a single [`Attachment`] or a collection. A downloadable attachment is presented to the recipient as a file; an [inline attachment](struct.Attachment.html#method.inline) is displayed where the HTML body references its content id through a `cid:` URL. `headers` adds custom `(name, value)` pairs to the message:
+`attachments` accepts one [`Attachment`] or a collection. Use an [inline attachment](struct.Attachment.html#method.inline) for content referenced by a `cid:` URL in the HTML. The `headers` field accepts custom `(name, value)` pairs:
 
 ```rust
 # use topcoat::{Result, context::Cx};
@@ -125,7 +125,7 @@ let mail = mail! {
 
 # Fallible And Async Values
 
-The macro expands to an awaited async block, so it must be used inside an async function. In exchange, field values can use `.await` and `?` directly, and their errors surface as the macro's own `Err`:
+Use the macro in an async context. Field expressions can use `.await` and `?`, and their errors become the macro's result:
 
 ```rust
 # use topcoat::Result;

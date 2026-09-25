@@ -28,6 +28,7 @@ default = [
 ]
 full = [
 	"alpine-ajax",
+	"anyhow",
 	"asset",
 	"compression",
 	"cookie",
@@ -35,6 +36,7 @@ full = [
 	"discover",
 	"font",
 	"font-fontsource",
+	"fs",
 	"htmx",
 	"icon",
 	"icon-iconify",
@@ -58,6 +60,9 @@ full = [
 alpine-ajax = [
 	"dep:topcoat-alpine-ajax",
 ]
+anyhow = [
+	"topcoat-core/anyhow",
+]
 asset = [
 	"dep:topcoat-asset",
 	"topcoat-font?/asset",
@@ -80,7 +85,6 @@ discover = [
 	"topcoat-font?/discover",
 	"topcoat-router?/discover",
 	"topcoat-router-macro?/discover",
-	"topcoat-runtime?/discover",
 	"topcoat-runtime-macro?/discover",
 ]
 font = [
@@ -91,6 +95,10 @@ font-fontsource = [
 	"font",
 	"topcoat-font/fontsource",
 	"topcoat-font-macro/fontsource",
+]
+fs = [
+	"router",
+	"topcoat-router/fs",
 ]
 htmx = [
 	"dep:topcoat-htmx",

@@ -63,7 +63,8 @@ impl ToTokens for Component {
         );
 
         let attrs = item.attrs;
-        item.attrs = vec![parse_quote!(#[allow(clippy::unused_async)])];
+        // Callers use named props, not this helper's positional arguments.
+        item.attrs = vec![parse_quote!(#[allow(clippy::unused_async, clippy::too_many_arguments)])];
         // The implicit `__cx` context parameter carries what `view!` bodies
         // read: the request context.
         item.sig.generics.params.insert(0, parse_quote! { '__a });
@@ -186,7 +187,7 @@ impl ToTokens for Component {
         // a `PhantomData` field. Markers with no such parameters are emitted
         // as unit structs, which makes the marker's bare name a value
         // (`combobox_content`) rather than a tuple-struct constructor, letting
-        // callers pass it directly, e.g. `router.shard(combobox_content)`.
+        // callers pass it directly, e.g. `router.route(combobox_content)`.
         let (marker_body, default_value) = if phantom_args.is_empty() {
             (quote! { #where_clause; }, quote! { Self })
         } else {
@@ -245,6 +246,7 @@ impl ToTokens for Component {
 
             #(#attrs)*
             #[derive(#topcoat_view_macro::Props)]
+            #[allow(dead_code)]
             #vis struct #props_ident #impl_generics #where_clause {
                 #(#fields),*
             }

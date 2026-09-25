@@ -5,7 +5,7 @@ use crate::Cookies;
 /// A [RFC 6265bis] cookie name prefix.
 ///
 /// A prefix asks the browser to enforce extra constraints on a cookie based on
-/// its name. Apply one with [`Cookies::override_prefix_host`] and friends.
+/// its name. For example, apply `__Host-` with [`Cookies::override_prefix_host`].
 ///
 /// [RFC 6265bis]: https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis#name-cookie-name-prefixes
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -45,10 +45,9 @@ impl Prefix {
 
     /// Applies the attributes the prefix requires.
     ///
-    /// With [`Conform::Override`] the required attributes are forced (RFC
-    /// compliant). With [`Conform::Default`] they are only filled in when the
-    /// cookie does not already set them, leaving any explicit caller value
-    /// untouched.
+    /// [`Conform::Override`] replaces attributes to meet the prefix's rules.
+    /// [`Conform::Default`] fills only unset attributes and preserves explicit
+    /// values, even when they conflict with those rules.
     fn conform(self, cookie: &mut Cookie<'static>, mode: Conform) {
         let force = matches!(mode, Conform::Override);
 

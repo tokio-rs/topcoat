@@ -1,4 +1,4 @@
-Expands to `const` [`IconData`] icons from a staged [Iconify] icon set.
+Creates [`IconData`] constants from a staged [Iconify] set.
 
 ```rust,ignore
 iconify::include!("feather");
@@ -8,7 +8,7 @@ view! {
 }
 ```
 
-Iconify aggregates the icons of over 150 open source icon sets. The staged set is read at compile time, so every reference is checked while you build: an unknown set or icon name is a compile error with near-miss suggestions.
+Unknown sets or icons cause a compile error with suggestions for similar names.
 
 # Selections
 
@@ -18,9 +18,9 @@ The string argument selects what to include from a set:
 - `include!("mdi:*")` expands to the same consts, inlined into the current scope.
 - `include!("mdi:delete")` expands to the single const `DELETE`.
 
-An optional leading visibility applies to the expansion, e.g. `include!(pub(crate) "mdi")`: to the module in the first form, and to each const in the other two.
+Add a visibility before the string, as in `include!(pub(crate) "mdi")`. It applies to the generated module, or to each constant when no module is generated.
 
-The whole-set forms skip icons their set marks as hidden, which usually means deprecated, and icons that carry a rotation or flip. Their consts also allow `dead_code`, so including a whole set does not warn about unused icons. Naming a hidden icon explicitly still works; naming a rotated or flipped one is an error.
+Whole-set imports skip hidden icons and icons with rotation or flip properties. They allow unused constants. You can select a hidden icon by name, but selecting a rotated or flipped icon is an error.
 
 # Names
 
@@ -30,7 +30,7 @@ Module names are the set's prefix in snake case (`simple-icons` becomes `simple_
 
 # Staging
 
-Sets are staged by the crate's build script through [`BuildConfig`], which downloads them from Iconify or picks them up from a local cache directory:
+Stage the set from `build.rs` with [`BuildConfig`]. It downloads missing sets and reuses cached copies:
 
 ```rust,no_run
 # #![allow(clippy::needless_doctest_main)]
@@ -45,7 +45,7 @@ fn main() {
 
 # Single icons
 
-This macro expands to items. To use an icon as an expression instead, inline in a view or behind a name of your choosing, reach for [`iconify_icon!`], which takes a single `"set:icon"` reference and expands to a const-evaluable [`IconData`] expression.
+Use [`iconify_icon!`] when you need an icon expression, such as an argument to a component.
 
 [Iconify]: https://iconify.design/
 [`IconData`]: ../struct.IconData.html

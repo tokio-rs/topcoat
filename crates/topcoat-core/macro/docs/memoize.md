@@ -1,6 +1,6 @@
-The `#[memoize]` attribute caches the result of a function for the duration of a single request, keyed by its arguments. Call the same function twice with the same arguments inside one request and the body runs only once: the second call returns the cached value.
+`#[memoize]` shares a function's result across calls in one request. A later call reuses the result when its arguments and observed request context bindings match.
 
-This is the per-request equivalent of memoization in libraries like React's `cache`: it's not a global cache and it's not persisted across requests. Each new request starts with an empty cache.
+Each request starts with an empty cache. Results are not shared across requests.
 
 # Setup
 
@@ -20,11 +20,11 @@ async fn get_user(cx: &Cx, id: i64) -> User {
 }
 ```
 
-That's it. Calling `get_user(cx, 42).await` from anywhere in the request (a page, a layout, a component) runs the body the first time and returns the cached `User` for every subsequent call with `id == 42`. The function's return type `T` is rewritten to `&T` that has the same lifetime as `&cx`. To borrow the contents of an `Option<T>` or `Result<T, E>` return value instead, see [`as_ref`](#borrowing-option-and-result-contents) below.
+The first call to `get_user(cx, 42).await` computes the user. Later calls with the same ID reuse it if their request context dependencies match. The macro changes the return type from `T` to `&T`, borrowed for the lifetime of `cx`. Use [`as_ref`](#borrowing-option-and-result-contents) to borrow the contents of an `Option` or `Result` instead.
 
 # Sync and async
 
-`#[memoize]` works on both synchronous and `async` functions. Pick whichever matches your work; the macro handles the rest.
+The attribute works on synchronous and `async` functions.
 
 ```rust
 # fn main() {}
@@ -86,7 +86,7 @@ fn main() {
 
 # What gets cached
 
-Every argument except `cx` is part of the cache key. Two calls hit the same cache entry if and only if every non-`cx` argument is equal.
+Every argument except `cx` is hashed into the cache key. The function's request context dependencies also determine whether a cached result can be reused.
 
 ```rust
 # use topcoat::context::{Cx, memoize};
@@ -103,13 +103,13 @@ add(cx, 1, 3); // prints "computing", returns 4 (different args)
 # }
 ```
 
-Each `#[memoize]` function has its own independent cache slot, so two functions with the same argument types don't collide.
+Each memoized function has a separate cache.
 
-The arguments are not the only thing that decides whether a call is a hit; the request context the body reads matters too, see [request context dependencies](#request-context-dependencies) below.
+See [request context dependencies](#request-context-dependencies) for how scoped values affect reuse.
 
 # Request context dependencies
 
-Request context is not part of the cache key, but it still decides who may reuse a cached value. `#[memoize]` records every request context value the body reads while it runs, and hands a cached result only to callers whose scope resolves those reads to the same values.
+The macro tracks request context lookups made while the function runs. A cached result can be reused only when those lookups resolve to the same registered bindings in the caller's scope.
 
 This matters because `Cx::with` derives a child scope holding additional values, so the same function can see a different value depending on the `cx` it is called with:
 
@@ -132,9 +132,9 @@ greeting(&scoped); // a different Locale, so the body runs again
 # }
 ```
 
-The first call ran under the request's own `Locale`, so the call through `scoped` cannot reuse its result and computes its own. Both results stay cached, and a later call through either scope hits the one computed for it. Without this a scoped value would leak out of its scope, or worse, the first caller would decide what every later caller sees.
+The two calls read different `Locale` bindings, so each computes a result. Both results stay cached for later calls through their respective scopes.
 
-Only the values the body actually reads count. Registering a value the body never looks up changes nothing, and a body that reads no request context at all is reusable from every scope. A lookup that found nothing is a dependency too: if the body read a type that was absent, a caller whose scope registers that type recomputes.
+Only observed lookups affect reuse. Adding an unrelated value does not invalidate the result. A lookup that returned `None` is also tracked. If a later caller has a value for that type, the function runs again.
 
 Values the body registers itself are not dependencies:
 
@@ -149,7 +149,7 @@ fn banner(cx: &Cx) -> String {
 }
 ```
 
-That read resolves through a binding the body created, which no caller can see, so it never keeps a caller from reusing the result.
+The function creates this binding itself, so it does not depend on the caller's value of that type.
 
 Dependencies also propagate through nested memoized calls:
 
@@ -231,18 +231,11 @@ The macro enforces these at compile time:
 - Every argument except `cx` must implement `Hash`, whether passed by value or by reference.
 - The return type `T` must be `Send + Sync + 'static`.
 
-Most everyday types (`i32`, `String`, `&str`, `Uuid`, your own `#[derive(Hash)]` structs) satisfy these out of the box.
-
-The hash of the arguments is the entire cache key, so the cache is only correct if every argument's `Hash` impl distinguishes values that are not equal. A hand-written impl that hashes only some of a type's fields makes calls that differ in the skipped fields collide, and a collision silently returns the cached value of a different call. Derived and standard library impls are always safe.
+The cache identifies arguments by their hash without an equality check. A custom `Hash` implementation must include every part of the value that affects the result. Omitting such a field can make distinct calls reuse the wrong value. Prefer deriving `Hash` when possible.
 
 # When to reach for it
 
-Use `#[memoize]` when the same data may be requested multiple times during a single request and recomputing it is wasteful. Common cases:
-
-- **Database lookups** that several components need (current user, settings, feature flags).
-- **Deduplication of fan-out fetches** when components render in parallel and would otherwise hit the same endpoint repeatedly.
-
-It is *not* a substitute for a long-lived cache (Redis, an LRU, etc.). Cross-request caching is a separate concern and should be layered behind your data access functions.
+Use `#[memoize]` when several callers need the same expensive result during one request. A shared user lookup is a typical example. Add a separate cache in your data access code if results should persist across requests.
 
 # Example: shared user lookup
 
@@ -287,4 +280,4 @@ async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
 }
 ```
 
-The page renders before the layout it is wrapped in, so the page computes the user and the layout reads it from the cache. Either way the database is queried at most once per request.
+Whichever caller runs first loads the user. Later callers reuse the cached result, so the database is queried at most once per request.

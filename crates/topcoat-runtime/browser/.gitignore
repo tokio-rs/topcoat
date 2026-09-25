@@ -1,6 +1,7 @@
 # Build output
 dist/*
 !dist/index.js
+!dist/coherence.js
 
 # Node.js
 node_modules

@@ -1,9 +1,9 @@
 /// The borrowed return type of a `#[memoize(as_ref)]` function.
 ///
-/// `#[memoize]` stores the function's return value in the request cache and
-/// hands out `&T`. With `as_ref`, the macro instead borrows the cached
-/// value's contents through this trait, so an `Option<T>` or `Result<T, E>`
-/// return value comes back as `Option<&T>` or `Result<&T, &E>`.
+/// `#[memoize]` normally returns `&T` from the request cache. The `as_ref`
+/// option uses this trait to borrow the cached value's contents instead.
+/// For example, `Option<T>` becomes `Option<&T>` and `Result<T, E>` becomes
+/// `Result<&T, &E>`.
 ///
 /// Implement this trait for your own return type to use it with
 /// `#[memoize(as_ref)]`:

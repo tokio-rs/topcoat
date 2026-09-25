@@ -27,7 +27,7 @@ where
     ///
     /// Reads inside a runtime expression are the client-reactive path and
     /// do not register a dependency on the server; the server-side
-    /// evaluation that produces the initial render reads untracked.
+    /// evaluation only records whether the expression needs a browser binding.
     #[must_use]
     pub fn read(&self) -> <&T as Surrogated>::Surrogate {
         self.0.read_untracked().into_surrogate()
@@ -75,35 +75,40 @@ impl SignalSurrogate<bool> {
     }
 }
 
-impl SignalSurrogate<f64> {
-    /// Adds one to the value.
-    ///
-    /// # Panics
-    ///
-    /// Always panics; signal writes can only occur in client-side expressions.
-    #[track_caller]
-    pub fn increment(&self) {
-        write_in_browser_only();
-    }
+macro_rules! numeric_signal {
+    ($($number:ty),+ $(,)?) => {
+        $(impl SignalSurrogate<$number> {
+            /// Adds one to the value.
+            ///
+            /// # Panics
+            ///
+            /// Always panics on the server. Integer overflow panics in the browser.
+            #[track_caller]
+            pub fn increment(&self) {
+                write_in_browser_only();
+            }
 
-    /// Subtracts one from the value.
-    ///
-    /// # Panics
-    ///
-    /// Always panics; signal writes can only occur in client-side expressions.
-    #[track_caller]
-    pub fn decrement(&self) {
-        write_in_browser_only();
-    }
+            /// Subtracts one from the value.
+            ///
+            /// # Panics
+            ///
+            /// Always panics on the server. Integer overflow panics in the browser.
+            #[track_caller]
+            pub fn decrement(&self) {
+                write_in_browser_only();
+            }
+        })+
+    };
 }
+
+numeric_signal!(
+    f64, u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize
+);
 
 impl SignalSurrogate<String> {
     /// Appends a string to the end of the value.
     ///
-    /// The argument is anything that dereferences to a string, so both a
-    /// borrowed `&str` and an owned `String` work. The owned form is what an
-    /// event field yields: `Event::target.value` is a `String`, so
-    /// `message.push_str(e.target.value)` is the common call.
+    /// Accepts borrowed or owned strings, including an event target's value.
     ///
     /// # Panics
     ///
@@ -182,13 +187,17 @@ mod tests {
     use std::panic::Location;
 
     use serde_json::json;
+    use topcoat_core::identity::Identity;
 
     use super::*;
 
     /// Builds a signal surrogate around a fresh signal holding `value`.
     #[track_caller]
     fn surrogate<T>(value: T) -> SignalSurrogate<T> {
-        SignalSurrogate::new(Signal::new(SignalId::derive(Location::caller()), value))
+        SignalSurrogate::new(Signal::new(
+            SignalId::derive(Identity::ROOT, Location::caller()),
+            value,
+        ))
     }
 
     #[test]
@@ -203,7 +212,7 @@ mod tests {
 
     #[test]
     fn deserializes_from_its_id_and_value() {
-        let id = SignalId::derive(Location::caller());
+        let id = SignalId::derive(Identity::ROOT, Location::caller());
 
         let signal: SignalSurrogate<String> =
             serde_json::from_value(json!({ "t": "Signal", "id": id.to_string(), "v": "shoes" }))
@@ -215,7 +224,7 @@ mod tests {
 
     #[test]
     fn deserializes_a_value_through_its_surrogate() {
-        let id = SignalId::derive(Location::caller());
+        let id = SignalId::derive(Identity::ROOT, Location::caller());
 
         let signal: SignalSurrogate<Option<f64>> = serde_json::from_value(json!({
             "t": "Signal",
@@ -229,7 +238,7 @@ mod tests {
 
     #[test]
     fn rejects_another_tag() {
-        let id = SignalId::derive(Location::caller());
+        let id = SignalId::derive(Identity::ROOT, Location::caller());
 
         let error = serde_json::from_value::<SignalSurrogate<String>>(
             json!({ "t": "Procedure", "id": id.to_string(), "v": "shoes" }),
@@ -241,7 +250,7 @@ mod tests {
 
     #[test]
     fn rejects_a_missing_value() {
-        let id = SignalId::derive(Location::caller());
+        let id = SignalId::derive(Identity::ROOT, Location::caller());
 
         let error = serde_json::from_value::<SignalSurrogate<String>>(
             json!({ "t": "Signal", "id": id.to_string() }),
@@ -253,7 +262,7 @@ mod tests {
 
     #[test]
     fn rejects_a_value_of_another_type() {
-        let id = SignalId::derive(Location::caller());
+        let id = SignalId::derive(Identity::ROOT, Location::caller());
 
         serde_json::from_value::<SignalSurrogate<f64>>(json!({
             "t": "Signal",

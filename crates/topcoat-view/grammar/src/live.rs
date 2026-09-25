@@ -1,20 +1,31 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
-use syn::parse::{Parse, ParseStream};
-use topcoat_core_grammar::paths::{topcoat_context, topcoat_view};
+use syn::{
+    parse::{Parse, ParseStream},
+    spanned::Spanned,
+};
+use topcoat_core_grammar::{
+    ParseOption,
+    paths::{topcoat_context, topcoat_core, topcoat_view},
+};
 
-use crate::view::{
-    View,
-    hir::{LowerView, ViewBuilder},
+use crate::{
+    leading_cx::LeadingCx,
+    view::{
+        View,
+        hir::{LowerView, ViewBuilder},
+    },
 };
 
 pub struct Live {
+    pub cx: Option<LeadingCx>,
     pub body: Vec<syn::Stmt>,
 }
 
 impl Parse for Live {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
+            cx: input.call(LeadingCx::parse_option)?,
             body: input.call(syn::Block::parse_within)?,
         })
     }
@@ -22,30 +33,54 @@ impl Parse for Live {
 
 impl ToTokens for Live {
     fn to_tokens(&self, tokens: &mut TokenStream) {
+        // Read the input span: line!() and column!() would name the outer
+        // view! invocation and merge its distinct live! sites.
+        let start = self
+            .body
+            .first()
+            .map_or_else(Span::call_site, Spanned::span)
+            .start();
+        let line = u32::try_from(start.line).expect("source line fits in u32");
+        let column = u32::try_from(start.column + 1).expect("source column fits in u32");
+        let site = quote! {
+            const {
+                #topcoat_core::identity::SiteKey::new(::core::file!(), #line, #column, 0)
+            }
+        };
         let body = &self.body;
-        quote! {
-            #topcoat_view::internal::LiveView::new(async move {
-                #(#body)*
-            })
-        }
+        let bind_cx = self.cx.as_ref().map(|cx| {
+            let cx = &cx.cx;
+            quote! { let __cx: #topcoat_context::Cx = (#cx).clone(); }
+        });
+
+        quote! {{
+            #bind_cx
+            let __region = #topcoat_view::RegionId::new(#topcoat_context::identity(&__cx), #site);
+            #topcoat_view::internal::LiveView::new(
+                __region,
+                async move {
+                    let __cx: &#topcoat_context::Cx = &__cx;
+                    #(#body)*
+                },
+            )
+        }}
         .to_tokens(tokens);
     }
 }
 
 #[cfg(feature = "pretty")]
 impl topcoat_core_grammar::pretty::PrettyPrint for Live {
+    /// Keeps statements on separate lines, preserving comments and blank lines.
     fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.cx.pretty_print(printer);
         for (index, stmt) in self.body.iter().enumerate() {
             stmt.pretty_print(printer);
             if index < self.body.len() - 1 {
                 printer.scan_same_line_trivia();
+                printer.scan_force_break();
                 printer.scan_break();
-                " ".pretty_print(printer);
                 printer.scan_trivia(true, true);
             }
-        }
-        if self.body.len() > 1 {
-            printer.scan_force_break();
         }
     }
 }
@@ -70,7 +105,7 @@ impl ToTokens for Emit {
         let view = builder.finish().emit_emit(owns_cx);
 
         let drive = quote! {
-            #topcoat_view::internal::LiveView::drive(#view).await
+            #topcoat_view::internal::LiveView::drive(__region, #view).await
         };
 
         // The view borrows the context rather than moving it, so the binding
@@ -112,7 +147,7 @@ mod tests {
     #[test]
     fn an_emitted_view_is_driven_into_the_live_view() {
         let tokens = emit("<div></div>");
-        assert!(tokens.starts_with(":: topcoat_view :: internal :: LiveView :: drive ("));
+        assert!(tokens.starts_with(":: topcoat_view :: internal :: LiveView :: drive (__region ,"));
         assert!(tokens.ends_with(". await"), "{tokens}");
     }
 
@@ -132,7 +167,7 @@ mod tests {
     fn an_explicit_cx_binds_the_context_identifier() {
         let tokens = emit("cx => <div></div>");
         assert!(tokens.contains("Cx = (cx) . clone () ;"), "{tokens}");
-        assert!(tokens.contains("let __cx = & __cx ;"), "{tokens}");
+        assert!(tokens.contains("Cx = & __cx ;"), "{tokens}");
     }
 
     #[test]
@@ -141,10 +176,7 @@ mod tests {
             .unwrap()
             .to_token_stream()
             .to_string();
-        assert!(
-            tokens.starts_with(":: topcoat_view :: internal :: LiveView :: new (async move {"),
-            "{tokens}"
-        );
+        assert!(tokens.contains("async move {"), "{tokens}");
         assert!(tokens.contains("let x = 1 ;"), "{tokens}");
     }
 }

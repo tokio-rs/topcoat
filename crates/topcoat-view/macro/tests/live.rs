@@ -84,6 +84,35 @@ async fn region_remapping_a_failed_emission_renders_as_plain_content() {
 }
 
 #[tokio::test]
+async fn an_explicit_context_is_owned_by_the_live_body() {
+    let region = {
+        let cx = Cx::default();
+        let region = live! { cx => emit! { load(fail: false) } };
+        drop(cx);
+        region
+    };
+    let cx = &Cx::default();
+    let html = view! { cx => (region) }.single().await.unwrap().render(cx);
+    assert_eq!(html, "<p>loaded</p>");
+}
+
+#[tokio::test]
+async fn an_explicit_context_reference_is_cloned_into_the_view() {
+    let (plain, live) = {
+        let context = Cx::default();
+        let cx = &context;
+        (
+            view! { cx => load(fail: false) },
+            live! { cx => emit! { load(fail: false) } },
+        )
+    };
+    let cx = &Cx::default();
+
+    assert_eq!(plain.single().await.unwrap().render(cx), "<p>loaded</p>");
+    assert_eq!(live.single().await.unwrap().render(cx), "<p>loaded</p>");
+}
+
+#[tokio::test]
 async fn region_failing_before_its_content_fails_the_view() {
     let cx = &Cx::default();
     let error = view! { cx => <main>(live! { emit! { load(fail: true) } })</main> }
@@ -191,8 +220,8 @@ async fn region_emitting_twice_swaps_its_content() {
     assert_eq!(
         content.content.render(cx),
         format!(
-            "<main><!--topcoat::region::start({region})--><p>first</p>\
-             <!--topcoat::region::end({region})--></main>"
+            "<main><!--::topcoat::region::start({region})--><p>first</p>\
+             <!--::topcoat::region::end({region})--></main>"
         )
     );
     assert_eq!(swap.replacement.render(cx), "<p>second</p>");
@@ -202,9 +231,10 @@ async fn region_emitting_twice_swaps_its_content() {
 }
 
 #[tokio::test]
-async fn region_ids_count_from_the_start_for_each_root_view() {
-    let cx = &Cx::default();
+async fn region_ids_are_stable_across_root_views() {
+    let mut previous = None;
     for _ in 0..2 {
+        let cx = &Cx::default();
         let mut view = pin!(view! {
             cx =>
             <main>
@@ -217,12 +247,19 @@ async fn region_ids_count_from_the_start_for_each_root_view() {
 
         let content = first(&mut view).await.unwrap();
         assert!(content.live);
+        let swap = next_swap(&mut view).await.unwrap().unwrap();
+        let region = swap.region;
         assert_eq!(
             content.content.render(cx),
-            "<main><!--topcoat::region::start(1)--><p>first</p>\
-             <!--topcoat::region::end(1)--></main>"
+            format!(
+                "<main><!--::topcoat::region::start({region})--><p>first</p>\
+             <!--::topcoat::region::end({region})--></main>"
+            )
         );
-        assert!(next_swap(&mut view).await.unwrap().is_some());
+        if let Some(previous) = previous {
+            assert_eq!(region, previous);
+        }
+        previous = Some(region);
         assert!(next_swap(&mut view).await.unwrap().is_none());
     }
 }
@@ -255,6 +292,7 @@ async fn first_loop_iteration_delivers_its_swap() {
     let mut view = pin!(view! {
         cx =>
         <ul>
+            #[key(label)]
             for label in ["only"] {
                 <li>(live! {
                     emit! { <i>(label) "1"</i> }?;
@@ -276,6 +314,7 @@ async fn live_loop_iterations_take_turns_swapping() {
     let mut view = pin!(view! {
         cx =>
         <ul>
+            #[key(label)]
             for label in ["a", "b"] {
                 <li>(live! {
                     emit! { <i>(label) "1"</i> }?;
@@ -338,8 +377,8 @@ async fn joined_emissions_all_reach_the_region() {
     assert_eq!(
         content.content.render(cx),
         format!(
-            "<main><!--topcoat::region::start({region})--><p>a</p>\
-             <!--topcoat::region::end({region})--></main>"
+            "<main><!--::topcoat::region::start({region})--><p>a</p>\
+             <!--::topcoat::region::end({region})--></main>"
         )
     );
     assert_eq!(swap.replacement.render(cx), "<p>b</p>");

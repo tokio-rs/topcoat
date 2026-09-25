@@ -43,6 +43,10 @@ source = "src/components/dialog.rs"
 [components.dropdown_menu]
 source = "src/components/dropdown_menu.rs"
 
+[components.field]
+source = "src/components/field.rs"
+dependencies = ["label"]
+
 [components.hover_card]
 source = "src/components/hover_card.rs"
 
@@ -74,6 +78,10 @@ source = "src/components/separator.rs"
 [components.sheet]
 source = "src/components/sheet.rs"
 dependencies = ["dialog"]
+
+[components.sidebar]
+source = "src/components/sidebar.rs"
+dependencies = ["button", "input", "separator", "sheet", "skeleton"]
 
 [components.skeleton]
 source = "src/components/skeleton.rs"

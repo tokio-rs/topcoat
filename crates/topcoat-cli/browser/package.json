@@ -1,0 +1,20 @@
+{
+	"name": "@topcoat-rs/dev",
+	"version": "0.0.1",
+	"private": true,
+	"license": "MIT",
+	"type": "module",
+	"scripts": {
+		"lint": "biome ci --config-path . . ../../topcoat-core/browser",
+		"build": "tsup && tsc",
+		"test": "vitest run"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.15",
+		"happy-dom": "^20.14.0",
+		"tsup": "^8.5.1",
+		"typescript": "^6.0.3",
+		"vite": "^8.1.5",
+		"vitest": "^4.1.10"
+	}
+}

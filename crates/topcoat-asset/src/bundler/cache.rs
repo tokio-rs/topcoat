@@ -27,9 +27,8 @@ impl Cache {
 
     /// Return the local path of `uri`'s cached contents, downloading first if needed.
     ///
-    /// Performs a blocking HTTP request when the asset isn't already cached. Safe to
-    /// call concurrently; two threads racing on the same `uri` each download it and
-    /// then atomically replace the cache entry with identical contents.
+    /// Performs a blocking HTTP request on a cache miss. Concurrent callers may
+    /// each download the URI, but only complete downloads enter the cache.
     pub fn fetch(&self, uri: &Uri) -> Result<PathBuf, BundleError> {
         let path = self.cached_path(uri);
         if path.exists() {

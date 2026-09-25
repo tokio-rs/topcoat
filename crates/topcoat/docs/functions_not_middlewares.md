@@ -1,8 +1,8 @@
 # Functions, not middlewares
 
-Developers coming from other frameworks may be used to guarding API routes with middlewares or extractors, for example to reject invalid requests or unauthenticated users. In Topcoat, prefer short, composable functions that take `cx: &Cx` and perform validation or data fetching directly.
+Use functions that take `cx: &Cx` to read request data and check application rules. A function can fetch the current user, require authentication, or build on another helper.
 
-These functions can be called from anywhere in the component tree without coupling unrelated components together. For data fetching and other expensive work, use `#[memoize]` to deduplicate repeated calls to the same logic within a request.
+Call each helper where its result is needed. Use `#[memoize]` to share expensive results across calls in the same request.
 
 # What not to do
 
@@ -33,7 +33,7 @@ async fn account_page(request: &Request) -> Html {
 }
 ```
 
-That can work, but it makes the page depend on configuration that lives somewhere else. If the middleware is missing or ordered incorrectly, the handler can panic. If a protected route is added without the middleware, it can accidentally expose data.
+The page depends on middleware configured elsewhere. Missing or incorrectly ordered middleware can cause a panic or leave a route without its intended authentication check.
 
 ## Extractors
 
@@ -74,7 +74,7 @@ async fn user_avatar(user: User) -> Html {
 }
 ```
 
-That is fine for local data flow, but the current user belongs to the request as a whole. Passing it through every layout and component couples unrelated code just so a deeply nested component can ask a simple question.
+Passing data explicitly works well when it belongs to the caller. For request-wide data, intermediate components may have to accept a value only to pass it on.
 
 # What to do in Topcoat
 
@@ -152,9 +152,9 @@ async fn user_avatar(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-`user_avatar` is now guarded wherever it is used. If it appears on a page rendered without a valid session, the component falls through to Topcoat's unauthorized response. The requirement lives with the code that depends on it, so you do not need to remember to annotate every route that might eventually render the component.
+`user_avatar` checks authentication whenever it renders. Without a valid session, it returns an unauthorized error. Each component or handler that needs protection calls the helper itself.
 
-Because `fetch_user` is memoized, the database lookup runs at most once for the same user ID during a request. A layout can call `fetch_current_user(cx)` to render the nav, a page can call `require_auth(cx)` to protect private content, and a nested component can call `require_auth(cx)` again to render an avatar. The calls stay decoupled, while the expensive work is deduplicated.
+The database lookup runs once for the same user ID during a request. Callers can independently request the user and share the cached result.
 
 ## Shape the functions by meaning
 
@@ -163,7 +163,7 @@ Use several focused helpers instead of one large auth function:
 - `session_cookie(cx)` reads the HTTP headers.
 - `fetch_user(cx, user_id)` performs the database lookup and memoizes it.
 - `fetch_current_user(cx)` turns the session into optional user data.
-- `require_auth(cx)` turns optional user data into a fallback-aware result.
+- `require_auth(cx)` returns the user or an unauthorized error.
 
 That keeps each function reusable. Public UI can call `fetch_current_user(cx)` and render a signed-out state. Private UI can call `require_auth(cx).await?` and fail closed. Admin UI can build on the same pattern:
 
@@ -182,4 +182,4 @@ async fn require_admin(cx: &Cx) -> Result<&User> {
 }
 ```
 
-The same style applies beyond auth: feature flags, tenant lookup, locale detection, experiments, settings, and URL-derived data all fit naturally as `cx` functions. Reach for a router layer for true cross-cutting transport concerns such as compression, tracing, or low-level request normalization. Reach for `cx` functions when application code needs to ask for request-scoped data.
+Use the same pattern for other application data that depends on the request. Use a router layer when work must wrap request handling, such as compressing a response.

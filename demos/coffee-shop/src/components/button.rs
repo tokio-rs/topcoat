@@ -23,18 +23,10 @@ pub enum ButtonVariant {
 }
 
 impl ButtonVariant {
-    /// The Tailwind classes for this variant.
+    /// Classes for the button variant and its interaction states.
     ///
-    /// Hover and press states apply the fill or foreground color at reduced
-    /// opacity, so they hold up in both color schemes without `dark:`
-    /// overrides. Every variant with a resting fill or border casts the
-    /// theme's control shadow; `Ghost` is flat until hovered, so it casts
-    /// none.
-    ///
-    /// Each variant sets its own border color rather than inheriting a
-    /// transparent one from [`BASE`]: with two border-color classes on the
-    /// same element, stylesheet order (not class order) would decide the
-    /// winner.
+    /// Each variant sets its own border color. Keep border colors out of the shared
+    /// base to avoid conflicting classes.
     fn classes(self) -> StaticClass {
         match self {
             Self::Primary => class!(
@@ -46,7 +38,7 @@ impl ButtonVariant {
                  hover:bg-foreground/10 active:bg-foreground/15",
             ),
             Self::Outline => class!(
-                "border-border text-foreground shadow-xs hover:bg-foreground/5 \
+                "border-border text-foreground hover:bg-foreground/5 \
                  active:bg-foreground/10",
             ),
             Self::Ghost => class!(
@@ -78,27 +70,22 @@ pub enum ButtonSize {
 }
 
 impl ButtonSize {
-    /// The Tailwind classes for this size.
-    ///
-    /// Each size sets a text size, which also scales any icons inside: the
-    /// `icon` component is `1em` square by default.
+    /// Classes for the button dimensions. Text size stays the same across sizes.
     fn classes(self) -> StaticClass {
         match self {
-            Self::Sm => class!("h-8 gap-1.5 rounded-md px-3 text-xs"),
-            Self::Md => class!("h-9 gap-2 rounded-lg px-4 text-sm"),
-            Self::Lg => class!("h-10 gap-2 rounded-lg px-5 text-base"),
-            Self::Icon => class!("size-9 rounded-lg text-base"),
+            Self::Sm => class!("h-8 gap-1.5 rounded-md px-3"),
+            Self::Md => class!("h-9 gap-2 rounded-lg px-4"),
+            Self::Lg => class!("h-10 gap-2 rounded-lg px-5"),
+            Self::Icon => class!("size-9 rounded-lg"),
         }
     }
 }
 
-/// The classes shared by every button, regardless of variant or size.
-///
-/// Every button carries a border (colored per variant) so that the `Outline`
-/// variant, which only recolors it, does not change the button's dimensions.
+/// Classes shared by button variants and sizes. A border reserves the same space in
+/// every variant.
 const BASE: StaticClass = class!(
     "inline-flex shrink-0 items-center justify-center border \
-     font-medium whitespace-nowrap transition-colors outline-none select-none \
+     text-sm font-medium whitespace-nowrap transition-colors outline-none select-none \
      focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
      focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
 );
@@ -123,13 +110,11 @@ pub fn button_variants(
     class!(BASE, variant.classes(), size.classes())
 }
 
-/// A button component.
+/// A styled button.
 ///
-/// The `variant` and `size` parameters select the styling, defaulting to
-/// `Primary` and `Md`. The `attrs` (such as `class`, `type`, `disabled`, or
-/// event handlers) are forwarded to the underlying `<button>`; a `class` among
-/// them is appended to the computed classes. Child nodes become the button's
-/// content.
+/// `variant` defaults to `Primary` and `size` to `Md`. Pass the content as children.
+/// `attrs` are forwarded to the `<button>`, with extra classes added to its classes.
+/// Use [`button_variants`] to apply the same styling to another element.
 ///
 /// ```ignore
 /// view! {
@@ -140,9 +125,6 @@ pub fn button_variants(
 ///     )
 /// }
 /// ```
-///
-/// To style a non-`<button>` element like a button, use [`button_variants`]
-/// directly.
 #[component]
 pub async fn button(
     #[default] variant: ButtonVariant,

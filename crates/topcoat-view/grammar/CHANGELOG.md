@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0](https://github.com/tokio-rs/topcoat/compare/topcoat-view-grammar-v0.8.1...topcoat-view-grammar-v0.9.0) - 2026-09-24
+
+### Added
+
+- *(runtime)* make procedure and shard paths customizable ([#441](https://github.com/tokio-rs/topcoat/pull/441))
+- *(view)* improved `suspense` behavior, dedicated error boundary view, refactor ([#432](https://github.com/tokio-rs/topcoat/pull/432))
+- *(view)* stable region IDs across rerenders ([#427](https://github.com/tokio-rs/topcoat/pull/427))
+- *(ui)* sidebar component ([#419](https://github.com/tokio-rs/topcoat/pull/419))
+- *(runtime)* better reactivity support for (Topcoat-) UI components ([#418](https://github.com/tokio-rs/topcoat/pull/418))
+- *(view)* [**breaking**] new way to specify identities (`#[key(...)]` and `cx.keyed(...)`) ([#410](https://github.com/tokio-rs/topcoat/pull/410))
+
+### Other
+
+- rewrite all docs 3 ([#439](https://github.com/tokio-rs/topcoat/pull/439))
+- rewrite all docs ([#435](https://github.com/tokio-rs/topcoat/pull/435))
+
 ## [0.8.0](https://github.com/tokio-rs/topcoat/compare/topcoat-view-grammar-v0.7.0...topcoat-view-grammar-v0.8.0) - 2026-09-09
 
 ### Added

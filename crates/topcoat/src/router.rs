@@ -1,9 +1,7 @@
 #![doc = include_str!("../docs/router.md")]
-// Without the `tower` and `serve` features the docs' links into the `tower`
-// module and the serve functions cannot resolve; they degrade to plain text
-// instead of failing the build.
+// Links to optional APIs become plain text when their features are disabled.
 #![cfg_attr(
-    not(all(feature = "serve", feature = "tower")),
+    not(all(feature = "fs", feature = "serve", feature = "tower")),
     allow(rustdoc::broken_intra_doc_links)
 )]
 
@@ -27,12 +25,6 @@ impl RouterBuilderDiscoverExt for RouterBuilder {
         {
             use topcoat_font::RouterBuilderFontExt;
             self = self.discover_fonts();
-        }
-        #[cfg(feature = "runtime")]
-        {
-            use topcoat_runtime::{RouterBuilderProcedureExt, RouterBuilderShardExt};
-            self = self.discover_procedures();
-            self = self.discover_shards();
         }
         self
     }

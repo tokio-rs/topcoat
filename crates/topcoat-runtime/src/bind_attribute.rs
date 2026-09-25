@@ -26,7 +26,16 @@ where
 {
     #[inline]
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
-        let Expr { evaluated, js } = self.value;
+        let Expr {
+            evaluated,
+            js,
+            is_static,
+        } = self.value;
+
+        if is_static {
+            Attribute::new(self.key, evaluated).into_view_parts(cx, parts);
+            return;
+        }
 
         Attribute::new(self.key.clone(), evaluated).into_view_parts(cx, parts);
         Attribute::new(

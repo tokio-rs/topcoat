@@ -33,4 +33,5 @@ pub use form::*;
 pub use html::*;
 pub use js::*;
 pub use json::*;
+pub use view::*;
 pub use wasm::*;

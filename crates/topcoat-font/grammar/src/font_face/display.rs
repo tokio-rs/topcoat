@@ -122,8 +122,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontDisplayValue {
     }
 }
 
-/// The display strategy of a font face: `auto`, `block`, `swap`, `fallback`, or
-/// `optional`.
+/// A CSS `font-display` value.
 pub enum FontDisplayKind {
     Auto(kw::auto),
     Block(kw::block),

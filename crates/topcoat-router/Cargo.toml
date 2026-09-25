@@ -18,6 +18,14 @@ compression = [
 discover = [
 	"dep:inventory",
 ]
+fs = [
+	"dep:httpdate",
+	"dep:mime_guess",
+	"dep:tokio",
+	"dep:tokio-util",
+	"tokio/fs",
+	"tokio/io-util",
+]
 multipart = [
 	"dep:multer",
 ]
@@ -63,11 +71,14 @@ heck.workspace = true
 http.workspace = true
 http-body.workspace = true
 http-body-util.workspace = true
+httpdate = { workspace = true, optional = true }
 hyper = { workspace = true, optional = true, features = ["server", "http1", "http2"] }
 hyper-util = { workspace = true, optional = true, features = ["server-auto", "tokio"] }
 matchit.workspace = true
+mime_guess = { workspace = true, optional = true }
 percent-encoding.workspace = true
 inventory = { workspace = true, optional = true }
+ipnet.workspace = true
 multer = { workspace = true, optional = true }
 pin-project-lite.workspace = true
 ref-cast.workspace = true
@@ -77,6 +88,7 @@ serde_path_to_error.workspace = true
 serde_urlencoded.workspace = true
 time = { workspace = true, optional = true, features = ["formatting"] }
 tokio = { workspace = true, optional = true }
+tokio-util = { workspace = true, optional = true, features = ["io"] }
 tokio-tungstenite = { workspace = true, optional = true, features = ["handshake"] }
 tower = { workspace = true, optional = true, features = ["util"] }
 tower-http = { workspace = true, optional = true, features = [
@@ -85,7 +97,7 @@ tower-http = { workspace = true, optional = true, features = [
 ] }
 
 [dev-dependencies]
-topcoat = { workspace = true, features = ["compression", "router", "sitemap", "sse", "tower", "websocket"] }
+topcoat = { workspace = true, features = ["compression", "fs", "router", "sitemap", "sse", "tower", "websocket"] }
 futures-util = { workspace = true, features = ["sink"] }
 tokio = { workspace = true, features = ["io-util", "macros", "rt", "test-util", "time"] }
 tokio-tungstenite = { workspace = true, features = ["connect"] }

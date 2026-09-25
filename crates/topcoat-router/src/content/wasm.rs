@@ -13,10 +13,9 @@ use crate::{
 /// from a [`route`](../topcoat_router_macro/attr.route.html) that serves a
 /// module by hand.
 ///
-/// The media type is load-bearing here. `WebAssembly.compileStreaming` and
-/// `instantiateStreaming` reject any response that does not carry exactly
-/// `application/wasm`, so a module served as `application/octet-stream` fails
-/// to instantiate even though the bytes are correct.
+/// Browser streaming compilation requires `application/wasm`. A generic
+/// binary content type does not work with `WebAssembly.compileStreaming`
+/// or `instantiateStreaming`.
 ///
 /// # Examples
 ///

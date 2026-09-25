@@ -24,15 +24,11 @@ impl BuildKind {
     }
 }
 
-/// An in-flight build, running as a background task.
+/// A background task that compiles the app and bundles its assets.
 ///
-/// The task compiles the application with cargo and bundles the assets
-/// embedded in the produced binary. Progress and failures are reported to
-/// the terminal by the task itself.
-///
-/// Dropping the handle cancels the build, but [`Self::cancel`] should be
-/// preferred: it also waits for the task to release the terminal (its
-/// progress spinner) before returning.
+/// Reports progress and failures to the terminal. Dropping the handle cancels the task.
+/// Prefer [`Self::cancel`] when the caller must wait for the task to release the
+/// terminal.
 pub struct BuildTask {
     handle: JoinHandle<Option<PathBuf>>,
 }

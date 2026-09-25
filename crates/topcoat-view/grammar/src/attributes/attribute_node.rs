@@ -78,7 +78,14 @@ impl Parse for AttributeNode {
         } else if TemplateLocal::peek(input) {
             Self::Local(input.parse()?)
         } else if TemplateForLoop::<AttributeNodes>::peek(input) {
-            Self::ForLoop(input.parse()?)
+            let loop_: TemplateForLoop<AttributeNodes> = input.parse()?;
+            if let Some(attribute) = loop_.attributes.first() {
+                return Err(syn::Error::new_spanned(
+                    attribute,
+                    "attributes are not supported on attribute loops",
+                ));
+            }
+            Self::ForLoop(loop_)
         } else if TemplateContinue::peek(input) {
             Self::Continue(input.parse()?)
         } else if TemplateBreak::peek(input) {

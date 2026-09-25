@@ -1,19 +1,19 @@
 {
 	"name": "@topcoat-rs/runtime",
 	"version": "0.0.1",
+	"license": "MIT",
 	"type": "module",
 	"scripts": {
-		"build": "tsup && tsc",
+		"lint": "biome ci --config-path . . ../../topcoat-core/browser",
+		"build": "tsup && tsup --config tsup.coherence.config.ts && tsc",
 		"test": "vitest run"
-	},
-	"dependencies": {
-		"@maverick-js/signals": "^6.0.0"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.15",
 		"happy-dom": "^20.14.0",
 		"tsup": "^8.5.1",
 		"typescript": "^6.0.3",
+		"vite": "^8.1.5",
 		"vitest": "^4.1.10"
 	}
 }

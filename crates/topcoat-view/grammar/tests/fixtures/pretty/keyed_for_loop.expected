@@ -1,0 +1,6 @@
+view! {
+    #[key( item . id )]
+    for item in items {
+        <li>(item)</li>
+    }
+}

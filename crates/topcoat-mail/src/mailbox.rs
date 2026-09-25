@@ -3,13 +3,10 @@
 use core::fmt;
 use std::str::FromStr;
 
-/// A validated email address with an optional display name -- renders as
-/// `Ada Lovelace <ada@example.com>` or bare `ada@example.com`.
+/// A validated email address with an optional display name.
 ///
-/// The pairing of an address with the human-readable name mail clients
-/// show next to it is what RFC 5322 calls a "mailbox". The address is
-/// parsed at construction, so every value of this type holds a well-formed
-/// address.
+/// Renders as `Ada Lovelace <ada@example.com>` or `ada@example.com`.
+/// Addresses are validated at construction.
 ///
 /// Construct one with [`Mailbox::new`] or [`Mailbox::named`], parse the
 /// bare or display-name form, or convert a `(name, address)` pair with
@@ -45,7 +42,7 @@ impl Mailbox {
         })
     }
 
-    /// An address with a display name -- `Ada Lovelace <ada@example.com>`.
+    /// Creates an address with a display name, such as `Ada <ada@example.com>`.
     ///
     /// # Errors
     ///
@@ -127,9 +124,7 @@ impl TryFrom<&String> for Mailbox {
     }
 }
 
-/// Any `(name, address)` pair converts, whatever the string flavors --
-/// `("Ada", "ada@example.com")`, `(&user.name, &user.email)`, owned
-/// `String`s, or a mix.
+/// Converts a `(name, address)` pair of borrowed or owned strings.
 impl<N, A> TryFrom<(N, A)> for Mailbox
 where
     N: Into<String>,
@@ -151,10 +146,8 @@ impl From<&Mailbox> for Mailbox {
 /// One or more mailboxes, converted fallibly from a single value or a
 /// collection.
 ///
-/// The `mail!` macro's recipient fields accept anything implementing this
-/// trait: a single [`Mailbox`], address string, or `(name, address)` pair,
-/// or a `Vec`, array, or slice of such values. Collection elements convert
-/// through `TryInto<Mailbox>`, so the flavors compose:
+/// Accepts a [`Mailbox`], an address string, a `(name, address)` pair, or a
+/// collection of values that convert through `TryInto<Mailbox>`:
 ///
 /// ```
 /// use topcoat_mail::{Mailbox, TryIntoMailboxes};

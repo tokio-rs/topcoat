@@ -4,14 +4,10 @@ use serde::Serialize;
 use topcoat_core::context::Cx;
 use topcoat_view::{AttributeValueViewParts, PartsWriter};
 
-/// The JavaScript source of a runtime expression, captured at its `$(..)`
-/// site.
+/// JavaScript source and captured values for a runtime expression.
 ///
-/// The `expr!` macro builds one of these next to the expression's Rust
-/// value: the source as it reaches the browser, with the values captured
-/// from the surrounding Rust scope serialized in place. Nothing is written
-/// until the expression is spliced into a view, where the source renders
-/// inside a marker comment.
+/// Captured Rust values are serialized into the source. Embedding it in a
+/// view escapes it for the surrounding HTML context.
 #[derive(Debug, Clone)]
 pub struct Js {
     parts: Vec<JsPart>,
@@ -41,6 +37,27 @@ impl Js {
     #[must_use]
     pub fn builder() -> JsBuilder {
         JsBuilder { parts: Vec::new() }
+    }
+
+    /// Returns executable JavaScript, including serialized captured values.
+    ///
+    /// The source expects the runtime context to be available as `cx`. It is
+    /// not escaped for embedding in HTML.
+    #[must_use]
+    pub fn to_source(&self) -> String {
+        let mut source = String::new();
+        for part in &self.parts {
+            match part {
+                JsPart::Source(js) => source.push_str(js),
+                JsPart::Raw(js) => source.push_str(js),
+                JsPart::Surrogate(json) => {
+                    source.push_str("cx.hydrate(");
+                    source.push_str(json);
+                    source.push(')');
+                }
+            }
+        }
+        source
     }
 
     /// Writes the source through `parts`, sealed for the writer's current
@@ -89,6 +106,15 @@ pub struct JsBuilder {
 }
 
 impl JsBuilder {
+    /// Appends an expression in parentheses, preserving its captured values.
+    #[must_use]
+    pub fn expression<T>(mut self, expression: &crate::Expr<T>) -> Self {
+        self.parts.push(JsPart::Raw("("));
+        self.parts.extend(expression.js.parts.iter().cloned());
+        self.parts.push(JsPart::Raw(")"));
+        self
+    }
+
     /// Appends source text.
     #[must_use]
     pub fn source(mut self, js: impl Into<Cow<'static, str>>) -> Self {
@@ -120,5 +146,24 @@ impl JsBuilder {
     #[must_use]
     pub fn build(self) -> Js {
         Js { parts: self.parts }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn executable_source_preserves_javascript_and_capture_escaping() {
+        let js = Js::builder()
+            .raw("(() => { const value = ")
+            .surrogate(&"\"<>&\n")
+            .source("; return value; })()")
+            .build();
+
+        assert_eq!(
+            js.to_source(),
+            r#"(() => { const value = cx.hydrate("\"<>&\n"); return value; })()"#,
+        );
     }
 }

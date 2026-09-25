@@ -10,13 +10,11 @@ use crate::{
     internal::{LiveView, MoveView, ScopeView},
 };
 
-/// The child content a component invocation passes to its component.
+/// Child content passed to a component.
 ///
-/// The children of an invocation reach the component as this view in its
-/// props. The component decides where they render by interpolating the
-/// value into its own template, which drives the children concurrently
-/// with the rest of the template; children that are never interpolated
-/// never run.
+/// Interpolate this value into the component's template to render the
+/// children there. They render concurrently with the surrounding content.
+/// Children that are never rendered do not run.
 pub struct Child<'a> {
     view: BoxView<'a>,
 }

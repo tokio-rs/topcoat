@@ -1,19 +1,13 @@
-/// How much of the stream to keep between chunks. A progress render is far
-/// shorter than this, so a count split across a chunk boundary is completed
-/// by the next chunk before the split half is trimmed away.
+/// Bytes retained between chunks so a progress count split across reads can be parsed.
 const TAIL_KEEP: usize = 128;
 
-/// Trim the tail once it grows past this, bounding it however cargo chops
-/// its writes.
+/// Buffer size that triggers trimming of older stream data.
 const TAIL_LIMIT: usize = 512;
 
-/// Incremental scanner for cargo's build progress.
+/// Reads build progress counts from Cargo's stderr.
 ///
-/// Cargo's progress bar renders contain a `current/total` unit count
-/// (`Building [===>  ] 12/34: app`). The scanner is fed the raw stderr
-/// stream chunk by chunk and reports the newest count each time it changes,
-/// keeping a small tail of the stream so a count split across two chunks is
-/// still seen whole.
+/// Feed successive chunks to report the newest changed count. Counts split across
+/// chunks are retained until they can be parsed.
 #[derive(Default)]
 pub(super) struct ProgressScanner {
     tail: Vec<u8>,
@@ -42,9 +36,7 @@ impl ProgressScanner {
     }
 }
 
-/// The last `<current>/<total>` pair of integers in `bytes` with
-/// `current <= total`, which in cargo's stderr is the progress bar's unit
-/// count.
+/// Finds the last `current/total` integer pair with `current <= total`.
 fn last_count(bytes: &[u8]) -> Option<(u64, u64)> {
     let mut last = None;
     let mut i = 0;

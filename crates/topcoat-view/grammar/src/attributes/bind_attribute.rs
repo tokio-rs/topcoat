@@ -45,13 +45,16 @@ impl LowerAttribute for BindAttribute {
             quote! {
                 {
                     let __key = ::core::convert::Into::<::std::string::String>::into(#key);
-                    let (__evaluated, __js) = #value.into_evaluated_and_js();
+                    let __value = #value;
+                    let __is_static = __value.is_static();
+                    let (__evaluated, __js) = __value.into_evaluated_and_js();
                     __attrs.insert(__cx, __key.clone(), __evaluated);
-                    __attrs.insert(
-                        __cx,
-                        ::std::format!("data-topcoat-bind:{}", __key),
-                        __js,
-                    );
+                    let __binding_key = ::std::format!("data-topcoat-bind:{}", __key);
+                    if __is_static {
+                        __attrs.remove(&__binding_key);
+                    } else {
+                        __attrs.insert(__cx, __binding_key, __js);
+                    }
                 }
             },
         );

@@ -1,23 +1,18 @@
-import type { AttributeValueViewParts, NodeViewParts } from "../view";
+import type { AttributeValueViewParts, NodeViewParts } from "../dom/view";
 import { Bool } from "./bool";
 import { F64 } from "./f64";
 
 const TEXT_ENCODER = new TextEncoder();
 
-// The code points Rust's `str::trim` family treats as whitespace: the Unicode
-// `White_Space` property. `String.prototype.trim` uses the ECMAScript
-// whitespace set instead, which strips U+FEFF and keeps U+0085 -- both the
-// opposite of Rust (#238).
+// Rust trims Unicode White_Space. JavaScript's trim uses a different set,
+// removing U+FEFF and keeping U+0085 where Rust does the opposite.
 const WHITE_SPACE =
 	"\\t\\n\\v\\f\\r \\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000";
 const TRIM_START = new RegExp(`^[${WHITE_SPACE}]+`, "u");
 const TRIM_END = new RegExp(`[${WHITE_SPACE}]+$`, "u");
 
-// Order two strings the way Rust's `str` does: by code point, which is the
-// order of their UTF-8 bytes. JavaScript's relational operators order by
-// UTF-16 code unit, so every code point above U+FFFF sorts below U+E000 --
-// its high surrogate is 0xD800-0xDBFF -- and the two sides of one `$()`
-// expression can disagree (#236).
+// Compare Unicode code points to match Rust's UTF-8 ordering. JavaScript's
+// UTF-16 ordering differs for characters represented by surrogate pairs.
 function compare(a: string, b: string): number {
 	const left = a[Symbol.iterator]();
 	const right = b[Symbol.iterator]();
@@ -120,9 +115,8 @@ export class Str implements AttributeValueViewParts, NodeViewParts {
 
 // biome-ignore lint/suspicious/noShadowRestrictedNames: Surrogate type
 export class String extends Str {
-	// Mirrors Rust's `Deref<Target = str>`: dereferencing an owned string
-	// yields the borrowed form. Returning a plain `Str` (never `this`) also
-	// keeps ref-unwrapping loops finite (#192).
+	// Return the borrowed form. Returning `this` would let repeated
+	// dereferencing loop forever.
 	deref(): Str {
 		return new Str(this.v);
 	}

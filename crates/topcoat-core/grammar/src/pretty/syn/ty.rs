@@ -7,7 +7,7 @@ impl PrettyPrint for syn::Type {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
         match self {
             Self::Array(ty) => ty.pretty_print(printer),
-            Self::BareFn(ty) => ty.pretty_print(printer),
+            Self::FnPtr(ty) => ty.pretty_print(printer),
             Self::Group(ty) => ty.elem.pretty_print(printer),
             Self::ImplTrait(ty) => ty.pretty_print(printer),
             Self::Infer(ty) => ty.underscore_token.pretty_print(printer),
@@ -97,14 +97,11 @@ impl PrettyPrint for syn::TypeReference {
 impl PrettyPrint for syn::TypePtr {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
         self.star_token.pretty_print(printer);
-        if let Some(const_token) = &self.const_token {
-            const_token.pretty_print(printer);
-            " ".pretty_print(printer);
+        match &self.mutability {
+            syn::PointerMutability::Const(token) => token.pretty_print(printer),
+            syn::PointerMutability::Mut(token) => token.pretty_print(printer),
         }
-        if let Some(mutability) = &self.mutability {
-            mutability.pretty_print(printer);
-            " ".pretty_print(printer);
-        }
+        " ".pretty_print(printer);
         self.elem.pretty_print(printer);
     }
 }
@@ -127,7 +124,7 @@ impl PrettyPrint for syn::TypeTraitObject {
     }
 }
 
-impl PrettyPrint for syn::TypeBareFn {
+impl PrettyPrint for syn::TypeFnPtr {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
         self.lifetimes.pretty_print(printer);
         if let Some(unsafety) = &self.unsafety {
@@ -151,7 +148,7 @@ impl PrettyPrint for syn::TypeBareFn {
     }
 }
 
-impl PrettyPrint for syn::BareFnArg {
+impl PrettyPrint for syn::NamedArg {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
         self.attrs.pretty_print(printer);
         if let Some((name, colon)) = &self.name {
@@ -163,7 +160,7 @@ impl PrettyPrint for syn::BareFnArg {
     }
 }
 
-impl PrettyPrint for syn::BareVariadic {
+impl PrettyPrint for syn::FnPtrVariadic {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
         self.attrs.pretty_print(printer);
         if let Some((name, colon)) = &self.name {
@@ -209,10 +206,8 @@ impl PrettyPrint for syn::TypeParamBound {
 impl PrettyPrint for syn::TraitBound {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
         let inner = |printer: &mut Printer<'_>| {
-            if let syn::TraitBoundModifier::Maybe(question) = &self.modifier {
-                question.pretty_print(printer);
-            }
             self.lifetimes.pretty_print(printer);
+            self.maybe.pretty_print(printer);
             self.path.pretty_print(printer);
         };
         match &self.paren_token {

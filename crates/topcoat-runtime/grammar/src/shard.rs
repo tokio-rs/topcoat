@@ -9,20 +9,25 @@ use topcoat_core_grammar::paths::{
     topcoat_context, topcoat_error, topcoat_inventory, topcoat_router, topcoat_runtime,
     topcoat_view, topcoat_view_macro,
 };
-use uuid::Uuid;
 
-use crate::shard::{ShardAttr, ShardItem};
+use crate::{
+    common::EndpointPath,
+    shard::{ShardAttr, ShardItem},
+};
+
+/// The path prefix for shards without an explicit path.
+const SHARD_ROUTE_PREFIX: &str = "/_topcoat/runtime/shards";
 
 /// A parsed `#[shard] async fn ...`.
 pub struct Shard {
-    _attr: ShardAttr,
+    attr: ShardAttr,
     item: ShardItem,
 }
 
 impl Shard {
     #[must_use]
     pub fn new(attr: ShardAttr, item: ShardItem) -> Self {
-        Self { _attr: attr, item }
+        Self { attr, item }
     }
 
     /// Parses a `#[shard]` attribute and function item from token streams.
@@ -82,7 +87,7 @@ impl ToTokens for Shard {
             .chain(value_idents.iter().map(|id| quote!(#id)));
         let call_args: Vec<_> = call_args.collect();
 
-        // The component face takes each value parameter as an `Expr<T>`.
+        // The component face accepts a value or expression for each parameter.
         let cx_param = has_cx.then(|| quote!(cx: &#topcoat_context::Cx,));
         // Bound to a local because it is interpolated inside the `#(...)*`
         // repetition below, where a bare `#topcoat_runtime` would expand to a
@@ -90,17 +95,15 @@ impl ToTokens for Shard {
         let expr_ty = quote!(#topcoat_runtime::Expr);
         let component_params = quote! {
             #cx_param
-            #(#value_idents: #expr_ty<#value_tys>,)*
+            #(#[into] #value_idents: #expr_ty<#value_tys>,)*
         };
-
-        let id = Uuid::new_v4().to_string();
 
         // Marker: the value users register and reference, expanded from the
         // component face. It renders the shard inline, splitting each
         // `Expr<T>` into its evaluated value (for the initial server render)
         // and its JavaScript source (tracked by the browser). The marker
         // struct the face expands to is a unit struct, so `#ident` stays a
-        // value usable directly in `router.shard(...)`. The function's doc
+        // value usable directly in `router.route(...)`. The function's doc
         // comments ride along on the face, so the component expansion carries
         // them onto the marker.
         //
@@ -108,40 +111,43 @@ impl ToTokens for Shard {
         // parts hoisted while the shard body runs land inside the scope
         // markers, where the browser attributes them to the shard.
         //
-        // The invocation's identity travels to the browser on the scope
-        // marker and comes back in the identity header of every re-render
-        // request, where the endpoint installs it again, so identities
-        // derived inside the shard body match between the inline render and
-        // a re-render.
+        // The scope marker carries the endpoint's URL, where the browser
+        // posts re-render requests. The invocation's identity travels on the
+        // same marker and comes back in the identity header of every
+        // re-render request, where the router installs it on the context, so
+        // identities derived inside the shard body match between the inline
+        // render and a re-render.
+        //
+        // The scope stays a view rather than settling the handler's content,
+        // so a live shard body keeps streaming its updates through the
+        // enclosing content.
+        let path = EndpointPath::resolve(self.attr.path.as_ref(), SHARD_ROUTE_PREFIX);
+        let url = EndpointPath::url(&path);
         let docs = item.attrs.iter().filter(|attr| attr.path().is_ident("doc"));
         let marker = quote! {
             #(#docs)*
             #[#topcoat_view_macro::component]
             #vis async fn #ident(#component_params) -> #topcoat_error::Result<impl #topcoat_view::View> {
-                let __identity = #topcoat_view::identity::Identity::current();
+                let __identity = #topcoat_context::identity(__cx);
                 #(
                     let (#value_idents, #js_idents) = #value_idents.into_evaluated_and_js();
                 )*
-                let __placeholder = #topcoat_view::ViewExt::single(
+                #topcoat_error::Result::Ok(#topcoat_runtime::ShardScope::new(
+                    __cx,
+                    __identity,
+                    #url,
+                    ::std::vec![#(#js_idents),*],
                     #topcoat_view::HoistView::new(#topcoat_view::internal::ThenView::new(
                         #ident::handler(__cx, #(#call_args),*),
                     )),
-                )
-                .await?;
-                let __scope = #topcoat_runtime::ShardScope::new(
-                    __identity,
-                    #topcoat_runtime::ShardId::new(#id),
-                    ::std::vec![#(#js_idents),*],
-                    __placeholder,
-                );
-                #topcoat_error::Result::Ok(#topcoat_view_macro::view! { (__scope) })
+                ))
             }
         };
 
         // The user's function body, re-emitted as the marker's `handler`
         // associated function. Associated items are reached through the type
         // rather than lexical scope, so `#ident::handler` is callable from
-        // the component face and the trait implementation below. The leading
+        // the component face and the route implementation below. The leading
         // `__cx` parameter carries the ambient context that `view!` bodies
         // read.
         let handler = quote! {
@@ -154,22 +160,35 @@ impl ToTokens for Shard {
             }
         };
 
-        // The trait implementation dispatching re-render requests to the
-        // handler: it deserializes the surrogate argument tuple and the
-        // signal values from the request body, installs the values and the
-        // invocation identity from the request's identity header, and
-        // forwards the arguments to the handler positionally.
-        let shard = quote! {
-            impl #topcoat_runtime::Shard for #ident {
-                fn id(&self) -> #topcoat_runtime::ShardId {
-                    #topcoat_runtime::ShardId::new(#id)
+        // The route serving re-render requests at the endpoint's path. Its
+        // handler deserializes the surrogate argument tuple and the signal
+        // values from the request body, installs the values, forwards the
+        // arguments to the handler positionally, and responds with the
+        // rendered view. The view streams like a page's, so a live shard
+        // body's later updates follow its first content in the response.
+        let route = quote! {
+            impl #topcoat_router::Route for #ident {
+                fn id(&self) -> #topcoat_router::RouteId {
+                    *ID
                 }
 
-                fn render<'cx>(
+                fn methods(&self) -> #topcoat_router::Methods<'_> {
+                    // Avoids URL length limits for large arguments.
+                    const METHODS: #topcoat_router::Methods<'static> =
+                        #topcoat_router::Methods::Only(&[#topcoat_router::Method::POST]);
+                    METHODS
+                }
+
+                fn path(&self) -> &#topcoat_router::Path {
+                    const PATH: &#topcoat_router::Path = #topcoat_router::Path::new(#path);
+                    PATH
+                }
+
+                fn handle<'cx>(
                     &'cx self,
                     cx: &'cx #topcoat_context::Cx,
                     body: #topcoat_router::Body,
-                ) -> #topcoat_runtime::ShardFuture<'cx> {
+                ) -> #topcoat_router::RouteFuture<'cx> {
                     ::std::boxed::Box::pin(async move {
                         type __Surrogate =
                             <(#(#value_tys,)*) as #topcoat_runtime::Surrogated>::Surrogate;
@@ -177,39 +196,51 @@ impl ToTokens for Shard {
                             <#topcoat_router::content::Json<#topcoat_runtime::ShardRequest<__Surrogate>> as #topcoat_router::request::FromRequest>
                                 ::from_request(cx, body).await?;
                         let (__args, __signals) = __request.into_parts();
-                        let __identity = #topcoat_router::request::initial_identity(cx)?;
                         let (#(#value_idents,)*) =
                             #topcoat_runtime::Surrogate::into_real(__args);
                         // Signals created while the handler runs resume from
                         // the values the client sent.
-                        let cx = &cx.with(__signals);
-                        // The handler's view is the outermost view of this
-                        // request's build, so its content is self-contained.
-                        let __view = #topcoat_view::HoistView::new(
-                            #topcoat_view::internal::ThenView::new(
-                                #ident::handler(cx, #(#call_args),*),
-                            ),
-                        );
-                        let __view = #topcoat_view::identity::IdentityView::new(__identity, __view);
-                        let __view = #topcoat_view::internal::ScopeView::new(__view);
-                        #topcoat_view::ViewExt::single(__view).await
+                        let cx = cx.with(__signals);
+                        // The response body outlives the handler, so the
+                        // view owns a copy of the request context and
+                        // drives itself in place as the outermost view of
+                        // the build, whose content is self-contained.
+                        let __owned = cx.clone();
+                        let __view = #topcoat_view::internal::MoveView::new(async move {
+                            let cx = &__owned;
+                            let __view = #topcoat_view::internal::ScopeView::new(
+                                #topcoat_view::HoistView::new(
+                                    #topcoat_view::internal::ThenView::new(
+                                        #ident::handler(cx, #(#call_args),*),
+                                    ),
+                                ),
+                            );
+                            #topcoat_view::internal::MoveView::drive(__view).await
+                        });
+                        #topcoat_router::response::AsyncIntoResponse::async_into_response(
+                            __view, &cx,
+                        )
+                        .await
                     })
                 }
             }
         };
 
-        // Discovery collects the marker erased behind its trait.
+        // Discovery collects the marker as a route.
         let submit = cfg!(feature = "discover").then(|| {
-            quote! { #topcoat_inventory::submit! { &#ident as &'static dyn #topcoat_runtime::Shard } }
+            quote! { #topcoat_inventory::submit! { &#ident as &'static dyn #topcoat_router::Route } }
         });
 
         quote! {
             #marker
 
             const _: () = {
+                static ID: ::std::sync::LazyLock<#topcoat_router::RouteId> =
+                    ::std::sync::LazyLock::new(#topcoat_router::RouteId::new);
+
                 #handler
 
-                #shard
+                #route
 
                 #submit
             };
@@ -238,5 +269,46 @@ mod tests {
         let doc = out.find("Counts clicks.").expect(&out);
         let face = out.find("async fn counter").expect(&out);
         assert!(doc < face, "{out}");
+    }
+
+    #[test]
+    fn a_named_path_replaces_the_default_route() {
+        let shard = Shard::parse(
+            quote! { "/search" },
+            quote! {
+                async fn counter(count: i64) -> Result<impl View> { todo!() }
+            },
+        )
+        .unwrap();
+        let out = shard.to_token_stream().to_string();
+        assert!(out.contains(r#""/search""#), "{out}");
+        assert!(!out.contains(SHARD_ROUTE_PREFIX), "{out}");
+    }
+
+    #[test]
+    fn a_shard_without_a_path_is_served_below_the_default_prefix() {
+        let shard = Shard::parse(
+            TokenStream::new(),
+            quote! {
+                async fn counter(count: i64) -> Result<impl View> { todo!() }
+            },
+        )
+        .unwrap();
+        let out = shard.to_token_stream().to_string();
+        assert!(out.contains(SHARD_ROUTE_PREFIX), "{out}");
+    }
+
+    #[test]
+    fn the_scope_marker_carries_the_url_without_group_segments() {
+        let shard = Shard::parse(
+            quote! { "/(api)/search" },
+            quote! {
+                async fn counter(count: i64) -> Result<impl View> { todo!() }
+            },
+        )
+        .unwrap();
+        let out = shard.to_token_stream().to_string();
+        assert!(out.contains(r#""/search""#), "{out}");
+        assert!(out.contains(r#""/(api)/search""#), "{out}");
     }
 }

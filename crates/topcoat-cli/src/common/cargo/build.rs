@@ -21,13 +21,10 @@ pub struct BuildOpts {
 }
 
 impl BuildOpts {
-    /// Compile the application and return the path of the final linked
-    /// output, reporting cargo's `current/total` build progress to
-    /// `on_progress` along the way.
+    /// Builds the selected target and returns its linked output path. Reports Cargo's
+    /// progress counts through `on_progress`.
     ///
-    /// The bundler scans any linked binary for embedded asset declarations,
-    /// so an executable and a cdylib/dylib (e.g. a `wasm32` build, which
-    /// produces no executable) are equally valid outputs.
+    /// Accepts executables and dynamic libraries as outputs.
     pub async fn build(
         &self,
         mut on_progress: impl FnMut(u64, u64) + Send + 'static,
@@ -136,11 +133,8 @@ impl BuildOpts {
     }
 }
 
-/// Command-line flags selecting which target to build and with which profile.
-///
-/// Shared by every command that compiles the application, flattened into their
-/// argument structs with `#[command(flatten)]` and converted into [`BuildOpts`]
-/// with [`From::from`].
+/// Command-line flags for choosing a build target and profile. Convert to [`BuildOpts`]
+/// before building.
 #[derive(Args)]
 pub struct BuildFlags {
     /// Build the named binary target
@@ -231,9 +225,8 @@ impl fmt::Debug for BuildError {
 
 impl std::error::Error for BuildError {}
 
-/// Identity of a built executable: enough to tell whether a rebuild actually
-/// produced a new binary. Cargo leaves the executable untouched when nothing
-/// needed relinking, so an unchanged stamp means an unchanged application.
+/// File metadata used to detect whether a build changed the executable. Cargo leaves
+/// the file untouched when it does not need to relink it.
 #[derive(PartialEq)]
 pub struct BuildStamp {
     path: PathBuf,

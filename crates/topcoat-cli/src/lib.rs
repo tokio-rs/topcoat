@@ -30,7 +30,7 @@ impl TopcoatCli {
 enum Command {
     /// Start a development server
     Dev(dev::DevCommand),
-    /// Format topcoat `view!` macros
+    /// Format Topcoat macro bodies
     Fmt(fmt::FmtCommand),
     /// Inspect assets embedded in the binary
     Asset(asset::AssetCommand),

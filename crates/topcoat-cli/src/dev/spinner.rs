@@ -2,11 +2,8 @@ use std::time::Duration;
 
 use indicatif::{ProgressBar, ProgressStyle};
 
-/// A single-line terminal spinner shown while a long-running step is in
-/// flight.
-///
-/// The spinner ticks on a background thread, so it animates even while the
-/// owning task is busy. Dropping it clears the line it occupied.
+/// A terminal spinner for an operation in progress. A background thread animates it,
+/// and dropping it clears its line.
 pub struct Spinner(ProgressBar);
 
 impl Spinner {

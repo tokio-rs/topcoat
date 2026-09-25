@@ -2,9 +2,9 @@ use std::{borrow::Cow, collections::HashMap};
 
 /// The kind of a module-router path segment, set via the `segment!` macro.
 ///
-/// When using the module router, each module maps to a URL segment. By default,
-/// regular modules are `Static` and `_`-prefixed modules are `Group`. Use
-/// `segment!(...)` in a module to override the default.
+/// Each module contributes a segment to the route path. Regular modules
+/// default to `Static`. Modules starting with `_` default to `Group`, which
+/// does not appear in the URL. Use `segment!(...)` to choose another kind.
 ///
 /// The `segment!` macro accepts comma-separated `key = value` attributes:
 ///
@@ -30,7 +30,8 @@ use std::{borrow::Cow, collections::HashMap};
 pub enum SegmentKind {
     /// A literal URL segment (e.g. `/users`). Default for regular modules.
     Static,
-    /// A layout-only grouping that doesn't appear in the URL. Default for `_`-prefixed modules.
+    /// A group used to match layouts and layers without adding a URL segment.
+    /// The default for modules starting with `_`.
     Group,
     /// A dynamic path parameter (e.g. `/{id}`).
     Param,

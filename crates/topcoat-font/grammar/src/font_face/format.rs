@@ -15,9 +15,8 @@ mod kw {
 
 /// A `format(...)` hint on a CSS `@font-face` `src` entry.
 ///
-/// The format may be a string literal naming a CSS format keyword (such as
-/// `"woff2"`) or a parenthesized expression resolving to a [`FontFormat`] at
-/// run time.
+/// Accepts a CSS keyword string such as `"woff2"` or an expression that
+/// evaluates to [`topcoat_font::FontFormat`].
 pub struct FontFormatHint {
     pub format_kw: kw::format,
     pub paren_token: Paren,
@@ -63,9 +62,8 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontFormatHint {
 
 /// The format inside a [`FontFormatHint`].
 ///
-/// Wraps an expression that resolves to a [`topcoat_font::FontFormat`] at run
-/// time. When the expression is a string literal, it is validated at compile
-/// time against the known CSS format keywords.
+/// String literals are validated as CSS keywords during parsing. Other
+/// expressions must evaluate to [`topcoat_font::FontFormat`].
 pub struct FontFormat(pub Expr);
 
 impl Parse for FontFormat {
@@ -106,11 +104,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontFormat {
     }
 }
 
-/// The `FontFormat` variant identifier for a CSS `format(...)` keyword, or
-/// `None` if the keyword names no known format.
-///
-/// This single mapping backs both parse-time validation and codegen, so the two
-/// can never disagree.
+/// Returns the `FontFormat` variant for a CSS keyword, or `None` if unknown.
 fn format_variant(keyword: &str) -> Option<&'static str> {
     Some(match keyword {
         "collection" => "Collection",

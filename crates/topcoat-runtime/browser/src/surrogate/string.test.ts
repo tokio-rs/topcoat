@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 
-import { Str, String } from "./string";
+import { String as RuntimeString, Str } from "./string";
 
 // Regression for #192: `String.deref()` returned `this`, so any loop that
 // unwraps ref-like values (`while (typeof v.deref === "function")`) never
@@ -8,17 +8,17 @@ import { Str, String } from "./string";
 // owned string.
 
 it("derefs to the borrowed form, not itself", () => {
-	const owned = new String("hello");
+	const owned = new RuntimeString("hello");
 	const borrowed = owned.deref();
 
 	expect(borrowed).toBeInstanceOf(Str);
-	expect(borrowed).not.toBeInstanceOf(String);
+	expect(borrowed).not.toBeInstanceOf(RuntimeString);
 	expect(borrowed).not.toBe(owned);
 	expect(borrowed.toNodeText()).toBe("hello");
 });
 
 it("ref-unwrapping an owned string terminates", () => {
-	let current: unknown = new String("hello");
+	let current: unknown = new RuntimeString("hello");
 	let steps = 0;
 	while (
 		current !== null &&

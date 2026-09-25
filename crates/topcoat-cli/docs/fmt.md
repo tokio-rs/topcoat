@@ -1,6 +1,6 @@
-Topcoat includes a source formatter for macro bodies in Rust files. It is intended to run alongside normal Rust formatting: `rustfmt` formats Rust syntax, while `topcoat fmt` formats the syntax inside Topcoat-aware macro invocations.
+`topcoat fmt` formats Topcoat macro bodies in Rust source files. Run it alongside `rustfmt`, which formats the surrounding Rust code.
 
-# The CLI Command
+# Running the formatter
 
 Run the formatter with:
 
@@ -8,7 +8,7 @@ Run the formatter with:
 topcoat fmt
 ```
 
-Prefer the direct `topcoat fmt` command, especially from editors and other frequently-run integrations. `cargo topcoat fmt` also works, but it goes through Cargo's command dispatch path and adds unnecessary startup overhead.
+You can also run `cargo topcoat fmt`. Use `topcoat fmt` in editors to avoid starting Cargo for each format request.
 
 With no file arguments, the command scans Rust files under the current directory and writes changes in place.
 
@@ -16,7 +16,7 @@ With no file arguments, the command scans Rust files under the current directory
 topcoat fmt src/main.rs src/app
 ```
 
-File arguments can point at individual files or directories. Directories are expanded recursively to Rust files.
+Pass file or directory paths to limit the files to format. The command searches directories recursively for Rust files.
 
 For editor integrations and other tools, use stdin/stdout mode:
 
@@ -26,17 +26,15 @@ topcoat fmt --stdin < src/main.rs > /tmp/main.rs
 
 In stdin mode, the formatted source is written to stdout instead of updating files on disk.
 
-By default the formatter handles every macro it knows about. Pass `--macros` with a comma-separated list to restrict it to a subset, leaving the rest untouched:
+By default, the formatter handles all supported macros. Pass a comma-separated list with `--macros` to format only those macros:
 
 ```sh
 topcoat fmt --macros view,class
 ```
 
-# What It Formats
+# Supported syntax
 
-The formatter parses Rust source, finds macro invocations it knows how to format, and replaces only those macro bodies. The surrounding Rust code is left as-is.
-
-In normal Topcoat code, this most notably means the HTML inside of a `view!` macro invocation is formatted:
+The formatter changes only supported macro bodies. For example, it formats the HTML inside `view!`:
 
 ```rust
 use topcoat::{router::page, view::{View, view}};
@@ -51,9 +49,7 @@ async fn page() -> topcoat::Result<impl View> {
 }
 ```
 
-Many other macros such as `font!` also work.
-
-The `topcoat fmt` command decides what source snippets to format based on the macro name at the call site. If you reexport the macro with a different name, it will no longer be formatted.
+Macros are identified by their names at the call site. A macro imported or re-exported under a different name will not be formatted.
 
 # Editor integration
 

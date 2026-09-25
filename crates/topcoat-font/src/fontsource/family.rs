@@ -3,10 +3,7 @@ use crate::UnicodeRanges;
 
 /// Static metadata describing a single font family in the Fontsource catalog.
 ///
-/// One `Family` constant is generated for every family in the vendored
-/// catalog in the [`families`] module, and the full list is available as
-/// [`families::ALL`]. The values mirror the fields of the Fontsource
-/// [`/v1/fonts`](https://api.fontsource.org/v1/fonts) endpoint.
+/// Find family constants in [`families`] or iterate over [`families::ALL`].
 #[derive(Debug, Clone, Copy)]
 pub struct Family {
     /// Fontsource id, used to build CDN URLs (e.g. `"roboto"`).
@@ -112,9 +109,7 @@ impl Family {
 
     /// The `unicode-range` this family ships for `subset`, if known.
     ///
-    /// Returns `None` for subsets without vendored ranges (notably the
-    /// numbered CJK blocks), in which case a face for that subset is emitted
-    /// without a `unicode-range` descriptor.
+    /// Returns `None` if the catalog has no range for this subset.
     #[must_use]
     pub const fn unicode_range(&self, subset: Subset) -> Option<UnicodeRanges> {
         let mut i = 0;

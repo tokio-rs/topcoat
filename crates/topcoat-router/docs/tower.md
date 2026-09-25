@@ -1,10 +1,10 @@
-Running tower services inside a topcoat router.
+Use tower services and middleware with Topcoat.
 
-The [tower](https://docs.rs/tower) ecosystem shares one service abstraction across axum, hyper, and a large catalog of middleware. This module (behind the `tower` feature) bridges it in both directions: [`TowerRoute`] mounts a tower service as a route and [`TowerLayer`] runs tower middleware as a layer inside a topcoat router, while [`TowerService`] serves a whole topcoat router as a tower service.
+Enable the `tower` feature to connect Topcoat with [tower](https://docs.rs/tower). Mount an existing service with [`TowerRoute`], apply middleware with [`TowerLayer`], or expose a Topcoat router through [`TowerService`].
 
 # Mounting a service as a route
 
-[`TowerRoute`] forwards its requests to a tower service (an axum router, a hyper service, a reverse proxy). Registered with [`any`](TowerRoute::any) at a catch-all path, it hands an entire URL subtree to the service, which responds to every HTTP method. This is the typical setup when migrating an existing application to topcoat one route at a time. The service receives each request with its original URI; nothing is stripped or rewritten.
+[`TowerRoute`] forwards requests to a tower service. Use [`any`](TowerRoute::any) to accept every HTTP method and a catch-all path to forward a URL subtree. For example, an existing axum application can keep serving `/legacy` while other routes move to Topcoat:
 
 ```rust,ignore
 use topcoat::router::{Router, tower::TowerRoute};
@@ -17,11 +17,13 @@ let router = Router::builder()
     .build();
 ```
 
-A catch-all segment does not match the bare prefix itself, so register a second `TowerRoute` for `/legacy` if the service also serves that URL. To restrict a mounted service to specific methods, use [`new`](TowerRoute::new) instead.
+The service receives the full URI, including `/legacy`. The catch-all requires another segment, so register `/legacy` separately if the service should handle that URL too. Use [`new`](TowerRoute::new) to restrict the HTTP methods.
+
+Add [`StripPrefixLayer`](crate::StripPrefixLayer) if the service expects paths relative to its mount point. With `.layer(StripPrefixLayer::new("/legacy"))`, a request for `/legacy/users/7?page=2` reaches the mounted service as `/users/7?page=2`.
 
 # Running middleware as a layer
 
-[`TowerLayer`] wraps routes in the middleware a `tower::Layer` builds (a timeout, a rate limit, CORS, compression) and registers like any other layer. It wraps every route by default; scope it to the routes under a path prefix with [`at`](TowerLayer::at):
+[`TowerLayer`] runs tower middleware around Topcoat request handling. By default, it covers every request, including unmatched requests. Use [`at`](TowerLayer::at) to limit it to matched handlers under a path:
 
 ```rust,no_run
 use std::time::Duration;
@@ -34,9 +36,9 @@ let router = Router::builder()
     .build();
 ```
 
-# Mounting a topcoat router in a tower application
+# Serving a Topcoat router in another application
 
-[`TowerService`] turns the bridge around: it serves a whole topcoat [`Router`](crate::Router) as a tower service, so an application that owns the HTTP server (an axum router, a hyper server) can embed a topcoat application. The service accepts a request with any body and never errors; the router renders every failure, including a handler panic, as a response.
+[`TowerService`] lets another application serve a Topcoat [`Router`](crate::Router). For example, an axum application can forward otherwise unmatched requests to Topcoat:
 
 ```rust,ignore
 use topcoat::router::{Router, RouterBuilderDiscoverExt, tower::TowerService};
@@ -49,10 +51,41 @@ let app = axum::Router::new()
     .fallback_service(TowerService::new(topcoat));
 ```
 
+Forward the full path, as the fallback above does. Topcoat uses its registered paths for both request matching and URL generation. If the surrounding service strips a prefix, generated links may point outside the mount.
+
+The service accepts compatible byte-stream request bodies. Routing errors and handler panics become HTTP responses. The service itself has no error result to handle.
+
+# Passing the connection address
+
+To expose the connection address, insert a [`RemoteAddr`](crate::RemoteAddr) into each request's extensions before calling [`TowerService`]. Use the transport's peer address, which belongs to the proxy when a reverse proxy connects to your server.
+
+In axum, middleware can copy the address from the request's `ConnectInfo<SocketAddr>` extension:
+
+```rust,ignore
+use std::net::SocketAddr;
+
+use axum::extract::{ConnectInfo, Request};
+use topcoat::router::RemoteAddr;
+
+let app = app.layer(axum::middleware::map_request(|mut request: Request| async {
+    if let Some(ConnectInfo(addr)) = request.extensions().get::<ConnectInfo<SocketAddr>>() {
+        let addr = *addr;
+        request.extensions_mut().insert(RemoteAddr(addr));
+    }
+    request
+}));
+```
+
+Serve the axum application with `app.into_make_service_with_connect_info::<SocketAddr>()` to populate that extension. See axum's [`ConnectInfo` documentation](https://docs.rs/axum/latest/axum/extract/struct.ConnectInfo.html) for the server setup.
+
+[`remote_addr`](crate::request::remote_addr) reads this address. [`client_ip`](crate::request::client_ip) uses its IP unless you configure [`TrustedProxies`](crate::TrustedProxies) to read the client's address from a trusted proxy's header.
+
+Without `RemoteAddr`, `remote_addr(cx)` returns `None`. You can still trust a proxy by its position with [`TrustedProxies::nearest`](crate::TrustedProxies::nearest). This supports connections without an IP address, such as Unix sockets. The direct connection counts as the first hop. Use this only when every request passes through the configured number of proxies. Embedding Topcoat in another tower application adds no proxy hop.
+
 # Errors
 
-An error produced by wrapped topcoat routes (a 404, a handler error) passes through a [`TowerLayer`]'s middleware and leaves it as the original error value, so outer layers and layouts can still catch it by type. An error a tower service produces itself (middleware timing out, a mounted service failing) surfaces as a [`TowerServiceError`]; unmapped, the router renders it as a 500.
+[`TowerLayer`] preserves errors from the inner Topcoat handler so outer code can catch them by type. Errors created by tower middleware or a mounted service become [`TowerServiceError`]. An unhandled service error produces `500 Internal Server Error`.
 
 # Requirements
 
-A mounted or wrapping service must be `Clone`, `Send`, and `Sync`; wrap a service that is not `Sync` in `tower::buffer`. See [`TowerRoute`] and [`TowerLayer`] for the exact bounds and the remaining caveats (like middleware that retries).
+Services used with [`TowerRoute`] or [`TowerLayer`] must implement `Clone + Send + Sync`. Wrap a service in `tower::buffer` if it needs to become `Sync`. `TowerLayer` permits only one inner call per request, so retry middleware is unsupported. See each adapter for the full bounds.

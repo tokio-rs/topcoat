@@ -22,13 +22,10 @@ use crate::{
 
 /// `multipart/form-data` request extractor, commonly used for file uploads.
 ///
-/// Iterate the request's parts with
-/// [`next_field`](Multipart::next_field); each [`Field`] exposes its metadata
-/// ([`name`](Field::name), [`file_name`](Field::file_name),
-/// [`content_type`](Field::content_type), [`headers`](Field::headers)) and its
-/// data ([`bytes`](Field::bytes), [`text`](Field::text),
-/// [`chunk`](Field::chunk)). A [`Field`] also implements [`Stream`], so its
-/// chunks can be consumed with the usual stream combinators.
+/// Call [`next_field`](Multipart::next_field) to read each [`Field`] and its
+/// metadata. Read a field all at once with [`bytes`](Field::bytes), or consume
+/// its chunks through [`Stream`]. Finish or drop a field before reading the
+/// next one.
 ///
 /// Wrap it in [`Option`] to make the body optional: the extractor yields
 /// [`None`] when the request carries no `multipart/form-data` body.

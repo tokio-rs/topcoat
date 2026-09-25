@@ -22,22 +22,15 @@ pub type TransportFuture<'a> = Pin<Box<dyn Future<Output = Result<Receipt>> + Se
 
 /// Delivers a [`Mail`] to its recipients.
 ///
-/// A transport receives the mail as declared content, assembles its wire
-/// form (rendering the HTML view with the request context), and hands it
-/// to a delivery mechanism. The crate ships three: `SmtpTransport` submits
-/// to an SMTP server (behind the `smtp` feature), [`FileTransport`] writes
-/// `.eml` files during development, and [`MemoryTransport`] captures mail in
-/// tests.
-///
-/// Implement this trait to deliver through anything else, such as a mail
-/// provider's HTTP API. [`Mail::formatted`] produces the RFC 5322 wire form
-/// for APIs that accept raw messages.
+/// Implement this trait to integrate a delivery service. The request context
+/// is available when rendering the HTML body. Use [`Mail::formatted`] for
+/// services that accept a complete RFC 5322 message.
 pub trait Transport: Send + Sync {
     /// Sends the mail, returning a [`Receipt`] once the delivery mechanism
     /// accepts it.
     ///
-    /// Acceptance is not receipt: a transport reports that the mail was
-    /// handed off successfully, not that it reached an inbox.
+    /// A successful send confirms that the transport accepted the message.
+    /// It does not confirm inbox delivery.
     fn send<'a>(&'a self, cx: &'a Cx, mail: Mail) -> TransportFuture<'a>;
 }
 
@@ -60,7 +53,7 @@ impl Receipt {
     /// The `Message-ID` of the sent mail, as it appears in the header.
     /// It is generated at send time unless the mail declared one.
     ///
-    /// Store it to thread a later mail onto this one with
+    /// Use it to link a later reply with
     /// [`in_reply_to`](crate::MailBuilder::in_reply_to).
     #[must_use]
     pub fn message_id(&self) -> &str {

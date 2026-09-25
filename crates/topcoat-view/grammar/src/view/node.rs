@@ -8,10 +8,10 @@ use topcoat_core_grammar::ParseOption;
 use crate::{
     template::{
         MatchArmBody, RuntimeExpr, TemplateBlock, TemplateBreak, TemplateContinue, TemplateExpr,
-        TemplateForLoop, TemplateIf, TemplateLocal, TemplateMatch,
+        TemplateIf, TemplateLocal, TemplateMatch,
     },
     view::{
-        Component, DocumentType, Element, Nodes,
+        Component, DocumentType, Element, ForLoop, Nodes,
         hir::{LowerView, ViewBuilder},
     },
 };
@@ -27,7 +27,7 @@ pub enum Node {
     RuntimeExpr(RuntimeExpr),
     If(TemplateIf<Nodes>),
     Local(TemplateLocal),
-    ForLoop(TemplateForLoop<Nodes>),
+    ForLoop(ForLoop),
     Continue(TemplateContinue),
     Break(TemplateBreak),
     Match(TemplateMatch<Node>),
@@ -86,7 +86,7 @@ impl Parse for Node {
             Self::If(input.parse()?)
         } else if TemplateLocal::peek(input) {
             Self::Local(input.parse()?)
-        } else if TemplateForLoop::<Nodes>::peek(input) {
+        } else if ForLoop::peek(input) {
             Self::ForLoop(input.parse()?)
         } else if TemplateContinue::peek(input) {
             Self::Continue(input.parse()?)

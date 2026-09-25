@@ -1,8 +1,7 @@
 //! Formatting and URL helpers compiled for both the server and the client.
 //! These mirror the other benchmark apps exactly (the parity contract).
 
-/// Price formatted as `$12.99`; plain integer math so every benchmark app
-/// formats identically.
+/// Formats a price in cents as dollars, using integer arithmetic.
 pub fn format_price(cents: u32) -> String {
     format!("${}.{:02}", cents / 100, cents % 100)
 }
@@ -53,8 +52,7 @@ pub fn products_url(page: usize, sort: Option<&str>, category: Option<&str>) -> 
     url
 }
 
-/// Maps the raw `sort` query value onto the four supported sort orders;
-/// anything else falls back to the default (ascending id) order.
+/// Normalizes the requested sort order. Unknown values select ascending ID order.
 pub fn normalize_sort(sort: Option<&str>) -> Option<&'static str> {
     match sort {
         Some("name") => Some("name"),

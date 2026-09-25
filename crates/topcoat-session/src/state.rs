@@ -6,14 +6,10 @@ use topcoat_core::{
 
 use crate::{Token, token_store};
 
-/// The request-scoped session cell, registered on the request context by the
-/// session layer (or manually via `CxTestBuilder` in tests).
+/// The current session token for one request.
 ///
-/// The cell caches the token presented by the request so the token store is
-/// read at most once per request, and it is updated by the lifecycle
-/// functions ([`start`](crate::start), [`stop`](crate::stop),
-/// [`rotate`](crate::rotate)) so later reads within the same request observe
-/// the change.
+/// The session layer registers this value in request context. It loads the
+/// token on first access and records session changes for later reads.
 #[derive(Debug, Default)]
 pub struct SessionState {
     token: Mutex<Load>,

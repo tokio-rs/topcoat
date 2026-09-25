@@ -9,9 +9,7 @@ pub(super) const STATE_FILE: &str = "components.toml";
 /// The format version written into the install state.
 const STATE_VERSION: u32 = 1;
 
-/// The contents of `components.toml`. Components are grouped under the registry
-/// crate they were added from, so the same component name can be installed from
-/// different registries and tracked independently.
+/// The package's component install state, grouped by source registry.
 #[derive(Serialize, Deserialize)]
 pub(super) struct InstallState {
     #[serde(default = "default_state_version")]
@@ -20,17 +18,15 @@ pub(super) struct InstallState {
     /// Set once at `init` time.
     #[serde(default = "default_components_dir")]
     pub components_dir: PathBuf,
-    /// The theme installed at `init` time, if one was chosen. The CSS itself
-    /// lives in the package; this records which theme it came from so updates
-    /// can be surfaced the same way components are.
+    /// The installed theme's source and destination. Its CSS is stored separately in
+    /// the package.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub theme: Option<InstalledTheme>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub registries: BTreeMap<String, RegistryState>,
 }
 
-/// The theme a package installed: which registry and theme it came from, the
-/// hash of the theme's source when installed, and where the CSS was written.
+/// An installed theme's registry, source hash, and destination path.
 #[derive(Serialize, Deserialize)]
 pub(super) struct InstalledTheme {
     pub name: String,
@@ -97,18 +93,14 @@ impl InstallState {
             .map_err(|error| format!("failed to write {}: {error}", path.display()))
     }
 
-    /// Returns the registry's tracked state, creating an empty entry the first
-    /// time a component is added from it. The crate has already been validated as
-    /// a usable registry by the caller, so this only manages bookkeeping.
+    /// Returns the registry's tracked state, creating an entry if needed. The caller
+    /// must validate the registry first.
     pub(super) fn registry_mut(&mut self, name: &str) -> &mut RegistryState {
         self.registries.entry(name.to_string()).or_default()
     }
 
-    /// Writes a fresh install state for a package that has none, recording where
-    /// components install. Registries are not tracked here; they are discovered
-    /// from the package's dependencies, so this only sets up the file the other
-    /// commands require. Errors if an install state already exists rather than
-    /// clobbering it.
+    /// Creates an install-state file recording the component directory. Returns an
+    /// error if the package already has install state.
     pub(super) fn create(
         package: &Package,
         components_dir: Option<PathBuf>,

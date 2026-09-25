@@ -1,6 +1,9 @@
+import { dehydrate } from "../expression/dehydrate";
+import type { DehydratedSurrogate } from "../expression/serialized";
 import { Bool } from "./bool";
 import { Option } from "./option";
 import { Panic } from "./panic";
+import { cloneValue } from "./ref";
 
 type ResultKind = "ok" | "err";
 
@@ -69,19 +72,20 @@ export class Result<T, E> {
 	}
 
 	clone(): Result<T, E> {
-		const inner = this.value as { clone?: () => T | E };
-		const value =
-			typeof inner?.clone === "function" ? inner.clone() : this.value;
+		const value = cloneValue(this.value);
 		return this.kind === "ok"
 			? Result.from_ok<T, E>(value as T)
 			: Result.from_err<T, E>(value as E);
 	}
 
-	dehydrate(): { t: "Result" } & ({ ok: unknown } | { err: unknown }) {
-		return {
-			t: "Result",
-			...(this.kind === "ok" ? { ok: this.value } : { err: this.value }),
-		};
+	dehydrate(): { t: "Result" } & (
+		| { ok: DehydratedSurrogate }
+		| { err: DehydratedSurrogate }
+	) {
+		const value = dehydrate(this.value);
+		return this.kind === "ok"
+			? { t: "Result", ok: value }
+			: { t: "Result", err: value };
 	}
 }
 

@@ -8,117 +8,99 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
-use crate::{RegionId, View, ViewFirst, ViewSwap};
+use crate::{View, ViewFirst, ViewSwap};
 
-/// Polls `body` and takes what the view driven inside it handed back.
+/// Polls `body` in first-content mode and takes any content it yields.
 ///
-/// The body gets a clean slot for the duration of the poll, so a driven
-/// view nested in it reports to this poll and not to an enclosing one.
-pub(super) fn poll_body<Fut: Future>(
+/// A yielded value accompanies `Poll::Pending`. With no yielded value, the
+/// body may still be waiting, or it may have completed or failed.
+pub(super) fn poll_first<Fut: Future>(
     body: Pin<&mut Fut>,
     cx: &mut Context<'_>,
-) -> (Poll<Fut::Output>, Option<Yield>) {
-    let _guard = YieldGuard::new();
-    (body.poll(cx), YIELD.take())
+) -> (Poll<Fut::Output>, Option<ViewFirst>) {
+    let _guard = YieldFirstGuard::new();
+    let _input_guard = DriveInputGuard::new();
+    DRIVE_INPUT.set(Some(DriveInput::First));
+    (body.poll(cx), YIELD_FIRST.take())
+}
+
+/// Polls `body` in swap mode and takes any replacement it yields.
+///
+/// A yielded swap accompanies `Poll::Pending`. Completion of a driven view
+/// lets the body continue, so the body may yield another view's content or
+/// wait for other work before it finishes.
+pub(super) fn poll_swap<Fut: Future>(
+    body: Pin<&mut Fut>,
+    cx: &mut Context<'_>,
+) -> (Poll<Fut::Output>, Option<ViewSwap>) {
+    let _guard = YieldSwapGuard::new();
+    let _input_guard = DriveInputGuard::new();
+    DRIVE_INPUT.set(Some(DriveInput::Swap));
+    (body.poll(cx), YIELD_SWAP.take())
 }
 
 thread_local! {
-    /// What the view driven on this task handed back on its last poll.
-    ///
-    /// A driven view reports out of band because it is polled through a
-    /// future, which has no room for a value in its pending state. The slot
-    /// is read back by the poll that set it going, so it only ever holds a
-    /// value across a single poll.
-    static YIELD: Cell<Option<Yield>> = const { Cell::new(None) };
+    /// The view method requested by the innermost polling helper.
+    static DRIVE_INPUT: Cell<Option<DriveInput>> = const { Cell::new(None) };
+    /// First content waiting for the current first-content poll to return.
+    static YIELD_FIRST: Cell<Option<ViewFirst>> = const { Cell::new(None) };
+    /// A replacement waiting for the current swap poll to return.
+    static YIELD_SWAP: Cell<Option<ViewSwap>> = const { Cell::new(None) };
 }
 
-/// The value a driven view handed back to the poll that set it going.
-pub(super) enum Yield {
-    /// The view's first content.
-    First(ViewFirst),
-    /// An update to content the view already reported.
-    Swap(ViewSwap),
+/// The view method to call while driving the current body.
+#[derive(Debug, Clone, Copy)]
+enum DriveInput {
+    First,
+    Swap,
 }
 
-impl Yield {
-    /// Turns the value into a swap of `region`.
-    ///
-    /// A region that already emitted has its markers in the document, so
-    /// first content arriving after that replaces what sits between them.
-    /// A swap already names the region it belongs to, which is a nested one
-    /// when the emitted content is live in its own right.
-    pub(super) fn into_swap(self, region: RegionId) -> ViewSwap {
-        match self {
-            Self::First(first) => ViewSwap {
-                region,
-                replacement: first.content,
-            },
-            Self::Swap(swap) => swap,
+/// Defines a guard that clears a slot and restores its enclosing value on drop.
+macro_rules! guard {
+    ($guard:ident, $tl:ident: $ty:ty) => {
+        struct $guard {
+            prev: Option<$ty>,
         }
-    }
 
-    /// Places the value in the slot of the current poll.
-    ///
-    /// The slot holds a single value, so when another drive filled it
-    /// during the same poll the value comes back to be offered again on a
-    /// later one.
-    fn offer(self) -> Option<Self> {
-        YIELD.with(|slot| match slot.take() {
-            None => {
-                slot.set(Some(self));
-                None
+        impl $guard {
+            fn new() -> Self {
+                Self { prev: $tl.take() }
             }
-            Some(taken) => {
-                slot.set(Some(taken));
-                Some(self)
+        }
+
+        impl Drop for $guard {
+            fn drop(&mut self) {
+                $tl.set(mem::take(&mut self.prev));
             }
-        })
-    }
+        }
+    };
 }
 
-/// Keeps the yield slot of an enclosing poll while a nested one runs.
-struct YieldGuard {
-    prev: Option<Yield>,
-}
-
-impl YieldGuard {
-    fn new() -> Self {
-        Self { prev: YIELD.take() }
-    }
-}
-
-impl Drop for YieldGuard {
-    fn drop(&mut self) {
-        YIELD.set(mem::take(&mut self.prev));
-    }
-}
+guard!(YieldFirstGuard, YIELD_FIRST: ViewFirst);
+guard!(YieldSwapGuard, YIELD_SWAP: ViewSwap);
+guard!(DriveInputGuard, DRIVE_INPUT: DriveInput);
 
 pin_project! {
-    /// The future a body awaits to drive a view in place.
+    /// A future that drives a view and yields its content to the enclosing poll.
     ///
-    /// The view's first content and every swap after it are handed to the
-    /// enclosing poll, and the future resolves once the view has no further
-    /// updates.
+    /// Poll it only through this module's helpers. Their mode selects the
+    /// view method directly; the drive does not track whether the view has
+    /// emitted first content or reported itself as no longer live.
     ///
-    /// A poll carries a single value. When a sibling drive already handed
-    /// one back during the same poll, this one holds on to its own and
-    /// offers it again on a later poll, so drives that run concurrently
-    /// under a combinator like `join!` lose nothing.
+    /// Yielding content leaves the future pending. It resolves when the
+    /// view reports no more swaps, or returns an error from either method.
+    /// If another drive has filled the slot, this drive leaves its view
+    /// unpolled and wakes the task so it can try again after the slot is read.
     pub(super) struct DriveFuture<V> {
         #[pin]
         view: V,
-        first: bool,
-        deferred: Option<Yield>,
     }
 }
 
 impl<V: View> DriveFuture<V> {
+    /// Wraps a view to drive when the returned future is awaited.
     pub(super) fn new(view: V) -> Self {
-        Self {
-            view,
-            first: true,
-            deferred: None,
-        }
+        Self { view }
     }
 }
 
@@ -127,32 +109,46 @@ impl<V: View> Future for DriveFuture<V> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-
-        let value = match this.deferred.take() {
-            Some(deferred) => deferred,
-            None if *this.first => match this.view.poll_first(cx) {
-                Poll::Ready(Ok(first)) => {
-                    *this.first = false;
-                    Yield::First(first)
-                }
-                Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
-                Poll::Pending => return Poll::Pending,
-            },
-            None => match this.view.poll_swap(cx) {
-                Poll::Ready(Ok(Some(swap))) => Yield::Swap(swap),
-                Poll::Ready(Ok(None)) => return Poll::Ready(Ok(())),
-                Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
-                Poll::Pending => return Poll::Pending,
-            },
+        let Some(input) = DRIVE_INPUT.get() else {
+            panic!("polled DriveFuture without DriveInput");
         };
 
-        *this.deferred = value.offer();
-        if this.deferred.is_some() {
-            // The enclosing poll has a value to deliver and runs again for it.
-            // The wake covers combinators that only poll futures which asked
-            // to be polled.
-            cx.waker().wake_by_ref();
+        match input {
+            DriveInput::First => {
+                if YIELD_FIRST.with(|cell| {
+                    let value = cell.take();
+                    let occupied = value.is_some();
+                    cell.set(value);
+                    occupied
+                }) {
+                    cx.waker().wake_by_ref();
+                    return Poll::Pending;
+                }
+                match this.view.poll_first(cx) {
+                    Poll::Ready(Ok(first)) => YIELD_FIRST.with(|cell| cell.set(Some(first))),
+                    Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
+                    Poll::Pending => return Poll::Pending,
+                }
+            }
+            DriveInput::Swap => {
+                if YIELD_SWAP.with(|cell| {
+                    let value = cell.take();
+                    let occupied = value.is_some();
+                    cell.set(value);
+                    occupied
+                }) {
+                    cx.waker().wake_by_ref();
+                    return Poll::Pending;
+                }
+                match this.view.poll_swap(cx) {
+                    Poll::Ready(Ok(Some(swap))) => YIELD_SWAP.with(|cell| cell.set(Some(swap))),
+                    Poll::Ready(Ok(None)) => return Poll::Ready(Ok(())),
+                    Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
+                    Poll::Pending => return Poll::Pending,
+                }
+            }
         }
+
         Poll::Pending
     }
 }

@@ -1,53 +1,37 @@
 use topcoat::{
     Result,
+    runtime::Expr,
     view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
-/// The classes for the [`dialog`] overlay: a layer covering the viewport,
-/// veiling the page behind it and holding the panel.
+/// Classes for the overlay that covers the viewport.
 ///
-/// The browser sizes a `<dialog>` to its content and caps it below the
-/// viewport, so both are cleared for the element to span the viewport. The
-/// veil is the background color at reduced opacity over a blur, so the page
-/// behind it recedes in both color schemes without a color of its own.
-///
-/// Only the open state sets a display: while the dialog is closed the
-/// browser's own `display: none` hides it, and an unconditional display would
-/// override that and leave the dialog on the page.
+/// Set `display` only for the open state so the native closed state remains hidden.
 const OVERLAY: StaticClass = class!(
     "fixed inset-0 z-50 size-full max-h-none max-w-none items-start \
      justify-center overflow-y-auto bg-background/80 p-4 text-foreground backdrop-blur-sm \
      open:flex",
 );
 
-/// The classes fading the veil in and out.
+/// Classes that fade the overlay in and out.
 ///
-/// A dialog goes from not being rendered at all to covering the page, which
-/// takes two things beyond the fade itself. `display` is named in the
-/// transition with `allow-discrete`, which holds the layer on the page for as
-/// long as the fade out lasts instead of taking it away at once. And
-/// `@starting-style` gives the layer the value to come from: an element that
-/// was not rendered a moment ago has no previous style to leave behind, so
-/// without it the fade in has nothing to run from.
+/// `allow-discrete` keeps it displayed through the exit transition. `@starting-style`
+/// supplies the entry transition's initial opacity.
 const FADE: StaticClass = class!(
     "opacity-0 open:opacity-100 starting:open:opacity-0 \
      [transition:opacity_200ms_ease-out,display_200ms_allow-discrete]",
 );
 
-/// A dialog component: a panel over the page for a single task.
+/// A panel displayed over the page.
 ///
-/// The dialog is a native `<dialog>` whose open state is the `open`
-/// parameter, so the server decides whether it shows. Both opening and
-/// closing it are a link or a form that changes the state behind `open`,
-/// which means the dialog survives a reload and can be linked to. Dismissing
-/// it in the browser alone needs scripting, as does trapping focus in it or
-/// closing it on Escape; the overlay does cover the page, so what is behind
-/// it cannot be clicked.
+/// Pass a boolean to `open` for a fixed state, or a runtime expression to control it in
+/// the browser. The overlay blocks clicks on the page behind it. Focus trapping and
+/// Escape dismissal require application scripting.
 ///
-/// Child nodes become the dialog's content, normally a single
-/// [`dialog_content`] panel. The `attrs` (such as `class` or `id`) are
-/// forwarded to the `<dialog>`; a `class` among them is appended to the
-/// computed classes.
+/// Pass a `dialog_content` panel as child content. `attrs` are forwarded to the
+/// `<dialog>`, with extra classes added to its classes.
+/// Give the dialog an accessible name with `aria-label`, or use `aria-labelledby`
+/// to reference its title's ID.
 ///
 /// ```ignore
 /// view! {
@@ -76,7 +60,8 @@ const FADE: StaticClass = class!(
 #[component]
 pub async fn dialog(
     /// Whether the dialog shows.
-    open: bool,
+    #[into]
+    open: Expr<bool>,
     /// Extra attributes for the `<dialog>` element.
     #[default]
     mut attrs: Attributes,
@@ -86,7 +71,7 @@ pub async fn dialog(
 ) -> Result<impl View> {
     Ok(view! {
         <dialog
-            open=(open)
+            :open=(open)
             class=(class!(OVERLAY, FADE, attrs.remove("class")))
             (attrs)
         >
@@ -95,41 +80,24 @@ pub async fn dialog(
     })
 }
 
-/// The classes for the [`dialog_content`] panel: a raised surface styled like
-/// a card, stacking its sections in a column.
-///
-/// The panel is centered by automatic vertical margins rather than by the
-/// overlay's alignment, which keeps its top edge reachable once it grows
-/// taller than the viewport and the overlay starts scrolling. It sets its own
-/// background and text color, so it reads the same on any ancestor, and is
-/// positioned, so a control such as a close button can be placed in one of
-/// its corners.
+/// Classes for the dialog panel. Automatic vertical margins center short panels while
+/// keeping the top of an oversized panel reachable by scrolling.
 const CONTENT: StaticClass = class!(
     "relative my-auto flex w-full max-w-lg flex-col gap-4 rounded-xl \
-     border border-border bg-background p-6 text-foreground shadow-sm",
+     border border-border bg-card p-6 text-card-foreground shadow-sm",
 );
 
-/// The classes bringing the panel in behind the veil.
-///
-/// It comes up a little short of its size and settles into it, which reads as
-/// the panel arriving rather than as the page cutting to it. The panel rests
-/// at that smaller size and is brought to full while the dialog around it is
-/// open, so it plays both ways: in as the dialog opens, and back out as it
-/// closes, for as long as the veil's fade holds the dialog on the page.
-/// `@starting-style` gives it the size to come from the first time, since a
-/// panel that was not rendered a moment ago has no previous size to leave.
+/// Classes that scale and fade the panel as the dialog opens or closes.
 const MOTION: StaticClass = class!(
     "scale-95 opacity-0 in-[[open]]:scale-100 in-[[open]]:opacity-100 \
      starting:in-[[open]]:scale-95 starting:in-[[open]]:opacity-0 \
      [transition:scale_200ms_ease-out,opacity_200ms_ease-out]",
 );
 
-/// The panel of a [`dialog`], holding the dialog's sections.
+/// The content panel inside a dialog.
 ///
-/// A panel stacks a [`dialog_header`], the dialog's body, and a
-/// [`dialog_footer`], any of which can be omitted. It fills the width of the
-/// overlay up to a readable maximum, so a wider or narrower dialog is a
-/// `max-w-*` class among the `attrs`.
+/// Pass the dialog's sections as children. To override its maximum width, use a more
+/// specific class such as `[&]:max-w-xl` in `attrs`, or edit the component's classes.
 #[component]
 pub async fn dialog_content(
     #[default] mut attrs: Attributes,
@@ -172,8 +140,7 @@ pub async fn dialog_title(
     })
 }
 
-/// The supporting text under a [`dialog_title`], telling the reader what the
-/// dialog is asking of them.
+/// Text that explains the dialog's purpose or requested action.
 #[component]
 pub async fn dialog_description(
     #[default] mut attrs: Attributes,
@@ -189,11 +156,8 @@ pub async fn dialog_description(
     })
 }
 
-/// The closing section of a [`dialog_content`], a row of actions ending at
-/// the panel's right edge.
-///
-/// The row wraps, so actions that do not fit the panel's width move onto
-/// their own line instead of overflowing it.
+/// A row of actions aligned to the right of the dialog. Actions wrap when they do not
+/// fit.
 #[component]
 pub async fn dialog_footer(
     #[default] mut attrs: Attributes,

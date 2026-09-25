@@ -1,8 +1,9 @@
 use crate::pretty::Printer;
 
-/// Implemented by anything that knows how to emit itself as formatted text
-/// through a [`Printer`]. The printer takes care of line breaking and
-/// indentation; implementors only describe the desired layout.
+/// Writes a value as formatted text through a [`Printer`].
+///
+/// Implementations describe the layout. The printer chooses line breaks and
+/// indentation.
 pub trait PrettyPrint {
     fn pretty_print(&self, printer: &mut Printer<'_>);
 }

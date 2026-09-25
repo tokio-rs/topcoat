@@ -2,13 +2,14 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::ExprBreak;
 
+use super::js::Js;
 use crate::expr::{Expr, NameResolver};
 
 impl Expr {
     pub(super) fn expr_break(
         expr: &ExprBreak,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         _names: &mut NameResolver,
     ) -> syn::Result<()> {
         if let Some(label) = &expr.label {

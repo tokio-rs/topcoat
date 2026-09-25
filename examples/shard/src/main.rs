@@ -14,8 +14,8 @@ async fn main() {
     topcoat::start(
         Router::builder()
             .assets(AssetBundle::load().unwrap())
-            .runtime()
             .discover()
+            .runtime()
             .build(),
     )
     .await
@@ -60,7 +60,7 @@ async fn search_results(cx: &Cx, query: String) -> Result<impl View> {
     // State the shard keeps for itself. Its current value travels with every
     // re-render request, so it survives the re-renders `query` triggers
     // instead of starting over at five.
-    let limit = signal(cx, || 5.0);
+    let limit = signal(cx, || 5usize);
 
     // Reading the limit on the server makes the shard depend on it. When the
     // button below changes it in the browser, only the shard renders again,
@@ -68,8 +68,7 @@ async fn search_results(cx: &Cx, query: String) -> Result<impl View> {
     let results = search_fruit(cx, &query).await;
     // The limit comes from the client, so a real application would validate
     // it. Clamping it keeps a bogus value from becoming a huge count.
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    let shown = limit.get().clamp(0.0, 100.0) as usize;
+    let shown = limit.get().min(100);
 
     Ok(view! {
         <div>
@@ -80,7 +79,7 @@ async fn search_results(cx: &Cx, query: String) -> Result<impl View> {
             }
 
             if results.len() > shown {
-                <button @click=$(|_e| limit.set(limit.get() + 5.0))>"show more"</button>
+                <button @click=$(|_e| limit.set(limit.get() + 5))>"show more"</button>
             }
         </div>
     })

@@ -27,14 +27,12 @@ use crate::{
 
 /// A [`Route`] that forwards its requests to a tower service.
 ///
-/// This adapter mounts a whole tower application (an axum router, a hyper
-/// service, a reverse proxy) as a route in a topcoat router, typically while
-/// migrating an existing application to topcoat one route at a time.
-/// Registered with [`any`](Self::any) at a catch-all path, it hands an entire
-/// URL subtree to the service. The service receives each request with its
-/// original URI; nothing is stripped or rewritten. A catch-all segment does
-/// not match the bare prefix itself, so register a second `TowerRoute` for
-/// the prefix if the service also serves that URL.
+/// Mount a tower application at a catch-all path with [`any`](Self::any) to
+/// forward requests under that path. The adapter forwards the URI provided by the
+/// surrounding layers. To make paths relative to a mount point, register a
+/// [`StripPrefixLayer`](crate::StripPrefixLayer) for the route. A catch-all
+/// segment does not match the bare prefix itself, so register a second
+/// `TowerRoute` for the prefix if the service also serves that URL.
 ///
 /// The service must be `Clone`, `Send`, and `Sync`; wrap a service that is
 /// not `Sync` in `tower::buffer`. Its per-request clones share cross-request
@@ -152,11 +150,8 @@ where
 /// A [`Layer`] that wraps request handling in a [`tower::Layer`]'s
 /// middleware.
 ///
-/// This adapter runs middleware from the tower ecosystem (a timeout, a rate
-/// limit, CORS, compression) inside a topcoat router. The middleware behaves
-/// as it would in a plain tower stack: its state (a concurrency-limit
-/// semaphore, a rate-limit window) is shared across requests, and changes it
-/// makes to the request are seen by the layers and route it wraps.
+/// Runs tower middleware inside a Topcoat router. Middleware state is shared
+/// across requests. Request changes are visible to the inner layers and route.
 ///
 /// The middleware's service must be `Clone`, `Send`, and `Sync`; wrap a
 /// service that is not `Sync` in `tower::buffer`. To run several tower
@@ -497,19 +492,16 @@ fn recover(error: BoxError) -> Error {
 
 /// A tower service dispatching every request to a topcoat [`Router`].
 ///
-/// This adapter is the opposite of [`TowerRoute`]: it serves a whole topcoat
-/// router inside a tower application (an axum router, a hyper server, a tower
-/// middleware stack), typically to embed a topcoat application in one that
-/// owns the HTTP server. The service accepts a request with any body yielding
-/// [`Bytes`] and never errors; the router renders every failure, including a
-/// handler panic, as a response.
+/// Serves a Topcoat router inside an application that owns the HTTP server.
+/// It accepts compatible request bodies yielding [`Bytes`]. Routing failures
+/// and handler panics become HTTP responses rather than service errors.
 ///
 /// The service is `Clone`, `Send`, `Sync`, and infallible, satisfying the
 /// bounds tower servers commonly require. Clones are cheap and share the
 /// router's routing tables and app context.
 ///
 /// The router matches the URI exactly as the service receives it, and
-/// generates its URLs (hrefs, redirects, asset URLs) from its own absolute
+/// generates its URLs from its own absolute
 /// route paths. Mount the service where the surrounding application forwards
 /// full request paths, like a root-level fallback; behind a mount that strips
 /// a path prefix, generated URLs would point outside the mount.
@@ -525,6 +517,13 @@ fn recover(error: BoxError) -> Error {
 /// // `fallback_service`.
 /// let service = TowerService::new(router);
 /// ```
+///
+/// The surrounding server owns the connections, so the router does not know
+/// the peer address of a request it receives this way. To make
+/// [`remote_addr`](crate::request::remote_addr) and
+/// [`client_ip`](crate::request::client_ip)
+/// work, insert a [`RemoteAddr`](crate::RemoteAddr) into the request's
+/// extensions before it reaches the service.
 #[derive(Clone)]
 pub struct TowerService {
     /// The served router, shared with every clone of the service.
@@ -1276,6 +1275,28 @@ mod tests {
             &body_bytes(response)[..],
             b"POST /legacy/users/7?page=2 payload"
         );
+    }
+
+    #[test]
+    fn a_strip_prefix_layer_rewrites_the_uri_a_tower_route_sees() {
+        let router = Router::builder()
+            .route(TowerRoute::new(
+                Methods::Any,
+                Path::new("/legacy/{*rest}"),
+                tower::service_fn(echo_service),
+            ))
+            .layer(crate::StripPrefixLayer::new("/legacy"))
+            .build();
+
+        let request = http::Request::builder()
+            .method(Method::POST)
+            .uri("/legacy/users/7?page=2")
+            .body(Body::from("payload"))
+            .unwrap();
+        let response = block_on(router.handle(request));
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(&body_bytes(response)[..], b"POST /users/7?page=2 payload");
     }
 
     #[test]

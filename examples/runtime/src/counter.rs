@@ -9,7 +9,7 @@ use topcoat::{
 #[page]
 pub async fn page(cx: &Cx) -> Result<impl View> {
     // The signal lives in the browser; the handlers below update it.
-    let count = signal(cx, || 0.0);
+    let count = signal(cx, || 0i32);
 
     Ok(view! {
         <button @click=$(|_e| count.increment())>"increment"</button>

@@ -1,4 +1,4 @@
-The `module_router!` macro derives a handler's path from its enclosing Rust module. A handler without a path string uses the module path. When registered, a handler with a path string uses that explicit path.
+The `module_router!` macro derives a handler's path from its enclosing Rust module. A handler without a path string uses the module path. A handler whose path string starts with `./` is served below the module path. Absolute path strings are ignored by the module router entirely.
 
 # Setup
 
@@ -28,9 +28,9 @@ Every module-derived `#[page]`, `#[layout]`, `#[layer]`, and `#[route]` under th
 
 # Registering everything else
 
-Module-derived handlers are all that `module_router!()` registers. Handlers with an explicit path string, fonts, procedures, shards, the asset bundle, and application context are registered on the builder it returns, the same way they are registered on a builder from `Router::builder()`.
+`module_router!()` registers module-derived handlers. Register other handlers and application services on the returned builder, just as you would with `Router::builder()`.
 
-With the `discover` feature, `RouterBuilderDiscoverExt::discover` adds everything Topcoat collects at link time. That covers explicit-path handlers and the annotated items of other features, such as fonts. Registration is additive, so it composes with `module_router!()`:
+Call `RouterBuilderDiscoverExt::discover` to add explicit-path handlers and other items collected through discovery:
 
 ```rust
 use topcoat::router::{Router, RouterBuilderDiscoverExt};
@@ -56,7 +56,7 @@ pub fn router() -> Router {
 }
 ```
 
-A missing registration is not a compile error. It surfaces on the first request that renders the item, as a panic about a type that is not registered for the application context. The type named in that panic tells you which registration the router is missing.
+Some integrations require registered application values. A missing value may cause a panic when a request first uses it. Follow the integration's setup guide when adding it to the router.
 
 # How modules map to routes
 
@@ -129,6 +129,44 @@ async fn api_log(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
 }
 ```
 
+# Relative paths
+
+A relative path string starting with `./` is joined onto the module path. This places a handler below its module without adding a module for it.
+
+```rust
+# use topcoat::{Result, router::page, view::{View, view}};
+// src/app/settings.rs: GET /settings
+#[page]
+async fn settings() -> Result<impl View> {
+    Ok(view! { <h1>"Settings"</h1> })
+}
+
+// src/app/settings.rs: POST /settings/export
+#[page(POST "./export")]
+async fn export() -> Result<impl View> {
+    Ok(view! { <p>"Export started"</p> })
+}
+```
+
+This can also be used to add a trailing slash to the end of your module path. A bare `./` serves the module path itself with a trailing slash, and a relative path ending in a slash keeps it.
+
+```rust
+# use topcoat::{Result, router::page, view::{View, view}};
+// src/app/settings.rs: GET /settings/
+#[page("./")]
+async fn settings() -> Result<impl View> {
+    Ok(view! { <h1>"Settings"</h1> })
+}
+
+// src/app/settings.rs: GET /settings/export/
+#[page("./export/")]
+async fn export() -> Result<impl View> {
+    Ok(view! { <h1>"Export"</h1> })
+}
+```
+
+The same form works for `#[layout]`, `#[layer]`, and `#[route]`.
+
 # Dynamic path parameters
 
 Call `path_param!` inside the module that should become dynamic. The declaration names the URL parameter and may name the type used to parse each captured segment. The macro changes that module's segment to the parameter and generates the Pascal-cased type used to read it.
@@ -168,7 +206,7 @@ The parameter name comes from `post_id` in the declaration, not from the filenam
 
 - After `path_param!(slug)`, `path_param::<Slug>(cx)` returns the percent-decoded segment as `&str` and cannot fail.
 - After `path_param!(post_id: u64)`, `path_param::<PostId>(cx)` parses with `FromStr`. Without `error = ...`, the function returns `Result<&u64, &<u64 as FromStr>::Err>`.
-- `error = bad_request`, `not_found`, `unauthorized`, `forbidden`, `redirect(...)`, or `redirect_permanent(...)` maps a parse failure to that router error.
+- An `error = ...` option maps a parse failure to a router error. See the [`path_param!` reference](https://docs.rs/topcoat/latest/topcoat/router/macro.path_param.html) for the supported forms.
 
 Parsing occurs once per request. Later calls return the memoized result.
 
@@ -278,11 +316,11 @@ topcoat::router::segment!(kind = Static);
 
 Group names remain part of Topcoat's logical paths. A layout or layer in `_marketing` applies only to descendants of `_marketing`, even though the group name is absent from request URLs.
 
-# Explicit paths
+# Explicit absolute paths
 
-Adding a path string to `#[page]`, `#[layout]`, `#[layer]`, or `#[route]` disables module path derivation for that item. `segment!` declarations do not alter explicit paths.
+Adding an absolute path string to `#[page]`, `#[layout]`, `#[layer]`, or `#[route]` disables module path derivation for that item. `segment!` declarations do not affect explicit absolute paths.
 
-`module_router!()` discovers module-derived handlers. Register an explicit-path handler by name:
+`module_router!()` discovers module-derived handlers. Register an absolute-path handler by name:
 
 ```rust
 # use topcoat::{Result, router::page, view::{View, view}};

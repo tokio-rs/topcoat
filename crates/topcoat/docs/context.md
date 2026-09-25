@@ -1,6 +1,6 @@
-[`Cx`] is Topcoat's request context. Pages, layouts, components, and routes can take it as an optional parameter when they need request-scoped information.
+[`Cx`] gives handlers and components access to request data and shared application values.
 
-Add `cx: &Cx` to the function signature when needed; leave it out when the function does not need request context. Topcoat passes it automatically when the parameter is present.
+Add `cx: &Cx` to a handler or component's parameters when it needs context. Topcoat supplies it automatically.
 
 # Router request helpers
 
@@ -22,15 +22,7 @@ fn request_summary(cx: &Cx) -> String {
 }
 ```
 
-The ones you reach for most, all listed in [`topcoat::router::request`](crate::router::request):
-
-- [`parts(cx)`](crate::router::request::parts) returns the current request's `http::request::Parts`.
-- [`method(cx)`](crate::router::request::method) returns the HTTP method.
-- [`uri(cx)`](crate::router::request::uri) returns the request URI.
-- [`version(cx)`](crate::router::request::version) returns the HTTP version.
-- [`headers(cx)`](crate::router::request::headers) returns the request headers.
-- [`content_type(cx)`](crate::router::request::content_type) returns the request `Content-Type`.
-- [`extensions(cx)`](crate::router::request::extensions) returns request extensions.
+Use a field helper such as [`headers(cx)`](crate::router::request::headers) for one part of the request. See [`router::request`](crate::router::request) for the available helpers.
 
 Use [`parts(cx)`](crate::router::request::parts) when you need several fields at once:
 
@@ -55,7 +47,7 @@ fn request_id(cx: &Cx) -> Option<&str> {
 }
 ```
 
-A handler reached through a [rewrite](crate::router::error#rewrites) sees the rewritten request in all of the above. Each helper has an `original_` counterpart returning the request as the client sent it, from [`original_parts(cx)`](crate::router::request::original_parts) down to [`original_uri(cx)`](crate::router::request::original_uri); for a request that was never rewritten they agree with the plain helpers.
+A handler reached through a [rewrite](crate::router::error#rewrites) sees the rewritten request in the HTTP field helpers. Those helpers have `original_` counterparts returning the request as the client sent it, from [`original_parts(cx)`](crate::router::request::original_parts) down to [`original_uri(cx)`](crate::router::request::original_uri). Layers can also change the current request without a rewrite. For example, [`StripPrefixLayer`](crate::router::StripPrefixLayer) changes `uri(cx)` while `original_uri(cx)` keeps the incoming URI. The client's IP address is resolved when the request arrives and stays the same across rewrites.
 
 # Path and query helpers
 
@@ -126,7 +118,7 @@ fn current_customer(cx: &Cx) -> Option<&Customer> {
 
 # Registering request context
 
-Request context is registered by scoping: [`Cx::with`] returns a child `Cx` whose request context also holds the given value, and [`Cx::with_many`] registers a tuple of values in one step. The child inherits every other value and shares the rest of the request state, such as the app context and the memoize cache, with its parent.
+[`Cx::with`] creates a child context with an additional value. [`Cx::with_many`] adds several values at once. The child inherits other context values and shares the request's state with its parent.
 
 ```rust
 use topcoat::context::{Cx, request_context};
@@ -145,7 +137,7 @@ fn greet(cx: &Cx) -> String {
 }
 ```
 
-Registering a type that is already present shadows it for the child scope: lookups through the child see the new value, while lookups through the parent still see the original. This is how router layers make values like the cookie jar available to everything below them; they derive a child context and pass it to the rest of the chain.
+Adding a type that is already present replaces it in the child scope. The parent still sees the original value. A router layer can pass a child context to the next handler to make its values available there.
 
 # Work that outlives the handler
 
@@ -174,11 +166,11 @@ async fn place_order(cx: &Cx) -> Result<&'static str> {
 }
 ```
 
-A cloned handle keeps reading the context after the response was sent, but it can no longer change what the client receives. Cookie changes and other response-directed writes made from work that outlives the handler are dropped.
+A cloned handle can still read context after the handler returns. It cannot change response headers that have already been sent. Cookie writes after the jar is sealed panic.
 
 # Memoization
 
-[`#[memoize]`](macro@memoize) caches a `cx`-taking function's result for the duration of a request, keyed by its arguments. Wrap the request helpers above with it so that repeated calls (across a layout, a page, and nested components) run the work once and share the result. A memoized body that reads request context keeps a result per set of values it observed, so a cached value never leaks out of the scope it was computed in. See its documentation for the details.
+[`#[memoize]`](macro@memoize) caches a function's result for one request. Repeated calls with the same arguments share the result when they see the same request context dependencies. Use it for expensive work needed in several places. See the macro's documentation for requirements and scoping rules.
 
 # Composing helpers
 

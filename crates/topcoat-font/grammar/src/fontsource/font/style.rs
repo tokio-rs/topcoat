@@ -9,8 +9,7 @@ use crate::fontsource::{
     font_face::{StyleKey, StyleValue},
 };
 
-/// A `style:` argument for `fontsource_font!`: one style or a bracketed list of
-/// styles to cross-product, e.g. `style: [Style::Normal, Style::Italic]`.
+/// A `style:` argument containing one style or a list, such as `[Normal, Italic]`.
 pub struct Style {
     pub key: StyleKey,
     pub colon_token: Token![:],

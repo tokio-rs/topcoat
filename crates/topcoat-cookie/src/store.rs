@@ -6,16 +6,12 @@ use crate::{Cookie, Cookies};
 
 /// A typed value backed by a single cookie.
 ///
-/// A `CookieStore` holds a deserialized `T` in memory and writes it back to its
-/// cookie as JSON on [`commit`](Self::commit). It is built from any [`Cookies`]
-/// jar, so signing, encryption, prefixes, and default attributes all compose
-/// through the jar it wraps.
+/// Holds a value of type `T` in memory. [`commit`](Self::commit) serializes it
+/// as JSON and writes it through the configured [`Cookies`] jar.
 ///
-/// Reads and mutations operate on the in-memory value only. **Nothing is written
-/// to the response until [`commit`](Self::commit) is called**; dropping the store
-/// (or calling [`rollback`](Self::rollback)) discards any pending changes. This
-/// makes it easy to update a cookie only once some other work has succeeded:
-/// just hold off on `commit` until then.
+/// Reads and mutations affect only the in-memory value until you commit.
+/// Dropping the store or calling [`rollback`](Self::rollback) discards those
+/// changes. Call [`remove`](Self::remove) to delete the cookie instead.
 ///
 /// Obtain one by reading the incoming cookie through [`cookie_store`]:
 ///
@@ -126,9 +122,7 @@ where
     /// Serializes the current value, queues it on the backing jar as a
     /// `Set-Cookie`, and returns the value.
     ///
-    /// This is the only method that writes anything: until it is called, the
-    /// store's value lives only in memory. Returns an error if the value cannot
-    /// be serialized.
+    /// Call this after any work that must succeed before saving the value.
     ///
     /// # Errors
     ///
@@ -147,10 +141,9 @@ where
 
     /// Queues a removal of the backing cookie, expiring it on the client.
     ///
-    /// Writes to the response like [`commit`](Self::commit), but deletes the
-    /// cookie instead of saving a value; the in-memory value is dropped. The
-    /// removal goes through the jar, so the `Path`/`Domain` and prefix attributes
-    /// the cookie was written with are reapplied and the browser can match it.
+    /// Drops the in-memory value and removes the cookie through the backing
+    /// jar. Use the same jar configuration as when writing so the browser can
+    /// match the cookie's name, path, and domain.
     pub fn remove(self) {
         self.jar.remove(Cookie::new(self.key, ""));
     }
@@ -184,9 +177,8 @@ where
 
     /// Seeds a [`CookieStore`] with `value` without reading the existing cookie.
     ///
-    /// Use this to overwrite the cookie outright when you don't need its current
-    /// contents. The value is not written until the returned store is
-    /// [`commit`](CookieStore::commit)ted.
+    /// Use this when the old value is not needed. Call
+    /// [`commit`](CookieStore::commit) on the returned store to save it.
     ///
     /// ```rust
     /// # use serde::{Deserialize, Serialize};
@@ -267,8 +259,8 @@ where
 
 /// Builds an [`UnparsedCookieStore`] for the cookie named `key`, backed by `jar`.
 ///
-/// `jar` is any [`Cookies`] jar, so signing, encryption, prefixes, and default
-/// attributes compose through it. Specify the stored type as `T`:
+/// The store uses the jar's configuration for every operation. Specify the
+/// stored type as `T`:
 ///
 /// ```rust
 /// # use serde::{Deserialize, Serialize};

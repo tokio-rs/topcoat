@@ -11,19 +11,14 @@ use crate::Cookies;
 
 /// The root cookie jar for a request.
 ///
-/// `CookieJar` wraps the [`cookie`] crate's [`CookieJar`](RawCookieJar) behind a
-/// [`Mutex`], giving the whole [`Cookies`] adapter stack interior mutability and
-/// thread safety. It is created lazily by [`cookies`](crate::cookies), which
-/// parses the incoming `Cookie` header on first access and memoizes the jar for
-/// the rest of the request.
+/// Access it with [`cookies`](crate::cookies). Calls in the same request share
+/// the jar and see its pending changes.
 ///
-/// Every adapter ([`SignedJar`](crate::SignedJar), [`PrivateJar`](crate::PrivateJar),
-/// [`Prefixed`](crate::Prefixed), [`Map`](crate::Map)) ultimately reads from and
-/// writes to this jar, so the pending changes it accumulates are what gets
-/// serialized into `Set-Cookie` response headers.
+/// Changes made through the jar or its adapters become `Set-Cookie` response
+/// headers when the handler returns.
 ///
-/// Once those headers are written the jar is sealed: reads keep working, but
-/// adding or removing a cookie panics instead of being silently dropped.
+/// Once the headers are written, reads still work but adding or removing a
+/// cookie panics.
 #[derive(Debug)]
 pub struct CookieJar {
     jar: Mutex<RawCookieJar>,

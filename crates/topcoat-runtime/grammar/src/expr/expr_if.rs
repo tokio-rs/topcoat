@@ -3,6 +3,7 @@ use quote::{ToTokens, quote};
 use syn::{Expr as SynExpr, ExprIf};
 use topcoat_core_grammar::paths::topcoat_runtime;
 
+use super::js::Js;
 use crate::expr::{Expr, contains_await::ContainsAwait, name_resolver::NameResolver};
 
 impl Expr {
@@ -12,7 +13,7 @@ impl Expr {
     pub(super) fn expr_if(
         if_expr: &ExprIf,
         rust: &mut TokenStream,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
     ) -> syn::Result<()> {
         let is_async = ContainsAwait::in_if(if_expr);
@@ -30,7 +31,7 @@ impl Expr {
 
     fn expr_if_inner(
         if_expr: &ExprIf,
-        js: &mut String,
+        js: &mut Js,
         names: &mut NameResolver,
     ) -> syn::Result<TokenStream> {
         js.push_str("{ if (");

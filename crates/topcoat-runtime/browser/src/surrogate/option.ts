@@ -1,6 +1,9 @@
-import type { AttributeValueViewParts, NodeViewParts } from "../view";
+import type { AttributeValueViewParts, NodeViewParts } from "../dom/view";
+import { dehydrate } from "../expression/dehydrate";
+import type { DehydratedSurrogate } from "../expression/serialized";
 import { Bool } from "./bool";
 import { Panic } from "./panic";
+import { cloneValue } from "./ref";
 
 export class Option<T> implements AttributeValueViewParts, NodeViewParts {
 	constructor(private readonly value: T | undefined) {}
@@ -37,10 +40,7 @@ export class Option<T> implements AttributeValueViewParts, NodeViewParts {
 
 	clone(): Option<T> {
 		if (this.value === undefined) return Option.none<T>();
-		const inner = this.value as { clone?: () => T };
-		return Option.some<T>(
-			typeof inner?.clone === "function" ? inner.clone() : this.value,
-		);
+		return Option.some(cloneValue(this.value));
 	}
 
 	isAttributePresent(): boolean {
@@ -57,7 +57,7 @@ export class Option<T> implements AttributeValueViewParts, NodeViewParts {
 		return (this.value as NodeViewParts).toNodeText();
 	}
 
-	dehydrate(): { t: "Option"; v: unknown } {
-		return { t: "Option", v: this.value === undefined ? null : this.value };
+	dehydrate(): { t: "Option"; v: DehydratedSurrogate } {
+		return { t: "Option", v: dehydrate(this.value) };
 	}
 }

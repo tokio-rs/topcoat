@@ -3,14 +3,12 @@ use topcoat::{
     view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
-/// A radio group component: a set of options of which one can be picked.
+/// A container for options that allow one selection.
 ///
-/// The group is a container; what ties its options together is the `name`
-/// they share, which is how the browser knows to let go of one when another
-/// is picked. Give every [`radio_group_item`] in the group the same `name`,
-/// and the one that starts out picked a `checked` attribute. The `attrs`
-/// (such as `class`) are forwarded to the underlying `<div>`; a `class` among
-/// them is appended to the computed classes.
+/// Give each `radio_group_item` the same `name` attribute to form the selection group.
+/// Set `checked` on the initially selected item. `attrs` are forwarded to the outer
+/// `<div>`, with extra classes added to its classes.
+/// Name the group with `aria-label` or `aria-labelledby` in `attrs`.
 ///
 /// ```ignore
 /// view! {
@@ -42,17 +40,10 @@ pub async fn radio_group(
     })
 }
 
-/// The classes for the native `<input type="radio">` inside a
-/// [`radio_group_item`].
-///
-/// The native glyph is suppressed with `appearance-none` so the component can
-/// draw its own dot, which keeps the control looking the same across
-/// browsers. The circle matches the input control's border and shadow, and
-/// picking it recolors the ring rather than filling it, which leaves room for
-/// the dot inside.
+/// Classes for the radio input and its selected border.
 const RADIO: StaticClass = class!(
     "peer size-4 shrink-0 appearance-none rounded-full border border-border \
-     bg-background shadow-xs transition-colors outline-none checked:border-primary \
+     bg-background transition-colors outline-none checked:border-primary \
      focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
      focus-visible:ring-offset-background disabled:pointer-events-none",
 );
@@ -63,11 +54,10 @@ const DOT: StaticClass = class!(
      opacity-0 transition-opacity peer-checked:opacity-100",
 );
 
-/// One option of a [`radio_group`]: a themed native `<input type="radio">`.
+/// A native radio input styled as a group option.
 ///
-/// The `attrs` (such as `name`, `value`, `checked`, or `disabled`) are
-/// forwarded to the `<input>`; a `class` among them is appended to the
-/// wrapping element's classes. Pair it with a `label` naming the option.
+/// Pair it with a label. Classes in `attrs` apply to the wrapper, while other
+/// attributes go on the `<input>`.
 #[component]
 pub async fn radio_group_item(#[default] mut attrs: Attributes) -> Result<impl View> {
     // The dot cannot be drawn by the `<input>` itself, which renders no
@@ -76,7 +66,7 @@ pub async fn radio_group_item(#[default] mut attrs: Attributes) -> Result<impl V
     Ok(view! {
         <span
             class=(class!(
-                "relative inline-flex shrink-0 has-[:disabled]:opacity-50",
+                "peer relative inline-flex shrink-0 has-[:disabled]:opacity-50",
                 attrs.remove("class"),
             ))
         >

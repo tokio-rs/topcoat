@@ -1,6 +1,6 @@
 # Session
 
-A login and logout flow with Topcoat sessions, storing the session records in an in-memory database.
+A login and logout flow with session records stored in memory.
 
 Run it with:
 

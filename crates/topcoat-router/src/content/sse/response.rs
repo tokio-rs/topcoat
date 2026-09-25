@@ -19,20 +19,18 @@ use crate::{
     response::{IntoResponse, Response},
 };
 
-/// Server-sent events response: streams [`Event`]s to the client over a
-/// long-lived connection.
+/// An HTTP response that streams server-sent [`Event`]s to the client.
 ///
-/// Wrap a [`Stream`] of events to reply with `Content-Type: text/event-stream`
-/// and send each event as the stream yields it. The connection stays open
-/// until the stream ends, an `Err` item occurs, or the client disconnects;
-/// a disconnect drops the stream, so cleanup belongs in the stream's `Drop`.
-/// The router never compresses event streams, so events are not delayed by
-/// an encoder buffer.
+/// Wrap a [`Stream`] of events to send each event as it becomes ready with
+/// `Content-Type: text/event-stream`. The response ends when the stream
+/// finishes, yields an error, or the client disconnects. Put cleanup in the
+/// stream's `Drop` implementation so it also runs on disconnect. The router
+/// leaves event streams uncompressed to avoid buffering delays.
 ///
-/// A browser `EventSource` reconnects automatically when the connection is
-/// lost. Send [`Event::retry`] to tune its reconnection delay, and
-/// [`Event::id`] together with [`last_event_id`](crate::content::sse::last_event_id)
-/// to resume a stream where the client left off.
+/// A browser `EventSource` reconnects automatically. Use [`Event::retry`] to
+/// set the delay. Give events an [`Event::id`] and read
+/// [`last_event_id`](crate::content::sse::last_event_id) on reconnect to resume
+/// from the client's last event.
 ///
 /// # Examples
 ///
@@ -99,8 +97,8 @@ impl<S> Sse<S> {
         }
     }
 
-    /// Sends keep-alive events whenever the stream is idle, so proxies and
-    /// clients do not drop a quiet connection. No keep-alive by default.
+    /// Sends events while the stream is idle to help avoid connection timeouts.
+    /// Disabled by default.
     pub fn keep_alive(mut self, keep_alive: KeepAlive) -> Self {
         self.keep_alive = Some(keep_alive);
         self

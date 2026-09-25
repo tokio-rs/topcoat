@@ -56,9 +56,8 @@ impl AddCommand {
     }
 }
 
-/// Asks the user a yes/no question on the terminal, defaulting to no. Errors
-/// when there is no terminal to prompt on, so non-interactive use must be
-/// explicit (via `--registry`).
+/// Asks for confirmation, defaulting to no. Returns an error without an interactive
+/// terminal. Use an explicit `--registry` to avoid registry-selection prompts.
 fn confirm(prompt: &str) -> Result<bool, String> {
     use std::io::{IsTerminal, Write};
 

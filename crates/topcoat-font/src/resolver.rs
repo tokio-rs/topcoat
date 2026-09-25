@@ -2,16 +2,12 @@ use std::fmt::Write;
 
 use crate::Font;
 
-/// Function that formats the URL at which a [`Font`]'s CSS is hosted by the
-/// router into a `dyn Write`.
+/// A callback that writes a [`Font`]'s stylesheet URL.
 pub type ResolveFontRouteFn = dyn Fn(Font, &mut dyn Write) -> std::fmt::Result + Send + Sync;
 
-/// Function registered with the app context that resolves a [`Font`] to its
-/// hosted stylesheet URL.
+/// Resolves fonts to their hosted stylesheet URLs.
 ///
-/// Registered by [`RouterBuilderFontExt`](crate::RouterBuilderFontExt)
-/// when a font is added to the router, and read when a [`Font`] is used as an
-/// attribute value in the `view!` macro.
+/// Register in app context to control the URLs rendered for [`Font`] values.
 pub struct FontResolver {
     resolve_fn: Box<ResolveFontRouteFn>,
 }

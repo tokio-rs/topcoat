@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 
-use proc_macro2::Ident;
+use proc_macro2::{Ident, Span, TokenStream};
+use quote::quote;
+use topcoat_core_grammar::paths::topcoat_runtime;
 
 pub(super) enum ResolvedIdent {
     Local { js_name: String, rust_ident: Ident },
-    External { js_name: String, rust_ident: Ident },
+    External { rust_ident: Ident },
 }
 
 struct LocalBinding {
@@ -20,9 +22,8 @@ pub(super) enum LocalBindingKind {
 }
 
 pub(super) struct ExternalBinding {
-    pub(super) original_ident: Ident,
+    pub(super) value: TokenStream,
     pub(super) rust_ident: Ident,
-    pub(super) js_name: String,
 }
 
 #[derive(Default)]
@@ -31,7 +32,6 @@ pub(super) struct NameResolver {
     externals: Vec<ExternalBinding>,
     external_by_name: HashMap<String, usize>,
     next_local: usize,
-    next_external: usize,
 }
 
 impl NameResolver {
@@ -83,25 +83,32 @@ impl NameResolver {
         if let Some(index) = self.external_by_name.get(&original) {
             let binding = &self.externals[*index];
             return ResolvedIdent::External {
-                js_name: binding.js_name.clone(),
                 rust_ident: binding.rust_ident.clone(),
             };
         }
 
-        let index = self.next_external;
-        let js_name = format!("__external{index}");
-        let rust_ident = Ident::new(&format!("__topcoat_external{index}"), ident.span());
-        self.next_external += 1;
-        self.external_by_name.insert(original, self.externals.len());
+        let index = self.externals.len();
+        let rust_ident = self.capture_value(
+            quote! {
+                ::core::convert::Into::<#topcoat_runtime::Expr<_>>::into(
+                    ::core::clone::Clone::clone(&#ident),
+                )
+            },
+            ident.span(),
+        );
+        self.external_by_name.insert(original, index);
+        ResolvedIdent::External { rust_ident }
+    }
+
+    /// Binds a value serialized by the Rust target when the expression is built.
+    pub(super) fn capture_value(&mut self, value: TokenStream, span: Span) -> Ident {
+        let index = self.externals.len();
+        let rust_ident = Ident::new(&format!("__topcoat_external{index}"), span);
         self.externals.push(ExternalBinding {
-            original_ident: ident.clone(),
+            value,
             rust_ident: rust_ident.clone(),
-            js_name: js_name.clone(),
         });
-        ResolvedIdent::External {
-            js_name,
-            rust_ident,
-        }
+        rust_ident
     }
 
     pub(super) fn is_surrogate_local(&self, ident: &Ident) -> bool {

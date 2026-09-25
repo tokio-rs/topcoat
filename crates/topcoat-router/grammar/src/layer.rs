@@ -1,20 +1,25 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 use syn::{
-    ItemFn, LitStr, Visibility,
+    ItemFn, Visibility,
     parse::{Parse, ParseStream},
     parse_quote,
 };
-use topcoat_core_grammar::paths::{topcoat_context, topcoat_inventory, topcoat_router};
+use topcoat_core_grammar::{
+    ParseOption,
+    paths::{topcoat_context, topcoat_inventory, topcoat_router},
+};
+
+use super::common::HandlerPath;
 
 pub struct LayerAttr {
-    path: Option<LitStr>,
+    path: Option<HandlerPath>,
 }
 
 impl Parse for LayerAttr {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
-            path: input.peek(LitStr).then(|| input.parse()).transpose()?,
+            path: input.call(HandlerPath::parse_option)?,
         })
     }
 }
@@ -103,30 +108,37 @@ impl ToTokens for Layer {
                 })
             }
         };
-        let (layer, submit_as) = if let Some(path) = attr.path.as_ref() {
-            let layer = quote! {
-                impl #topcoat_router::Layer for #ident {
-                    fn path(&self) -> ::core::option::Option<&#topcoat_router::Path> {
-                        const PATH: &#topcoat_router::Path = #topcoat_router::Path::new(#path);
-                        ::core::option::Option::Some(PATH)
-                    }
+        let (layer, submit_as) =
+            if let Some(path) = attr.path.as_ref().and_then(HandlerPath::absolute) {
+                let layer = quote! {
+                    impl #topcoat_router::Layer for #ident {
+                        fn path(&self) -> ::core::option::Option<&#topcoat_router::Path> {
+                            const PATH: &#topcoat_router::Path = #topcoat_router::Path::new(#path);
+                            ::core::option::Option::Some(PATH)
+                        }
 
-                    #handle
-                }
-            };
-            (layer, quote! { #topcoat_router::Layer })
-        } else {
-            let layer = quote! {
-                impl #topcoat_router::ModuleLayer for #ident {
-                    fn module_path(&self) -> &'static str {
-                        ::core::module_path!()
+                        #handle
                     }
+                };
+                (layer, quote! { #topcoat_router::Layer })
+            } else {
+                let relative_path = attr
+                    .path
+                    .as_ref()
+                    .and_then(HandlerPath::relative_path_method);
+                let layer = quote! {
+                    impl #topcoat_router::ModuleLayer for #ident {
+                        fn module_path(&self) -> &'static str {
+                            ::core::module_path!()
+                        }
 
-                    #handle
-                }
+                        #relative_path
+
+                        #handle
+                    }
+                };
+                (layer, quote! { #topcoat_router::ModuleLayer })
             };
-            (layer, quote! { #topcoat_router::ModuleLayer })
-        };
 
         // Discovery collects the marker erased behind its trait.
         let submit = cfg!(feature = "discover").then(|| {

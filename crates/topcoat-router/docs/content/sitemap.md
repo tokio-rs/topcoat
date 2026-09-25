@@ -1,10 +1,10 @@
-XML sitemaps for topcoat routes.
+XML sitemaps for Topcoat routes.
 
-A [sitemap](https://www.sitemaps.org) lists the URLs of a site so crawlers can discover every page, along with optional metadata about each one. This module (behind the `sitemap` feature) provides the [`Sitemap`] response: a route builds one entry by entry and returns it, and the response is sent as the sitemap XML document with `Content-Type: application/xml`.
+A [sitemap](https://www.sitemaps.org) lists URLs for crawlers to discover. Enable the `sitemap` feature and return a [`Sitemap`] from a route to serve an XML sitemap.
 
 # Serving a sitemap
 
-Crawlers expect the sitemap at `/sitemap.xml`. Add entries with [`url`](Sitemap::url), which takes a path string or a [`SitemapUrl`] carrying the optional fields, and [`urls`](Sitemap::urls), which adds every entry of an iterator, such as one built from the rows of a database query.
+This example serves a sitemap at `/sitemap.xml`. Add one entry with [`url`](Sitemap::url) or an iterator of entries with [`urls`](Sitemap::urls). Each entry can be a path string or a [`SitemapUrl`] with optional metadata.
 
 ```rust
 use topcoat::{
@@ -37,7 +37,7 @@ let router = Router::builder().base_url("https://example.com").build();
 
 Beyond its location, a [`SitemapUrl`] carries the optional metadata of the sitemap format. Every builder method replaces the field it sets.
 
-- [`last_modified`](SitemapUrl::last_modified) is the time the page last changed. It accepts anything convertible into a `SystemTime`, which covers the timestamp types of the common date and time crates.
+- [`last_modified`](SitemapUrl::last_modified) records when the page last changed. It accepts a value convertible into `SystemTime`.
 - [`change_frequency`](SitemapUrl::change_frequency) hints how often crawlers should revisit the page, from [`Always`](ChangeFrequency::Always) for a page that changes on every access to [`Never`](ChangeFrequency::Never) for an archived one.
 - [`priority`](SitemapUrl::priority) ranks the page relative to the other pages of the site, from `0.0` to `1.0`; crawlers treat an entry without a priority as `0.5`.
 

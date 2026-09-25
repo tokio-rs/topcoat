@@ -9,8 +9,8 @@ use crate::{Captured, HtmlContext, PartsWriter, PromotedStr, StaticStr, Unescape
 
 /// Converts a value used as an attribute key into view parts.
 ///
-/// When this trait is implemented on a type, it can be used in the attribute key position of an
-/// element in the [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) macro:
+/// Implement this trait to use a type as a dynamic attribute name in
+/// [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html):
 ///
 /// ```rust
 /// # use topcoat::view::{View, component, view};
@@ -131,12 +131,8 @@ impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
 
 /// An attribute key captured from any [`AttributeKeyViewParts`] value.
 ///
-/// Produced by the [`Attributes`](crate::Attributes) collection. A key that
-/// pushes a single string is kept as that string, so it costs nothing
-/// beyond the string itself; anything else is rendered into a `String` when
-/// it is captured. A variant carries the context it was pushed with, so
-/// validation happens when the key is finally written into a view. Keys
-/// compare and hash by their text alone.
+/// Keys retain their HTML context for validation when rendered. Equality
+/// and hashing use only the key's text.
 #[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum AttributeKey {

@@ -12,15 +12,10 @@ fn module_name(file_name: &str) -> Option<&str> {
     }
 }
 
-/// The file that holds the components directory's module declarations.
+/// Finds the file containing the components directory's module declarations.
 ///
-/// By default this is a sibling `<dir>.rs` file next to the directory. If the
-/// user instead keeps a `mod.rs` inside the directory, that file is maintained,
-/// so either Rust module style works.
-///
-/// Rust forbids declaring a module via both files at once, so when both exist
-/// this errors rather than silently picking one (which would leave a stale file
-/// and a package that does not compile).
+/// Uses the sibling `<dir>.rs` file unless an inner `mod.rs` exists. Returns an error
+/// if both exist.
 fn module_file(dir: &Path) -> Result<PathBuf, String> {
     let mod_path = dir.join("mod.rs");
 
@@ -44,9 +39,8 @@ fn module_file(dir: &Path) -> Result<PathBuf, String> {
     }
 }
 
-/// Verifies the components directory does not declare its module via both a
-/// sibling `<dir>.rs` and an inner `mod.rs`. Call this before mutating any files
-/// so an ambiguous layout aborts before components are written or removed.
+/// Rejects a directory with both a sibling `<dir>.rs` and an inner `mod.rs`. Call
+/// before writing or removing components.
 pub(super) fn check(dir: &Path) -> Result<(), String> {
     module_file(dir).map(|_| ())
 }

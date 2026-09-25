@@ -7,9 +7,8 @@ pub use topcoat_runtime_macro::*;
 ///
 /// # Panics
 ///
-/// Panics when the router was built without
-/// [`runtime()`](RouterBuilderRuntimeExt::runtime), since the script would
-/// have no routes to talk to.
+/// Panics if the router was built without
+/// [`runtime()`](RouterBuilderRuntimeExt::runtime).
 #[cfg(feature = "view")]
 #[topcoat::view::component]
 pub async fn script(cx: &topcoat::context::Cx) -> topcoat::Result<impl topcoat::view::View> {

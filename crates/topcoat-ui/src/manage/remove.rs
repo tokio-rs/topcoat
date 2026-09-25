@@ -12,12 +12,12 @@ pub struct Removed {
     pub registry: String,
 }
 
-/// Removes previously added components from the package.
+/// Removes installed components.
 ///
-/// Each component's registry is resolved first, so a bad name aborts before
-/// anything is deleted: with `registry` it is removed from that registry,
-/// otherwise from the sole registry it is installed from (an error if it is
-/// installed from several). The state is saved once, after all removals.
+/// Resolves every requested component before deleting files. Use `registry` to select
+/// the source registry when a component name is installed from several registries.
+/// Saves the install state after all removals. An I/O failure can leave some removals
+/// complete and others unfinished.
 ///
 /// # Errors
 ///
@@ -97,8 +97,8 @@ pub fn remove(
     Ok(removed)
 }
 
-/// Determines which registry the component should be removed from: the one named
-/// via `registry`, or the sole registry that has it installed.
+/// Selects the named registry, or the sole registry from which the component is
+/// installed.
 fn resolve_registry(
     component: &str,
     registry: Option<&str>,

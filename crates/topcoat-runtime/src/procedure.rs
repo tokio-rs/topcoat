@@ -1,67 +1,13 @@
-use std::{hash::Hash, pin::Pin};
-
-use serde::{Deserialize, Serialize};
-use topcoat_core::{context::Cx, error::Result};
-use topcoat_router::{
-    Body, Method, Methods, Path, PathBuf, Route, RouteFuture, RouteId, RouterBuilder,
-    response::Response,
-};
+use serde::Serialize;
+use topcoat_router::Route;
 
 use crate::{Surrogate, Surrogated};
 
-const PROCEDURE_ROUTE_PREFIX: &str = "/_topcoat/runtime/procedures";
-
-/// The identity of a procedure, stable across the server and the client
-/// runtime.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct ProcedureId(&'static str);
-
-impl ProcedureId {
-    #[must_use]
-    pub const fn new(inner: &'static str) -> Self {
-        Self(inner)
-    }
-
-    #[must_use]
-    fn as_str(&self) -> &str {
-        self.0
-    }
-}
-
-/// The future returned by [`Procedure::handle`]: a boxed, `Send` future
-/// borrowing the procedure and its request context.
-pub type ProcedureFuture<'cx> = Pin<Box<dyn Future<Output = Result<Response>> + Send + 'cx>>;
-
-/// An async server function callable from the client runtime.
+/// A procedure's argument and return types for calls in runtime expressions.
 ///
-/// Registered into a [`RouterBuilder`] with
-/// [`procedure`](RouterBuilderProcedureExt::procedure), which serves it as a
-/// route dispatched by [`ProcedureId`].
-pub trait Procedure: Send + Sync + 'static {
-    /// The identity of this procedure.
-    fn id(&self) -> ProcedureId;
-
-    /// Handles a procedure call, deserializing its arguments from `body`.
-    fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> ProcedureFuture<'cx>;
-}
-
-impl<P: Procedure + ?Sized> Procedure for &'static P {
-    fn id(&self) -> ProcedureId {
-        (**self).id()
-    }
-
-    fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> ProcedureFuture<'cx> {
-        (**self).handle(cx, body)
-    }
-}
-
-#[cfg(feature = "discover")]
-inventory::collect!(&'static dyn Procedure);
-
-/// The argument and return types of a [`Procedure`], as seen by runtime
-/// expressions calling it.
-pub trait TypedProcedure: Procedure {
+/// Procedures implement [`Route`] to handle calls over HTTP. Register one
+/// with [`RouterBuilder::route`](topcoat_router::RouterBuilder::route).
+pub trait TypedProcedure: Route {
     /// The arguments, as a tuple in declaration order.
     type Args: Surrogated;
 
@@ -69,85 +15,21 @@ pub trait TypedProcedure: Procedure {
     type Output: Surrogated;
 }
 
-/// A [`Route`] that handles calls to one server procedure.
-pub struct ProcedureRoute {
-    id: RouteId,
-    path: PathBuf,
-    procedure: Box<dyn Procedure>,
-}
-
-impl ProcedureRoute {
-    /// Builds the route that serves `procedure`.
-    pub fn new(procedure: impl Procedure) -> Self {
-        Self {
-            id: RouteId::new(),
-            path: Path::new(&format!(
-                "{PROCEDURE_ROUTE_PREFIX}/{}",
-                procedure.id().as_str()
-            ))
-            .to_owned(),
-            procedure: Box::new(procedure),
-        }
-    }
-}
-
-impl Route for ProcedureRoute {
-    fn id(&self) -> RouteId {
-        self.id
-    }
-
-    fn methods(&self) -> Methods<'_> {
-        Methods::Only(&[Method::POST])
-    }
-
-    fn path(&self) -> &Path {
-        &self.path
-    }
-
-    fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
-        self.procedure.handle(cx, body)
-    }
-}
-
-/// Registers server procedures on a [`RouterBuilder`].
-pub trait RouterBuilderProcedureExt {
-    /// Mounts a procedure route.
-    #[must_use]
-    fn procedure(self, procedure: impl Procedure) -> Self;
-
-    /// Registers every procedure linked into the binary.
-    #[cfg(feature = "discover")]
-    #[must_use]
-    fn discover_procedures(self) -> Self;
-}
-
-impl RouterBuilderProcedureExt for RouterBuilder {
-    fn procedure(self, procedure: impl Procedure) -> Self {
-        self.route(ProcedureRoute::new(procedure))
-    }
-
-    #[cfg(feature = "discover")]
-    fn discover_procedures(mut self) -> Self {
-        for &procedure in inventory::iter::<&'static dyn Procedure>() {
-            self = self.procedure(procedure);
-        }
-        self
-    }
-}
-
-/// The surrogate a [`Procedure`] value turns into inside a runtime
-/// expression.
+/// A procedure captured by a runtime expression.
 ///
-/// Captured as a `&'static` reference, so closures inside the expression can
-/// hold it without borrowing a local. Serializes as the procedure's id, so
-/// the browser can call it back, and exposes the typed [`call`](Self::call)
-/// that runtime expressions invoke.
-pub struct ProcedureSurrogate<P>(P);
+/// Serializes the endpoint URL for the browser and checks the argument and
+/// return types of [`call`](Self::call).
+pub struct ProcedureSurrogate<P> {
+    procedure: P,
+    /// The request URL, with route groups removed and `/` for the root.
+    url: &'static str,
+}
 
 impl<P: TypedProcedure> ProcedureSurrogate<P> {
+    /// Pairs a procedure with the URL that serves its calls.
     #[must_use]
-    pub const fn new(procedure: P) -> Self {
-        Self(procedure)
+    pub const fn new(procedure: P, url: &'static str) -> Self {
+        Self { procedure, url }
     }
 
     /// Invokes the procedure from the client side.
@@ -171,7 +53,7 @@ where
     type Real = P;
 
     fn into_real(self) -> Self::Real {
-        self.0
+        self.procedure
     }
 }
 
@@ -183,12 +65,12 @@ impl<P: TypedProcedure> Serialize for ProcedureSurrogate<P> {
         #[derive(Serialize)]
         struct TaggedProcedure {
             t: &'static str,
-            id: ProcedureId,
+            path: &'static str,
         }
 
         TaggedProcedure {
             t: "Procedure",
-            id: self.0.id(),
+            path: self.url,
         }
         .serialize(serializer)
     }

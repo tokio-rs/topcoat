@@ -3,6 +3,7 @@ mod document_type;
 mod element;
 mod element_name;
 mod element_tag;
+mod for_loop;
 pub(crate) mod hir;
 mod html_ident;
 mod node;
@@ -13,6 +14,7 @@ pub use document_type::*;
 pub use element::*;
 pub use element_name::*;
 pub use element_tag::*;
+pub use for_loop::*;
 pub use html_ident::*;
 pub use node::*;
 pub use nodes::*;
@@ -31,10 +33,8 @@ use crate::{
 pub struct View {
     /// The request context binding supplied by a leading `cx =>` argument.
     ///
-    /// Inside a `#[component]`, `#[page]`, `#[layout]`, or `#[shard]`, the
-    /// context is available implicitly, so this is [`None`]. Anywhere else
-    /// (for example a `#[route]` handler), the caller names it explicitly as
-    /// `view! { cx => ... }` and the rest of the view renders against it.
+    /// `None` uses the surrounding macro's context. An explicit
+    /// `view! { cx => ... }` renders against the supplied context.
     pub cx: Option<LeadingCx>,
     pub nodes: Nodes,
 }
@@ -134,7 +134,7 @@ mod tests {
     fn explicit_cx_binds_the_context_identifier() {
         let tokens = parse("cx => <div></div>").to_token_stream().to_string();
         assert!(tokens.contains("Cx = (cx) . clone () ;"), "{tokens}");
-        assert!(tokens.contains("let __cx = & __cx ;"), "{tokens}");
+        assert!(tokens.contains("Cx = & __cx ;"), "{tokens}");
     }
 
     #[test]

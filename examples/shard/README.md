@@ -1,6 +1,6 @@
 # Shard
 
-A search box whose results are searched on the server. The query is stored in a signal and passed to a `#[shard]` as an argument, so the shard renders again whenever the query changes. The shard also keeps state of its own: a "show more" limit it creates, reads on the server, and which survives its re-renders.
+A search box that passes its query signal to a `#[shard]`. The server renders new results when the query changes. A local result limit shows how a shard preserves its own state across renders.
 
 Run it with:
 

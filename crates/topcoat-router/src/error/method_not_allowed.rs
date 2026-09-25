@@ -27,7 +27,7 @@ pub fn method_not_allowed(methods: impl IntoIterator<Item = Method>) -> MethodNo
 /// `Result`.
 ///
 /// Construct one with [`method_not_allowed`].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MethodNotAllowedError {
     /// The value of the `Allow` header: the supported methods, comma-separated.
     allow: String,

@@ -3,12 +3,8 @@ use topcoat_core::context::{Cx, request_context};
 
 use crate::header;
 
-/// Reads the request header `name` as a string slice, or [`None`] when it is
-/// absent or not valid UTF-8.
-///
-/// The header map is borrowed straight from the request, so these reads are
-/// cheap pointer lookups: there is nothing worth caching with `#[memoize]`,
-/// and borrowing avoids the allocation a memoized owned value would require.
+/// Borrows the header value, or returns [`None`] if it is missing or cannot
+/// be represented as text.
 #[track_caller]
 fn header<'cx>(cx: &'cx Cx, name: &HeaderName) -> Option<&'cx str> {
     request_context::<Parts>(cx)
@@ -18,8 +14,7 @@ fn header<'cx>(cx: &'cx Cx, name: &HeaderName) -> Option<&'cx str> {
         .ok()
 }
 
-/// Returns `true` when the current request was issued by htmx, i.e. it carries
-/// an `HX-Request: true` header.
+/// Returns whether the request carries `HX-Request: true`.
 ///
 /// # Panics
 ///
@@ -31,8 +26,7 @@ pub fn hx_request(cx: &Cx) -> bool {
     header(cx, &header::HX_REQUEST) == Some("true")
 }
 
-/// Returns `true` when the request was made by an element using `hx-boost`,
-/// i.e. it carries `HX-Boosted: true`.
+/// Returns whether `HX-Boosted` is `true`, indicating an `hx-boost` request.
 ///
 /// # Panics
 ///
@@ -44,8 +38,8 @@ pub fn hx_boosted(cx: &Cx) -> bool {
     header(cx, &header::HX_BOOSTED) == Some("true")
 }
 
-/// Returns `true` when the request restores history after a miss in the local
-/// history cache, i.e. it carries `HX-History-Restore-Request: true`.
+/// Returns whether `HX-History-Restore-Request` is `true`, indicating that htmx
+/// is restoring a page missing from its history cache.
 ///
 /// # Panics
 ///
