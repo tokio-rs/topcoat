@@ -65,6 +65,7 @@ mod posts {
         };
 
         path_param!(post_id: u32, error = not_found);
+        path_param!(comment_id: u32, segment = false, error = not_found);
 
         #[page]
         async fn post(cx: &Cx) -> Result<impl View> {
@@ -72,6 +73,17 @@ mod posts {
             Ok(view! {
                 "post "
                 (id)
+            })
+        }
+
+        #[page("./comments/{comment_id}")]
+        async fn comment(cx: &Cx) -> Result<impl View> {
+            let post_id = path_param::<PostId>(cx)?;
+            let comment_id = path_param::<CommentId>(cx)?;
+            Ok(view! {
+                (post_id)
+                ":"
+                (comment_id)
             })
         }
     }
@@ -126,6 +138,10 @@ async fn path_param_modules_capture_their_segment() {
 
     let (status, _) = send(&router, "/posts/not-a-number").await;
     assert_eq!(status, 404);
+
+    let (status, body) = send(&router, "/posts/42/comments/7").await;
+    assert_eq!(status, 200);
+    assert_eq!(body, "<main>42:7</main>");
 }
 
 #[tokio::test]
@@ -140,6 +156,120 @@ async fn segment_rename_replaces_the_module_name() {
 }
 
 // -- relative paths --
+
+mod articles {
+    use topcoat::{
+        Result,
+        context::Cx,
+        router::{href, page, path_param},
+        view::{View, view},
+    };
+
+    path_param!(article_id: u32, error = bad_request, segment = false);
+
+    #[page]
+    async fn index() -> Result<impl View> {
+        Ok(view! { <a href=(href!(article, ArticleId(42)))>"article"</a> })
+    }
+
+    #[page("./{article_id}")]
+    async fn article(cx: &Cx) -> Result<impl View> {
+        let id = path_param::<ArticleId>(cx)?;
+        Ok(view! {
+            "article "
+            (id)
+        })
+    }
+}
+
+#[tokio::test]
+async fn relative_path_parameter_preserves_the_module_segment() {
+    let router = router();
+    let (status, body) = send(&router, "/articles/42").await;
+    assert_eq!(status, 200);
+    assert_eq!(body, "<main>article 42</main>");
+
+    let (status, _) = send(&router, "/articles/not-a-number").await;
+    assert_eq!(status, 400);
+
+    let (status, body) = send(&router, "/articles").await;
+    assert_eq!(status, 200);
+    assert_eq!(body, "<main><a href=\"/articles/42\">article</a></main>");
+}
+
+mod users {
+    use topcoat::{
+        Result,
+        context::Cx,
+        router::{href, page, path_param, route, segment},
+        view::{View, view},
+    };
+
+    segment!(kind = Static, rename = "members");
+    path_param!(user_id: u32, segment = false, error = bad_request);
+    path_param!(post_id: u32, error = not_found, segment = false);
+    path_param!(comment_id, segment = false);
+    path_param!(*file_path, segment = false);
+
+    #[page]
+    async fn index() -> Result<impl View> {
+        Ok(view! {
+            <a href=(href!(comment, UserId(7), PostId(42), CommentId("a/b")))>
+                "comment"
+            </a>
+        })
+    }
+
+    #[page("./{user_id}/posts/{post_id}/comments/{comment_id}")]
+    async fn comment(cx: &Cx) -> Result<impl View> {
+        let user = path_param::<UserId>(cx)?;
+        let post = path_param::<PostId>(cx)?;
+        let comment = path_param::<CommentId>(cx);
+        Ok(view! {
+            (user)
+            ":"
+            (post)
+            ":"
+            (comment)
+        })
+    }
+
+    #[route(GET "./{user_id}/files/{*file_path}")]
+    async fn file(cx: &Cx) -> Result<String> {
+        let user = path_param::<UserId>(cx)?;
+        let path = path_param::<FilePath>(cx).collect::<Vec<_>>().join("|");
+        Ok(format!("{user}:{path}"))
+    }
+}
+
+#[tokio::test]
+async fn relative_parameters_coexist_with_a_segment_override() {
+    let router = router();
+    let (status, body) = send(&router, "/members/7/posts/42/comments/a%2Fb").await;
+    assert_eq!(status, 200);
+    assert_eq!(body, "<main>7:42:a/b</main>");
+
+    let (status, body) = send(&router, "/members").await;
+    assert_eq!(status, 200);
+    assert_eq!(
+        body,
+        "<main><a href=\"/members/7/posts/42/comments/a%2Fb\">comment</a></main>"
+    );
+
+    let (status, _) = send(&router, "/members/7/posts/invalid/comments/1").await;
+    assert_eq!(status, 404);
+}
+
+#[tokio::test]
+async fn relative_catch_all_reads_decoded_segments() {
+    let router = router();
+    let (status, body) = send(&router, "/members/7/files/guides/a%2Fb").await;
+    assert_eq!(status, 200);
+    assert_eq!(body, "7:guides|a/b");
+
+    let (status, _) = send(&router, "/members/7/files").await;
+    assert_eq!(status, 404);
+}
 
 #[page("./about")]
 async fn about() -> Result<impl View> {

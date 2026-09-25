@@ -22,7 +22,7 @@ async fn post() -> Result<impl View> {
 }
 ```
 
-The declaration also emits a [`segment!`](macro.segment.html) override. Under [`module_router!`](../router/macro.module_router.html), it changes the declaring module's segment to the parameter, so the page does not write a path.
+By default, the declaration also emits a [`segment!`](macro.segment.html) override. Under [`module_router!`](../router/macro.module_router.html), it changes the declaring module's segment to the parameter, so the page does not write a path.
 
 ```rust
 // src/app/posts/id.rs serves /posts/{post_id}.
@@ -35,7 +35,23 @@ async fn post() -> Result<impl View> {
 }
 ```
 
-A module contributes one segment and can declare one path parameter. Put another parameter in a descendant module.
+A module contributes one segment. Put another module-derived parameter in a descendant module.
+
+For a parameter written in a relative path, set `segment = false` to leave the module's segment unchanged:
+
+```rust
+// src/app/posts.rs serves /posts/{post_id}.
+# use topcoat::{Result, context::Cx, router::{page, path_param}, view::{View, view}};
+path_param!(post_id: u64, segment = false, error = bad_request);
+
+#[page("./{post_id}")]
+async fn post(cx: &Cx) -> Result<impl View> {
+    let post_id = path_param::<PostId>(cx)?;
+    Ok(view! { "post " (post_id) })
+}
+```
+
+You can declare several parameters with `segment = false` in one module, including catch-all parameters. They can coexist with one manual `segment!` override or one parameter using the default `segment = true`. The option also works for absolute paths and does not change parameter parsing or link generation. The `segment` and `error` options can appear in either order, each at most once.
 
 Reading a parameter that the matched route did not capture panics.
 
@@ -199,4 +215,4 @@ Empty values, `.`, and `..` panic because browsers treat them as path structure 
 - Parsed segment types must implement [`Display`](core::fmt::Display) to be filled into an [`href`](fn.href.html).
 - The parsed segment type and its `<T as FromStr>::Err` must be `Send + Sync + 'static` so the result can be [memoized](../context/attr.memoize.html).
 - The parameter name in an explicit route must match the declaration.
-- A module can contain either one `path_param!` declaration or one manual `segment!` override.
+- A module can contain at most one segment override, from either `path_param!` with `segment = true` (the default) or a manual `segment!`. Declarations with `segment = false` do not count toward this limit.

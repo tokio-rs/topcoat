@@ -161,7 +161,7 @@ Parsing occurs once per request and the result is memoized.
 
 Prefix the name with `*` to capture the remaining path as decoded segments. After `path_param!(*doc_path)`, `path_param::<DocPath>(cx)` returns [`CatchAllSegments`]. After `path_param!(*ids: u32)`, `path_param::<Ids>(cx)` returns `Result<&[u32], _>`.
 
-With [`module_router!`], a declaration inside a non-root route module also changes that module's segment to the parameter. See [`module_router!`] for module structure, nested parameters, and catch-all parameters.
+With [`module_router!`], a declaration inside a non-root route module also changes that module's segment to the parameter by default. For parameters written in relative paths, use `path_param!(post_id: u64, segment = false)` to keep the module's segment unchanged. Several parameters can be declared this way in one module. See [`module_router!`] for module structure, relative paths, and catch-all parameters.
 
 ## Query parameters
 
