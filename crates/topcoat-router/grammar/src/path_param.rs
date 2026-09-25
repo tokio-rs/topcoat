@@ -1,10 +1,11 @@
 use heck::ToPascalCase;
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, format_ident, quote};
 use syn::{
-    Ident, Token, Type, Visibility,
+    Ident, LitBool, Token, Type, Visibility,
     ext::IdentExt,
     parse::{Parse, ParseStream},
+    punctuated::Punctuated,
 };
 use topcoat_core_grammar::{
     ParseOption,
@@ -19,8 +20,7 @@ pub struct PathParam {
     pub star_token: Option<Token![*]>,
     pub name: Ident,
     pub param_type: Option<PathParamType>,
-    pub error: Option<PathParamError>,
-    pub trailing_comma: Option<Token![,]>,
+    pub options: Option<PathParamOptions>,
 }
 
 impl PathParam {
@@ -33,7 +33,28 @@ impl PathParam {
     }
 
     fn error(&self) -> Option<&ErrorAttr> {
-        self.error.as_ref().map(|error| &error.error)
+        self.options.as_ref()?.attrs.iter().find_map(|attr| {
+            if let PathParamAttr::Error(error) = attr {
+                Some(error)
+            } else {
+                None
+            }
+        })
+    }
+
+    fn registers_segment(&self) -> bool {
+        self.options
+            .as_ref()
+            .and_then(|options| {
+                options.attrs.iter().find_map(|attr| {
+                    if let PathParamAttr::Segment { value, .. } = attr {
+                        Some(value.value)
+                    } else {
+                        None
+                    }
+                })
+            })
+            .unwrap_or(true)
     }
 
     fn type_ident(&self) -> Ident {
@@ -285,6 +306,10 @@ impl PathParam {
     }
 
     fn segment(&self) -> TokenStream {
+        if !self.registers_segment() {
+            return TokenStream::new();
+        }
+
         let name = self.name_string();
         let kind = if self.is_catch_all() {
             quote! { CatchAll }
@@ -303,15 +328,14 @@ impl Parse for PathParam {
             star_token: input.parse()?,
             name: input.parse()?,
             param_type: input.call(PathParamType::parse_option)?,
-            error: input.call(PathParamError::parse_option)?,
-            trailing_comma: input.peek(Token![,]).then(|| input.parse()).transpose()?,
+            options: input.call(PathParamOptions::parse_option)?,
         };
 
-        if let Some(error) = &param.error
+        if let Some(error) = param.error()
             && param.param_type().is_none()
         {
             return Err(syn::Error::new(
-                error.error.span(),
+                error.span(),
                 "`error` cannot be used with an unparsed path parameter, which cannot fail",
             ));
         }
@@ -358,28 +382,91 @@ impl ParseOption for PathParamType {
     }
 }
 
-/// An error mapping in a `path_param!` declaration.
-pub struct PathParamError {
+/// The comma-separated options in a `path_param!` declaration.
+pub struct PathParamOptions {
     pub comma_token: Token![,],
-    pub error: ErrorAttr,
+    pub attrs: Punctuated<PathParamAttr, Token![,]>,
 }
 
-impl Parse for PathParamError {
+impl Parse for PathParamOptions {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        Ok(Self {
+        let options = Self {
             comma_token: input.parse()?,
-            error: input.parse()?,
-        })
+            attrs: Punctuated::parse_terminated(input)?,
+        };
+
+        let mut has_error = false;
+        let mut has_segment = false;
+        for attr in &options.attrs {
+            let seen = match attr {
+                PathParamAttr::Error(_) => &mut has_error,
+                PathParamAttr::Segment { .. } => &mut has_segment,
+            };
+            if *seen {
+                return Err(syn::Error::new(
+                    attr.span(),
+                    format_args!("duplicate attribute `{}`", attr.keyword()),
+                ));
+            }
+            *seen = true;
+        }
+
+        Ok(options)
     }
 }
 
-impl ParseOption for PathParamError {
+impl ParseOption for PathParamOptions {
     fn peek(input: ParseStream) -> bool {
-        let input = input.fork();
-        if input.parse::<Token![,]>().is_err() {
-            return false;
+        input.peek(Token![,])
+    }
+}
+
+mod kw {
+    syn::custom_keyword!(segment);
+}
+
+/// An option in a `path_param!` declaration.
+pub enum PathParamAttr {
+    Error(ErrorAttr),
+    Segment {
+        segment_token: kw::segment,
+        eq_token: Token![=],
+        value: LitBool,
+    },
+}
+
+impl PathParamAttr {
+    fn keyword(&self) -> &'static str {
+        match self {
+            Self::Error(_) => "error",
+            Self::Segment { .. } => "segment",
         }
-        ErrorAttr::peek(&input)
+    }
+
+    fn span(&self) -> Span {
+        match self {
+            Self::Error(error) => error.error_token.span,
+            Self::Segment { segment_token, .. } => segment_token.span,
+        }
+    }
+}
+
+impl Parse for PathParamAttr {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        if ErrorAttr::peek(input) {
+            return Ok(Self::Error(input.parse()?));
+        }
+
+        let lookahead = input.lookahead1();
+        if lookahead.peek(kw::segment) {
+            Ok(Self::Segment {
+                segment_token: input.parse()?,
+                eq_token: input.parse()?,
+                value: input.parse()?,
+            })
+        } else {
+            Err(lookahead.error())
+        }
     }
 }
 
@@ -410,8 +497,8 @@ mod tests {
                 .to_string(),
             "u64"
         );
-        assert!(param.error.is_some());
-        assert!(param.trailing_comma.is_some());
+        assert!(param.error().is_some());
+        assert!(param.options.as_ref().unwrap().attrs.trailing_punct());
         assert_eq!(param.type_ident(), "PostIds");
     }
 
@@ -423,8 +510,8 @@ mod tests {
         assert!(!param.is_catch_all());
         assert_eq!(param.name, "slug");
         assert!(param.param_type.is_none());
-        assert!(param.error.is_none());
-        assert!(param.trailing_comma.is_none());
+        assert!(param.error().is_none());
+        assert!(param.options.is_none());
         assert_eq!(param.type_ident(), "Slug");
     }
 
@@ -446,5 +533,38 @@ mod tests {
 
         assert_eq!(param.name_string(), "type");
         assert_eq!(param.type_ident(), "Type");
+    }
+
+    #[test]
+    fn parses_segment_option_with_error_in_either_order() {
+        for source in [
+            "pub post_id: u32, segment = false, error = bad_request,",
+            "pub post_id: u32, error = bad_request, segment = false",
+        ] {
+            let param = parse(source);
+            assert!(!param.registers_segment());
+            assert!(param.error().is_some());
+        }
+    }
+
+    #[test]
+    fn segment_registration_defaults_to_true() {
+        for source in ["slug", "slug,", "slug, segment = true"] {
+            assert!(parse(source).registers_segment());
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_options() {
+        for source in [
+            "slug, segment = false, segment = true",
+            "id: u32, error = not_found, error = bad_request",
+            "slug, segment = 0",
+            "slug, unknown = false",
+            "slug, segment = false, error = not_found",
+            "slug segment = false",
+        ] {
+            assert!(syn::parse_str::<PathParam>(source).is_err(), "{source}");
+        }
     }
 }

@@ -167,6 +167,22 @@ async fn export() -> Result<impl View> {
 
 The same form works for `#[layout]`, `#[layer]`, and `#[route]`.
 
+For parameters written in a relative path, add `segment = false` to each `path_param!` declaration. This defines the typed accessor without changing the module's segment.
+
+```rust
+// src/app/posts.rs: GET /posts/{post_id}
+# use topcoat::{Result, context::Cx, router::{page, path_param}, view::{View, view}};
+path_param!(post_id: u64, segment = false, error = bad_request);
+
+#[page("./{post_id}")]
+async fn post(cx: &Cx) -> Result<impl View> {
+    let post_id = path_param::<PostId>(cx)?;
+    Ok(view! { <h1>"Post " (post_id)</h1> })
+}
+```
+
+Several parameters can be declared this way in one module. For example, a handler in `app::users` with the path `./{user_id}/posts/{post_id}/comments/{comment_id}` serves `/users/{user_id}/posts/{post_id}/comments/{comment_id}` when all three declarations use `segment = false`. The option also works for catch-all parameters and can be combined with a manual `segment!` override.
+
 # Dynamic path parameters
 
 Call `path_param!` inside the module that should become dynamic. The declaration names the URL parameter and may name the type used to parse each captured segment. The macro changes that module's segment to the parameter and generates the Pascal-cased type used to read it.
@@ -210,7 +226,7 @@ The parameter name comes from `post_id` in the declaration, not from the filenam
 
 Parsing occurs once per request. Later calls return the memoized result.
 
-A module contributes one segment, so it can declare one `path_param!`. Use nested modules for multiple parameters:
+A module contributes one segment, so only one `path_param!` per module can use the default `segment = true`. Use nested modules for multiple module-derived parameters, or `segment = false` for parameters in relative paths as shown above:
 
 | Module | Route path |
 |---|---|
@@ -282,7 +298,7 @@ async fn posts(cx: &Cx) -> Result<impl View> {
 
 `Static` is the default kind for regular modules. `Group` is the default for modules whose names start with `_`. A rename is used as written; Topcoat does not kebab-case it.
 
-`path_param!` emits a `Param` or `CatchAll` segment override, so do not combine it with `segment!` in the same module. A manual override creates the route capture but does not define a typed accessor.
+By default, `path_param!` emits a `Param` or `CatchAll` segment override. To combine it with `segment!` in the same module, set `segment = false` on the parameter declaration. A manual override creates the route capture but does not define a typed accessor.
 
 # Groups
 
