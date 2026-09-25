@@ -21,7 +21,7 @@ async fn post(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-The router raises some of these itself: a request that matches no route gets a [`NotFoundError`], a matched path with the wrong method a [`MethodNotAllowedError`], a request body that fails to parse a [`BadRequestError`], and a request body over the body limit a [`ContentTooLargeError`].
+The router raises some of these itself: a request that matches no route gets a [`NotFoundError`], a matched path with the wrong method a [`MethodNotAllowedError`], a request body that fails to parse a [`BadRequestError`], and a request body over the body limit a [`ContentTooLargeError`]. A well formed value that breaks a domain rule is a validation failure instead: it responds `422 Unprocessable Entity`. See the [validation guide](https://docs.rs/topcoat/latest/topcoat/validation/index.html)..
 
 # From an `Option` or `Result`
 

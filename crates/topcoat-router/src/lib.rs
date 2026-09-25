@@ -31,6 +31,7 @@ mod service;
 pub mod tower;
 mod trailing_slash;
 mod urlencoded;
+pub mod validation;
 
 pub use body::*;
 pub use body_limit::*;
