@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cli-v0.9.0...topcoat-cli-v0.10.0) - 2026-09-26
+
+### Added
+
+- *(ui)* implement new --all flag for `ui add` CLI command ([#450](https://github.com/tokio-rs/topcoat/pull/450))
+
 ## [0.9.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cli-v0.8.1...topcoat-cli-v0.9.0) - 2026-09-24
 
 ### Added
