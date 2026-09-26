@@ -30,6 +30,7 @@ Each crate's `docs/` directory holds the user-facing guides for that crate, embe
 ### Getting started
 
 - [`crates/topcoat/docs/getting_started.md`](crates/topcoat/docs/getting_started.md): Creating a new project, installing the `topcoat` CLI, and running the dev server.
+- [`crates/topcoat/docs/deployment.md`](crates/topcoat/docs/deployment.md): Building and deploying a release executable with its asset bundle.
 
 ### Routing
 
