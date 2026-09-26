@@ -102,12 +102,23 @@ pub fn add(
     let mut visited: HashSet<(String, String)> = HashSet::new();
     let mut queue: VecDeque<Pending> = VecDeque::new();
 
+    // Expand `all` into every component in the selected registry. This happens
+    // before the normal dependency walk, so the existing installation logic can
+    // handle each component exactly like an explicitly requested component.
+    let components = if options.components.len() == 1 && options.components[0] == "all" {
+        let registry_name = options.registry.as_deref().unwrap_or(DEFAULT_REGISTRY);
+        let registry = load_registry(&mut registries, &workspace, registry_name)?;
+        registry.names().map(str::to_owned).collect()
+    } else {
+        options.components.clone()
+    };
+
     // Choose the registry to add from for each requested component and seed it as
     // a root of the dependency walk. With --registry it is used directly;
     // otherwise the default registry is preferred, and pulling a component the
     // default registry does not offer requires confirming a non-default registry
     // (or passing --registry).
-    for component in &options.components {
+    for component in &components {
         let root_registry = resolve_root_registry(
             component,
             options.registry.as_deref(),
