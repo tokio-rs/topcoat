@@ -13,38 +13,73 @@ use crate::{DEFAULT_REGISTRY, Dependency, Registry, content_hash};
 
 /// Options for installing components.
 pub struct AddOptions {
-    /// Names of the components to add (e.g. `button`). Each is resolved and
-    /// installed along with its transitive dependencies.
-    pub components: Vec<String>,
+    /// Which components to add. Each is resolved and installed along with its
+    /// transitive dependencies.
+    pub selection: Selection,
     /// Registry crate to add from (defaults to the built-in default registry).
     pub registry: Option<String>,
     /// Overwrite the component file if it already exists.
     pub overwrite: bool,
 }
 
-/// A component written into the package by [`add`].
-pub struct AddedComponent {
+/// The components an [`add`] call installs.
+pub enum Selection {
+    /// Components named individually (e.g. `button`). A named component whose
+    /// file already exists is an error unless overwriting.
+    Named(Vec<String>),
+    /// Every component the registry offers. Components whose files already
+    /// exist are skipped unless overwriting.
+    All,
+}
+
+/// What [`add`] did with one component.
+pub struct AddEntry {
     /// The component's name.
     pub name: String,
-    /// The package-relative path of the written file.
+    /// The package-relative path of the component's file.
     pub file: PathBuf,
     /// The registry crate it was added from.
     pub registry: String,
+    /// What happened to the file.
+    pub action: AddAction,
 }
 
-/// The result of [`add`].
-pub enum AddOutcome {
-    /// Nothing was written; every needed file was already present.
-    UpToDate,
-    /// One or more components were written.
-    Added(Vec<AddedComponent>),
+/// The action [`add`] took for a component.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum AddAction {
+    /// The file was written for the first time.
+    Installed,
+    /// An existing file was replaced with the registry's source.
+    Overwritten,
+    /// The file already existed and was left untouched.
+    Skipped,
 }
 
 /// A requested component or dependency awaiting installation planning.
 struct Pending {
     registry: String,
     component: String,
-    root: bool,
+    origin: Origin,
+}
+
+/// How a pending component entered the plan, which decides what happens when
+/// its file already exists.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Origin {
+    /// Named by the caller: an existing file is an error unless overwriting.
+    Named,
+    /// Swept in by selecting every registry component: an existing file is
+    /// skipped unless overwriting.
+    Swept,
+    /// Pulled in as a dependency: an existing file is never touched.
+    Dependency,
+}
+
+impl Origin {
+    /// Whether an existing file is rewritten when overwriting is requested.
+    fn overwritable(self) -> bool {
+        matches!(self, Self::Named | Self::Swept)
+    }
 }
 
 /// A file to write once planning has fully succeeded.
@@ -56,6 +91,8 @@ struct PlannedWrite {
     file_name: String,
     contents: String,
     registry: String,
+    /// Whether the file exists and is being replaced.
+    existed: bool,
 }
 
 /// An installed component to replace because another registry supplies the same
@@ -73,11 +110,15 @@ struct PlannedRemoval {
 /// owned by one. File writes begin only after planning succeeds, but a later I/O
 /// failure can leave a partial installation.
 ///
+/// Returns an entry for every file written and for every selected component that
+/// was skipped because its file already exists. Dependencies whose files already
+/// exist are left untouched and not reported.
+///
 /// # Errors
 ///
 /// Returns an error if the install state or workspace cannot be loaded, a
 /// requested component or its registry cannot be resolved, a confirmation
-/// prompt is declined, an existing file would be overwritten without
+/// prompt is declined, a named component's file already exists without
 /// `overwrite`, or any file write, module declaration, or state save fails.
 ///
 /// # Panics
@@ -90,7 +131,7 @@ pub fn add(
     package: &Package,
     options: &AddOptions,
     confirm: &mut Confirm<'_>,
-) -> Result<AddOutcome, String> {
+) -> Result<Vec<AddEntry>, String> {
     let mut state = InstallState::load(package)?;
     let workspace = Workspace::load(package)?;
 
@@ -102,28 +143,45 @@ pub fn add(
     let mut visited: HashSet<(String, String)> = HashSet::new();
     let mut queue: VecDeque<Pending> = VecDeque::new();
 
-    // Choose the registry to add from for each requested component and seed it as
-    // a root of the dependency walk. With --registry it is used directly;
-    // otherwise the default registry is preferred, and pulling a component the
-    // default registry does not offer requires confirming a non-default registry
-    // (or passing --registry).
-    for component in &options.components {
-        let root_registry = resolve_root_registry(
-            component,
-            options.registry.as_deref(),
-            &workspace,
-            &mut registries,
-            confirm,
-        )?;
-        queue.push_back(Pending {
-            registry: root_registry,
-            component: component.clone(),
-            root: true,
-        });
+    // Seed the roots of the dependency walk.
+    match &options.selection {
+        // Choose the registry to add from for each named component. With
+        // --registry it is used directly; otherwise the default registry is
+        // preferred, and pulling a component the default registry does not offer
+        // requires confirming a non-default registry (or passing --registry).
+        Selection::Named(components) => {
+            for component in components {
+                let root_registry = resolve_root_registry(
+                    component,
+                    options.registry.as_deref(),
+                    &workspace,
+                    &mut registries,
+                    confirm,
+                )?;
+                queue.push_back(Pending {
+                    registry: root_registry,
+                    component: component.clone(),
+                    origin: Origin::Named,
+                });
+            }
+        }
+        // Every component of one registry: the one given with --registry, or the
+        // default registry. Nothing needs confirming since no other registry is
+        // consulted.
+        Selection::All => {
+            let name = options.registry.as_deref().unwrap_or(DEFAULT_REGISTRY);
+            let registry = load_registry(&mut registries, &workspace, name)?;
+            queue.extend(registry.names().map(|component| Pending {
+                registry: name.to_string(),
+                component: component.to_string(),
+                origin: Origin::Swept,
+            }));
+        }
     }
 
     let mut writes: Vec<PlannedWrite> = Vec::new();
     let mut removals: Vec<PlannedRemoval> = Vec::new();
+    let mut skipped: Vec<AddEntry> = Vec::new();
 
     while let Some(pending) = queue.pop_front() {
         if !visited.insert((pending.registry.clone(), pending.component.clone())) {
@@ -187,11 +245,22 @@ pub fn add(
         }
 
         let exists = file.exists();
-        if exists && pending.root && !options.overwrite && !replacing {
-            return Err(format!(
-                "{} already exists; pass --overwrite to replace it",
-                relative_file.display()
-            ));
+        if exists && !options.overwrite && !replacing {
+            match pending.origin {
+                Origin::Named => {
+                    return Err(format!(
+                        "{} already exists; pass --overwrite to replace it",
+                        relative_file.display()
+                    ));
+                }
+                Origin::Swept => skipped.push(AddEntry {
+                    name: component.name().to_string(),
+                    file: relative_file.clone(),
+                    registry: pending.registry.clone(),
+                    action: AddAction::Skipped,
+                }),
+                Origin::Dependency => {}
+            }
         }
 
         // Read the source once: it is hashed to record the component's version in
@@ -202,8 +271,9 @@ pub fn add(
         let hash = content_hash(&contents);
 
         // Write the source unless it is already present. Dependencies never
-        // clobber existing files; only the root (or a replacement) rewrites.
-        if !exists || (pending.root && options.overwrite) || replacing {
+        // clobber existing files; only a root being overwritten (or a
+        // replacement) rewrites.
+        if !exists || (pending.origin.overwritable() && options.overwrite) || replacing {
             writes.push(PlannedWrite {
                 name: component.name().to_string(),
                 dir: dir.clone(),
@@ -212,6 +282,7 @@ pub fn add(
                 file_name: component.file_name().to_string(),
                 contents,
                 registry: pending.registry.clone(),
+                existed: exists,
             });
         }
 
@@ -238,7 +309,7 @@ pub fn add(
             queue.push_back(Pending {
                 registry,
                 component,
-                root: false,
+                origin: Origin::Dependency,
             });
         }
     }
@@ -269,20 +340,21 @@ pub fn add(
     }
     state.save(package)?;
 
-    if writes.is_empty() {
-        Ok(AddOutcome::UpToDate)
-    } else {
-        Ok(AddOutcome::Added(
-            writes
-                .into_iter()
-                .map(|write| AddedComponent {
-                    name: write.name,
-                    file: write.relative_file,
-                    registry: write.registry,
-                })
-                .collect(),
-        ))
-    }
+    let mut entries: Vec<AddEntry> = writes
+        .into_iter()
+        .map(|write| AddEntry {
+            name: write.name,
+            file: write.relative_file,
+            registry: write.registry,
+            action: if write.existed {
+                AddAction::Overwritten
+            } else {
+                AddAction::Installed
+            },
+        })
+        .collect();
+    entries.append(&mut skipped);
+    Ok(entries)
 }
 
 /// Selects a registry for a component.

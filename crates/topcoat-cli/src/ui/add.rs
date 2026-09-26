@@ -1,14 +1,18 @@
 use clap::Args;
 use console::style;
-use topcoat_ui::manage::{self, AddOptions, AddOutcome, Package};
+use topcoat_ui::manage::{self, AddAction, AddOptions, Package, Selection};
 
 use super::PackageArg;
 
 #[derive(Args)]
 pub(super) struct AddCommand {
     /// Names of the components to add (e.g. `button card`)
-    #[arg(required = true)]
+    #[arg(required_unless_present = "all", conflicts_with = "all")]
     components: Vec<String>,
+    /// Add every component the registry offers, skipping those already
+    /// installed (combine with `--overwrite` to replace them too)
+    #[arg(short, long)]
+    all: bool,
     /// Registry crate to add from (defaults to the built-in default registry)
     #[arg(short, long)]
     registry: Option<String>,
@@ -30,27 +34,49 @@ impl AddCommand {
     fn run_inner(self) -> Result<(), String> {
         let package = Package::locate(self.package.package)?;
         let options = AddOptions {
-            components: self.components,
+            selection: if self.all {
+                Selection::All
+            } else {
+                Selection::Named(self.components)
+            },
             registry: self.registry,
             overwrite: self.overwrite,
         };
 
         let mut confirm = confirm;
-        match manage::add(&package, &options, &mut confirm)? {
-            AddOutcome::UpToDate => {
-                println!("{} already up to date", style("✓").green());
-            }
-            AddOutcome::Added(added) => {
-                for component in added {
+        let entries = manage::add(&package, &options, &mut confirm)?;
+
+        let mut written = false;
+        for entry in entries {
+            let file = style(format!("({})", entry.file.display())).dim();
+            let name = style(entry.name).bold();
+            match entry.action {
+                AddAction::Installed => {
+                    written = true;
                     println!(
-                        "{} added {} {} from {}",
+                        "{} added {name} {file} from {}",
                         style("+").green(),
-                        style(component.name).bold(),
-                        style(format!("({})", component.file.display())).dim(),
-                        component.registry
+                        entry.registry
+                    );
+                }
+                AddAction::Overwritten => {
+                    written = true;
+                    println!(
+                        "{} updated {name} {file} from {}",
+                        style("~").yellow(),
+                        entry.registry
+                    );
+                }
+                AddAction::Skipped => {
+                    println!(
+                        "{}",
+                        style(format!("- skipped {name} {file}: already installed")).dim()
                     );
                 }
             }
+        }
+        if !written {
+            println!("{} already up to date", style("✓").green());
         }
         Ok(())
     }

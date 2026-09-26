@@ -85,6 +85,14 @@ The command copies the source into your components directory, adds its module de
 
 Module declarations go in `src/components.rs`, or in `src/components/mod.rs` if that file already exists. If both files exist, resolve the conflict before adding components.
 
+To install every component the registry offers, pass `--all`:
+
+```sh
+topcoat ui add --all
+```
+
+Components that are already installed are skipped and reported. Add `--overwrite` to replace them with the registry's source as well.
+
 To see what is on offer, run:
 
 ```sh
@@ -187,6 +195,8 @@ topcoat ui add button --overwrite
 ```
 
 This replaces your file with the registry's source. Save any local changes first, then review the diff and reapply the changes you want to keep.
+
+To refresh every component at once, run `topcoat ui add --all --overwrite`. This also installs any component you do not have yet.
 
 # Removing components
 
