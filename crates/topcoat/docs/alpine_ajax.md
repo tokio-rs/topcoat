@@ -1,0 +1,1 @@
+../../../docs/alpine_ajax.md

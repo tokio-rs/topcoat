@@ -7,7 +7,7 @@ description: Always use this skill before writing long form markdown documentati
 
 ## Placement
 
-Put a markdown file into a `docs/` folder for the crate it affects, then link it via `#[doc = include_str!("../docs/file.md")]`. General guides for a feature should go into `crates/topcoat/docs` and then document the re-export module in `src/`. These should likely also be referenced in the `README.md` and `AGENTS.md`.
+Put guide sources in the top-level `docs/` directory, following the module structure. For example, use `docs/router.md`, `docs/router/module.md`, and `docs/router/content/sse.md`. Crate-local `docs/` files must be relative symlinks to those sources, with the crate module prefix omitted. The facade crate keeps the full module paths. Embed documentation through the crate-local path with `#[doc = include_str!("../docs/file.md")]` so published crates include it. Edit the top-level source and link to it from `README.md` and `AGENTS.md` where appropriate.
 
 ## Structure
 

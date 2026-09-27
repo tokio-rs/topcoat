@@ -203,8 +203,8 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 ## Learn Topcoat
 
 **Start here**
-- [Getting started](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/getting_started.md): create a new project, install the CLI, run the dev server.
-- [Source code formatting](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat-cli/docs/fmt.md): `topcoat fmt` for macro bodies.
+- [Getting started](https://github.com/tokio-rs/topcoat/blob/main/docs/getting_started.md): create a new project, install the CLI, run the dev server.
+- [Source code formatting](https://github.com/tokio-rs/topcoat/blob/main/docs/cli/fmt.md): `topcoat fmt` for macro bodies.
 
 **Rendering**
 - [The `view!` macro](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html): templating syntax, control flow, conditional attributes.
@@ -219,7 +219,7 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 
 **Working with requests**
 - [Request context (`Cx`)](https://docs.rs/topcoat/latest/topcoat/context/index.html): the value pages, layouts, and components read from.
-- [App context](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/app_context.md): share long-lived values across requests, keyed by type.
+- [App context](https://github.com/tokio-rs/topcoat/blob/main/docs/context/app_context.md): share long-lived values across requests, keyed by type.
 - [Memoization](https://docs.rs/topcoat/latest/topcoat/context/attr.memoize.html): `#[memoize]` for per-request caching and fan-out dedup.
 - [Functions, not middlewares](https://docs.rs/topcoat/latest/topcoat/context/index.html#functions-not-middlewares): the recommended way to model auth and other request-scoped concerns.
 - [Cookies](https://docs.rs/topcoat/latest/topcoat/cookie/index.html): read and write the request cookie jar, with signed, encrypted, and prefixed cookies.
@@ -237,7 +237,7 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 - [Shards](https://docs.rs/topcoat/latest/topcoat/runtime/attr.shard.html): components that re-render on the server when their arguments change.
 
 **Miscellaneous**
-- [Topcoat UI](https://github.com/tokio-rs/topcoat/blob/main/crates/topcoat/docs/ui.md): premade components vendored into your project for you to edit.
+- [Topcoat UI](https://github.com/tokio-rs/topcoat/blob/main/docs/ui.md): premade components vendored into your project for you to edit.
 - [Mail](https://docs.rs/topcoat/latest/topcoat/mail/index.html): declare mail with the `mail!` macro, deliver through SMTP, file, or in-memory transports.
 
 **Third-party integrations**

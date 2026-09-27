@@ -113,7 +113,7 @@ More detail is in the [`commit`](.agents/skills/commit/SKILL.md) and [`pr`](.age
 ## Where to find things
 
 - [README](README.md): an introduction to Topcoat and an index of guides.
-- [`crates/topcoat/docs/getting_started.md`](crates/topcoat/docs/getting_started.md): building an app with Topcoat, which is worth doing before changing the framework.
+- [`docs/getting_started.md`](docs/getting_started.md): building an app with Topcoat, which is worth doing before changing the framework.
 - [Tokio Discord](https://discord.gg/tokio): questions, feature discussions, and everything else.
 
 By contributing, you agree that your contributions are licensed under the [MIT license](LICENSE).

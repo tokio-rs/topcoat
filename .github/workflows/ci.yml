@@ -327,7 +327,7 @@ jobs:
 
           # Only touch `topcoat = { version = "..." }` snippets, leaving
           # unrelated tool/CDN versions (Tailwind, htmx, iconify, ...) alone.
-          find crates/topcoat/docs -name '*.md' -exec sed -i -E \
+          find docs -type f -name '*.md' -exec sed -i -E \
             "s/(topcoat = \\{ version = \")[^\"]+(\")/\\1${version}\\2/g" {} +
 
           if git diff --quiet; then
@@ -335,6 +335,6 @@ jobs:
             exit 0
           fi
 
-          git add crates/topcoat/docs
+          git add docs
           git commit -m "chore: point docs install version at ${version}"
           git push origin "$branch"

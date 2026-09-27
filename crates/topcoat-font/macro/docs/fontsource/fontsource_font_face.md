@@ -1,0 +1,1 @@
+../../../../../docs/font/fontsource/fontsource_font_face.md
