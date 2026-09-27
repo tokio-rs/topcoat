@@ -342,9 +342,7 @@ impl RouterBuilder {
     /// # }
     ///
     /// pub fn router() -> Router {
-    ///     module_router!()
-    ///         .app_context(Database::connect())
-    ///         .build()
+    ///     module_router!().app_context(Database::connect()).build()
     /// }
     ///
     /// async fn fetch_user(cx: &Cx, id: u64) -> User {
