@@ -1,7 +1,15 @@
+use std::time::Duration;
+
 use futures_core::Stream;
 use futures_util::stream;
-use std::time::Duration;
-use topcoat::{Result, context::Cx, router::{content::sse::{Event, KeepAlive, Sse, last_event_id}, route}};
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{
+        content::sse::{Event, KeepAlive, Sse, last_event_id},
+        route,
+    },
+};
 
 #[route(GET)]
 pub(crate) async fn ticks(cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {

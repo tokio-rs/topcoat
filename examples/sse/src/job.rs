@@ -1,8 +1,16 @@
-use crate::Progress;
+use std::time::Duration;
+
 use futures_core::Stream;
 use futures_util::stream;
-use std::time::Duration;
-use topcoat::{Result, router::{content::sse::{Event, Sse}, route}};
+use topcoat::{
+    Result,
+    router::{
+        content::sse::{Event, Sse},
+        route,
+    },
+};
+
+use crate::Progress;
 
 #[route(GET)]
 pub(crate) async fn job() -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {

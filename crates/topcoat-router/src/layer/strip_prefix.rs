@@ -23,7 +23,7 @@ use crate::{
 /// use topcoat::{
 ///     Result,
 ///     context::Cx,
-///     router::{module_router, path_param, StripPrefixLayer, request::uri, route},
+///     router::{StripPrefixLayer, module_router, path_param, request::uri, route},
 /// };
 ///
 /// mod res {

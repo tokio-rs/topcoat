@@ -29,7 +29,7 @@ The context and body parameters are optional and may appear in either order. The
 Extractors that buffer the body reject requests above the body limit with `413 Content Too Large`. The default is 2 MiB. Register a [`BodyLimit`](crate::BodyLimit) layer to change it for the application or a path:
 
 ```rust,no_run
-use topcoat::router::{module_router, BodyLimit};
+use topcoat::router::{BodyLimit, module_router};
 
 let router = module_router!()
     // Allow up to 32 MiB under /upload, keep the 2 MiB default elsewhere.

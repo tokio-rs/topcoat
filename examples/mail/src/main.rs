@@ -1,8 +1,15 @@
+use topcoat::mail::RouterBuilderMailExt;
+
 mod send;
 mod sent;
 
 use serde::Deserialize;
-use topcoat::{Result, mail::{FileTransport, MailConfig, mail, send}, router::{Slot, href, layout, module_router, page}, view::{View, view}};
+use topcoat::{
+    Result,
+    mail::{FileTransport, MailConfig},
+    router::{Slot, href, layout, module_router, page},
+    view::{View, view},
+};
 
 const OUTBOX: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/outbox");
 

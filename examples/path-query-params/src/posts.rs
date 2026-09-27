@@ -1,7 +1,13 @@
 pub(crate) mod post_id;
 
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{href, page, query_params},
+    view::{View, view},
+};
+
 use crate::{PostsQuery, home};
-use topcoat::{Result, context::Cx, router::{href, page, query_params}, view::{View, view}};
 
 #[page]
 pub(crate) async fn posts(cx: &Cx) -> Result<impl View> {

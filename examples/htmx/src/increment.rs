@@ -1,6 +1,14 @@
-use crate::Counter;
 use std::sync::atomic::Ordering;
-use topcoat::{Result, context::{Cx, app_context}, htmx::HxResponseTrigger, router::route, view::{ViewHandle, view}};
+
+use topcoat::{
+    Result,
+    context::{Cx, app_context},
+    htmx::HxResponseTrigger,
+    router::route,
+    view::{ViewExt, ViewHandle, view},
+};
+
+use crate::Counter;
 
 #[route(POST)]
 pub(crate) async fn increment(cx: &Cx) -> Result<(HxResponseTrigger, ViewHandle)> {

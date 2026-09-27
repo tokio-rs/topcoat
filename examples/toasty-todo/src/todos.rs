@@ -1,7 +1,16 @@
 pub(crate) mod todo_id;
 
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{
+        content::Form,
+        error::{SeeOther, see_other},
+        href, route,
+    },
+};
+
 use crate::{NewTodo, Todo, db, home};
-use topcoat::{Result, context::Cx, router::{content::Form, error::{SeeOther, see_other}, href, route}};
 
 #[route(POST)]
 pub(crate) async fn create(cx: &Cx, Form(new_todo): Form<NewTodo>) -> Result<SeeOther> {

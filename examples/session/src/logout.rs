@@ -1,5 +1,13 @@
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{
+        error::{SeeOther, see_other},
+        href, route,
+    },
+};
+
 use crate::{db, session};
-use topcoat::{Result, context::Cx, router::{error::{SeeOther, see_other}, href, page, route}};
 
 #[route(POST)]
 pub(crate) async fn logout(cx: &Cx) -> Result<SeeOther> {
@@ -7,5 +15,5 @@ pub(crate) async fn logout(cx: &Cx) -> Result<SeeOther> {
         db(cx).delete(&token_hash);
     }
 
-    Ok(see_other(href!(page).resolve(cx)))
+    Ok(see_other(href!(crate::page).resolve(cx)))
 }

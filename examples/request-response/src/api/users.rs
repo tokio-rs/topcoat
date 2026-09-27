@@ -1,5 +1,9 @@
+use topcoat::{
+    Result,
+    router::{content::Json, route},
+};
+
 use crate::User;
-use topcoat::{Result, router::{content::Json, route}};
 
 // Json<T> parses an application/json request body and serializes the response.
 #[route(POST)]

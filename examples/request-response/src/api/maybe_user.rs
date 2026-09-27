@@ -1,5 +1,9 @@
+use topcoat::{
+    Result,
+    router::{content::Json, route},
+};
+
 use crate::User;
-use topcoat::{Result, router::{content::Json, route}};
 
 // Option<Json<T>> is None when the request carries no JSON body, and still
 // errors when a malformed body is present.

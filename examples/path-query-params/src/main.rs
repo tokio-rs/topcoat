@@ -1,7 +1,11 @@
 mod docs;
 mod posts;
 
-use topcoat::{Result, router::{Slot, href, layout, module_router, page, query_params}, view::{View, view}};
+use topcoat::{
+    Result,
+    router::{Slot, href, layout, module_router, page, query_params},
+    view::{View, view},
+};
 
 #[tokio::main]
 async fn main() {

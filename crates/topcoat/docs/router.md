@@ -247,7 +247,7 @@ A [`StatusCode`] in a `view!`'s body sets the response status, and a [`HeaderMap
 use topcoat::{
     Result,
     context::Cx,
-    router::{
+    router::{path_param, 
         Slot, StatusCode,
         error::{NotFoundError, RouterErrorExt},
         layout, page,
@@ -261,7 +261,7 @@ mod posts {
     mod id {
         use super::super::*;
 
-        topcoat::router::path_param!(id);
+        path_param!(id);
 
         #[page]
         async fn post(cx: &Cx) -> Result<impl View> {
@@ -359,7 +359,7 @@ Enable the `fs` feature to serve files from a directory. Import [`RouterBuilderD
 ```rust
 # #[cfg(feature = "fs")]
 # {
-use topcoat::router::{module_router, RouterBuilderDirectoryExt};
+use topcoat::router::{RouterBuilderDirectoryExt, module_router};
 
 let router = module_router!().public_dir("./public").build();
 # }
@@ -372,7 +372,7 @@ Use [`serve_dir`](RouterBuilderDirectoryExt::serve_dir) to choose a different ro
 ```rust
 # #[cfg(feature = "fs")]
 # {
-use topcoat::router::{module_router, RouterBuilderDirectoryExt};
+use topcoat::router::{RouterBuilderDirectoryExt, module_router};
 
 let router = module_router!()
     .serve_dir("/downloads/{*file}", "./files")

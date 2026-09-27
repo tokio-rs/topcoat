@@ -1,6 +1,13 @@
+use topcoat::asset::RouterBuilderAssetExt;
+
 mod echo;
 
-use topcoat::{Result, asset::{AssetBundle, asset}, router::{module_router, page}, view::{View, view}};
+use topcoat::{
+    Result,
+    asset::{AssetBundle, asset},
+    router::{module_router, page},
+    view::{View, view},
+};
 
 #[tokio::main]
 async fn main() {

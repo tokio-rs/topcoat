@@ -8,7 +8,7 @@ Declare web fonts in Rust and serve their CSS through the router. Each [`@font-f
 use topcoat::{
     Result,
     font::{Font, font},
-    router::{module_router, RouterBuilderDiscoverExt, page},
+    router::{RouterBuilderDiscoverExt, module_router, page},
     view::{View, view},
 };
 
@@ -119,7 +119,7 @@ Pass `host: Asset` to bundle the font files as Topcoat [assets] and serve them f
 use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
     font::{Font, fontsource::fontsource_font},
-    router::{module_router, RouterBuilderDiscoverExt},
+    router::{RouterBuilderDiscoverExt, module_router},
 };
 
 const ROBOTO: Font = fontsource_font!(ROBOTO, host: Asset);

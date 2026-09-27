@@ -239,7 +239,7 @@ Share a [`Key`] across requests by registering it as [app context](crate::contex
 ```rust
 use topcoat::{
     cookie::{Key, RouterBuilderCookieExt},
-    router::{module_router, Router, RouterBuilderDiscoverExt},
+    router::{Router, RouterBuilderDiscoverExt, module_router},
 };
 
 pub fn router() -> Router {

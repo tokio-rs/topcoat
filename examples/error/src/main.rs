@@ -3,7 +3,15 @@ mod posts;
 mod rewrite;
 mod rewritten;
 
-use topcoat::{Result, router::{Slot, StatusCode, error::{ForbiddenError, NotFoundError, rewrite}, href, layout, module_router, not_found, page}, view::{View, error_boundary, view}};
+use topcoat::{
+    Result,
+    router::{
+        Slot, StatusCode,
+        error::{ForbiddenError, NotFoundError},
+        href, layout, module_router, not_found, page,
+    },
+    view::{View, error_boundary, view},
+};
 
 #[tokio::main]
 async fn main() {

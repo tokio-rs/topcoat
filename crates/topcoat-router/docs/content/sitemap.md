@@ -4,10 +4,10 @@ A [sitemap](https://www.sitemaps.org) lists URLs for crawlers to discover. Enabl
 
 # Serving a sitemap
 
-This example uses [module routing](crate::module_router) to serve a sitemap at `/sitemap.xml`. The `segment!` rename preserves the dot, which a Rust module name cannot contain. Add one entry with [`url`](Sitemap::url) or an iterator of entries with [`urls`](Sitemap::urls). Each entry can be a path string or a [`SitemapUrl`] with optional metadata.
+This example serves a sitemap at `/sitemap.xml`. The relative path `./sitemap.xml` adds the filename below the enclosing module. Add one entry with [`url`](Sitemap::url) or an iterator of entries with [`urls`](Sitemap::urls). Each entry can be a path string or a [`SitemapUrl`] with optional metadata.
 
 ```rust
-// src/app/sitemap_xml.rs
+// src/app.rs
 use topcoat::{
     Result,
     router::{
@@ -16,9 +16,7 @@ use topcoat::{
     },
 };
 
-topcoat::router::segment!(rename = "sitemap.xml");
-
-#[route(GET)]
+#[route(GET "./sitemap.xml")]
 async fn sitemap() -> Result<Sitemap> {
     let posts = ["first-post", "second-post"];
     Ok(Sitemap::new()
@@ -32,7 +30,6 @@ The sitemap format requires absolute URLs, so register the base URL the applicat
 
 ```rust,no_run
 use topcoat::router::module_router;
-use topcoat::router::Router;
 
 let router = module_router!().base_url("https://example.com").build();
 ```

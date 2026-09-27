@@ -1,7 +1,17 @@
-use crate::Counter;
 use futures_core::Stream;
 use futures_util::stream;
-use topcoat::{Result, context::Cx, datastar::{ElementPatchMode, PatchElements, PatchSignals, Signals}, router::{content::sse::{Event, Sse}, route}, view::view};
+use topcoat::{
+    Result,
+    context::Cx,
+    datastar::{ElementPatchMode, PatchElements, PatchSignals, Signals},
+    router::{
+        content::sse::{Event, Sse},
+        route,
+    },
+    view::{ViewExt, view},
+};
+
+use crate::Counter;
 
 #[route(POST)]
 pub(crate) async fn increment(

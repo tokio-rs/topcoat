@@ -7,7 +7,7 @@ Enable the `tower` feature to connect Topcoat with [tower](https://docs.rs/tower
 [`TowerRoute`] forwards requests to a tower service. Use [`any`](TowerRoute::any) to accept every HTTP method and a catch-all path to forward a URL subtree. For example, an existing axum application can keep serving `/legacy` while other routes move to Topcoat:
 
 ```rust,ignore
-use topcoat::router::{module_router, Router, tower::TowerRoute};
+use topcoat::router::{Router, module_router, tower::TowerRoute};
 
 // The pre-migration application, still serving everything under `/legacy`.
 let legacy: axum::Router = legacy_app();
@@ -41,7 +41,7 @@ let router = module_router!()
 [`TowerService`] lets another application serve a Topcoat [`Router`](crate::Router). For example, an axum application can forward otherwise unmatched requests to Topcoat:
 
 ```rust,ignore
-use topcoat::router::{module_router, Router, RouterBuilderDiscoverExt, tower::TowerService};
+use topcoat::router::{Router, module_router, RouterBuilderDiscoverExt, tower::TowerService};
 
 let topcoat = module_router!().discover().build();
 

@@ -15,7 +15,7 @@ Choose a transport in [`MailConfig`] and register it with the router's [`mail`](
 ```rust
 use topcoat::{
     mail::{FileTransport, MailConfig, RouterBuilderMailExt},
-    router::{module_router, Router, RouterBuilderDiscoverExt},
+    router::{Router, RouterBuilderDiscoverExt, module_router},
 };
 
 pub fn router() -> Router {

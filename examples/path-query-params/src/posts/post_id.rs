@@ -1,4 +1,9 @@
-use topcoat::{Result, context::Cx, router::{href, page, path_param}, view::{View, view}};
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{href, page, path_param},
+    view::{View, view},
+};
 
 path_param!(pub(crate)
     post_id: u32,

@@ -17,14 +17,14 @@ use std::{borrow::Cow, collections::HashMap};
 ///
 /// ```rust
 /// // In a module-router module (e.g. src/app/users/id.rs):
-/// topcoat::router::segment!(kind = Param);
+/// segment!(kind = Param);
 /// // This module now maps to /users/{id}
 ///
 /// // Rename the URL segment:
-/// topcoat::router::segment!(rename = "user-id");
+/// segment!(rename = "user-id");
 ///
 /// // Combine attributes:
-/// topcoat::router::segment!(kind = CatchAll, rename = "path");
+/// segment!(kind = CatchAll, rename = "path");
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SegmentKind {

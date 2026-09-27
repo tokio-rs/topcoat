@@ -1,5 +1,13 @@
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{
+        error::{SeeOther, see_other},
+        href, path_param, route,
+    },
+};
+
 use crate::{Todo, db, home};
-use topcoat::{Result, context::Cx, router::{error::{SeeOther, see_other}, href, path_param, route}};
 
 #[route(POST)]
 pub(crate) async fn toggle(cx: &Cx) -> Result<SeeOther> {

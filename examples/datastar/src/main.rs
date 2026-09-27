@@ -1,7 +1,11 @@
 mod increment;
 
 use serde::{Deserialize, Serialize};
-use topcoat::{Result, router::{href, module_router, page}, view::{View, view}};
+use topcoat::{
+    Result,
+    router::{href, module_router, page},
+    view::{View, view},
+};
 
 #[tokio::main]
 async fn main() {

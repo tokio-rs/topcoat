@@ -7,9 +7,10 @@ A handler whose path string starts with `./` is served below the module path. Ab
 Call `module_router!()` from the root module of the route tree. That module maps to `/`. The macro returns a `RouterBuilder`, so add everything else your application needs on that builder before calling `.build()`.
 
 ```rust
-use topcoat::router::module_router;
 // src/app.rs
-pub fn router() -> topcoat::router::Router {
+use topcoat::router::{Router, module_router};
+
+pub fn router() -> Router {
     module_router!().build()
 }
 ```
@@ -36,7 +37,7 @@ Every module-derived `#[page]`, `#[layout]`, `#[layer]`, and `#[route]` under th
 Call `RouterBuilderDiscoverExt::discover` to add explicit-path handlers and other items collected through discovery:
 
 ```rust
-use topcoat::router::{module_router, Router, RouterBuilderDiscoverExt};
+use topcoat::router::{Router, RouterBuilderDiscoverExt, module_router};
 
 pub fn router() -> Router {
     module_router!().discover().build()
@@ -48,7 +49,7 @@ Anything that is registered as a value is passed in by hand. The asset bundle is
 ```rust,no_run
 use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
-    router::{module_router, Router, RouterBuilderDiscoverExt},
+    router::{Router, RouterBuilderDiscoverExt, module_router},
 };
 
 pub fn router() -> Router {
@@ -308,13 +309,15 @@ The two groups can apply different layouts to top-level URLs.
 Use an explicit kind when the module name should not select the default:
 
 ```rust
+use topcoat::router::segment;
 // src/app/marketing.rs: hide `marketing` from served URLs.
-topcoat::router::segment!(kind = Group);
+segment!(kind = Group);
 ```
 
 ```rust
+use topcoat::router::segment;
 // src/app/_internal.rs: serve the module at /internal.
-topcoat::router::segment!(kind = Static);
+segment!(kind = Static);
 ```
 
 Group names remain part of Topcoat's logical paths. A layout or layer in `_marketing` applies only to descendants of `_marketing`, even though the group name is absent from request URLs.

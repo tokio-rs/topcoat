@@ -1,8 +1,15 @@
+use topcoat::asset::RouterBuilderAssetExt;
+
 mod job;
 mod ticks;
 
 use serde::Serialize;
-use topcoat::{Result, asset::{AssetBundle, asset}, router::{module_router, page}, view::{View, view}};
+use topcoat::{
+    Result,
+    asset::{AssetBundle, asset},
+    router::{module_router, page},
+    view::{View, view},
+};
 
 #[tokio::main]
 async fn main() {

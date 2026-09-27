@@ -1,4 +1,7 @@
-use topcoat::{Result, router::{content::RawForm, route}};
+use topcoat::{
+    Result,
+    router::{content::RawForm, route},
+};
 
 // RawForm yields the urlencoded bytes without deserializing them.
 #[route(POST)]

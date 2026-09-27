@@ -1,7 +1,13 @@
 mod login;
 
 use std::time::Duration;
-use topcoat::{Result, context::Cx, router::{error::redirect, href, page}, view::{View, component, suspense, view}};
+
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{error::redirect, href, page},
+    view::{View, component, suspense, view},
+};
 
 // The check finishes after the page committed with the fallback, so its
 // redirect can no longer become a redirect response. It streams to the

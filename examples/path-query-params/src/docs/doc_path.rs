@@ -1,5 +1,11 @@
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{href, page, path_param},
+    view::{View, view},
+};
+
 use crate::home;
-use topcoat::{Result, context::Cx, router::{href, page, path_param}, view::{View, view}};
 
 path_param!(pub(crate) *doc_path);
 

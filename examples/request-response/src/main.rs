@@ -1,7 +1,17 @@
 mod api;
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use topcoat::{Result, context::Cx, router::{Body, error::bad_request, module_router, request::{Bytes, FromRequest, headers}, response::{IntoResponse, Response}}};
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{
+        Body,
+        error::bad_request,
+        module_router,
+        request::{Bytes, FromRequest, headers},
+        response::{IntoResponse, Response},
+    },
+};
 
 #[tokio::main]
 async fn main() {

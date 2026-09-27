@@ -1,5 +1,10 @@
+use topcoat::{
+    Result,
+    router::{href, page},
+    view::{View, view},
+};
+
 use crate::{OUTBOX, home, outbox};
-use topcoat::{Result, router::{href, page}, view::{View, view}};
 
 #[page]
 pub(crate) async fn sent() -> Result<impl View> {

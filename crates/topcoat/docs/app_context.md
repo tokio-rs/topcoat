@@ -9,7 +9,7 @@ Values are identified by their Rust type. The router accepts one value of each t
 Build the router and chain `.app_context(value)` for every value you want to share:
 
 ```rust
-use topcoat::router::{module_router, Router, RouterBuilderDiscoverExt};
+use topcoat::router::{Router, RouterBuilderDiscoverExt, module_router};
 
 pub fn router() -> Router {
     module_router!()

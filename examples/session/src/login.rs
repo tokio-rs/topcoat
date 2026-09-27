@@ -1,5 +1,14 @@
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{
+        content::Form,
+        error::{SeeOther, see_other},
+        href, route,
+    },
+};
+
 use crate::{LoginForm, User, db, session};
-use topcoat::{Result, context::Cx, router::{content::Form, error::{SeeOther, see_other}, href, page, route}};
 
 #[route(POST)]
 pub(crate) async fn login(cx: &Cx, Form(form): Form<LoginForm>) -> Result<SeeOther> {
@@ -8,5 +17,5 @@ pub(crate) async fn login(cx: &Cx, Form(form): Form<LoginForm>) -> Result<SeeOth
 
     db(cx).create(session, User { name: form.name });
 
-    Ok(see_other(href!(page).resolve(cx)))
+    Ok(see_other(href!(crate::page).resolve(cx)))
 }

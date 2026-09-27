@@ -1,7 +1,14 @@
 mod increment;
 
 use std::sync::atomic::AtomicU64;
-use topcoat::{Result, context::{Cx, app_context}, htmx::hx_request, router::{Slot, href, layout, module_router, page}, view::{View, view}};
+
+use topcoat::{
+    Result,
+    context::Cx,
+    htmx::hx_request,
+    router::{Slot, href, layout, module_router, page},
+    view::{View, view},
+};
 
 #[tokio::main]
 async fn main() {

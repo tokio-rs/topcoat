@@ -1,6 +1,19 @@
-use crate::{Counter, home};
 use std::sync::atomic::Ordering;
-use topcoat::{Result, alpine_ajax::ajax_request, context::{Cx, app_context}, router::{error::see_other, href, response::Response, route}, view::view};
+
+use topcoat::{
+    Result,
+    alpine_ajax::ajax_request,
+    context::{Cx, app_context},
+    router::{
+        error::see_other,
+        href,
+        response::{IntoResponse, Response},
+        route,
+    },
+    view::{ViewExt, view},
+};
+
+use crate::{Counter, home};
 
 #[route(POST)]
 pub(crate) async fn increment(cx: &Cx) -> Result<Response> {

@@ -21,26 +21,31 @@ A `CatchAll` matches one or more remaining URL segments, including `/` separator
 # Examples
 
 ```rust
+use topcoat::router::segment;
 // src/app/blog_post.rs: module URL becomes `/articles` instead of `/blog-post`.
-topcoat::router::segment!(rename = "articles");
+segment!(rename = "articles");
 ```
 
 ```rust
+use topcoat::router::segment;
 // src/app/marketing.rs: `marketing` contributes no URL segment.
-topcoat::router::segment!(kind = Group);
+segment!(kind = Group);
 ```
 
 ```rust
+use topcoat::router::segment;
 // src/app/_group.rs: `_group` is reachable as `/group`.
-topcoat::router::segment!(kind = Static);
+segment!(kind = Static);
 ```
 
 ```rust
+use topcoat::router::segment;
 // src/app/users/id.rs: pages in this module serve `/users/{id}`.
-topcoat::router::segment!(kind = Param);
+segment!(kind = Param);
 ```
 
 ```rust
+use topcoat::router::segment;
 // src/app/docs/rest.rs: pages in this module serve `/docs/{*path}`.
-topcoat::router::segment!(kind = CatchAll, rename = "path");
+segment!(kind = CatchAll, rename = "path");
 ```

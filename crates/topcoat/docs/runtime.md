@@ -26,7 +26,7 @@ Call [`runtime()`](RouterBuilderRuntimeExt::runtime) to enable page reruns, and 
 ```rust,no_run
 use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
-    router::{module_router, Router, RouterBuilderDiscoverExt},
+    router::{Router, RouterBuilderDiscoverExt, module_router},
     runtime::RouterBuilderRuntimeExt,
 };
 

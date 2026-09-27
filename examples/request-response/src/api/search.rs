@@ -1,5 +1,12 @@
+use topcoat::{
+    Result,
+    router::{
+        content::{Form, Json},
+        route,
+    },
+};
+
 use crate::{Search, SearchResult};
-use topcoat::{Result, router::{content::{Form, Json}, route}};
 
 // For GET and HEAD requests, Form<T> reads URL-encoded values from the query string.
 #[route(GET)]

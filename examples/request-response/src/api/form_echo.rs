@@ -1,5 +1,9 @@
+use topcoat::{
+    Result,
+    router::{content::Form, route},
+};
+
 use crate::Search;
-use topcoat::{Result, router::{content::Form, route}};
 
 // For other methods, Form<T> reads and writes application/x-www-form-urlencoded bodies.
 #[route(POST)]

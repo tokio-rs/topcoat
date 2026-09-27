@@ -54,7 +54,7 @@ Load the generated asset bundle while building the router, before `.build()`. Us
 ```rust,no_run
 use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
-    router::{module_router, Router, RouterBuilderDiscoverExt},
+    router::{Router, RouterBuilderDiscoverExt, module_router},
 };
 
 pub fn router() -> Router {
@@ -124,7 +124,7 @@ topcoat asset bundle --out dist/assets
 ```
 
 ```rust,no_run
-# use topcoat::{asset::{AssetBundle, RouterBuilderAssetExt}, router::{module_router, RouterBuilderDiscoverExt}};
+# use topcoat::{asset::{AssetBundle, RouterBuilderAssetExt}, router::{RouterBuilderDiscoverExt, module_router}};
 let router = module_router!()
     .discover()
     .assets(AssetBundle::load_dir("dist/assets").unwrap())
@@ -177,7 +177,7 @@ Use `checksum` for remote assets when you want deployments to fail if the remote
 To serve assets from an external host, register its base URL with [`AssetConfig::hosted_at`]:
 
 ```rust,no_run
-# use topcoat::{asset::{AssetBundle, AssetConfig, RouterBuilderAssetExt}, router::{module_router, RouterBuilderDiscoverExt}};
+# use topcoat::{asset::{AssetBundle, AssetConfig, RouterBuilderAssetExt}, router::{RouterBuilderDiscoverExt, module_router}};
 let router = module_router!()
     .discover()
     .assets(AssetConfig::hosted_at(

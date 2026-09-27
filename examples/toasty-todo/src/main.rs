@@ -2,7 +2,12 @@ mod todos;
 
 use serde::Deserialize;
 use toasty::Db;
-use topcoat::{Result, context::{Cx, app_context}, router::{Slot, href, layout, module_router, page}, view::{View, component, view}};
+use topcoat::{
+    Result,
+    context::{Cx, app_context},
+    router::{Slot, href, layout, module_router, page},
+    view::{View, component, view},
+};
 
 #[tokio::main]
 async fn main() {

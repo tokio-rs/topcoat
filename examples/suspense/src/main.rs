@@ -2,7 +2,12 @@ mod error_boundary;
 mod redirect;
 mod suspense;
 
-use topcoat::{Result, context::Cx, router::{Slot, error::redirect, href, layout, module_router, page}, view::{View, view}};
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{Slot, error::redirect, href, layout, module_router, page},
+    view::{View, view},
+};
 
 #[tokio::main]
 async fn main() {

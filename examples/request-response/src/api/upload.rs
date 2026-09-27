@@ -1,4 +1,8 @@
-use topcoat::{Result, context::Cx, router::{Body, body_limit, route, to_bytes}};
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{Body, body_limit, route, to_bytes},
+};
 
 // Body gives the handler the raw stream when it wants to parse bytes itself.
 // A raw stream bypasses the body limit; pass body_limit(cx) to keep it.

@@ -1,4 +1,7 @@
-use topcoat::{Result, router::{content::multipart::Multipart, route}};
+use topcoat::{
+    Result,
+    router::{content::multipart::Multipart, route},
+};
 
 // Multipart streams multipart/form-data fields, commonly used for file uploads.
 // Available with the `multipart` feature.

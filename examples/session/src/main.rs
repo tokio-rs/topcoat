@@ -1,9 +1,22 @@
+use topcoat::{cookie::RouterBuilderCookieExt, session::RouterBuilderSessionExt};
+
 mod login;
 mod logout;
 
+use std::{
+    collections::HashMap,
+    sync::{Mutex, PoisonError},
+    time::SystemTime,
+};
+
 use serde::Deserialize;
-use std::{collections::HashMap, sync::{Mutex, PoisonError}, time::SystemTime};
-use topcoat::{Result, context::{Cx, app_context}, router::{Slot, href, layout, module_router, page}, session::{SessionConfig, TokenHash, self}, view::{View, view}};
+use topcoat::{
+    Result,
+    context::{Cx, app_context},
+    router::{Slot, href, layout, module_router, page},
+    session::{self, SessionConfig, TokenHash},
+    view::{View, view},
+};
 
 #[tokio::main]
 async fn main() {

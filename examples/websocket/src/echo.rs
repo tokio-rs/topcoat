@@ -1,4 +1,11 @@
-use topcoat::{Result, router::{content::websocket::{Message, WebSocketUpgrade}, response::Response, route}};
+use topcoat::{
+    Result,
+    router::{
+        content::websocket::{Message, WebSocketUpgrade},
+        response::Response,
+        route,
+    },
+};
 
 #[route(GET)]
 pub(crate) async fn echo(upgrade: WebSocketUpgrade) -> Result<Response> {

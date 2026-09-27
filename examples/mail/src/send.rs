@@ -1,6 +1,15 @@
-use crate::{FERRIS, GETTING_STARTED, Recipient};
+use topcoat::{
+    Result,
+    context::Cx,
+    mail::{Attachment, mail, send},
+    router::{
+        content::Form,
+        error::{SeeOther, see_other},
+        href, route,
+    },
+};
 
-use topcoat::{Result, context::Cx, mail::{Attachment, mail, send}, router::{content::Form, error::{SeeOther, see_other}, href, route}};
+use crate::{FERRIS, GETTING_STARTED, Recipient};
 
 #[route(POST)]
 pub(crate) async fn send_welcome(cx: &Cx, Form(recipient): Form<Recipient>) -> Result<SeeOther> {

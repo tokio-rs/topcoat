@@ -1,7 +1,14 @@
 mod increment;
 
 use std::sync::atomic::{AtomicU64, Ordering};
-use topcoat::{Result, alpine_ajax::ajax_request, context::{Cx, app_context}, router::{Slot, href, layout, module_router, page}, view::{View, view}};
+
+use topcoat::{
+    Result,
+    alpine_ajax::ajax_request,
+    context::{Cx, app_context},
+    router::{Slot, href, layout, module_router, page},
+    view::{View, view},
+};
 
 #[tokio::main]
 async fn main() {

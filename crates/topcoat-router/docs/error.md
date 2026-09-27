@@ -10,10 +10,10 @@ A constructor returns a concrete error type that converts into the handler's err
 
 ```rust
 // src/app/posts/id.rs
-use topcoat::{Result, context::Cx, router::{error::not_found, page}, view::{View, view}};
+use topcoat::{Result, context::Cx, router::{path_param, error::not_found, page}, view::{View, view}};
 # struct Post;
 # async fn find_post(_cx: &Cx) -> Option<Post> { None }
-topcoat::router::path_param!(id);
+path_param!(id);
 
 #[page]
 async fn post(cx: &Cx) -> Result<impl View> {
