@@ -96,6 +96,4 @@ Ok(view! {
 
 ## Working in this repository
 
-Read [AGENTS.md](AGENTS.md) and applicable `.agents/skills/*/SKILL.md`. Safe Rust only; ASCII; `foo.rs` beside `foo/`, not `foo/mod.rs`. Framework: `crates/topcoat-*`; facade: `crates/topcoat`; macro parsing/codegen: each crate's `grammar/`, thin entry points: `macro/`, formatting: grammar `pretty` feature. Browser code: `crates/topcoat-{core,runtime,cli}/browser`.
-
-Guide sources live in `docs/`; crate-local docs are relative symlinks, embedded through crate-local `include_str!` paths. Declare dependencies centrally in workspace Cargo.toml, enable features in consumers. Format Rust with `cargo +nightly fmt --all` and macros with `cargo topcoat fmt`. Follow [verification](.agents/skills/check/SKILL.md) for lint/test/doc checks and browser bundle regeneration; [coherence tests](docs/runtime/coherence.md) check Rust/JS expression parity. Use [contribution guidelines](CONTRIBUTING.md) for commits/PRs.
+For framework changes, also read [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
