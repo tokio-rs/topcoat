@@ -7,12 +7,12 @@ Enable the `tower` feature to connect Topcoat with [tower](https://docs.rs/tower
 [`TowerRoute`] forwards requests to a tower service. Use [`any`](TowerRoute::any) to accept every HTTP method and a catch-all path to forward a URL subtree. For example, an existing axum application can keep serving `/legacy` while other routes move to Topcoat:
 
 ```rust,ignore
-use topcoat::router::{Router, tower::TowerRoute};
+use topcoat::router::{module_router, Router, tower::TowerRoute};
 
 // The pre-migration application, still serving everything under `/legacy`.
 let legacy: axum::Router = legacy_app();
 
-let router = Router::builder()
+let router = module_router!()
     .route(TowerRoute::any("/legacy/{*rest}", legacy))
     .build();
 ```
@@ -28,10 +28,10 @@ Add [`StripPrefixLayer`](crate::StripPrefixLayer) if the service expects paths r
 ```rust,no_run
 use std::time::Duration;
 
-use topcoat::router::{Router, tower::TowerLayer};
+use topcoat::router::{module_router, tower::TowerLayer};
 use tower::timeout::TimeoutLayer;
 
-let router = Router::builder()
+let router = module_router!()
     .layer(TowerLayer::new(TimeoutLayer::new(Duration::from_secs(5))).at("/api"))
     .build();
 ```
@@ -41,9 +41,9 @@ let router = Router::builder()
 [`TowerService`] lets another application serve a Topcoat [`Router`](crate::Router). For example, an axum application can forward otherwise unmatched requests to Topcoat:
 
 ```rust,ignore
-use topcoat::router::{Router, RouterBuilderDiscoverExt, tower::TowerService};
+use topcoat::router::{module_router, Router, RouterBuilderDiscoverExt, tower::TowerService};
 
-let topcoat = Router::builder().discover().build();
+let topcoat = module_router!().discover().build();
 
 // Serve every request the surrounding axum application does not handle.
 let app = axum::Router::new()

@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use topcoat::{
     Result,
     context::{Cx, app_context},
-    router::{Router, RouterBuilderDiscoverExt, page},
+    router::{module_router, page},
     view::{View, view},
 };
 
@@ -13,8 +13,7 @@ struct PageViews(AtomicU64);
 #[tokio::main]
 async fn main() {
     topcoat::start(
-        Router::builder()
-            .discover()
+        module_router!()
             .app_context(PageViews(AtomicU64::new(0)))
             .build(),
     )
@@ -22,7 +21,7 @@ async fn main() {
     .unwrap();
 }
 
-#[page("/")]
+#[page]
 async fn home(cx: &Cx) -> Result<impl View> {
     let views = app_context::<PageViews>(cx);
     let current = views.0.fetch_add(1, Ordering::Relaxed) + 1;

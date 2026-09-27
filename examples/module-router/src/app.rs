@@ -1,3 +1,5 @@
+use topcoat::router::module_router;
+
 mod _marketing;
 mod api;
 mod docs;
@@ -11,7 +13,7 @@ use topcoat::{
 // The `module_router!()` macro call must be placed at the root of your route structure.
 // In this case, the `app` module is marked as the root.
 pub fn router() -> topcoat::router::Router {
-    topcoat::router::module_router!().build()
+    module_router!().build()
 }
 
 // A layout in the root app module wraps every page.

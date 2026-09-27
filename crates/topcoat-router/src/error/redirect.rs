@@ -117,6 +117,7 @@ impl IntoResponse for RedirectError {
 /// From a route:
 ///
 /// ```rust
+/// // src/app/logout.rs
 /// use topcoat::{
 ///     Result,
 ///     context::Cx,
@@ -126,7 +127,7 @@ impl IntoResponse for RedirectError {
 ///     },
 /// };
 ///
-/// #[route(POST "/logout")]
+/// #[route(POST)]
 /// async fn logout(cx: &Cx) -> Result<SeeOther> {
 ///     // ...clear the session...
 ///     Ok(see_other("/"))
@@ -136,6 +137,7 @@ impl IntoResponse for RedirectError {
 /// From a page:
 ///
 /// ```rust
+/// // src/app/signup.rs
 /// use topcoat::{
 ///     Result,
 ///     context::Cx,
@@ -147,7 +149,7 @@ impl IntoResponse for RedirectError {
 /// # struct Signup { email: String }
 /// # async fn create_account(_cx: &Cx, _email: &str) -> Result<bool> { Ok(true) }
 ///
-/// #[page(POST "/signup")]
+/// #[page(POST)]
 /// async fn signup(cx: &Cx, Form(input): Form<Signup>) -> Result<impl View> {
 ///     if create_account(cx, &input.email).await? {
 ///         return Err(see_other("/welcome").into());

@@ -37,9 +37,10 @@ topcoat fmt --macros view,class
 The formatter changes only supported macro bodies. For example, it formats the HTML inside `view!`:
 
 ```rust
+// src/app.rs
 use topcoat::{router::page, view::{View, view}};
 
-#[page("/")]
+#[page]
 async fn page() -> topcoat::Result<impl View> {
     Ok(view! {
         <main>

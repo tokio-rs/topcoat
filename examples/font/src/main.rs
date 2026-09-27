@@ -2,7 +2,7 @@ use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
     font::{Font, font, fontsource::fontsource_font},
-    router::{Router, RouterBuilderDiscoverExt, page},
+    router::{RouterBuilderDiscoverExt, module_router, page},
     view::{View, view},
 };
 
@@ -25,7 +25,7 @@ const ORBITRON: Font = font! {
 
 #[tokio::main]
 async fn main() {
-    let router = Router::builder()
+    let router = module_router!()
         .assets(AssetBundle::load().unwrap())
         .discover()
         .build();
@@ -33,7 +33,7 @@ async fn main() {
     topcoat::start(router).await.unwrap();
 }
 
-#[page("/")]
+#[page]
 async fn home() -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>

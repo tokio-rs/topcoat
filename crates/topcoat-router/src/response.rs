@@ -40,6 +40,7 @@ const APPLICATION_OCTET_STREAM: HeaderValue = HeaderValue::from_static("applicat
 /// or body:
 ///
 /// ```rust
+/// // src/app/api/report_csv.rs
 /// use topcoat::{
 ///     Result,
 ///     context::Cx,
@@ -60,7 +61,9 @@ const APPLICATION_OCTET_STREAM: HeaderValue = HeaderValue::from_static("applicat
 ///     }
 /// }
 ///
-/// #[route(GET "/api/report.csv")]
+/// topcoat::router::segment!(rename = "report.csv");
+///
+/// #[route(GET)]
 /// async fn report() -> Result<Csv> {
 ///     Ok(Csv("name,total\nAda,42\n".to_string()))
 /// }

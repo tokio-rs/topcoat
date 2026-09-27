@@ -1,6 +1,17 @@
-A [`Router`] matches requests to handlers. Create one with [`Router::builder`], register handlers, and call [`build`](RouterBuilder::build). Pass the finished router to [`start`](crate::start) to serve requests.
+A [`Router`] matches requests to handlers. [Module routing](macro@module_router) is the recommended default. It derives paths from your Rust module tree, so handlers omit path strings. Call [`module_router!`] in the root of that tree, then [`build`](RouterBuilder::build). Pass the finished router to [`start`](crate::start) to serve requests.
 
-Register handlers explicitly on the builder or enable the `discover` feature to collect annotated handlers automatically. Use [`module_router!`] to derive route paths from your module tree.
+```rust
+use topcoat::router::{Router, module_router};
+
+// src/app.rs: this module maps to /.
+pub fn router() -> Router {
+    module_router!().build()
+}
+```
+
+Declare child modules with `mod`, just as in any Rust application. A `#[page]` in `app::about` serves `/about`, and one in `app::settings::profile` serves `/settings/profile`. The function name does not affect the URL. See the [module routing guide](macro@module_router) for setup, parameters, groups, and segment overrides.
+
+The feature examples below use this module tree, with file comments showing where each handler belongs. Explicit paths and manual registration remain available when URLs should be independent of module structure. The sections on manual registration and `discover()` show those alternatives.
 
 # Paths
 
@@ -17,23 +28,32 @@ A trailing slash is part of the path. A page at `/users/` is served at `/users/`
 
 # Pages
 
-A page is an async function annotated with [`#[page]`](page) and a path, returning a rendered view:
+A page is an async function annotated with [`#[page]`](page), returning a rendered view:
 
 ```rust
+// src/app.rs
 use topcoat::{Result, router::page, view::{View, view}};
 
-#[page("/")]
+#[page]
 async fn home() -> Result<impl View> {
     Ok(view! { <h1>"Home"</h1> })
 }
 
-#[page("/users/{id}")]
-async fn user_profile() -> Result<impl View> {
-    Ok(view! { <h1>"User profile"</h1> })
+mod users {
+    mod id {
+        use topcoat::{Result, router::{page, path_param}, view::{View, view}};
+
+        path_param!(id);
+
+        #[page]
+        async fn user_profile() -> Result<impl View> {
+            Ok(view! { <h1>"User profile"</h1> })
+        }
+    }
 }
 ```
 
-A page serves `GET` by default; naming methods before the path (e.g., `#[page(POST "/signup")]`) overrides that, with the same method forms as [`#[route]`](macro@route).
+A page serves `GET` by default. Naming methods, such as `#[page(POST)]`, overrides that, with the same method forms as [`#[route]`](macro@route).
 
 See [`#[page]`](page) for the handler signature, module-derived paths, and using pages as components.
 
@@ -42,13 +62,14 @@ See [`#[page]`](page) for the handler signature, module-derived paths, and using
 A layout wraps pages. It receives the inner page (or nested layout) as a [`Slot`], to embed in its own view. Annotate it with [`#[layout]`](layout):
 
 ```rust
+// src/app.rs
 use topcoat::{
     Result,
     router::{Slot, layout},
     view::{View, view},
 };
 
-#[layout("/")]
+#[layout]
 async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
@@ -72,13 +93,14 @@ A layout matches a page by path segments. A layout at `/` wraps all pages. One a
 A layer wraps request handling under its path prefix. It receives the request context, the request body, and [`Next`], which represents the remaining layers and the handler. A layer that registers request-scoped values derives a child context with [`Cx::with`](crate::context::Cx::with) and passes that to `next.run`:
 
 ```rust
+// src/app.rs
 use topcoat::{
     Result,
     context::Cx,
     router::{Body, Next, layer, response::Response},
 };
 
-#[layer("/")]
+#[layer]
 async fn timing(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
     let start = std::time::Instant::now();
     let response = next.run(cx, body).await?;
@@ -94,15 +116,16 @@ Layers follow the same prefix rule as layouts and nest from least specific (oute
 An API route is an async function annotated with [`#[route]`](macro@route) and an explicit HTTP method:
 
 ```rust
+// src/app/api/health.rs
 use topcoat::{Result, router::route};
 
-#[route(GET "/api/health")]
+#[route(GET)]
 async fn health() -> Result<&'static str> {
     Ok("ok")
 }
 ```
 
-The method can also be a bracketed list (`#[route([GET, POST] "/form")]`) registering the handler for each listed method, or `*` (`#[route(* "/webhook")]`) registering it for every method. A route declaring a specific method takes precedence over a `*` route at the same path.
+The method can also be a bracketed list (`#[route([GET, POST])]`) registering the handler for each listed method, or `*` (`#[route(*)]`) registering it for every method. A route declaring a specific method takes precedence over a `*` route at the same path.
 
 See [`#[route]`](macro@route) for the handler signature and how return values convert into responses.
 
@@ -111,6 +134,7 @@ See [`#[route]`](macro@route) for the handler signature and how return values co
 A page or route handler can take the request context as `cx: &`[`Cx`](crate::context::Cx) and, alongside it, a single request body parameter, such as a [`Json`](content::Json) body. An API route additionally returns a value that becomes the response.
 
 ```rust
+// src/app/api/users.rs
 # #[derive(serde::Deserialize)] struct CreateUser { name: String }
 # #[derive(serde::Serialize)] struct User { name: String }
 use topcoat::{
@@ -119,7 +143,7 @@ use topcoat::{
     router::{content::Json, route},
 };
 
-#[route(POST "/api/users")]
+#[route(POST)]
 async fn create_user(cx: &Cx, Json(input): Json<CreateUser>) -> Result<Json<User>> {
     // ...
 #     Ok(Json(User { name: input.name }))
@@ -141,6 +165,7 @@ Call [`path_param!`](macro@path_param) with the parameter name from the URL. The
 - An `error = ...` option maps parse failures to a router error. See [`path_param!`](macro@path_param) for the supported forms.
 
 ```rust
+// src/app/posts/post_id.rs
 use topcoat::{
     Result,
     context::Cx,
@@ -150,7 +175,7 @@ use topcoat::{
 
 path_param!(post_id: u64, error = bad_request);
 
-#[page("/posts/{post_id}")]
+#[page]
 async fn post(cx: &Cx) -> Result<impl View> {
     let post_id = path_param::<PostId>(cx)?;
     Ok(view! { <h1>"Post " (post_id)</h1> })
@@ -168,6 +193,7 @@ With [`module_router!`], a declaration inside a non-root route module also chang
 Apply [`#[query_params]`](macro@query_params) to a struct with named fields. The macro derives `serde::Deserialize`, and [`query_params::<T>(cx)`](fn@query_params) deserializes the request query string into that struct. Use `Option<T>` for keys that may be absent.
 
 ```rust
+// src/app/posts.rs
 use topcoat::{
     Result,
     context::Cx,
@@ -181,7 +207,7 @@ struct PostsQuery {
     q: Option<String>,
 }
 
-#[page("/posts")]
+#[page]
 async fn posts(cx: &Cx) -> Result<impl View> {
     let query = query_params::<PostsQuery>(cx)?;
     Ok(view! {
@@ -200,10 +226,11 @@ Handlers return a [`Result`](crate::Result). The router converts an unhandled er
 The [`error`](mod@error) module has a constructor for each response, like [`not_found()`](error::not_found) or [`redirect(uri)`](error::redirect), and the [`RouterErrorExt`](error::RouterErrorExt) methods that turn an `Option` or `Result` into one:
 
 ```rust
+// src/app/dashboard.rs
 # use topcoat::{Result, context::Cx, router::{error::RouterErrorExt, page}, view::{View, view}};
 # struct User;
 # async fn current_session(_cx: &Cx) -> Option<User> { None }
-#[page("/dashboard")]
+#[page]
 async fn dashboard(cx: &Cx) -> Result<impl View> {
     let _user = current_session(cx).await.ok_or_unauthorized()?;
     Ok(view! { <h1>"Dashboard"</h1> })
@@ -230,13 +257,21 @@ use topcoat::{
 
 # struct Post { title: String }
 # async fn find_post(_cx: &Cx) -> Option<Post> { None }
-#[page("/posts/{id}")]
-async fn post(cx: &Cx) -> Result<impl View> {
-    let post = find_post(cx).await.ok_or_not_found()?;
-    Ok(view! { <h1>(post.title)</h1> })
+mod posts {
+    mod id {
+        use super::super::*;
+
+        topcoat::router::path_param!(id);
+
+        #[page]
+        async fn post(cx: &Cx) -> Result<impl View> {
+            let post = find_post(cx).await.ok_or_not_found()?;
+            Ok(view! { <h1>(post.title)</h1> })
+        }
+    }
 }
 
-#[layout("/")]
+#[layout]
 async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <html>
@@ -269,7 +304,7 @@ The router applies an [`OriginPolicy`] to every request before any layer or hand
 
 # Manual registration
 
-Build a router by chaining `.page()`, `.layout()`, `.layer()`, and `.route()`, then calling [`build`](RouterBuilder::build):
+For routes with explicit paths, build a router by chaining `.page()`, `.layout()`, `.layer()`, and `.route()`, then calling [`build`](RouterBuilder::build). This is an alternative to the recommended [module routing](macro@module_router):
 
 ```rust
 # use topcoat::{Result, context::Cx, router::{Body, Next, Slot, layer, layout, page, response::Response, route}, view::{View, view}};
@@ -299,7 +334,7 @@ Layout and layer matching is based on path prefixes, not registration order; see
 
 # Auto-discovery with `discover()`
 
-With the `discover` feature enabled, every [`#[page]`](page), [`#[layout]`](layout), [`#[layer]`](layer), and [`#[route]`](macro@route) is collected at link time. Instead of listing each item by hand, call [`discover`](RouterBuilderDiscoverExt::discover) on the builder:
+With the `discover` feature enabled, explicit-path [`#[page]`](page), [`#[layout]`](layout), [`#[layer]`](layer), and [`#[route]`](macro@route) handlers can be collected at link time. Instead of listing each item by hand, call [`discover`](RouterBuilderDiscoverExt::discover) on the builder:
 
 ```rust
 use topcoat::router::{Router, RouterBuilderDiscoverExt};
@@ -324,9 +359,9 @@ Enable the `fs` feature to serve files from a directory. Import [`RouterBuilderD
 ```rust
 # #[cfg(feature = "fs")]
 # {
-use topcoat::router::{Router, RouterBuilderDirectoryExt};
+use topcoat::router::{module_router, RouterBuilderDirectoryExt};
 
-let router = Router::builder().public_dir("./public").build();
+let router = module_router!().public_dir("./public").build();
 # }
 ```
 
@@ -337,9 +372,9 @@ Use [`serve_dir`](RouterBuilderDirectoryExt::serve_dir) to choose a different ro
 ```rust
 # #[cfg(feature = "fs")]
 # {
-use topcoat::router::{Router, RouterBuilderDirectoryExt};
+use topcoat::router::{module_router, RouterBuilderDirectoryExt};
 
-let router = Router::builder()
+let router = module_router!()
     .serve_dir("/downloads/{*file}", "./files")
     .build();
 # }
@@ -353,8 +388,8 @@ Use [`start`](crate::start) to run a finalized router:
 
 ```rust,no_run
 # mod my_app {
-#     use topcoat::router::{Router, RouterBuilderDiscoverExt};
-#     pub fn router() -> Router { Router::builder().discover().build() }
+#     use topcoat::router::{Router, RouterBuilderDiscoverExt, module_router};
+#     pub fn router() -> Router { module_router!().discover().build() }
 # }
 #[tokio::main]
 async fn main() {

@@ -8,7 +8,7 @@ Declare web fonts in Rust and serve their CSS through the router. Each [`@font-f
 use topcoat::{
     Result,
     font::{Font, font},
-    router::{Router, RouterBuilderDiscoverExt, page},
+    router::{module_router, RouterBuilderDiscoverExt, page},
     view::{View, view},
 };
 
@@ -26,11 +26,11 @@ const ORBITRON: Font = font! {
 #[tokio::main]
 async fn main() {
     // Discover the font and page.
-    let router = Router::builder().discover().build();
+    let router = module_router!().discover().build();
     topcoat::start(router).await.unwrap();
 }
 
-#[page("/")]
+#[page]
 async fn home() -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
@@ -119,12 +119,12 @@ Pass `host: Asset` to bundle the font files as Topcoat [assets] and serve them f
 use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
     font::{Font, fontsource::fontsource_font},
-    router::{Router, RouterBuilderDiscoverExt},
+    router::{module_router, RouterBuilderDiscoverExt},
 };
 
 const ROBOTO: Font = fontsource_font!(ROBOTO, host: Asset);
 
-let router = Router::builder()
+let router = module_router!()
     .assets(AssetBundle::load().unwrap())
     .discover()
     .build();

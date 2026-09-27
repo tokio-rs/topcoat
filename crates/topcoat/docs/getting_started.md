@@ -23,16 +23,16 @@ Replace `src/main.rs` with:
 ```rust
 use topcoat::{
     Result,
-    router::{Router, RouterBuilderDiscoverExt, page},
+    router::{module_router, page},
     view::{View, component, view},
 };
 
 #[tokio::main]
 async fn main() {
-    topcoat::start(Router::builder().discover().build()).await.unwrap();
+    topcoat::start(module_router!().build()).await.unwrap();
 }
 
-#[page("/")]
+#[page]
 async fn home() -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
@@ -55,6 +55,8 @@ async fn hello(name: &str) -> Result<impl View> {
     })
 }
 ```
+
+Module routing is the recommended default. `module_router!()` uses its enclosing module as `/`, so the `home` page above serves `/`. To add `/about`, declare `mod about;` in `main.rs` and put a `#[page]` handler in `src/about.rs`. See the [module routing guide](crate::router::module_router) for nested modules, layouts, and path parameters.
 
 Run `cargo run` to serve the app at <http://127.0.0.1:3000>. For automatic rebuilds while you work, install the Topcoat CLI.
 

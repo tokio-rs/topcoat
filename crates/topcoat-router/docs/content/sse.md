@@ -1,5 +1,7 @@
 Server-sent events for Topcoat routes.
 
+The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
+
 Server-sent events (SSE) send events from the server to a client over one HTTP response. Enable the `sse` feature and return an [`Sse`] response containing a stream of [`Event`]s. In a browser, use `EventSource` to subscribe and reconnect when the connection is lost.
 
 # Streaming events
@@ -7,6 +9,7 @@ Server-sent events (SSE) send events from the server to a client over one HTTP r
 Return [`Sse`] with the stream of events to send. Build each [`Event`] with [`data`](Event::data) for text or [`json_data`](Event::json_data) for a serialized value. Optional fields can name the event and control reconnection.
 
 ```rust
+// src/app/events.rs
 use futures_core::Stream;
 use topcoat::{
     Result,
@@ -16,7 +19,7 @@ use topcoat::{
     },
 };
 
-#[route(GET "/events")]
+#[route(GET)]
 async fn events() -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
     let events = futures_util::stream::iter(
         ["one", "two", "three"].map(|name| Ok(Event::new().event("named").data(name))),
@@ -32,6 +35,7 @@ The `use<>` bound prevents the returned stream from borrowing the request contex
 A stream outlives the handler that returned it, so it cannot borrow the `Cx` the route was called with. Clone the `Cx` and move the owned handle into the stream instead; it reads the same app and request context.
 
 ```rust
+// src/app/greetings.rs
 use futures_core::Stream;
 use topcoat::{
     Result,
@@ -46,7 +50,7 @@ struct Customer {
     name: String,
 }
 
-#[route(GET "/greetings")]
+#[route(GET)]
 async fn greetings(cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
     let cx = cx.clone();
     let events = futures_util::stream::once(async move {
@@ -66,6 +70,7 @@ Proxies and load balancers may close idle connections. Configure [`keep_alive`](
 A reconnecting `EventSource` echoes the [`id`](Event::id) of the last event it received in the `Last-Event-ID` request header. Read it with [`last_event_id`] to resume the stream where the client left off instead of replaying it from the start.
 
 ```rust
+// src/app/ticks.rs
 use futures_core::Stream;
 use topcoat::{
     Result,
@@ -76,7 +81,7 @@ use topcoat::{
     },
 };
 
-#[route(GET "/ticks")]
+#[route(GET)]
 async fn ticks(cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
     let next: u64 = last_event_id(cx)
         .and_then(|id| id.parse().ok())

@@ -1,5 +1,7 @@
 Turning handler errors into HTTP responses.
 
+The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
+
 Handlers return a `Result`. An unhandled router error selects an HTTP error or redirect response. Other errors produce `500 Internal Server Error`.
 
 # Constructors
@@ -9,10 +11,13 @@ Construct an error with the function named for the response you want. For exampl
 A constructor returns a concrete error type that converts into the handler's error, so bubble it up with `?` or return it directly:
 
 ```rust
+// src/app/posts/id.rs
 use topcoat::{Result, context::Cx, router::{error::not_found, page}, view::{View, view}};
 # struct Post;
 # async fn find_post(_cx: &Cx) -> Option<Post> { None }
-#[page("/posts/{id}")]
+topcoat::router::path_param!(id);
+
+#[page]
 async fn post(cx: &Cx) -> Result<impl View> {
     let Some(_post) = find_post(cx).await else {
         return Err(not_found().into());
@@ -28,10 +33,11 @@ The router raises some of these itself: a request that matches no route gets a [
 [`RouterErrorExt`] adds `ok_or_*` methods to [`Option`] and [`core::result::Result`]. They replace `None` or `Err` with a router error that you can propagate with `?`:
 
 ```rust
+// src/app/dashboard.rs
 # use topcoat::{Result, context::Cx, router::{error::RouterErrorExt, page}, view::{View, view}};
 # struct User;
 # async fn current_session(_cx: &Cx) -> Option<User> { None }
-#[page("/dashboard")]
+#[page]
 async fn dashboard(cx: &Cx) -> Result<impl View> {
     let _user = current_session(cx).await.ok_or_unauthorized()?;
     Ok(view! { <h1>"Dashboard"</h1> })
@@ -45,13 +51,14 @@ The methods mirror the constructors: [`ok_or_not_found`](RouterErrorExt::ok_or_n
 Wrap content in an [`error_boundary`](https://docs.rs/topcoat/latest/topcoat/view/struct.error_boundary.html) to render a fallback when it fails. The fallback receives the error and can inspect its type with `downcast_ref`. For example, a layout can catch a [`ForbiddenError`] from its page and render an access-denied view:
 
 ```rust
+// src/app.rs
 use topcoat::{
     Result,
     router::{Slot, StatusCode, error::ForbiddenError, layout},
     view::{View, error_boundary, view},
 };
 
-#[layout("/")]
+#[layout]
 async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <html>
@@ -86,7 +93,7 @@ A [`NotFoundError`] returned by a handler is caught the same way. The 404 for a 
 
 ```rust
 # use topcoat::router::not_found;
-not_found!("/");
+not_found!();
 ```
 
 This registers a page resolving every otherwise unmatched URL under its path to a [`NotFoundError`], which then bubbles through the layouts like any other handler error. See the [`not_found!` reference](../macro.not_found.html) for the module-derived form and how the catch-all segment is appended.
@@ -96,9 +103,10 @@ This registers a page resolving every otherwise unmatched URL under its path to 
 A rewrite handles the request again at another path. It runs the layers and handler for that path without changing the browser URL or making another client request. Return [`rewrite(path, body)`](rewrite) as an error:
 
 ```rust
+// src/app/dashboard.rs
 use topcoat::{Result, context::Cx, router::{Body, error::rewrite, page}, view::{View, view}};
 # async fn beta_tester(_cx: &Cx) -> bool { false }
-#[page("/dashboard")]
+#[page]
 async fn dashboard(cx: &Cx) -> Result<impl View> {
     if beta_tester(cx).await {
         return Err(rewrite("/dashboard-beta", Body::empty()).into());
@@ -118,23 +126,31 @@ use topcoat::{Result, context::{Cx, try_request_context}, router::{Body, Method,
 
 struct Saved;
 
-#[route(POST "/settings/save")]
-async fn save_settings() -> Result<()> {
-    Err(rewrite("/settings", Body::empty())
-        .method(Method::GET)
-        .with(Saved)
-        .into())
-}
+mod settings {
+    use super::*;
 
-#[page("/settings")]
-async fn settings(cx: &Cx) -> Result<impl View> {
-    let saved = try_request_context::<Saved>(cx).is_some();
-    Ok(view! {
-        if saved {
-            <p>"Settings saved."</p>
+    mod save {
+        use super::*;
+    
+        #[route(POST)]
+        async fn save_settings() -> Result<()> {
+            Err(rewrite("/settings", Body::empty())
+                .method(Method::GET)
+                .with(Saved)
+                .into())
         }
-        <form method="post" action="/settings/save"></form>
-    })
+    }
+    
+    #[page]
+    async fn settings(cx: &Cx) -> Result<impl View> {
+        let saved = try_request_context::<Saved>(cx).is_some();
+        Ok(view! {
+            if saved {
+                <p>"Settings saved."</p>
+            }
+            <form method="post" action="/settings/save"></form>
+        })
+    }
 }
 ```
 

@@ -30,6 +30,7 @@ use crate::{
 /// # Examples
 ///
 /// ```rust
+/// // src/app/search.rs
 /// use serde::{Deserialize, Serialize};
 /// use topcoat::{
 ///     Result,
@@ -45,7 +46,7 @@ use crate::{
 ///     page: u32,
 /// }
 ///
-/// #[route(GET "/search")]
+/// #[route(GET)]
 /// async fn search(Form(input): Form<Search>) -> Result<Json<Search>> {
 ///     Ok(Json(input))
 /// }

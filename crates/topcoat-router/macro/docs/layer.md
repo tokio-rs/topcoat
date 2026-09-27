@@ -1,6 +1,6 @@
 Declares a layer that wraps request handling under its path.
 
-A layer wraps handlers whose registered path starts with its path. Set an absolute path with `#[layer("/admin")]`. Under [`module_router!`](macro.module_router.html), omit the path to derive it from the enclosing module, or use `./` to extend that path. For example, `#[layer("./v1")]` in `src/app/api.rs` wraps handlers under `/api/v1`.
+Use `#[layer]` without a path string with [module routing](macro.module_router.html), the recommended default. The enclosing module determines the URL prefix. A path starting with `./` extends the module path. An absolute path, such as `#[layer("/admin")]`, chooses the URL independently of the module tree and requires separate registration.
 
 For a matched handler, the prefix is checked when the router is built, comparing the layer's path to the handler's registered path segment by segment; the request URL is not consulted. A handler is wrapped only when its leading segments spell out the layer's path exactly: a layer at `/docs/admin` wraps neither a page at `/docs/{something}` nor one at `/docs/{*path}`, even though both serve URLs under `/docs/admin`. A parameter segment only matches a parameter of the same name, and group segments count, so a layer at `/dashboard` does not wrap a page at `/(auth)/dashboard` although that page is served at `/dashboard`.
 
@@ -13,6 +13,18 @@ When several layers wrap a handler, they nest from least specific (outermost) to
 The function must be `async` and take [`cx: &Cx`](../context/struct.Cx.html), [`body: Body`](struct.Body.html), and [`next: Next<'_>`](struct.Next.html). It returns `Result<T>`, where `T` implements [`AsyncIntoResponse`](response/trait.AsyncIntoResponse.html). Every [`IntoResponse`](response/trait.IntoResponse.html) type meets this bound. Call [`next.run(cx, body)`](struct.Next.html#method.run) to run the remaining layers and handler. Return directly to answer the request without running them.
 
 # Examples
+
+Module-derived path (in `src/app/api.rs` under `module_router!()`, this wraps every request under `/api`):
+
+```rust
+# use topcoat::{Result, context::Cx, router::{Body, Next, layer, response::Response}};
+#[layer]
+async fn api_log(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
+    let response = next.run(cx, body).await?;
+    println!("API response: {}", response.status());
+    Ok(response)
+}
+```
 
 Explicit path:
 
@@ -28,18 +40,6 @@ async fn timing(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
     let start = std::time::Instant::now();
     let response = next.run(cx, body).await?;
     println!("handled in {:?}", start.elapsed());
-    Ok(response)
-}
-```
-
-Module-derived path (in `src/app/api.rs` under `module_router!()`, this wraps every request under `/api`):
-
-```rust
-# use topcoat::{Result, context::Cx, router::{Body, Next, layer, response::Response}};
-#[layer]
-async fn api_log(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
-    let response = next.run(cx, body).await?;
-    println!("API response: {}", response.status());
     Ok(response)
 }
 ```

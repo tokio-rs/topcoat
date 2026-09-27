@@ -2,7 +2,7 @@ use topcoat::{
     Result,
     context::Cx,
     router::{
-        Router, RouterBuilderDiscoverExt, page,
+        module_router, page,
         request::{headers, uri},
     },
     view::{View, view},
@@ -10,9 +10,7 @@ use topcoat::{
 
 #[tokio::main]
 async fn main() {
-    topcoat::start(Router::builder().discover().build())
-        .await
-        .unwrap();
+    topcoat::start(module_router!().build()).await.unwrap();
 }
 
 fn current_path(cx: &Cx) -> &str {
@@ -26,7 +24,7 @@ fn user_agent(cx: &Cx) -> &str {
         .unwrap_or("unknown")
 }
 
-#[page("/")]
+#[page]
 async fn home(cx: &Cx) -> Result<impl View> {
     // `Cx` carries the current request and can be passed to plain functions.
     Ok(view! {

@@ -16,12 +16,15 @@ use crate::{
 /// # Examples
 ///
 /// ```rust
+/// // src/app/app_js.rs
 /// use topcoat::{
 ///     Result,
 ///     router::{content::Js, route},
 /// };
 ///
-/// #[route(GET "/app.js")]
+/// topcoat::router::segment!(rename = "app.js");
+///
+/// #[route(GET)]
 /// async fn app_js() -> Result<Js<&'static str>> {
 ///     Ok(Js("export const ready = true;"))
 /// }

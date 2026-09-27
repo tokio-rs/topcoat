@@ -60,10 +60,10 @@ At runtime, load the asset bundle on the router:
 ```rust,no_run
 use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
-    router::{Router, RouterBuilderDiscoverExt},
+    router::{module_router, RouterBuilderDiscoverExt},
 };
 
-let router = Router::builder()
+let router = module_router!()
     .discover()
     .assets(AssetBundle::load().unwrap())
     .build();

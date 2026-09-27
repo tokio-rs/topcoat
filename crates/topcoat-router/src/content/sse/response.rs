@@ -35,6 +35,7 @@ use crate::{
 /// # Examples
 ///
 /// ```rust
+/// // src/app/events.rs
 /// use futures_core::Stream;
 /// use topcoat::{
 ///     Result,
@@ -44,7 +45,7 @@ use crate::{
 ///     },
 /// };
 ///
-/// #[route(GET "/events")]
+/// #[route(GET)]
 /// async fn events() -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
 ///     let events = futures_util::stream::iter(
 ///         ["one", "two", "three"].map(|name| Ok(Event::new().data(name))),
@@ -58,6 +59,7 @@ use crate::{
 /// clones the [`Cx`] and moves the owned handle in:
 ///
 /// ```rust
+/// // src/app/greetings.rs
 /// use futures_core::Stream;
 /// use topcoat::{
 ///     Result,
@@ -72,7 +74,7 @@ use crate::{
 ///     name: String,
 /// }
 ///
-/// #[route(GET "/greetings")]
+/// #[route(GET)]
 /// async fn greetings(cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
 ///     let cx = cx.clone();
 ///     let events = futures_util::stream::once(async move {

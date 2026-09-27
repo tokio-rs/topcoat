@@ -30,13 +30,12 @@ pub trait RouterBuilderAssetExt {
     /// # Examples
     ///
     /// ```rust
-    /// # #[topcoat::router::page("/")] async fn about() -> topcoat::Result<impl topcoat::view::View> { Ok(topcoat::view::view! {}) }
+    /// # #[topcoat::router::page] async fn about() -> topcoat::Result<impl topcoat::view::View> { Ok(topcoat::view::view! {}) }
     /// use topcoat::asset::{AssetBundle, RouterBuilderAssetExt};
-    /// use topcoat::router::Router;
+    /// use topcoat::router::{Router, module_router};
     ///
     /// pub fn router() -> Router {
-    ///     Router::builder()
-    ///         .page(about)
+    ///     module_router!()
     ///         .assets(AssetBundle::load().unwrap())
     ///         .build()
     /// }

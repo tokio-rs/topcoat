@@ -19,13 +19,14 @@ Read the struct with [`query_params::<T>(cx)`](fn.query_params.html). It returns
 Set `error = ...` to convert parse failures into a router error. Callers can then propagate the error with `?`:
 
 ```rust
+// src/app/posts.rs
 # use topcoat::{context::Cx, Result, router::{page, query_params}, view::{View, view}};
 #[query_params(error = bad_request)]
 struct PageQuery {
     page: Option<u32>,
 }
 
-#[page("/posts")]
+#[page]
 async fn posts(cx: &Cx) -> Result<impl View> {
     // Responds with a 400 naming the failing key when the query string
     // does not match.

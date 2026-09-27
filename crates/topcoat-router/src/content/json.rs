@@ -29,6 +29,7 @@ use crate::{
 /// # Examples
 ///
 /// ```rust
+/// // src/app/api/users.rs
 /// use serde::{Deserialize, Serialize};
 /// use topcoat::{
 ///     Result,
@@ -46,7 +47,7 @@ use crate::{
 ///     name: String,
 /// }
 ///
-/// #[route(POST "/api/users")]
+/// #[route(POST)]
 /// async fn create_user(Json(input): Json<CreateUser>) -> Result<Json<User>> {
 ///     Ok(Json(User {
 ///         id: 1,

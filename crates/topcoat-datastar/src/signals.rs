@@ -24,6 +24,7 @@ use crate::datastar_request;
 /// # Examples
 ///
 /// ```rust
+/// // src/app/increment.rs
 /// use serde::{Deserialize, Serialize};
 /// use topcoat::{
 ///     Result,
@@ -36,7 +37,7 @@ use crate::datastar_request;
 ///     count: u64,
 /// }
 ///
-/// #[route(POST "/increment")]
+/// #[route(POST)]
 /// async fn increment(Signals(counter): Signals<Counter>) -> Result<PatchSignals> {
 ///     PatchSignals::json(&Counter {
 ///         count: counter.count + 1,

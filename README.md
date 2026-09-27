@@ -37,16 +37,16 @@ Topcoat is a modular, batteries-included Rust framework for building full-stack 
 ```rust,ignore
 use topcoat::{
     Result,
-    router::{Router, RouterBuilderDiscoverExt, page},
+    router::{module_router, page},
     view::{View, component, view},
 };
 
 #[tokio::main]
 async fn main() {
-    topcoat::start(Router::builder().discover().build()).await.unwrap();
+    topcoat::start(module_router!().build()).await.unwrap();
 }
 
-#[page("/")]
+#[page]
 async fn home() -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
@@ -63,6 +63,8 @@ async fn hello(name: &str) -> Result<impl View> {
     Ok(view! { <h1>"Hello, " (name) "!"</h1> })
 }
 ```
+
+Module routing is the recommended default. `module_router!()` derives URLs from Rust modules, so handlers use `#[page]` or `#[route(GET)]` without a path string. See the [module routing guide](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html) for nested routes, layouts, and path parameters. Explicit paths are available when you need to choose URLs independently of the module tree.
 
 ## What makes Topcoat different
 

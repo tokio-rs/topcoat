@@ -1,41 +1,26 @@
-use std::{
-    collections::HashMap,
-    sync::{Mutex, PoisonError},
-    time::SystemTime,
-};
+mod login;
+mod logout;
 
 use serde::Deserialize;
-use topcoat::{
-    Result,
-    context::{Cx, app_context},
-    cookie::RouterBuilderCookieExt,
-    router::{
-        Router, RouterBuilderDiscoverExt, Slot,
-        content::Form,
-        error::{SeeOther, see_other},
-        href, layout, page, route,
-    },
-    session::{self, RouterBuilderSessionExt, SessionConfig, TokenHash},
-    view::{View, view},
-};
+use std::{collections::HashMap, sync::{Mutex, PoisonError}, time::SystemTime};
+use topcoat::{Result, context::{Cx, app_context}, router::{Slot, href, layout, module_router, page}, session::{SessionConfig, TokenHash, self}, view::{View, view}};
 
 #[tokio::main]
 async fn main() {
     // Topcoat issues and carries the session token; where the session records
     // live is up to the application, here the in-memory `Database` below.
     topcoat::start(
-        Router::builder()
+        module_router!()
             .cookies()
             .sessions(SessionConfig::default())
             .app_context(Database::default())
-            .discover()
             .build(),
     )
     .await
     .unwrap();
 }
 
-#[layout("/")]
+#[layout]
 async fn root(slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
@@ -49,7 +34,7 @@ async fn root(slot: Slot<'_>) -> Result<impl View> {
     })
 }
 
-#[page("/")]
+#[page]
 async fn page(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         if let Some(user) = current_user(cx).await? {
@@ -58,11 +43,13 @@ async fn page(cx: &Cx) -> Result<impl View> {
                 (&user.name)
             </div>
 
-            <form method="POST" action=(href!(logout))><button>"log out"</button></form>
+            <form method="POST" action=(href!(crate::logout::logout))>
+                <button>"log out"</button>
+            </form>
         } else {
             <div>"currently not logged in"</div>
 
-            <form method="POST" action=(href!(login))>
+            <form method="POST" action=(href!(crate::login::login))>
                 <input name="name" placeholder="Username" required="true">
                 <button>"log in"</button>
             </form>
@@ -75,25 +62,6 @@ async fn page(cx: &Cx) -> Result<impl View> {
 #[derive(Deserialize)]
 struct LoginForm {
     name: String,
-}
-
-#[route(POST "/login")]
-async fn login(cx: &Cx, Form(form): Form<LoginForm>) -> Result<SeeOther> {
-    // A real application would verify credentials before starting the session.
-    let session = session::start(cx).await?;
-
-    db(cx).create(session, User { name: form.name });
-
-    Ok(see_other(href!(page).resolve(cx)))
-}
-
-#[route(POST "/logout")]
-async fn logout(cx: &Cx) -> Result<SeeOther> {
-    if let Some(token_hash) = session::stop(cx).await? {
-        db(cx).delete(&token_hash);
-    }
-
-    Ok(see_other(href!(page).resolve(cx)))
 }
 
 // --- In-memory demo database ------------------------------------------------

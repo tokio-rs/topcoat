@@ -1,18 +1,16 @@
 use topcoat::{
     Result,
-    router::{Router, RouterBuilderDiscoverExt, page},
+    router::{module_router, page},
     view::{View, component, view},
 };
 
 #[tokio::main]
 async fn main() {
-    // `discover` picks up every page, layout, and route declared in the crate.
-    topcoat::start(Router::builder().discover().build())
-        .await
-        .unwrap();
+    // `module_router!` derives page, layout, and route paths from Rust modules.
+    topcoat::start(module_router!().build()).await.unwrap();
 }
 
-#[page("/")]
+#[page]
 async fn home() -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>

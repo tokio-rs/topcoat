@@ -2,7 +2,7 @@ use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
     context::Cx,
-    router::{Router, RouterBuilderDiscoverExt, page},
+    router::{RouterBuilderDiscoverExt, module_router, page},
     runtime::{Event, RouterBuilderRuntimeExt, procedure, signal},
     view::{View, view},
 };
@@ -10,7 +10,7 @@ use topcoat::{
 #[tokio::main]
 async fn main() {
     topcoat::start(
-        Router::builder()
+        module_router!()
             .assets(AssetBundle::load().unwrap())
             .discover()
             .runtime()
@@ -20,7 +20,7 @@ async fn main() {
     .unwrap();
 }
 
-#[page("/")]
+#[page]
 async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>

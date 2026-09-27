@@ -54,11 +54,11 @@ Load the generated asset bundle while building the router, before `.build()`. Us
 ```rust,no_run
 use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
-    router::{Router, RouterBuilderDiscoverExt},
+    router::{module_router, Router, RouterBuilderDiscoverExt},
 };
 
 pub fn router() -> Router {
-    Router::builder()
+    module_router!()
         .discover()
         .assets(AssetBundle::load().unwrap())
         .build()
@@ -124,8 +124,8 @@ topcoat asset bundle --out dist/assets
 ```
 
 ```rust,no_run
-# use topcoat::{asset::{AssetBundle, RouterBuilderAssetExt}, router::{Router, RouterBuilderDiscoverExt}};
-let router = Router::builder()
+# use topcoat::{asset::{AssetBundle, RouterBuilderAssetExt}, router::{module_router, RouterBuilderDiscoverExt}};
+let router = module_router!()
     .discover()
     .assets(AssetBundle::load_dir("dist/assets").unwrap())
     .build();
@@ -177,8 +177,8 @@ Use `checksum` for remote assets when you want deployments to fail if the remote
 To serve assets from an external host, register its base URL with [`AssetConfig::hosted_at`]:
 
 ```rust,no_run
-# use topcoat::{asset::{AssetBundle, AssetConfig, RouterBuilderAssetExt}, router::{Router, RouterBuilderDiscoverExt}};
-let router = Router::builder()
+# use topcoat::{asset::{AssetBundle, AssetConfig, RouterBuilderAssetExt}, router::{module_router, RouterBuilderDiscoverExt}};
+let router = module_router!()
     .discover()
     .assets(AssetConfig::hosted_at(
         "https://cdn.example.com/assets",
@@ -194,8 +194,9 @@ Upload the bundle as part of deploying the matching binary. The filenames includ
 The application needs the bundle's [`AssetCatalog`] to resolve URLs. The catalog maps asset IDs to filenames and can be loaded from `manifest.toml` without the files themselves. If your application cannot read the filesystem, embed the manifest with `include_str!` and pass the parsed [`Manifest`] in place of the bundle:
 
 ```rust,ignore
+use topcoat::router::module_router;
 let manifest = Manifest::parse(include_str!("../dist/assets/manifest.toml"))?;
-let router = Router::builder()
+let router = module_router!()
     .assets(AssetConfig::hosted_at("https://static.example.com/assets", manifest))
     .build();
 ```

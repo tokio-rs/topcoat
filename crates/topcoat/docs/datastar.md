@@ -1,5 +1,7 @@
 [Datastar](https://data-star.dev) updates HTML and reactive signals from server responses. Use `data-*` attributes to bind signals to elements and actions such as `@get` to send requests.
 
+The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
+
 Topcoat extracts signals from requests and creates Datastar responses. Return one update from a handler or send several over a [server-sent event stream](crate::router::content::sse).
 
 Everything below is re-exported from `topcoat::datastar` and gated behind the `datastar` feature, which also enables the router's `sse` feature.
@@ -46,6 +48,7 @@ See the [assets guide](crate::asset) for loading the asset bundle on your router
 The [`Signals`] extractor deserializes request signals into your type. It reads JSON from the `datastar` query parameter for GET requests and from the body for other methods.
 
 ```rust
+// src/app/increment.rs
 use serde::{Deserialize, Serialize};
 use topcoat::{
     Result,
@@ -58,7 +61,7 @@ struct Counter {
     count: u64,
 }
 
-#[route(POST "/increment")]
+#[route(POST)]
 async fn increment(Signals(counter): Signals<Counter>) -> Result<PatchSignals> {
     PatchSignals::json(&Counter {
         count: counter.count + 1,
@@ -73,6 +76,7 @@ Use `Option<Signals<T>>` to also accept requests without Datastar. It returns `N
 [`PatchElements`] updates page elements with HTML. By default, Datastar matches elements by `id` and morphs them to match the response. Use [`selector`](PatchElements::selector) and [`mode`](PatchElements::mode) to choose another target or update behavior. Returned from a handler, the patch sends one SSE event and closes the stream:
 
 ```rust
+// src/app/entries.rs
 use topcoat::{
     Result,
     context::Cx,
@@ -81,7 +85,7 @@ use topcoat::{
     view::{ViewExt, view},
 };
 
-#[route(POST "/entries")]
+#[route(POST)]
 async fn create(cx: &Cx) -> Result<PatchElements> {
     let entry = view! { cx => <li>"A new entry"</li> }.single().await?;
     Ok(PatchElements::new(entry.render(cx))
@@ -101,6 +105,7 @@ async fn create(cx: &Cx) -> Result<PatchElements> {
 For live updates, return an [`Sse`] stream and convert each patch into an [`Event`] with `Into`. See the [server-sent events guide](crate::router::content::sse) for keep-alives and handling reconnections.
 
 ```rust
+// src/app/progress.rs
 use futures_core::Stream;
 use futures_util::stream;
 use serde::Serialize;
@@ -118,7 +123,7 @@ struct Progress {
     percent: u8,
 }
 
-#[route(GET "/progress")]
+#[route(GET)]
 async fn progress() -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
     let events = stream::iter((0..=100u8).step_by(20).map(|percent| {
         PatchSignals::json(&Progress { percent }).map(Into::into)
@@ -145,6 +150,7 @@ let script = ExecuteScript::new("console.log('saved')");
 Datastar also accepts ordinary responses. It patches `text/html` into the page and merges `application/json` into the signals. Response types that implement [`IntoResponseParts`] set headers to control these updates. Place them before the body in a response tuple:
 
 ```rust
+// src/app/save.rs
 use topcoat::{
     Result,
     context::Cx,
@@ -153,7 +159,7 @@ use topcoat::{
     view::{ViewExt, ViewHandle, view},
 };
 
-#[route(POST "/save")]
+#[route(POST)]
 async fn save(cx: &Cx) -> Result<(DatastarSelector, DatastarMode, ViewHandle)> {
     let status = view! { cx => <p>"Saved!"</p> }.single().await?;
     Ok((

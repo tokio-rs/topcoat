@@ -62,7 +62,7 @@ use topcoat::{
     context::Cx,
     font::fontsource::fontsource_font,
     icon::{icon, iconify::iconify_icon},
-    router::{Router, RouterBuilderDiscoverExt, page},
+    router::{RouterBuilderDiscoverExt, module_router, page},
     runtime::{Event, RouterBuilderRuntimeExt, Signal, expr, shard, signal},
     tailwind,
     view::{Child, View, attributes, component, view},
@@ -79,7 +79,7 @@ const REGISTRY: &str = "https://github.com/tokio-rs/topcoat/tree/main/crates/top
 
 #[tokio::main]
 async fn main() {
-    let router = Router::builder()
+    let router = module_router!()
         .assets(AssetBundle::load().unwrap())
         .discover()
         .runtime()
@@ -104,7 +104,7 @@ fn status_variant(status: &str) -> BadgeVariant {
         .map_or(BadgeVariant::default(), |(_, variant)| *variant)
 }
 
-#[page("/")]
+#[page]
 async fn home(cx: &Cx) -> Result<impl View> {
     let dark = signal(cx, || false);
     let sidebar_open = signal(cx, || true);

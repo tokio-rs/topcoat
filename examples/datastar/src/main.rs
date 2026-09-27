@@ -1,26 +1,14 @@
-use futures_core::Stream;
-use futures_util::stream;
+mod increment;
+
 use serde::{Deserialize, Serialize};
-use topcoat::{
-    Result,
-    context::Cx,
-    datastar::{ElementPatchMode, PatchElements, PatchSignals, Signals},
-    router::{
-        Router, RouterBuilderDiscoverExt,
-        content::sse::{Event, Sse},
-        href, page, route,
-    },
-    view::{View, ViewExt, view},
-};
+use topcoat::{Result, router::{href, module_router, page}, view::{View, view}};
 
 #[tokio::main]
 async fn main() {
-    topcoat::start(Router::builder().discover().build())
-        .await
-        .unwrap();
+    topcoat::start(module_router!().build()).await.unwrap();
 }
 
-#[page("/")]
+#[page]
 async fn home() -> Result<impl View> {
     // Datastar keeps the counter in the browser and sends it along with every
     // action request.
@@ -45,7 +33,9 @@ async fn home() -> Result<impl View> {
                 </h1>
 
                 // The route's URL is interpolated into the Datastar action.
-                <button data-on:click=(("@post('", href!(increment), "')"))>
+                <button
+                    data-on:click=(("@post('", href!(crate::increment::increment), "')"))
+                >
                     "Increment"
                 </button>
 
@@ -59,33 +49,4 @@ async fn home() -> Result<impl View> {
 #[derive(Deserialize, Serialize)]
 struct Counter {
     count: u64,
-}
-
-#[route(POST "/increment")]
-async fn increment(
-    cx: &Cx,
-    Signals(counter): Signals<Counter>,
-) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
-    let count = counter.count + 1;
-
-    let entry = view! {
-        cx =>
-        <li>
-            "Counted to "
-            (count)
-        </li>
-    }
-    .single()
-    .await?;
-
-    // One event updates the counter signal, the other appends the log entry.
-    let events = stream::iter([
-        PatchSignals::json(&Counter { count }).map(Into::into),
-        Ok(PatchElements::new(entry.render(cx))
-            .selector("#log")
-            .mode(ElementPatchMode::Append)
-            .into()),
-    ]);
-
-    Ok(Sse::new(events))
 }

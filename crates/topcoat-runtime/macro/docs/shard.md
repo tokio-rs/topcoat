@@ -137,10 +137,11 @@ search_results(query: $(query.get()), limit: limit)
 Register a shard on the [`Router`] so the browser can request new content. It implements [`Route`], so pass its name to `.route()`:
 
 ```rust
+use topcoat::router::module_router;
 # use topcoat::{Result, router::Router, runtime::shard, view::{View, view}};
 # #[shard]
 # async fn search_results(query: String) -> Result<impl View> { Ok(view! { (query) }) }
-let router = Router::builder().route(search_results).build();
+let router = module_router!().route(search_results).build();
 ```
 
 With the `discover` feature enabled, `.discover()` registers all shards linked into the application.

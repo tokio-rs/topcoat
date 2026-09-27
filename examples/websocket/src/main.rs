@@ -1,28 +1,17 @@
-use topcoat::{
-    Result,
-    asset::{AssetBundle, RouterBuilderAssetExt, asset},
-    router::{
-        Router,
-        content::websocket::{Message, WebSocketUpgrade},
-        page,
-        response::Response,
-        route,
-    },
-    view::{View, view},
-};
+mod echo;
+
+use topcoat::{Result, asset::{AssetBundle, asset}, router::{module_router, page}, view::{View, view}};
 
 #[tokio::main]
 async fn main() {
-    let router = Router::builder()
-        .page(home)
-        .route(echo)
+    let router = module_router!()
         .assets(AssetBundle::load().unwrap())
         .build();
 
     topcoat::start(router).await.unwrap();
 }
 
-#[page("/")]
+#[page]
 async fn home() -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
@@ -45,19 +34,5 @@ async fn home() -> Result<impl View> {
                 <script src=(asset!("./echo.js"))></script>
             </body>
         </html>
-    })
-}
-
-#[route(GET "/echo")]
-async fn echo(upgrade: WebSocketUpgrade) -> Result<Response> {
-    upgrade.on_upgrade(|mut socket| async move {
-        while let Some(Ok(message)) = socket.recv().await {
-            // Ping, pong, and close messages are already handled for us.
-            if matches!(message, Message::Text(_) | Message::Binary(_))
-                && socket.send(message).await.is_err()
-            {
-                break;
-            }
-        }
     })
 }

@@ -1,18 +1,12 @@
-use std::sync::atomic::{AtomicU64, Ordering};
+mod increment;
 
-use topcoat::{
-    Result,
-    context::{Cx, app_context},
-    htmx::{HxResponseTrigger, hx_request},
-    router::{Router, RouterBuilderDiscoverExt, Slot, href, layout, page, route},
-    view::{View, ViewExt, ViewHandle, view},
-};
+use std::sync::atomic::AtomicU64;
+use topcoat::{Result, context::{Cx, app_context}, htmx::hx_request, router::{Slot, href, layout, module_router, page}, view::{View, view}};
 
 #[tokio::main]
 async fn main() {
     topcoat::start(
-        Router::builder()
-            .discover()
+        module_router!()
             .app_context(Counter(AtomicU64::new(0)))
             .build(),
     )
@@ -20,7 +14,7 @@ async fn main() {
     .unwrap();
 }
 
-#[layout("/")]
+#[layout]
 async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         if hx_request(cx) {
@@ -44,7 +38,7 @@ async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     })
 }
 
-#[page("/")]
+#[page]
 async fn home() -> Result<impl View> {
     Ok(view! {
         <h1>
@@ -53,22 +47,14 @@ async fn home() -> Result<impl View> {
         </h1>
 
         // Swaps the returned fragment into #count.
-        <button hx-post=(href!(increment)) hx-target="#count" hx-swap="innerHTML">
+        <button
+            hx-post=(href!(crate::increment::increment))
+            hx-target="#count"
+            hx-swap="innerHTML"
+        >
             "Increment"
         </button>
     })
 }
 
 struct Counter(AtomicU64);
-
-#[route(POST "/increment")]
-async fn increment(cx: &Cx) -> Result<(HxResponseTrigger, ViewHandle)> {
-    let count = app_context::<Counter>(cx).0.fetch_add(1, Ordering::Relaxed) + 1;
-    let fragment = view! { cx => <span id="count">(count)</span> }
-        .single()
-        .await?;
-
-    // The trigger becomes an `HX-Trigger: counted` response header, which
-    // fires a `counted` event in the browser.
-    Ok((HxResponseTrigger::receive(["counted"]), fragment))
-}

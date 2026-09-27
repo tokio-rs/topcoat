@@ -1,16 +1,8 @@
+mod send;
+mod sent;
+
 use serde::Deserialize;
-use topcoat::{
-    Result,
-    context::Cx,
-    mail::{Attachment, FileTransport, MailConfig, RouterBuilderMailExt, mail, send},
-    router::{
-        Router, RouterBuilderDiscoverExt, Slot,
-        content::Form,
-        error::{SeeOther, see_other},
-        href, layout, page, route,
-    },
-    view::{View, view},
-};
+use topcoat::{Result, mail::{FileTransport, MailConfig, mail, send}, router::{Slot, href, layout, module_router, page}, view::{View, view}};
 
 const OUTBOX: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/outbox");
 
@@ -23,12 +15,12 @@ async fn main() {
         .transport(FileTransport::new(OUTBOX))
         .build();
 
-    topcoat::start(Router::builder().discover().mail(config).build())
+    topcoat::start(module_router!().mail(config).build())
         .await
         .unwrap();
 }
 
-#[layout("/")]
+#[layout]
 async fn root(slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
@@ -42,19 +34,19 @@ async fn root(slot: Slot<'_>) -> Result<impl View> {
     })
 }
 
-#[page("/")]
+#[page]
 async fn home() -> Result<impl View> {
     Ok(view! {
         <h1>"Send a welcome mail"</h1>
 
-        <form method="POST" action=(href!(send_welcome))>
+        <form method="POST" action=(href!(crate::send::send_welcome))>
             <input name="name" placeholder="Name" required="true">
             <input type="email" name="address" placeholder="Address" required="true">
             <button>"send"</button>
         </form>
 
         <p>"Nothing leaves the machine: the mail is written to a file."</p>
-        <a href=(href!(sent))>"Outbox"</a>
+        <a href=(href!(crate::sent::sent))>"Outbox"</a>
     })
 }
 
@@ -71,74 +63,6 @@ const GETTING_STARTED: &str = "\
 2. Open http://localhost:3000.
 3. Read the guides at https://docs.rs/topcoat.
 ";
-
-#[route(POST "/send")]
-async fn send_welcome(cx: &Cx, Form(recipient): Form<Recipient>) -> Result<SeeOther> {
-    let mail = mail! {
-        from: ("Topcoat", "welcome@example.com"),
-
-        // Recipient fields accept a mailbox, an address, or a
-        // `(name, address)` pair.
-        to: (&recipient.name, &recipient.address),
-
-        reply_to: "support@example.com",
-        subject: format!("Welcome, {}!", recipient.name),
-
-        // Mail clients support less CSS than browsers, so the styles stay
-        // simple and inline.
-        html: {
-            <div style="font-family: sans-serif; max-width: 30rem">
-                // `cid:ferris` references the inline attachment below.
-                <img src="cid:ferris" alt="Ferris the crab" width="120">
-
-                <h1 style="font-size: 1.25rem">
-                    "Welcome, "
-                    (&recipient.name)
-                    "!"
-                </h1>
-
-                <p>"Your account is ready. The attached notes get you started."</p>
-            </div>
-        },
-
-        // Without a `text` field, the plain-text alternative is derived from
-        // the HTML.
-        attachments: [
-            Attachment::inline("ferris", "image/png", FERRIS),
-            Attachment::new("getting-started.txt", "text/plain", GETTING_STARTED),
-        ],
-
-        headers: ("List-Unsubscribe", "<mailto:unsubscribe@example.com>"),
-    }?;
-
-    send(cx, mail).await?;
-
-    Ok(see_other(href!(sent).resolve(cx)))
-}
-
-#[page("/sent")]
-async fn sent() -> Result<impl View> {
-    let files = outbox()?;
-
-    Ok(view! {
-        <h1>"Outbox"</h1>
-
-        <p>
-            "The mail was written to "
-            <code>(OUTBOX)</code>
-            ". Open one of these files in a mail client to read it as the \
-             recipient would."
-        </p>
-
-        <ul>
-            for file in files {
-                <li>(file)</li>
-            }
-        </ul>
-
-        <a href=(href!(home))>"Send another"</a>
-    })
-}
 
 fn outbox() -> Result<Vec<String>> {
     // The directory does not exist until the first message is sent.

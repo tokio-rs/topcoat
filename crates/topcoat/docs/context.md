@@ -1,5 +1,7 @@
 [`Cx`] gives handlers and components access to request data and shared application values.
 
+The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
+
 Add `cx: &Cx` to a handler or component's parameters when it needs context. Topcoat supplies it automatically.
 
 # Router request helpers
@@ -54,6 +56,7 @@ A handler reached through a [rewrite](crate::router::error#rewrites) sees the re
 The [`path_param!`](macro@crate::router::path_param) macro and [`#[query_params]`](macro@crate::router::query_params) attribute declare typed values that you read with the [`path_param::<T>(cx)`](fn@crate::router::path_param) and [`query_params::<T>(cx)`](fn@crate::router::query_params) functions. Topcoat parses typed path parameters and query structs lazily and memoizes them for the request.
 
 ```rust
+// src/app/posts/post_id.rs
 use topcoat::{
     Result,
     context::Cx,
@@ -68,7 +71,7 @@ struct PostQuery {
     preview: Option<bool>,
 }
 
-#[page("/posts/{post_id}")]
+#[page]
 async fn post(cx: &Cx) -> Result<impl View> {
     let post_id = path_param::<PostId>(cx)?;
     let query = query_params::<PostQuery>(cx)?;
@@ -144,6 +147,7 @@ Adding a type that is already present replaces it in the child scope. The parent
 A [`Cx`] is a handle to state shared by everything serving one request. The router drops its own handle once the response is sent, so a streaming response body or a spawned task cannot borrow the `cx` the handler was called with. Clone the `Cx` and move the owned handle into the work instead; it reads the same app and request context.
 
 ```rust
+// src/app/orders.rs
 # async fn record(name: &str) {}
 use topcoat::{
     Result,
@@ -155,7 +159,7 @@ struct Customer {
     name: String,
 }
 
-#[route(POST "/orders")]
+#[route(POST)]
 async fn place_order(cx: &Cx) -> Result<&'static str> {
     let cx = cx.clone();
     tokio::spawn(async move {

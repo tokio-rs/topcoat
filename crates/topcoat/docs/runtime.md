@@ -26,12 +26,12 @@ Call [`runtime()`](RouterBuilderRuntimeExt::runtime) to enable page reruns, and 
 ```rust,no_run
 use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
-    router::{Router, RouterBuilderDiscoverExt},
+    router::{module_router, Router, RouterBuilderDiscoverExt},
     runtime::RouterBuilderRuntimeExt,
 };
 
 pub fn router() -> Router {
-    Router::builder()
+    module_router!()
         .discover()
         .assets(AssetBundle::load().unwrap())
         .runtime()
@@ -41,7 +41,7 @@ pub fn router() -> Router {
 
 The runtime reruns a page by sending its current signal values to the page's URL. The [`RuntimeLayer`] added by `.runtime()` converts this request into a `GET`, so the page and its layouts can render with those values. Registering your layers first lets them handle the rerun as a `GET`. See [`RuntimeLayer`] for the request format and rewrite behavior.
 
-The example's `.discover()` registers pages, [procedures](#procedures), and [shards](#shards) from your application. To register a procedure or shard explicitly, pass its name to `.route()`.
+The example uses [module routing](crate::router::module_router), the recommended default, to register pages from the module tree. `.discover()` adds [procedures](#procedures) and [shards](#shards) from your application. To register a procedure or shard explicitly, pass its name to `.route()`.
 
 # Runtime expressions
 
@@ -222,9 +222,10 @@ A shard has its own HTTP endpoint. **Validate its arguments and authorize access
 Read a signal in server Rust with `.get()` to clone its value or `.read()` to borrow it. These are **tracked reads**. A change in the browser causes the page to re-render on the server with the new value:
 
 ```rust
+// src/app/search.rs
 # use topcoat::{Result, context::Cx, router::page, runtime::{Event, signal}, view::*};
 # async fn search_products(_cx: &Cx, _query: &str) -> Result<Vec<String>> { Ok(vec![]) }
-#[page("/search")]
+#[page]
 async fn search(cx: &Cx) -> Result<impl View> {
     let query = signal(cx, String::new);
     let products = search_products(cx, &query.get()).await?;

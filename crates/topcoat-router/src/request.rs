@@ -39,6 +39,7 @@ pub type Request<T = Body> = http::Request<T>;
 /// deserialized:
 ///
 /// ```rust
+/// // src/app/api/signed.rs
 /// # #[derive(serde::Deserialize)]
 /// # struct CreateUser { name: String }
 /// # fn verify_signature(_signature: &str, _bytes: &[u8]) -> topcoat::Result<()> { Ok(()) }
@@ -75,7 +76,7 @@ pub type Request<T = Body> = http::Request<T>;
 /// }
 ///
 /// // Once implemented, use it like the built-in extractors:
-/// #[route(POST "/api/signed")]
+/// #[route(POST)]
 /// async fn signed(SignedJson(input): SignedJson<CreateUser>) -> Result<&'static str> {
 ///     let _ = input;
 ///     Ok("ok")

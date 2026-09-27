@@ -1,14 +1,17 @@
 Topcoat reads and writes cookies through a jar shared by the request. Register `.cookies()` on the router, then call `cookies(cx)` to read cookies or queue changes. When the handler returns, Topcoat adds the changes to the response as `Set-Cookie` headers. This also works when the handler returns an error or redirect.
 
+The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
+
 Cookies are part of the default feature set, and everything below is re-exported from `topcoat::cookie`. Topcoat builds on the `cookie` crate: a cookie is a [`Cookie`], and signing and encryption use its [`Key`].
 
 ```rust
+use topcoat::router::module_router;
 use topcoat::{
     cookie::RouterBuilderCookieExt,
     router::Router,
 };
 
-let router = Router::builder()
+let router = module_router!()
     .cookies()
     .build();
 ```
@@ -20,6 +23,7 @@ let router = Router::builder()
 A cookie is a [`Cookie`] from the `cookie` crate. Build a bare one with `Cookie::new`, or use `Cookie::build` for attributes:
 
 ```rust
+// src/app/api/theme.rs
 use topcoat::{
     Result,
     context::Cx,
@@ -27,7 +31,7 @@ use topcoat::{
     router::route,
 };
 
-#[route(POST "/api/theme")]
+#[route(POST)]
 async fn toggle_theme(cx: &Cx) -> Result<String> {
     let jar = cookies(cx);
 
@@ -69,6 +73,7 @@ jar.add(("theme", "dark"));
 Set cookies before the handler returns. Later work, such as a streaming response, cannot change the response headers. Adding or removing a cookie after the jar has been sealed panics. Reading cookies still works.
 
 ```rust
+// src/app/report.rs
 use topcoat::{
     Result,
     context::Cx,
@@ -80,7 +85,7 @@ use topcoat::{
 # #[component]
 # async fn figures() -> Result<impl View> { Ok(view! { <p>"42"</p> }) }
 
-#[page("/report")]
+#[page]
 async fn report(cx: &Cx) -> Result<impl View> {
     // Runs while the handler is still in charge of the response.
     cookies(cx).add(("last_report", "sales"));
@@ -236,11 +241,11 @@ Share a [`Key`] across requests by registering it as [app context](crate::contex
 ```rust
 use topcoat::{
     cookie::{Key, RouterBuilderCookieExt},
-    router::{Router, RouterBuilderDiscoverExt},
+    router::{module_router, Router, RouterBuilderDiscoverExt},
 };
 
 pub fn router() -> Router {
-    Router::builder()
+    module_router!()
         .discover()
         .cookies()
         .app_context(Key::generate())
@@ -251,6 +256,7 @@ pub fn router() -> Router {
 Then `signed_cookies(cx)` and `private_cookies(cx)` use the registered key:
 
 ```rust
+// src/app/api/login.rs
 use topcoat::{
     Result,
     context::Cx,
@@ -258,7 +264,7 @@ use topcoat::{
     router::route,
 };
 
-#[route(POST "/api/login")]
+#[route(POST)]
 async fn login(cx: &Cx) -> Result<&'static str> {
     private_cookies(cx).add(cookie!("session" = "secret-token"; Path = "/"));
     Ok("logged in")
@@ -274,6 +280,7 @@ A [`CookieStore<T>`](CookieStore) stores a typed value as JSON in one cookie. Th
 Create a store with [`cookie_store`] and the jar it should use. The store inherits that jar's configuration. For example, a store built on [`private_cookies`] encrypts its value.
 
 ```rust
+// src/app/api/cart.rs
 use serde::{Deserialize, Serialize};
 use topcoat::{
     Result,
@@ -287,7 +294,7 @@ struct Cart {
     items: Vec<String>,
 }
 
-#[route(POST "/api/cart")]
+#[route(POST)]
 async fn add_item(cx: &Cx) -> Result<String> {
     let cart = cookie_store::<Cart, _>(private_cookies(cx), "cart")
         .parse_or_default()

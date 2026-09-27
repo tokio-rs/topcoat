@@ -1,5 +1,7 @@
 Topcoat manages session tokens. Your application stores each token's hash and expiry, associates it with a user, and checks that record on later requests. You choose the database and schema.
 
+The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
+
 Sessions are part of the default feature set, and everything below is re-exported from `topcoat::session`.
 
 # The model
@@ -25,13 +27,14 @@ Changing the session involves setting cookies, which is only possible if the res
 Register session support on the router with [`RouterBuilderSessionExt::sessions`]. The default [`SessionConfig`] carries the token in a session cookie, which needs cookie support installed as well:
 
 ```rust
+use topcoat::router::module_router;
 use topcoat::{
     cookie::RouterBuilderCookieExt,
     router::Router,
     session::{RouterBuilderSessionExt, SessionConfig},
 };
 
-let router = Router::builder()
+let router = module_router!()
     .cookies()
     .sessions(SessionConfig::default())
     .build();
@@ -42,6 +45,7 @@ let router = Router::builder()
 After authenticating the user, call [`start`] and store the returned [`Session`]. It always generates a fresh token. This prevents session fixation, where an attacker tries to make a user log in with a token the attacker already knows.
 
 ```rust
+// src/app/login.rs
 use topcoat::{
     Result,
     context::Cx,
@@ -52,7 +56,7 @@ use topcoat::{
 # async fn verify_credentials(_cx: &Cx) -> Result<User> { Ok(User) }
 # async fn persist_session(_cx: &Cx, _user: &User, _session: &session::Session) -> Result<()> { Ok(()) }
 
-#[route(POST "/login")]
+#[route(POST)]
 async fn login(cx: &Cx) -> Result<SeeOther> {
     let user = verify_credentials(cx).await?;
 
@@ -88,6 +92,7 @@ The database lookup runs on every call to `current_user`. Use [`#[memoize]`](mac
 Guard pages by combining it with the router's error helpers:
 
 ```rust
+// src/app/account.rs
 use topcoat::{
     Result,
     context::Cx,
@@ -97,7 +102,7 @@ use topcoat::{
 # #[derive(Clone)] struct User { name: String }
 # async fn current_user(_cx: &Cx) -> Result<Option<User>> { Ok(None) }
 
-#[page("/account")]
+#[page]
 async fn account(cx: &Cx) -> Result<impl View> {
     let user = current_user(cx).await?.ok_or_redirect("/login")?;
     Ok(view! {
@@ -111,6 +116,7 @@ async fn account(cx: &Cx) -> Result<impl View> {
 [`stop`] tells the client to discard its token and hands back the hash of the session it ended, so you can delete the record:
 
 ```rust
+// src/app/logout.rs
 use topcoat::{
     Result,
     context::Cx,
@@ -119,7 +125,7 @@ use topcoat::{
 };
 # async fn delete_session(_cx: &Cx, _hash: &session::TokenHash) -> Result<()> { Ok(()) }
 
-#[route(POST "/logout")]
+#[route(POST)]
 async fn logout(cx: &Cx) -> Result<SeeOther> {
     if let Some(hash) = session::stop(cx).await? {
         delete_session(cx, &hash).await?;

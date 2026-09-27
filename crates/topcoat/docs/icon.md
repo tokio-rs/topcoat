@@ -8,7 +8,7 @@ Topcoat renders icons as inline `<svg>` elements. Icons scale with the surroundi
 use topcoat::{
     Result,
     icon::{IconData, icon},
-    router::{Router, RouterBuilderDiscoverExt, page},
+    router::{module_router, page},
     view::{View, svg::ViewBox, view},
 };
 
@@ -20,12 +20,12 @@ const TRASH: IconData = IconData::unescaped_unchecked(
 
 #[tokio::main]
 async fn main() {
-    topcoat::start(Router::builder().discover().build())
+    topcoat::start(module_router!().build())
         .await
         .unwrap();
 }
 
-#[page("/")]
+#[page]
 async fn home() -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>

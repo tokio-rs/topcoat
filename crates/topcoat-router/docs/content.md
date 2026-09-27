@@ -1,5 +1,7 @@
 Request extractors and response types for Topcoat handlers.
 
+The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
+
 A handler's parameters describe the request body it accepts. Its return type describes the response it sends. This module provides types for both roles.
 
 # Reading a request body
@@ -7,6 +9,7 @@ A handler's parameters describe the request body it accepts. Its return type des
 A page or route can accept one body parameter that implements [`FromRequest`](crate::request::FromRequest). For example, [`Json`] deserializes a JSON body into your type. Add `cx: &Cx` when the handler also needs request context.
 
 ```rust
+// src/app/api/users.rs
 # #[derive(serde::Deserialize)] struct CreateUser { name: String }
 use topcoat::{
     Result,
@@ -14,7 +17,7 @@ use topcoat::{
     router::{content::Json, route},
 };
 
-#[route(POST "/api/users")]
+#[route(POST)]
 async fn create_user(cx: &Cx, Json(input): Json<CreateUser>) -> Result<String> {
     let _ = cx;
     Ok(format!("created {}", input.name))
@@ -28,9 +31,9 @@ The context and body parameters are optional and may appear in either order. The
 Extractors that buffer the body reject requests above the body limit with `413 Content Too Large`. The default is 2 MiB. Register a [`BodyLimit`](crate::BodyLimit) layer to change it for the application or a path:
 
 ```rust,no_run
-use topcoat::router::{BodyLimit, Router};
+use topcoat::router::{module_router, BodyLimit};
 
-let router = Router::builder()
+let router = module_router!()
     // Allow up to 32 MiB under /upload, keep the 2 MiB default elsewhere.
     .layer(BodyLimit::max(32 * 1024 * 1024).at("/upload"))
     .build();
@@ -47,13 +50,14 @@ A route returns `Result<T>`. Implement [`IntoResponse`](crate::response::IntoRes
 A tuple builds a response from several parts. The last element is the body, a leading [`StatusCode`](crate::StatusCode) sets the status, and the elements in between attach headers or extensions:
 
 ```rust
+// src/app/api/users.rs
 # #[derive(serde::Serialize)] struct User { name: String }
 use topcoat::{
     Result,
     router::{StatusCode, content::Json, route},
 };
 
-#[route(POST "/api/users")]
+#[route(POST)]
 async fn create_user() -> Result<(StatusCode, Json<User>)> {
     let user = User {
         name: "Ada".to_string(),

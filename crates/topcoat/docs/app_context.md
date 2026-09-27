@@ -9,10 +9,10 @@ Values are identified by their Rust type. The router accepts one value of each t
 Build the router and chain `.app_context(value)` for every value you want to share:
 
 ```rust
-use topcoat::router::{Router, RouterBuilderDiscoverExt};
+use topcoat::router::{module_router, Router, RouterBuilderDiscoverExt};
 
 pub fn router() -> Router {
-    Router::builder()
+    module_router!()
         .discover()
         .app_context(Database::connect())
         .app_context(HttpClient::new())
@@ -23,10 +23,11 @@ pub fn router() -> Router {
 Registering two values of the same type panics. Wrap them in distinct types when you need to share both:
 
 ```rust
+use topcoat::router::module_router;
 struct PrimaryDb(Database);
 struct ReplicaDb(Database);
 
-Router::builder()
+module_router!()
     .app_context(PrimaryDb(Database::connect_primary()))
     .app_context(ReplicaDb(Database::connect_replica()))
     .build();

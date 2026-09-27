@@ -492,9 +492,10 @@ Ok(view! {
 The first status code in markup order wins. For each header name, the first declaration supplies all its values. In a layout, place declarations before the slot to override the page, or after the slot to provide defaults:
 
 ```rust
+// src/app/docs.rs
 # use topcoat::{Result, view::*};
 # use topcoat::router::{HeaderValue, Slot, header, layout};
-#[layout("/docs")]
+#[layout]
 async fn docs_layout(slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <main>(slot)</main>

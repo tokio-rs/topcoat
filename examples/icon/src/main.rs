@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     icon::{IconData, icon, iconify},
-    router::{Router, RouterBuilderDiscoverExt, page},
+    router::{module_router, page},
     view::{View, svg::ViewBox, view},
 };
 
@@ -18,12 +18,10 @@ iconify::include!("feather");
 
 #[tokio::main]
 async fn main() {
-    topcoat::start(Router::builder().discover().build())
-        .await
-        .unwrap();
+    topcoat::start(module_router!().build()).await.unwrap();
 }
 
-#[page("/")]
+#[page]
 async fn home() -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>

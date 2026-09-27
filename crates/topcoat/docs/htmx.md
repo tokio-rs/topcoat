@@ -1,5 +1,7 @@
 [htmx](https://htmx.org) updates parts of a page with HTML from the server. Attributes such as `hx-get` send requests and select where the response appears.
 
+The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
+
 Topcoat reads htmx request headers and sets response headers that control how the browser applies an update.
 
 Everything below is re-exported from `topcoat::htmx` and gated behind the `htmx` feature.
@@ -77,6 +79,7 @@ Other accessors read individual [request headers](https://htmx.org/reference/#re
 Use response types to set htmx [response headers](https://htmx.org/reference/#response_headers). They implement [`IntoResponseParts`], so place them before the body in the response tuple. This example changes the target and swap mode:
 
 ```rust
+// src/app/save.rs
 use topcoat::{
     Result,
     context::Cx,
@@ -85,7 +88,7 @@ use topcoat::{
     view::{ViewExt, ViewHandle, view},
 };
 
-#[route(POST "/save")]
+#[route(POST)]
 async fn save(cx: &Cx) -> Result<(HxRetarget, HxReswap, ViewHandle)> {
     let body = view! { cx => <div>"Saved!"</div> }.single().await?;
     Ok((

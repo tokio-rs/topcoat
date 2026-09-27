@@ -1,5 +1,7 @@
 Declare email with [`mail!`] and deliver it with [`send`]. A [`Transport`] determines how messages are delivered.
 
+The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
+
 Everything below is re-exported from `topcoat::mail` and gated behind the `mail` feature. The SMTP transport additionally needs the `mail-smtp` feature.
 
 ```toml
@@ -15,11 +17,11 @@ Choose a transport in [`MailConfig`] and register it with the router's [`mail`](
 ```rust
 use topcoat::{
     mail::{FileTransport, MailConfig, RouterBuilderMailExt},
-    router::{Router, RouterBuilderDiscoverExt},
+    router::{module_router, Router, RouterBuilderDiscoverExt},
 };
 
 pub fn router() -> Router {
-    Router::builder()
+    module_router!()
         .discover()
         .mail(
             MailConfig::builder()
@@ -37,6 +39,7 @@ Handlers use the registered transport. You can change delivery settings without 
 The [`mail!`] macro creates a [`Mail`] from `name: value` fields. Its `html` field accepts [`view!`](crate::view::view) markup:
 
 ```rust
+// src/app/api/welcome.rs
 use topcoat::{
     Result,
     context::Cx,
@@ -44,7 +47,7 @@ use topcoat::{
     router::route,
 };
 
-#[route(POST "/api/welcome")]
+#[route(POST)]
 async fn welcome(cx: &Cx) -> Result<&'static str> {
     let mail = mail! {
         from: ("Topcoat", "welcome@example.com"),

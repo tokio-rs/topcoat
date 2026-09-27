@@ -1,21 +1,20 @@
 use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt, asset},
-    router::{Router, page},
+    router::{module_router, page},
     view::{View, view},
 };
 
 #[tokio::main]
 async fn main() {
-    let router = Router::builder()
-        .page(home)
+    let router = module_router!()
         .assets(AssetBundle::load().unwrap())
         .build();
 
     topcoat::start(router).await.unwrap();
 }
 
-#[page("/")]
+#[page]
 async fn home() -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>

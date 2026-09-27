@@ -36,6 +36,7 @@ const REWRITE_LIMIT: usize = 8;
 /// # Examples
 ///
 /// ```rust
+/// // src/app/dashboard.rs
 /// use topcoat::{
 ///     Result,
 ///     context::Cx,
@@ -44,7 +45,7 @@ const REWRITE_LIMIT: usize = 8;
 /// };
 /// # async fn beta_tester(_cx: &Cx) -> bool { false }
 ///
-/// #[page("/dashboard")]
+/// #[page]
 /// async fn dashboard(cx: &Cx) -> Result<impl View> {
 ///     if beta_tester(cx).await {
 ///         return Err(rewrite("/dashboard-beta", Body::empty()).into());

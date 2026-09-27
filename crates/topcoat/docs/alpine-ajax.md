@@ -1,5 +1,7 @@
 [Alpine AJAX](https://alpine-ajax.js.org) updates parts of a page with HTML from the server. Add `x-target` to a form or link to select which elements the response replaces.
 
+The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
+
 Topcoat reads Alpine AJAX's request headers so handlers can return the requested fragments. Configure browser behavior through Alpine AJAX's markup and events.
 
 Everything below is re-exported from `topcoat::alpine_ajax` and gated behind the `alpine-ajax` feature.
@@ -102,6 +104,7 @@ By default, `x-target` applies to successful responses. Add a status modifier to
 Return `422` with the form and an error message when validation fails. The `.422` target list leaves `comments` unchanged. A successful response updates both targets:
 
 ```rust
+// src/app/comments.rs
 use topcoat::{
     Result,
     context::Cx,
@@ -109,7 +112,7 @@ use topcoat::{
     view::{ViewExt, view},
 };
 
-#[route(POST "/comments")]
+#[route(POST)]
 async fn create_comment(cx: &Cx /* , Form(input): Form<NewComment> */) -> Result<Response> {
     let error: Option<&str> = None; // validate `input` here
 

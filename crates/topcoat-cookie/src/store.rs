@@ -16,6 +16,7 @@ use crate::{Cookie, Cookies};
 /// Obtain one by reading the incoming cookie through [`cookie_store`]:
 ///
 /// ```rust
+/// // src/app/api/cart.rs
 /// use serde::{Deserialize, Serialize};
 /// use topcoat::{
 ///     Result,
@@ -29,7 +30,7 @@ use crate::{Cookie, Cookies};
 ///     items: Vec<String>,
 /// }
 ///
-/// #[route(POST "/api/cart")]
+/// #[route(POST)]
 /// async fn add_item(cx: &Cx) -> Result<String> {
 ///     // `commit` writes the cookie and hands the value back; without it the
 ///     // change is discarded.

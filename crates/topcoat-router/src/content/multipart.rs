@@ -37,12 +37,13 @@ use crate::{
 /// # Examples
 ///
 /// ```rust
+/// // src/app/api/upload.rs
 /// use topcoat::{
 ///     Result,
 ///     router::{content::multipart::Multipart, route},
 /// };
 ///
-/// #[route(POST "/api/upload")]
+/// #[route(POST)]
 /// async fn upload(mut multipart: Multipart) -> Result<&'static str> {
 ///     while let Some(field) = multipart.next_field().await? {
 ///         let name = field.name().map(str::to_owned);

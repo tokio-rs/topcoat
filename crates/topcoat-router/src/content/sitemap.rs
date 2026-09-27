@@ -32,6 +32,7 @@ use crate::{
 /// # Examples
 ///
 /// ```rust
+/// // src/app/sitemap_xml.rs
 /// use topcoat::{
 ///     Result,
 ///     router::{
@@ -40,7 +41,9 @@ use crate::{
 ///     },
 /// };
 ///
-/// #[route(GET "/sitemap.xml")]
+/// topcoat::router::segment!(rename = "sitemap.xml");
+///
+/// #[route(GET)]
 /// async fn sitemap() -> Result<Sitemap> {
 ///     Ok(Sitemap::new()
 ///         .url("/")

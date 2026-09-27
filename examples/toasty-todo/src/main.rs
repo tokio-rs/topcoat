@@ -1,16 +1,8 @@
+mod todos;
+
 use serde::Deserialize;
 use toasty::Db;
-use topcoat::{
-    Result,
-    context::{Cx, app_context},
-    router::{
-        Router, RouterBuilderDiscoverExt, Slot,
-        content::Form,
-        error::{SeeOther, see_other},
-        href, layout, page, path_param, route,
-    },
-    view::{View, component, view},
-};
+use topcoat::{Result, context::{Cx, app_context}, router::{Slot, href, layout, module_router, page}, view::{View, component, view}};
 
 #[tokio::main]
 async fn main() {
@@ -24,7 +16,7 @@ async fn main() {
 
     db.push_schema().await.unwrap();
 
-    topcoat::start(Router::builder().discover().app_context(db).build())
+    topcoat::start(module_router!().app_context(db).build())
         .await
         .unwrap();
 }
@@ -46,7 +38,7 @@ struct Todo {
     done: bool,
 }
 
-#[layout("/")]
+#[layout]
 async fn root(slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
@@ -60,12 +52,12 @@ async fn root(slot: Slot<'_>) -> Result<impl View> {
     })
 }
 
-#[page("/")]
+#[page]
 async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>"Toasty Todos"</h1>
 
-        <form method="post" action=(href!(create))>
+        <form method="post" action=(href!(crate::todos::create))>
             <input type="text" name="title" placeholder="What needs doing?" required="">
             <button type="submit">"Add"</button>
         </form>
@@ -106,7 +98,13 @@ async fn home(cx: &Cx) -> Result<impl View> {
 #[component]
 async fn toggle_checkbox(todo: &Todo) -> Result<impl View> {
     Ok(view! {
-        <form method="post" action=(href!(toggle, TodoId(todo.id)))>
+        <form
+            method="post"
+            action=(href!(
+                crate::todos::todo_id::toggle::toggle,
+                crate::todos::todo_id::TodoId(todo.id),
+            ))
+        >
             <input type="checkbox" checked=(todo.done) onchange="this.form.submit()">
         </form>
     })
@@ -115,7 +113,13 @@ async fn toggle_checkbox(todo: &Todo) -> Result<impl View> {
 #[component]
 async fn delete_button(todo: &Todo) -> Result<impl View> {
     Ok(view! {
-        <form method="post" action=(href!(delete, TodoId(todo.id)))>
+        <form
+            method="post"
+            action=(href!(
+                crate::todos::todo_id::delete::delete,
+                crate::todos::todo_id::TodoId(todo.id),
+            ))
+        >
             <button type="submit">"delete"</button>
         </form>
     })
@@ -126,39 +130,4 @@ async fn delete_button(todo: &Todo) -> Result<impl View> {
 #[derive(Deserialize)]
 struct NewTodo {
     title: String,
-}
-
-#[route(POST "/todos")]
-async fn create(cx: &Cx, Form(new_todo): Form<NewTodo>) -> Result<SeeOther> {
-    let title = new_todo.title.trim();
-
-    if !title.is_empty() {
-        toasty::create!(Todo { title, done: false })
-            .exec(&mut db(cx))
-            .await?;
-    }
-
-    // Post/Redirect/Get, so a reload does not submit the form again.
-    Ok(see_other(href!(home).resolve(cx)))
-}
-
-path_param!(todo_id: u64, error = bad_request);
-
-#[route(POST "/todos/{todo_id}/toggle")]
-async fn toggle(cx: &Cx) -> Result<SeeOther> {
-    let mut db = db(cx);
-
-    let mut todo = Todo::get_by_id(&mut db, *path_param::<TodoId>(cx)?).await?;
-    let done = !todo.done;
-
-    toasty::update!(todo { done }).exec(&mut db).await?;
-
-    Ok(see_other(href!(home).resolve(cx)))
-}
-
-#[route(POST "/todos/{todo_id}/delete")]
-async fn delete(cx: &Cx) -> Result<SeeOther> {
-    Todo::delete_by_id(&mut db(cx), *path_param::<TodoId>(cx)?).await?;
-
-    Ok(see_other(href!(home).resolve(cx)))
 }

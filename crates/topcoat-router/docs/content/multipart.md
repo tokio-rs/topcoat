@@ -1,5 +1,7 @@
 Multipart form data for Topcoat routes.
 
+The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
+
 Enable the `multipart` feature to read `multipart/form-data`, the format used by browser forms that upload files. The [`Multipart`] extractor yields each form field as a [`Field`].
 
 # Reading fields
@@ -7,12 +9,13 @@ Enable the `multipart` feature to read `multipart/form-data`, the format used by
 Accept a [`Multipart`] parameter and call [`next_field`](Multipart::next_field) to read fields in request order. Finish reading or drop each field before requesting the next one.
 
 ```rust
+// src/app/api/upload.rs
 use topcoat::{
     Result,
     router::{content::multipart::Multipart, route},
 };
 
-#[route(POST "/api/upload")]
+#[route(POST)]
 async fn upload(mut multipart: Multipart) -> Result<&'static str> {
     while let Some(field) = multipart.next_field().await? {
         let name = field.name().map(str::to_owned);

@@ -1,23 +1,21 @@
 use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
-    router::{Router, Slot, layout, page},
+    router::{Slot, layout, module_router, page},
     tailwind,
     view::{View, view},
 };
 
 #[tokio::main]
 async fn main() {
-    let router = Router::builder()
-        .layout(root_layout)
-        .page(home)
+    let router = module_router!()
         .assets(AssetBundle::load().unwrap())
         .build();
 
     topcoat::start(router).await.unwrap();
 }
 
-#[layout("/")]
+#[layout]
 async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
@@ -38,7 +36,7 @@ async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
     })
 }
 
-#[page("/")]
+#[page]
 async fn home() -> Result<impl View> {
     Ok(view! {
         <main

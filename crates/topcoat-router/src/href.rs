@@ -407,6 +407,7 @@ fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bo
 /// Use [`is_current`](Href::is_current) to mark a navigation link as active.
 ///
 /// ```
+/// // src/app/posts.rs
 /// use serde::Serialize;
 /// use topcoat::{
 ///     Result,
@@ -415,16 +416,19 @@ fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bo
 ///     view::{View, view},
 /// };
 ///
-/// path_param!(post_id: u64);
+/// mod post_id {
+///     use topcoat::router::path_param;
+///     path_param!(pub post_id: u64);
+/// }
 ///
 /// #[derive(Serialize)]
 /// struct Pagination {
 ///     page: u32,
 /// }
 ///
-/// #[page("/posts")]
+/// #[page]
 /// async fn posts(cx: &Cx) -> Result<impl View> {
-///     let comments = href("/posts/{post_id}", (PostId(5),))
+///     let comments = href("/posts/{post_id}", (post_id::PostId(5),))
 ///         .query(Pagination { page: 2 })
 ///         .fragment("comments");
 ///     Ok(view! {
@@ -480,38 +484,47 @@ where
 ///     view::{View, view},
 /// };
 ///
-/// path_param!(post_id: u64, error = bad_request);
-///
+/// // src/app/posts.rs
 /// #[derive(Serialize)]
 /// struct Pagination {
 ///     page: u32,
 /// }
 ///
-/// #[page("/posts")]
+/// #[page]
 /// async fn posts(cx: &Cx) -> Result<impl View> {
 ///     Ok(view! {
-///         <a href=(href!(post, PostId(1)))>"The first post"</a>
-///         <a href=(href!(post, PostId(1)).fragment("comments"))>"Its comments"</a>
+///         <a href=(href!(post_id::post, post_id::PostId(1)))>"The first post"</a>
+///         <a href=(href!(post_id::post, post_id::PostId(1)).fragment("comments"))>"Its comments"</a>
 ///         <a href=(href!(posts).query(Pagination { page: 2 }))>"Next page"</a>
 ///     })
 /// }
 ///
-/// #[page("/posts/{post_id}")]
-/// async fn post(cx: &Cx) -> Result<impl View> {
-///     let post_id = path_param::<PostId>(cx)?;
+/// pub mod post_id {
+///     use super::*;
 ///
-///     Ok(view! {
-///         <form method="post" action=(href!(publish, PostId(*post_id)))>
-///             <button>"Publish"</button>
-///         </form>
-///     })
-/// }
+///     path_param!(pub post_id: u64, error = bad_request);
 ///
-/// #[route(POST "/posts/{post_id}/publish")]
-/// async fn publish(cx: &Cx) -> Result<SeeOther> {
-///     let post_id = path_param::<PostId>(cx)?;
+///     #[page]
+///     pub async fn post(cx: &Cx) -> Result<impl View> {
+///         let post_id = path_param::<PostId>(cx)?;
+///     
+///         Ok(view! {
+///             <form method="post" action=(href!(publish::publish, PostId(*post_id)))>
+///                 <button>"Publish"</button>
+///             </form>
+///         })
+///     }
+///     
+///     pub mod publish {
+///         use super::*;
 ///
-///     Ok(see_other(href!(post, PostId(*post_id)).resolve(cx)))
+///         #[route(POST)]
+///         pub async fn publish(cx: &Cx) -> Result<SeeOther> {
+///             let post_id = path_param::<PostId>(cx)?;
+///         
+///             Ok(see_other(href!(post, PostId(*post_id)).resolve(cx)))
+///         }
+///     }
 /// }
 /// ```
 ///
@@ -685,6 +698,7 @@ where
     /// Use it to mark the link pointing at the page being rendered:
     ///
     /// ```
+    /// // src/app/posts.rs
     /// use topcoat::{
     ///     Result,
     ///     context::Cx,
@@ -692,7 +706,7 @@ where
     ///     view::{View, view},
     /// };
     ///
-    /// #[page("/posts")]
+    /// #[page]
     /// async fn posts(cx: &Cx) -> Result<impl View> {
     ///     let link = href!(posts);
     ///     let current = link.is_current(cx);

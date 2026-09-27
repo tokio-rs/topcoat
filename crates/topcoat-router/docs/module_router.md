@@ -1,13 +1,16 @@
-The `module_router!` macro derives a handler's path from its enclosing Rust module. A handler without a path string uses the module path. A handler whose path string starts with `./` is served below the module path. Absolute path strings are ignored by the module router entirely.
+Module routing is the recommended default for Topcoat applications. The `module_router!` macro derives a handler's path from its enclosing Rust module. Use `#[page]`, `#[layout]`, `#[layer]`, and `#[route(GET)]` without path strings, and organize routes in modules.
+
+A handler whose path string starts with `./` is served below the module path. Absolute path strings are ignored by the module router entirely. Use them when a handler's URL needs to be independent of the module tree, and register that handler separately as described under "Explicit absolute paths".
 
 # Setup
 
 Call `module_router!()` from the root module of the route tree. That module maps to `/`. The macro returns a `RouterBuilder`, so add everything else your application needs on that builder before calling `.build()`.
 
 ```rust
+use topcoat::router::module_router;
 // src/app.rs
 pub fn router() -> topcoat::router::Router {
-    topcoat::router::module_router!().build()
+    module_router!().build()
 }
 ```
 
@@ -33,10 +36,10 @@ Every module-derived `#[page]`, `#[layout]`, `#[layer]`, and `#[route]` under th
 Call `RouterBuilderDiscoverExt::discover` to add explicit-path handlers and other items collected through discovery:
 
 ```rust
-use topcoat::router::{Router, RouterBuilderDiscoverExt};
+use topcoat::router::{module_router, Router, RouterBuilderDiscoverExt};
 
 pub fn router() -> Router {
-    topcoat::router::module_router!().discover().build()
+    module_router!().discover().build()
 }
 ```
 
@@ -45,11 +48,11 @@ Anything that is registered as a value is passed in by hand. The asset bundle is
 ```rust,no_run
 use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
-    router::{Router, RouterBuilderDiscoverExt},
+    router::{module_router, Router, RouterBuilderDiscoverExt},
 };
 
 pub fn router() -> Router {
-    topcoat::router::module_router!()
+    module_router!()
         .discover()
         .assets(AssetBundle::load().unwrap())
         .build()
@@ -323,6 +326,7 @@ Adding an absolute path string to `#[page]`, `#[layout]`, `#[layer]`, or `#[rout
 `module_router!()` discovers module-derived handlers. Register an absolute-path handler by name:
 
 ```rust
+use topcoat::router::module_router;
 # use topcoat::{Result, router::page, view::{View, view}};
 #[page("/legacy")]
 async fn legacy() -> Result<impl View> {
@@ -330,7 +334,7 @@ async fn legacy() -> Result<impl View> {
 }
 
 pub fn router() -> topcoat::router::Router {
-    topcoat::router::module_router!()
+    module_router!()
         .page(legacy)
         .build()
 }

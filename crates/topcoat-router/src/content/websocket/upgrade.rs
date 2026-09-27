@@ -36,6 +36,7 @@ use crate::{
 /// # Examples
 ///
 /// ```rust
+/// // src/app/echo.rs
 /// use topcoat::{
 ///     Result,
 ///     router::{
@@ -45,7 +46,7 @@ use crate::{
 ///     },
 /// };
 ///
-/// #[route(GET "/echo")]
+/// #[route(GET)]
 /// async fn echo(upgrade: WebSocketUpgrade) -> Result<Response> {
 ///     upgrade.on_upgrade(|mut socket| async move {
 ///         while let Some(Ok(message)) = socket.recv().await {
@@ -63,6 +64,7 @@ use crate::{
 /// Clone [`Cx`] and move it into the callback to read context there:
 ///
 /// ```rust
+/// // src/app/greet.rs
 /// use topcoat::{
 ///     Result,
 ///     context::{Cx, request_context},
@@ -77,7 +79,7 @@ use crate::{
 ///     name: String,
 /// }
 ///
-/// #[route(GET "/greet")]
+/// #[route(GET)]
 /// async fn greet(cx: &Cx, upgrade: WebSocketUpgrade) -> Result<Response> {
 ///     let cx = cx.clone();
 ///     upgrade.on_upgrade(move |mut socket| async move {

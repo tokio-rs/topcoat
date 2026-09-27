@@ -3,7 +3,7 @@ use topcoat::{
     Result,
     context::Cx,
     cookie::{CookieStore, Cookies, Key, RouterBuilderCookieExt, cookie_store, signed_cookies},
-    router::{Router, RouterBuilderDiscoverExt, page},
+    router::{module_router, page},
     view::{View, view},
 };
 
@@ -13,8 +13,7 @@ async fn main() {
     // A real application would load a persistent key instead of generating
     // a new one on every start.
     topcoat::start(
-        Router::builder()
-            .discover()
+        module_router!()
             .cookies()
             .app_context(Key::generate())
             .build(),
@@ -46,7 +45,7 @@ fn visits(cx: &Cx) -> CookieStore<Visits, impl Cookies> {
     cookie_store(cookies(cx), "visits").parse_or_default()
 }
 
-#[page("/")]
+#[page]
 async fn home(cx: &Cx) -> Result<impl View> {
     // `commit` queues the updated value as a Set-Cookie response header.
     let visits = visits(cx).update(Visits::increment).commit()?;

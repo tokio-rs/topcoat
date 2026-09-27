@@ -1,8 +1,8 @@
 Declares a layout that wraps inner pages.
 
-A layout wraps pages whose registered path starts with the layout's path, compared segment by segment. Set an absolute path with `#[layout("/settings")]`. Under [`module_router!`](macro.module_router.html), omit the path to derive it from the enclosing module, or use `./` to extend the module path. For example, `#[layout("./admin")]` in `src/app/settings.rs` wraps pages under `/settings/admin`.
+Use `#[layout]` without a path string with [module routing](macro.module_router.html), the recommended default. The enclosing module determines the URL prefix. A path starting with `./` extends the module path. An absolute path, such as `#[layout("/settings")]`, chooses the URL independently of the module tree and requires separate registration.
 
-A layout registers like any other handler: pass the function name to [`RouterBuilder::layout`](struct.RouterBuilder.html#method.layout), or let [`discover`](trait.RouterBuilderDiscoverExt.html) or [`module_router!`](macro.module_router.html) collect it automatically.
+[`module_router!`](macro.module_router.html) registers module-derived handlers. For explicit paths, pass the function name to [`RouterBuilder::layout`](struct.RouterBuilder.html#method.layout) or use [`discover`](trait.RouterBuilderDiscoverExt.html).
 
 # Handler signature
 
@@ -11,6 +11,21 @@ The function must be `async` and return a [`Result`](../type.Result.html) contai
 Render `slot` where the inner content should appear. Wrap it in an [`error_boundary`](../view/struct.error_boundary.html) to show a custom view if it fails. See the [error guide](../router/error/index.html).
 
 # Examples
+
+Module-derived path (in `src/app/settings.rs` under `module_router!()`, this wraps every page under `/settings`):
+
+```rust
+# use topcoat::{Result, router::{Slot, layout}, view::{View, view}};
+#[layout]
+async fn settings_layout(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
+        <section>
+            <nav>"Settings nav"</nav>
+            (slot)
+        </section>
+    })
+}
+```
 
 Explicit path:
 
@@ -27,21 +42,6 @@ async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
                 (slot)
             </body>
         </html>
-    })
-}
-```
-
-Module-derived path (in `src/app/settings.rs` under `module_router!()`, this wraps every page under `/settings`):
-
-```rust
-# use topcoat::{Result, router::{Slot, layout}, view::{View, view}};
-#[layout]
-async fn settings_layout(slot: Slot<'_>) -> Result<impl View> {
-    Ok(view! {
-        <section>
-            <nav>"Settings nav"</nav>
-            (slot)
-        </section>
     })
 }
 ```
@@ -67,24 +67,32 @@ When several layouts match a page, they nest from least specific (outermost) to 
 
 ```rust
 # use topcoat::{Result, router::{Slot, layout, page}, view::{View, view}};
-#[layout("/")]
+#[layout]
 async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
     Ok(view! { <html><body>(slot)</body></html> })
 }
 
-#[layout("/settings")]
-async fn settings_layout(slot: Slot<'_>) -> Result<impl View> {
-    Ok(view! {
-        <div class="settings-shell">
-            <nav>"Settings nav"</nav>
-            (slot)
-        </div>
-    })
-}
+mod settings {
+    use super::*;
 
-#[page("/settings/profile")]
-async fn profile() -> Result<impl View> {
-    Ok(view! { <h1>"Profile"</h1> })
+    #[layout]
+    async fn settings_layout(slot: Slot<'_>) -> Result<impl View> {
+        Ok(view! {
+            <div class="settings-shell">
+                <nav>"Settings nav"</nav>
+                (slot)
+            </div>
+        })
+    }
+    
+    mod profile {
+        use super::*;
+    
+        #[page]
+        async fn profile() -> Result<impl View> {
+            Ok(view! { <h1>"Profile"</h1> })
+        }
+    }
 }
 ```
 
@@ -96,11 +104,11 @@ A layout doubles as a [component](../view/attr.component.html), taking a [`Slot`
 
 ```rust
 # use topcoat::{Result, router::{Slot, layout, page}, view::{View, view}};
-# #[layout("/")]
+# #[layout]
 # async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
 #     Ok(view! { <body>(slot)</body> })
 # }
-#[page("/standalone")]
+#[page]
 async fn standalone() -> Result<impl View> {
     Ok(view! {
         root_layout(slot: Slot::new(view! { <p>"content"</p> }))

@@ -1,24 +1,12 @@
-use std::sync::atomic::{AtomicU64, Ordering};
+mod increment;
 
-use topcoat::{
-    Result,
-    alpine_ajax::ajax_request,
-    context::{Cx, app_context},
-    router::{
-        Router, RouterBuilderDiscoverExt, Slot,
-        error::see_other,
-        href, layout, page,
-        response::{IntoResponse, Response},
-        route,
-    },
-    view::{View, ViewExt, view},
-};
+use std::sync::atomic::{AtomicU64, Ordering};
+use topcoat::{Result, alpine_ajax::ajax_request, context::{Cx, app_context}, router::{Slot, href, layout, module_router, page}, view::{View, view}};
 
 #[tokio::main]
 async fn main() {
     topcoat::start(
-        Router::builder()
-            .discover()
+        module_router!()
             .app_context(Counter(AtomicU64::new(0)))
             .build(),
     )
@@ -26,7 +14,7 @@ async fn main() {
     .unwrap();
 }
 
-#[layout("/")]
+#[layout]
 async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         if ajax_request(cx) {
@@ -55,7 +43,7 @@ async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     })
 }
 
-#[page("/")]
+#[page]
 async fn home(cx: &Cx) -> Result<impl View> {
     let count = app_context::<Counter>(cx).0.load(Ordering::Relaxed);
 
@@ -67,26 +55,14 @@ async fn home(cx: &Cx) -> Result<impl View> {
 
         // Alpine AJAX intercepts this form and replaces the element whose
         // id matches `x-target`.
-        <form method="post" action=(href!(increment)) x-target="count">
+        <form
+            method="post"
+            action=(href!(crate::increment::increment))
+            x-target="count"
+        >
             <button type="submit">"Increment"</button>
         </form>
     })
 }
 
 struct Counter(AtomicU64);
-
-#[route(POST "/increment")]
-async fn increment(cx: &Cx) -> Result<Response> {
-    let count = app_context::<Counter>(cx).0.fetch_add(1, Ordering::Relaxed) + 1;
-
-    // An Alpine AJAX request only receives the targeted element.
-    if ajax_request(cx) {
-        return view! { cx => <span id="count">(count)</span> }
-            .single()
-            .await?
-            .into_response(cx);
-    }
-
-    // Without JavaScript, use Post/Redirect/Get and render the complete page.
-    see_other(href!(home).resolve(cx)).into_response(cx)
-}

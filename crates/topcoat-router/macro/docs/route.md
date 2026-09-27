@@ -6,9 +6,9 @@ A route always declares its HTTP methods as the first argument:
 - a bracketed list (`[GET, POST]`) responding to each listed method, or
 - `*`, responding to every method. A route declaring a specific method takes precedence over a `*` route at the same path.
 
-Place an absolute path after the methods to choose the URL directly, as in `#[route(GET "/api/health")]`. Under [`module_router!`](macro.module_router.html), omit the path to derive it from the enclosing module. A path starting with `./` extends the module path. For example, `#[route(GET "./health")]` in `src/app/api.rs` serves `/api/health`.
+Use `#[route(GET)]` without a path string with [module routing](macro.module_router.html), the recommended default. The enclosing module determines the URL. A path starting with `./` extends the module path. An absolute path, such as `#[route(GET "/api/health")]`, chooses the URL independently of the module tree and requires separate registration.
 
-A route registers like any other handler: pass the function name to [`RouterBuilder::route`](struct.RouterBuilder.html#method.route), or let [`discover`](trait.RouterBuilderDiscoverExt.html) or [`module_router!`](macro.module_router.html) collect it automatically.
+[`module_router!`](macro.module_router.html) registers module-derived handlers. For explicit paths, pass the function name to [`RouterBuilder::route`](struct.RouterBuilder.html#method.route) or use [`discover`](trait.RouterBuilderDiscoverExt.html).
 
 # Handler signature
 
@@ -19,6 +19,16 @@ The function must be `async` and return `Result<T>`, where `T` implements [`Asyn
 The macro converts the success value into a response. See [`IntoResponse`](response/trait.IntoResponse.html) for supported types and tuples. Wrap a value in [`Json<T>`](content/struct.Json.html) to serialize it as JSON.
 
 # Examples
+
+Module-derived path (in `src/app/api/health.rs` under `module_router!()`, this serves `GET /api/health`):
+
+```rust
+# use topcoat::{Result, router::route};
+#[route(GET)]
+async fn health() -> Result<&'static str> {
+    Ok("ok")
+}
+```
 
 Explicit method and path, reading a JSON body and answering with one:
 
@@ -40,16 +50,6 @@ async fn create_user(Json(input): Json<CreateUser>) -> Result<Json<CreateUser>> 
 }
 ```
 
-Module-derived path (in `src/app/api/health.rs` under `module_router!()`, this serves `GET /api/health`):
-
-```rust
-# use topcoat::{Result, router::route};
-#[route(GET)]
-async fn health() -> Result<&'static str> {
-    Ok("ok")
-}
-```
-
 Path below the module (in `src/app/api.rs` under `module_router!()`, this serves `GET /api/health` without a module for it):
 
 ```rust
@@ -64,13 +64,21 @@ A method list, and a `*` route answering every method (say, a webhook endpoint p
 
 ```rust
 # use topcoat::{Result, router::route};
-#[route([GET, POST] "/form")]
-async fn form() -> Result<&'static str> {
-    Ok("form")
+mod form {
+    use super::*;
+
+    #[route([GET, POST])]
+    async fn form() -> Result<&'static str> {
+        Ok("form")
+    }
 }
 
-#[route(* "/webhook")]
-async fn webhook() -> Result<&'static str> {
-    Ok("received")
+mod webhook {
+    use super::*;
+
+    #[route(*)]
+    async fn webhook() -> Result<&'static str> {
+        Ok("received")
+    }
 }
 ```

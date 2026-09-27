@@ -1,28 +1,18 @@
 Declares a page handler.
 
-Pass an absolute path, such as `#[page("/about")]`, to choose the URL directly. Under [`module_router!`](macro.module_router.html), omit the path to derive it from the enclosing module. A path starting with `./` extends that module path. For example, `#[page("./export")]` in `src/app/settings.rs` serves `/settings/export`.
+Use `#[page]` without a path string with [module routing](macro.module_router.html), the recommended default. The enclosing module determines the URL. A path starting with `./` extends the module path. An absolute path, such as `#[page("/about")]`, chooses the URL independently of the module tree and requires separate registration.
 
-A page serves `GET` by default. To serve other methods, name them before the path, using the same forms as [`#[route]`](attr.route.html): a single method (`#[page(POST "/signup")]`), a bracketed list (`[GET, POST]`), or `*` for every method.
+A page serves `GET` by default. To serve other methods, name them in the attribute, using the same forms as [`#[route]`](attr.route.html): a single method (`#[page(POST)]`), a bracketed list (`[GET, POST]`), or `*` for every method.
 
 Path strings follow the [`Path`](struct.Path.html) syntax.
 
-A page registers like any other handler: pass the function name to [`RouterBuilder::page`](struct.RouterBuilder.html#method.page), or let [`discover`](trait.RouterBuilderDiscoverExt.html) or [`module_router!`](macro.module_router.html) collect it automatically.
+[`module_router!`](macro.module_router.html) registers module-derived handlers. For explicit paths, pass the function name to [`RouterBuilder::page`](struct.RouterBuilder.html#method.page) or use [`discover`](trait.RouterBuilderDiscoverExt.html).
 
 # Handler signature
 
 The function must be `async` and return a [`Result`](../type.Result.html) containing a [`View`](../view/trait.View.html). It may take [`cx: &Cx`](../context/struct.Cx.html) and one body parameter implementing [`FromRequest`](request/trait.FromRequest.html). Both are optional and may appear in either order. The body parameter may use a pattern such as `Json(input): Json<T>`.
 
 # Examples
-
-Explicit path:
-
-```rust
-# use topcoat::{Result, router::page, view::{View, view}};
-#[page("/users/{id}")]
-async fn user_profile() -> Result<impl View> {
-    Ok(view! { <h1>"User profile"</h1> })
-}
-```
 
 Module-derived path (in `src/app/about.rs` under `module_router!()`, this serves `/about`):
 
@@ -31,6 +21,16 @@ Module-derived path (in `src/app/about.rs` under `module_router!()`, this serves
 #[page]
 async fn about() -> Result<impl View> {
     Ok(view! { <h1>"About"</h1> })
+}
+```
+
+Explicit path:
+
+```rust
+# use topcoat::{Result, router::page, view::{View, view}};
+#[page("/users/{id}")]
+async fn user_profile() -> Result<impl View> {
+    Ok(view! { <h1>"User profile"</h1> })
 }
 ```
 
@@ -47,11 +47,12 @@ async fn export() -> Result<impl View> {
 Declaring a method (a form submission answered with a rendered view):
 
 ```rust
+// src/app/signup.rs
 # use topcoat::{Result, router::{content::Form, page}, view::{View, view}};
 # use serde::Deserialize;
 # #[derive(Deserialize)]
 # struct Signup { email: String }
-#[page(POST "/signup")]
+#[page(POST)]
 async fn signup(Form(input): Form<Signup>) -> Result<impl View> {
     Ok(view! { <h1>"Welcome, " (input.email)</h1> })
 }
@@ -60,11 +61,12 @@ async fn signup(Form(input): Form<Signup>) -> Result<impl View> {
 Reading a request body:
 
 ```rust
+// src/app/contact.rs
 # use topcoat::{Result, router::{content::Form, page}, view::{View, view}};
 # use serde::Deserialize;
 # #[derive(Deserialize)]
 # struct Search { q: String }
-#[page("/contact")]
+#[page]
 async fn contact(Form(input): Form<Search>) -> Result<impl View> {
     Ok(view! { <main>"searching for " (input.q)</main> })
 }
@@ -79,17 +81,21 @@ A page doubles as a [component](../view/attr.component.html): calling it inside 
 # use serde::Deserialize;
 # #[derive(Deserialize)]
 # struct Search { q: String }
-# #[page("/contact")]
-# async fn contact(Form(input): Form<Search>) -> Result<impl View> {
+# mod contact {
+# use super::*;
+# #[page]
+# pub(super) async fn contact(Form(input): Form<Search>) -> Result<impl View> {
 #     Ok(view! { <main>"searching for " (input.q)</main> })
 # }
-#[page("/preview")]
+# }
+// src/app/preview.rs
+#[page]
 async fn preview() -> Result<impl View> {
     let query = Search {
         q: String::from("topcoat"),
     };
     Ok(view! {
-        contact(body: Form(query))
+        contact::contact(body: Form(query))
     })
 }
 ```

@@ -66,10 +66,11 @@ Awaiting a call yields the procedure's `Ok` value. If the procedure returns `Err
 Register a procedure on the [`Router`] before calling it from the browser. It implements [`Route`], so pass its name to `.route()`:
 
 ```rust
+use topcoat::router::module_router;
 # use topcoat::{Result, router::Router, runtime::procedure};
 # #[procedure]
 # async fn double(value: usize) -> Result<usize> { Ok(value * 2) }
-let router = Router::builder().route(double).build();
+let router = module_router!().route(double).build();
 ```
 
 With the `discover` feature enabled, `.discover()` registers all procedures linked into the application.
