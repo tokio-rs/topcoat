@@ -75,6 +75,8 @@ Each module below the root contributes one path segment. Static module names are
 
 The function name does not affect the path. Two module-derived handlers in the same module receive the same path.
 
+Use [`href!`](macro.href.html) to link to a handler by its Rust name, such as `href!(settings::profile::page)`, so the URL follows its registered path.
+
 # Pages, layouts, layers, and API routes
 
 A `#[page]` serves `GET` unless the attribute declares other methods, such as `#[page(POST)]`. A `#[layout]` wraps pages in its module and descendant modules.

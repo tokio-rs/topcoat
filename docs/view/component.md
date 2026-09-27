@@ -3,13 +3,13 @@ The [`#[component]`][`component`] attribute defines an async function that retur
 ```rust
 use topcoat::{
     Result,
-    view::{View, component, view},
+    view::{View, class, component, view},
 };
 
 #[component]
-async fn badge(label: &str, tone: &str) -> Result<impl View> {
+async fn badge(label: &str, is_success: bool) -> Result<impl View> {
     Ok(view! {
-        <span class=(format!("badge badge-{tone}"))>
+        <span class=(class!("badge", "badge-success" if is_success))>
             (label)
         </span>
     })
@@ -23,14 +23,14 @@ Call components inside [`view!`] with named arguments:
 ```rust
 # use topcoat::{Result, view::*};
 # #[component]
-# async fn badge(label: &str, tone: &str) -> Result<impl View> { Ok(view! { <span>(label)(tone)</span> }) }
+# async fn badge(label: &str, is_success: bool) -> Result<impl View> { Ok(view! { <span class=(topcoat::view::class!("badge", "badge-success" if is_success))>(label)</span> }) }
 # #[component]
 # async fn example() -> Result<impl View> {
 Ok(view! {
     <header>
         badge(
             label: "New",
-            tone: "success",
+            is_success: true,
         )
     </header>
 })
@@ -60,7 +60,7 @@ async fn panel(title: &str, #[default] child: Child<'_>) -> Result<impl View> {
 }
 
 # #[component]
-# async fn badge(label: &str, tone: &str) -> Result<impl View> { Ok(view! { <span>(label)(tone)</span> }) }
+# async fn badge(label: &str, is_success: bool) -> Result<impl View> { Ok(view! { <span class=(topcoat::view::class!("badge", "badge-success" if is_success))>(label)</span> }) }
 # #[component]
 # async fn example() -> Result<impl View> {
 Ok(view! {
@@ -70,7 +70,7 @@ Ok(view! {
         <p>"Account details"</p>
         badge(
             label: "Active",
-            tone: "success",
+            is_success: true,
         )
     )
 })

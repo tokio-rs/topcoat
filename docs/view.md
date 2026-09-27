@@ -1,5 +1,7 @@
 Build HTML with [`view!`] and define reusable components with [`#[component]`][`component`]. The [`view!`] guide introduces markup, Rust expressions, and rendering.
 
+Use [`class!`] to combine base classes with variants, conditional classes, or classes supplied by a caller. Keep fixed class lists as ordinary `class="..."` attributes. Use [`attributes!`] to build and forward collections of attributes.
+
 For content that loads slowly, [`suspense`] can show a fallback while the page streams. Use [`error_boundary`] to show a fallback when content fails to render.
 
 [`view!`]: macro.view.html

@@ -470,7 +470,27 @@ Ok(view! {
 
 # Attribute Collections And Class Lists
 
-Use [`attributes!`] to build an attribute collection separately from its element. Use [`class!`] to combine static and conditional class names. Their guides cover the syntax and how to insert the values into a view.
+Use [`attributes!`] to build an attribute collection separately from its element.
+
+Use [`class!`] when a class list combines base classes with conditional, optional, or supplied classes. The macro joins the entries with spaces and skips absent entries:
+
+```rust
+use topcoat::{Result, view::{View, class, component, view}};
+
+#[component]
+async fn save_button(is_pending: bool, #[default] extra_class: Option<&str>) -> Result<impl View> {
+    Ok(view! {
+        <button
+            disabled=(is_pending)
+            class=(class!("btn", "opacity-50" if is_pending, extra_class))
+        >
+            "Save"
+        </button>
+    })
+}
+```
+
+Keep a fixed class list as `class="btn btn-primary"`. For composed lists, prefer `class!` over building a space-separated string with `format!` or concatenation. See the [`class!`] guide for alternatives, collections, and reusable class values.
 
 # Status Codes And Response Headers
 

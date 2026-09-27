@@ -1,6 +1,8 @@
 The [`class!`] macro builds a [`topcoat::view::Class`] value by joining HTML class names with spaces.
 
-Use it in the value position of a `class` attribute when the list mixes static and conditional parts:
+Use it to combine base classes, variants, optional classes, conditional classes, and forwarded classes. It handles the spaces between entries, so callers do not need to format or concatenate a class list. Keep a fixed class list as an ordinary `class="btn btn-lg"` attribute.
+
+Pass the result directly as the value of a `class` attribute:
 
 ```rust
 # #[topcoat::view::component]
@@ -61,6 +63,26 @@ Ok(view! {
     <p class=(class!(variant, "active" if false))></p>
 })
 # }
+```
+
+# Forwarded classes
+
+When a component accepts an attribute collection, remove its `class` entry and combine it with the component's classes. Forward the remaining attributes separately:
+
+```rust
+use topcoat::{
+    Result,
+    view::{Attributes, Child, View, class, component, view},
+};
+
+#[component]
+async fn panel(#[default] mut attrs: Attributes, #[default] child: Child<'_>) -> Result<impl View> {
+    Ok(view! {
+        <section class=(class!("panel", attrs.remove("class"))) (attrs)>
+            (child)
+        </section>
+    })
+}
 ```
 
 # Static class lists

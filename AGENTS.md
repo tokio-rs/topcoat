@@ -1,5 +1,10 @@
 # Agent instructions
 
+## Application code conventions
+
+- Use `href!(handler, ...)` for URLs targeting Topcoat pages and routes, including navigation links, form actions, and redirects. Prefer handler references over repeating route paths. Pass the result directly to view attributes, and use `.resolve(cx)` when a string is required. See [`docs/router/href.md`](docs/router/href.md).
+- Use `class!` to combine base classes, variants, optional classes, conditional classes, and forwarded classes. Keep fixed class lists as ordinary `class="..."` attributes. See [`docs/view/class.md`](docs/view/class.md).
+
 ## Project structure
 
 Topcoat is a Cargo workspace. The framework crates live in `crates/`, small single-feature examples in `examples/`, complete demo applications in `demos/`, and the prose guides in the top-level `docs/` directory.
@@ -8,7 +13,7 @@ Topcoat is a Cargo workspace. The framework crates live in `crates/`, small sing
 
 - `topcoat-core`: foundations shared by the other crates: the `Error`/`Result` types and the request context (`Cx`, `app_context`, `request_context`). Its macro crate provides `#[memoize]`, and its grammar crate holds the pretty-printer backing `topcoat fmt`'s macro-body formatting.
 - `topcoat-view`: the `view!`, `live!`, `emit!`, `attributes!`, and `class!` macros, the `#[component]` macro, and the runtime `View`/`Attributes`/`Class` types.
-- `topcoat-router`: `Router`, the `#[page]`/`#[layout]`/`#[route]` macros, `module_router!`, `path_param!`, and `#[query_params]`.
+- `topcoat-router`: `Router`, the `#[page]`/`#[layout]`/`#[route]` macros, `module_router!`, `href!`, `path_param!`, and `#[query_params]`.
 - `topcoat-runtime`: the client-side interactive runtime (signals, event handlers, bind attributes, the `expr!` macro) and the injected browser script.
 - `topcoat-font`: the `font!` and `font_face!` macros and the Fontsource integration for bundling and serving web fonts.
 - `topcoat-icon`: the `icon` component and the Iconify integration for vendoring icon sets into a project.
@@ -35,6 +40,7 @@ The top-level `docs/` directory is the source of truth for guides. Its structure
 
 - [`docs/router.md`](docs/router.md): The `Router` primitive: registering `#[page]`, `#[layout]`, and `#[route]` items manually or via `.discover()`, and how layouts nest by path prefix.
 - [`docs/router/module.md`](docs/router/module.md): `module_router!`, which derives routes from the module tree (kebab-cased segments, `segment!` overrides, `_`-prefixed groups).
+- [`docs/router/href.md`](docs/router/href.md): `href!` for links, form actions, and redirects to handlers, with path parameters, queries, fragments, and active navigation.
 - [`docs/router/error.md`](docs/router/error.md): Router errors: the status-code constructors, the `RouterErrorExt` conversions from `Option`/`Result`, catching an error in an outer handler, and internal rewrites.
 - [`docs/router/tower.md`](docs/router/tower.md): The tower bridge: `TowerRoute` for mounting a tower service as a route, `TowerLayer` for running tower middleware as a layer, and `TowerService` for serving the router as a tower service.
 - [`docs/router/content.md`](docs/router/content.md): Request and response bodies: `FromRequest` extractors, `IntoResponse` return values, and an overview of the content types below.

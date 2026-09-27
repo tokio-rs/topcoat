@@ -30,7 +30,9 @@ async fn settings_layout(slot: Slot<'_>) -> Result<impl View> {
 Explicit path:
 
 ```rust
-use topcoat::{Result, router::{Slot, layout}, view::{View, view}};
+use topcoat::{Result, router::{Slot, href, layout}, view::{View, view}};
+# #[topcoat::router::page("/")]
+# async fn home() -> Result<impl View> { Ok(topcoat::view::view! { "Home" }) }
 
 #[layout("/")]
 async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
@@ -38,7 +40,7 @@ async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
         <!DOCTYPE html>
         <html>
             <body>
-                <nav><a href="/">"Home"</a></nav>
+                <nav><a href=(href!(home))>"Home"</a></nav>
                 (slot)
             </body>
         </html>

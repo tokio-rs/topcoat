@@ -47,12 +47,16 @@ After authenticating the user, call [`start`] and store the returned [`Session`]
 use topcoat::{
     Result,
     context::Cx,
-    router::{error::{SeeOther, see_other}, route},
+    router::{error::{SeeOther, see_other}, href, route},
     session,
 };
 # struct User;
 # async fn verify_credentials(_cx: &Cx) -> Result<User> { Ok(User) }
 # async fn persist_session(_cx: &Cx, _user: &User, _session: &session::Session) -> Result<()> { Ok(()) }
+# mod app {
+#     #[topcoat::router::page]
+#     pub async fn home() -> topcoat::Result<impl topcoat::view::View> { Ok(topcoat::view::view! { "Home" }) }
+# }
 
 #[route(POST)]
 async fn login(cx: &Cx) -> Result<SeeOther> {
@@ -61,8 +65,9 @@ async fn login(cx: &Cx) -> Result<SeeOther> {
     let session = session::start(cx).await?;
     persist_session(cx, &user, &session).await?;
 
-    Ok(see_other("/"))
+    Ok(see_other(href!(crate::app::home).resolve(cx)))
 }
+# fn main() {}
 ```
 
 `Session.token_hash` is the key of the record, and `Session.expires_at` is when it stops being valid. Persist both.
@@ -94,19 +99,28 @@ Guard pages by combining it with the router's error helpers:
 use topcoat::{
     Result,
     context::Cx,
-    router::{error::RouterErrorExt, page},
+    router::{error::RouterErrorExt, href, page},
     view::{View, view},
 };
 # #[derive(Clone)] struct User { name: String }
 # async fn current_user(_cx: &Cx) -> Result<Option<User>> { Ok(None) }
+# mod app {
+#     pub mod login {
+#         #[topcoat::router::page]
+#         pub async fn page() -> topcoat::Result<impl topcoat::view::View> { Ok(topcoat::view::view! { "Sign in" }) }
+#     }
+# }
 
 #[page]
 async fn account(cx: &Cx) -> Result<impl View> {
-    let user = current_user(cx).await?.ok_or_redirect("/login")?;
+    let user = current_user(cx)
+        .await?
+        .ok_or_redirect(href!(crate::app::login::page).resolve(cx))?;
     Ok(view! {
         <h1>"Account of " (&user.name)</h1>
     })
 }
+# fn main() {}
 ```
 
 # Logging out
@@ -118,18 +132,23 @@ async fn account(cx: &Cx) -> Result<impl View> {
 use topcoat::{
     Result,
     context::Cx,
-    router::{error::{SeeOther, see_other}, route},
+    router::{error::{SeeOther, see_other}, href, route},
     session,
 };
 # async fn delete_session(_cx: &Cx, _hash: &session::TokenHash) -> Result<()> { Ok(()) }
+# mod app {
+#     #[topcoat::router::page]
+#     pub async fn home() -> topcoat::Result<impl topcoat::view::View> { Ok(topcoat::view::view! { "Home" }) }
+# }
 
 #[route(POST)]
 async fn logout(cx: &Cx) -> Result<SeeOther> {
     if let Some(hash) = session::stop(cx).await? {
         delete_session(cx, &hash).await?;
     }
-    Ok(see_other("/"))
+    Ok(see_other(href!(crate::app::home).resolve(cx)))
 }
+# fn main() {}
 ```
 
 [`stop`] only clears the current session. To revoke other sessions, delete their records from your storage. Later lookups must reject those tokens.

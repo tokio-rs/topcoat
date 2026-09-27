@@ -216,6 +216,7 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 **Routing**
 - [Router](https://docs.rs/topcoat/latest/topcoat/router/index.html): pages, layouts, and API routes; manual and auto-discovered.
 - [Module-based routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html): derive the route table from your module tree.
+- [Linking to handlers](https://github.com/tokio-rs/topcoat/blob/main/docs/router/href.md): use `href!` for navigation links, form actions, and redirects.
 
 **Working with requests**
 - [Request context (`Cx`)](https://docs.rs/topcoat/latest/topcoat/context/index.html): the value pages, layouts, and components read from.

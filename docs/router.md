@@ -47,6 +47,52 @@ With the `discover` feature enabled, `Router::builder().discover().build()` coll
 
 You can also combine the approaches. `module_router!()` collects module-derived handlers; chain `.page(home)` or `.route(health)` to add an explicit-path handler, or `.discover()` to collect them all.
 
+# Linking to pages and routes
+
+Use [`href!`](macro@href) for URLs targeting Topcoat handlers, including navigation links, form actions, and redirects. Pass the handler's Rust name so the URL follows its registered path when you rename a module or change an explicit path. Pass each path parameter as a `path_param!` value:
+
+```rust
+use topcoat::{router::href, view::view};
+# use topcoat::{Result, router::{page, route}, view::View};
+# #[page("/posts")] async fn posts() -> Result<impl View> { Ok(topcoat::view::view! { "Posts" }) }
+# #[route(POST "/posts")] async fn publish() -> Result<()> { Ok(()) }
+# mod post_id {
+#     use super::*;
+#     topcoat::router::path_param!(pub post_id: u64);
+#     #[page("/posts/{post_id}")] pub async fn post() -> Result<impl View> { Ok(topcoat::view::view! { "Post" }) }
+# }
+# #[page] async fn example() -> Result<impl View> {
+Ok(view! {
+    <a href=(href!(posts))>"All posts"</a>
+    <a href=(href!(post_id::post, post_id::PostId(1)))>"First post"</a>
+    <form method="post" action=(href!(publish))>
+        <button>"Publish"</button>
+    </form>
+})
+# }
+# fn main() {}
+```
+
+A view renders the returned [`Href`] directly. Call [`resolve`](Href::resolve) when a redirect helper needs a string:
+
+```rust
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{error::{SeeOther, see_other}, href, route},
+};
+# #[topcoat::router::page("/posts")]
+# async fn posts() -> Result<impl topcoat::view::View> { Ok(topcoat::view::view! { "Posts" }) }
+
+#[route(POST)]
+async fn publish(cx: &Cx) -> Result<SeeOther> {
+    // Save the post, then redirect to the list.
+    Ok(see_other(href!(posts).resolve(cx)))
+}
+```
+
+Use ordinary URLs for external destinations and standalone fragment links such as `href="#details"`. The [`href!` guide](macro@href) covers queries, fragments, and URL forms. See [layouts](#layouts) below for active navigation with [`Href::is_current`] and [`class!`](macro@crate::view::class).
+
 # Path syntax
 
 Explicit route paths use Topcoat's [`Path`] syntax. A path is made of `/`-separated segments, and each segment is one of four kinds.
@@ -99,28 +145,46 @@ A layout wraps pages. It receives the inner page (or nested layout) as a [`Slot`
 // src/app.rs
 use topcoat::{
     Result,
-    router::{Slot, layout},
-    view::{View, view},
+    context::Cx,
+    router::{Slot, href, layout},
+    view::{View, class, view},
 };
+# #[topcoat::router::page] async fn home() -> Result<impl View> { Ok(topcoat::view::view! { "Home" }) }
+# mod about {
+#     use super::*;
+#     #[topcoat::router::page] pub async fn page() -> Result<impl View> { Ok(topcoat::view::view! { "About" }) }
+# }
 
 #[layout]
-async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
+    let about_link = href!(about::page);
+    let current = about_link.is_current(cx);
+
     Ok(view! {
         <!DOCTYPE html>
         <html>
             <body>
                 <nav>
-                    <a href="/">"Home"</a>
-                    <a href="/about">"About"</a>
+                    <a href=(href!(home))>"Home"</a>
+                    <a
+                        href=(about_link)
+                        aria-current=(current.then_some("page"))
+                        class=(class!("nav-link", "active" if current))
+                    >
+                        "About"
+                    </a>
                 </nav>
                 (slot)
             </body>
         </html>
     })
 }
+# fn main() {}
 ```
 
 A layout matches a page by path segments. A layout at `/` wraps all pages. One at `/settings` wraps `/settings` and pages below it, such as `/settings/profile`. Matching layouts nest with the least specific path outside the most specific one. See [`#[layout]`](layout) for details.
+
+The navigation uses [`Href::is_current`] to identify the active link and [`class!`](macro@crate::view::class) to combine its base and conditional classes.
 
 # Layers
 
@@ -460,7 +524,7 @@ use topcoat::{
     Result,
     context::Cx,
     router::{
-        Body, Next, Router, Slot, content::Json, layer, layout, page, response::Response, route,
+        Body, Next, Router, Slot, content::Json, href, layer, layout, page, response::Response, route,
     },
     view::{View, view},
 };
@@ -477,8 +541,8 @@ async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
         <html>
             <body>
                 <nav>
-                    <a href="/">"Home"</a>
-                    <a href="/users">"Users"</a>
+                    <a href=(href!(home))>"Home"</a>
+                    <a href=(href!(users_list))>"Users"</a>
                 </nav>
                 (slot)
             </body>
