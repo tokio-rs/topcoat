@@ -1,0 +1,101 @@
+# Topcoat
+
+> Rust server-rendered web framework. Async components produce HTML; runtime expressions compile to Rust + JavaScript, without client WASM. Experimental. Apps depend on the `topcoat` facade.
+
+Links point to authoritative guides in this checkout. Runnable patterns: `examples/<feature>/src/`; complete app: `demos/coffee-shop/`. Consult linked guides/source for details omitted here.
+
+## Start
+
+`cargo new app`; `cargo add topcoat`; `cargo add tokio --features rt-multi-thread,macros`. Install `cargo install topcoat-cli`; run `topcoat dev` (build/bundle/reload). `start` defaults to `127.0.0.1:3000`; override `HOST`/`PORT`. [Setup](docs/getting_started.md).
+
+```rust
+use topcoat::{Result, router::{module_router, page}, view::{View, view}};
+
+#[tokio::main]
+async fn main() {
+    topcoat::start(module_router!().build()).await.unwrap();
+}
+
+#[page]
+async fn home() -> Result<impl View> {
+    Ok(view! {
+        <!DOCTYPE html>
+        <html><head>topcoat::dev::script()</head><body><h1>"Hello"</h1></body></html>
+    })
+}
+```
+
+Defaults include router/view/runtime/serve/discover, asset/compression/cookie/session/font/icon; `full` enables all. Other feature names appear below. Import `RouterBuilder*Ext` traits for extension methods. Features expose APIs; builder calls install services. Exact flags: `crates/topcoat/Cargo.toml`.
+
+## Routing and HTTP
+
+- [Module routing](docs/router/module.md): `module_router!()` maps its enclosing module to `/`; descendants add kebab-case segments. Declare children with `mod`; no filesystem scan. Function names do not affect URLs. `_group` modules scope layouts/layers without URL segments. `segment!(rename = "...")` or `kind = Static|Group|Param|CatchAll` overrides a segment.
+- `#[page] async fn ... -> Result<impl View>` serves GET. `#[route(POST)] async fn ... -> Result<T>` serves `T: AsyncIntoResponse` (includes IntoResponse). Both accept optional `cx: &Cx` and ONE `FromRequest` argument, e.g. `Form(input): Form<Input>`. Methods also accept `[GET, POST]` or `*`; specific beats `*`. GET supplies HEAD unless overridden.
+- `#[page("./export")]` extends the module URL. Absolute paths, e.g. `#[route(GET "/health")]`, require `.route(handler)`/`.page(handler)` or `.discover()`. `module_router!()` collects module-derived handlers; `.discover()` adds absolute handlers, procedures, shards, fonts. Both require `discover` (default). Duplicate path+method panics; trailing-slash mismatches redirect.
+- `#[layout] async fn shell(slot: Slot<'_>) -> Result<impl View>` wraps pages via `(slot)`; optional cx. `#[layer] async fn wrap(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response>` calls `next.run(cx, body).await`. Both match registered logical path prefixes, including groups/parameter names. Least specific is outermost; same-path explicit layers run last-registered first. Discovered layers/layouts need unique paths. Only pathless layers (`path() == None`) wrap routing misses. [Router](docs/router.md).
+- [Parameters](docs/router/path_param.md): `path_param!(pub post_id: u64, error = bad_request)` creates `PostId`, makes its module `{post_id}`; `path_param::<PostId>(cx)?` returns `&u64`. Untyped `path_param!(slug)` reads decoded `&str`; typed without `error` returns a borrowed Result. `path_param!(*rest)` reads decoded segments; `*rest: T` reads a parsed slice. Catch-all is last and nonempty. One parameter OR `segment!` per module; missing captures panic.
+- [Queries](docs/router/query_params.md): `#[query_params(error = bad_request)] struct Query { page: Option<u32> }`; `query_params::<Query>(cx)?` borrows cached data. Macro derives Deserialize; missing/empty optional values become None. Path/query parsing is memoized per request.
+- [Links](docs/router/href.md): always `href!(handler, PostId(id))` for internal links/actions/redirects; named wrappers in path order. Render `href=(href!(handler))`; `.resolve(cx)` yields string. `.query(serializable)`, `.fragment("id")`, `.is_current(cx)`, `.absolute()` (needs `.base_url(...)`). Segments are encoded; empty/`.`/`..` or mismatched parameters panic. External URLs/standalone fragments are strings.
+- [Content](docs/router/content.md): `router::content::{Form, Json}`; Form reads query on GET/HEAD, URL-encoded body otherwise. Option extractors allow missing input, not malformed input. Buffered limit: 2 MiB; override `.layer(BodyLimit::max(bytes).at("/upload"))`. Raw Body bypasses limits; custom extractors should buffer via `request::Bytes`. Response tuples: optional status, headers/extensions, body last. Route HTML: `ViewHandle` from `.single().await?`, or `BoxView<'static>` for streaming.
+- [Errors](docs/router/error.md): `router::error::RouterErrorExt` gives Option/Result `ok_or_not_found()?`, `ok_or_forbidden()?`, etc. `Ok(see_other(href!(page).resolve(cx)))` gives POST/Redirect/GET (303); `redirect` is 307. Unknown errors become 500; `bad_request` messages are public. Error boundaries need an explicit status in fallback. `not_found!()` adds a catch-all page to render misses through layouts; prefix itself needs its own page.
+- `Err(rewrite(target, body).method(Method::GET).with(value).into())` redispatches with fresh context/cache, discarding pending response changes. Request helpers see rewritten values; `original_*` sees incoming values. Default OriginPolicy checks cross-origin mutations/WebSockets before layers, not authentication. Use POST for mutations. `client_ip(cx)` ignores forwarding headers unless `.trusted_proxies(...)` is configured. `serve(listener, router)`/`Router::handle(request)` support custom hosting.
+
+## Views and state
+
+- [Views](docs/view/view.md): `view! { <p>"text " (expr)</p> }`. Void tags have no close, others must close. Quoted text; `(expr)` interpolates values/names. Rust if/for/match/let works in children/attributes; multi-node match arms need braces. Values are escaped; unescaped APIs require trusted markup.
+- [Components](docs/view/component.md): `#[component] async fn panel(title: &str, #[default] child: Child<'_>) -> Result<impl View>`; call `panel(title: "Hi", <p>"Child"</p>)`. Named props, then children without commas. Optional `cx: &Cx` is injected. `#[default]`/`#[default(expr)]`/`#[into]` control props; `#[derive(Props)]` provides these builder rules. Plain helpers: `view! { cx => ... }`. Box recursive/different view types with `ViewExt::boxed()`.
+- Views lazily capture by move; components run concurrently, output in source order. Do ordered side effects before constructing views. `view.single().await?.render(cx)` (ViewExt) renders non-live HTML; `.single()` panics on live views, `.first()` discards later updates.
+- `disabled=(bool)` includes/omits a boolean attribute; `title=(Option<T>)` omits `None`. Literal `disabled="false"` is still present. Enumerated/ARIA booleans need strings (`"true"`/`"false"`).
+- Fixed `class="a b"`; composed `class=(class!("base", optional, "on" if active else "off"))`. Absent entries skipped, empty class omitted. `attributes! { id="x" }` spreads via `<div (attrs)>`, consuming attrs. Merge forwarded classes: `class!("base", attrs.remove("class"))`, then `(attrs)`. No Tailwind conflict resolution. [Classes](docs/view/class.md), [attributes](docs/view/attributes.md).
+- `#[key(item.id)] for item in items { ... }` establishes identity for stateful components/shards/live regions; missing keys can error. Also supply stable HTML IDs for DOM reordering. Ordinary helpers need explicitly derived `cx.keyed(item.id)` for distinct identities.
+- `(StatusCode::NOT_FOUND)`, `(HeaderMap)`, `((HeaderName, HeaderValue))` set response metadata. First in markup order wins per status/header name; before `(slot)` overrides, after supplies defaults. Cannot change once streaming starts.
+- [Context](docs/context.md): `.app_context(value)` shares `Send + Sync + 'static` values by exact type; duplicates panic. `context::app_context::<T>(cx)`/`request_context::<T>(cx)` borrow; missing values panic, `try_*` returns Option. `cx.with(value)` scopes without changing parent; clone Cx into streams/tasks. HTTP accessors: `router::request`.
+- Prefer composable `helper(cx: &Cx)` guards called wherever protection is needed. [Memoize](docs/context/memoize.md): `#[memoize]` caches sync/async results per request; requires cx, Hash arguments, owned `Send + Sync + 'static` output; returns `&T`. `#[memoize(as_ref)]` borrows Option/Result contents. Concurrent calls share work; observed scoped bindings affect reuse, interior mutations do not invalidate. Same-argument recursion panics.
+
+## Browser runtime and streaming
+
+Setup: `module_router!().discover().assets(AssetBundle::load()?).runtime().build()`; include `topcoat::runtime::script()` in `<head>`. Register application layers before `.runtime()`. Procedures/shards need discovery or `.route(name)`. [Runtime](docs/runtime.md).
+
+```rust
+// Inside a component/page with cx: &Cx; import runtime::{signal, Event}.
+let query = signal(cx, String::new);
+Ok(view! {
+    <input :value=$(query.get()) @input=$(|e: Event| query.set(e.target.value))>
+    <p>$(query.get())</p>
+})
+```
+
+- `$(...)` = `runtime::expr!(...)`: initial server value, reactive browser updates. `@event` accepts closure/JS string; `:attr` binds attribute. Captures clone browser-visible snapshots; never capture secrets. [Expressions](docs/runtime/expr.md) support selected operations on numbers/bool/strings/Option/Result/collections/tuples/signals; blocks/if/closures/async/loop/while, not arbitrary Rust. Unsuffixed integers are usize; overflow panics.
+- `raw!("${binding}.jsMethod()", rust_fallback)` escapes to JS with equivalent server evaluation. No fallback means browser-only; a fallback must read the signals its JS depends on.
+- Server `.get()`/`.read()` tracks enclosing page/shard for server rerenders; inside `$(...)` tracks browser updates. `_untracked` avoids server rerenders. Signal handles alone create no dependency. Validate all restored values as client input.
+- [Procedure](docs/runtime/procedure.md): `#[procedure] async fn save(cx: &Cx, value: String) -> Result<String>`; browser async handler calls `save(query.get()).await`, omitting cx, receiving Ok value. Server Err fails expression; nested Result carries client-handled failures. Evaluating calls during server rendering panics.
+- [Shard](docs/runtime/shard.md): `#[shard] async fn results(cx: &Cx, query: String) -> Result<impl View>`; `results(query: $(query.get()))`. Renders inline initially, requests HTML on input changes. Args use expression vocabulary; Signal<T> props share handles. Endpoints bypass page/layout guards: authorize inside every shard/procedure and validate inputs. Generated POST paths are unstable; explicit paths allow no captures.
+- [Live](docs/view/live.md): `live! { emit! { "Loading" }?; let x = fetch().await?; emit! { (x) } }` replaces region per emission; returns Result<EmitToken>. Must emit >=1 time; first emission blocks initial HTML. `suspense(fallback: view! { ... }, child())` handles loading; `error_boundary(fallback: |e| Ok(view! { ... }), child())` handles errors. HTTP swaps include their script automatically.
+- `runtime::connected(cx)` requests WebSocket after HTTP completes, reruns page/shard with true. Emit and finish on HTTP; indefinite waits only when connected. Reconnect restarts rendering, so reread state; start durable jobs elsewhere. `connected_untracked` checks without requesting connection.
+
+## Assets and services
+
+- [Assets](docs/asset.md): `asset!("./image.png")` renders hashed URL. `./`/`../` from source file, bare paths from crate root, HTTP(S) downloaded/cached. `topcoat dev` bundles; manual `topcoat asset bundle --release` must match profile/package. `.assets(AssetBundle::load()?)` loads `assets/` beside binary. Custom `--out` needs `load_dir`. Deploy matching binary+bundle; missing assets panic. `AssetConfig::hosted_at(base, catalog)` supports separately uploaded CDN files.
+- [Tailwind](docs/tailwind.md): enable `tailwind` on runtime/build dependencies (build: `default-features = false`). build.rs: `topcoat::tailwind::BuildConfig::new().render().unwrap()`; layout: `<link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())>`. Needs bundle. Scans literal classes, not dynamically assembled names. `.input("styles.css")` selects CSS.
+- [Fonts](docs/font.md): `font!("Family", @font-face { src: url(...); ... })`, `font_face!` for one face. `.discover()`/`.font(FONT)` registers; `font::link(font: FONT)` loads CSS. `font-fontsource`: `fontsource_font!(GEIST, weight: [400, 700], host: Asset)` bundles files; default host is CDN.
+- [Icons](docs/icon.md): `icon(data: ICON, label: "Meaning")` renders SVG; unlabeled = decorative. `icon-iconify` on runtime/build dependencies; build.rs: `topcoat::icon::iconify::BuildConfig::new().icon_set("feather").stage().unwrap()`. `iconify::include!("feather")` creates `feather::TRASH_2`; `iconify_icon!("feather:trash-2")` yields one icon.
+- [UI](docs/ui.md), `ui`: configure Tailwind; `topcoat ui init`; `topcoat ui add button`. Compile installed styles.css; load its font. Import/edit copied `src/components`; commit components.toml. Props: variant/size enums, attrs, children. `ui list` shows updates; `add --overwrite` replaces local edits; `remove` deletes. `.dark` ancestor selects dark theme.
+- [Cookies](docs/cookie.md): `.cookies()`, import `cookie::Cookies`, use `cookies(cx).get/add/remove`. `cookie!("name" = value; Path = "/"; Secure; HttpOnly; SameSite = Lax)`. Write before response seals; late writes panic, errors/redirects preserve pending writes. Removal needs matching name/path/domain. Signed = authenticated; private = encrypted+authenticated; shared helpers need persisted Key in app context. `cookie_store::<T, _>(jar, "name").parse_or_default().update(...).commit()?` writes JSON; no commit = discarded changes.
+- [Sessions](docs/session.md): `.cookies().sessions(SessionConfig::default())`. Authenticate, then `session::start(cx).await?`; store token_hash/user/expiry, never raw token. `token_hash(cx).await?` needs application lookup+expiry validation. `stop` returns hash to delete; `refresh` requires validation+persisted expiry; `rotate` requires revoking old hash+persisting replacement. Default cookie: __Host-/Secure/HttpOnly/SameSite=Lax/Path=/. Mutate before streaming. TokenStore changes transport, not database storage.
+- [Mail](docs/mail.md), `mail`/`mail-smtp`: `.mail(MailConfig::builder().transport(...).build())`; `mail! { from: "...", to: "...", html: { cx => ... } }?`, then `send(cx, mail).await?`. Plain text derived from HTML; attachments supported. FileTransport for .eml, MemoryTransport for tests, SmtpTransport for delivery.
+
+## Optional HTTP integrations
+
+- `fs`: import `RouterBuilderDirectoryExt`; `.public_dir("./public")` or `.serve_dir("/files/{*rest}", dir)` for fixed file URLs.
+- [SSE](docs/router/content/sse.md), `sse`: `Sse::new(stream)` of Result<Event>; `.keep_alive(KeepAlive::new())`; Event data/id, `last_event_id(cx)` for resume. Own captures/clone Cx; use `+ use<>` to avoid implicit context borrowing.
+- [WebSocket](docs/router/content/websocket.md), `websocket`: GET takes WebSocketUpgrade; authenticate before on_upgrade, move owned captures, recv/send Message; configure protocols/limits.
+- [Multipart](docs/router/content/multipart.md), `multipart`: `next_field().await?`, consume/drop before next; bytes/text/chunk; BodyLimit applies across fields.
+- [Sitemap](docs/router/content/sitemap.md), `sitemap`: return `Sitemap::new().url(...)`; relative entries require `.base_url(...)`. `SitemapUrl` adds last-modified/frequency/priority.
+- [Tower](docs/router/tower.md), `tower`: TowerRoute mounts services, TowerLayer wraps handling, TowerService exposes Topcoat. Full URI forwarded; StripPrefixLayer opts into stripping. Register catch-all prefix separately. No middleware retries.
+- [htmx](docs/htmx.md), `htmx`: `hx_request(cx)` chooses fragments; Hx* response parts precede body. [Alpine AJAX](docs/alpine_ajax.md), `alpine-ajax`: `ajax_request/ajax_targets` choose fragments; load plugin before Alpine, both deferred. [Datastar](docs/datastar.md), `datastar`: Signals<T> reads GET query/non-GET body; PatchElements/PatchSignals emit SSE updates. Load each library's browser script separately.
+
+## Working in this repository
+
+Read [AGENTS.md](AGENTS.md) and applicable `.agents/skills/*/SKILL.md`. Safe Rust only; ASCII; `foo.rs` beside `foo/`, not `foo/mod.rs`. Framework: `crates/topcoat-*`; facade: `crates/topcoat`; macro parsing/codegen: each crate's `grammar/`, thin entry points: `macro/`, formatting: grammar `pretty` feature. Browser code: `crates/topcoat-{core,runtime,cli}/browser`.
+
+Guide sources live in `docs/`; crate-local docs are relative symlinks, embedded through crate-local `include_str!` paths. Declare dependencies centrally in workspace Cargo.toml, enable features in consumers. Format Rust with `cargo +nightly fmt --all` and macros with `cargo topcoat fmt`. Follow [verification](.agents/skills/check/SKILL.md) for lint/test/doc checks and browser bundle regeneration; [coherence tests](docs/runtime/coherence.md) check Rust/JS expression parity. Use [contribution guidelines](CONTRIBUTING.md) for commits/PRs.
