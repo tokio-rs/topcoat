@@ -202,6 +202,7 @@ async fn home() -> Result<impl View> {
         <a href=(href!(docs::doc_path::document, docs::doc_path::DocPath(["guides", "getting started"])))>"Guides"</a>
     })
 }
+# fn main() {}
 ```
 
 Each argument must have the name expected by its path parameter. For example, filling `{post_id}` with a parameter named `slug` panics.

@@ -412,7 +412,7 @@ fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bo
 /// use topcoat::{
 ///     Result,
 ///     context::Cx,
-///     router::{href, page, path_param},
+///     router::{href, page},
 ///     view::{View, view},
 /// };
 ///
@@ -526,6 +526,7 @@ where
 ///         }
 ///     }
 /// }
+/// # fn main() {}
 /// ```
 ///
 /// Use the [`href`] function to pass parameters as a tuple.

@@ -24,7 +24,7 @@ Changing the session involves setting cookies, which is only possible if the res
 
 Register session support on the router with [`RouterBuilderSessionExt::sessions`]. The default [`SessionConfig`] carries the token in a session cookie, which needs cookie support installed as well:
 
-```rust
+```rust,standalone_crate
 use topcoat::router::module_router;
 use topcoat::{
     cookie::RouterBuilderCookieExt,

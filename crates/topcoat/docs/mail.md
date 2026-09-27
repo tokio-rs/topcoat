@@ -12,7 +12,7 @@ topcoat = { version = "0.9.0", features = ["mail", "mail-smtp"] }
 
 Choose a transport in [`MailConfig`] and register it with the router's [`mail`](RouterBuilderMailExt::mail) method:
 
-```rust
+```rust,standalone_crate
 use topcoat::{
     mail::{FileTransport, MailConfig, RouterBuilderMailExt},
     router::{Router, RouterBuilderDiscoverExt, module_router},

@@ -98,4 +98,5 @@ async fn preview() -> Result<impl View> {
         contact::contact(body: Form(query))
     })
 }
+# fn main() {}
 ```

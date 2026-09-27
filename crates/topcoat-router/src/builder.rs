@@ -329,13 +329,10 @@ impl RouterBuilder {
     /// # Examples
     ///
     /// ```rust
-    /// # use topcoat::{Result, router::route};
     /// # struct User;
-    /// # #[route(GET "/users")]
-    /// # async fn get_user() -> Result<&'static str> { Ok("ok") }
     /// use topcoat::{
     ///     context::{Cx, app_context},
-    ///     router::Router,
+    ///     router::{Router, module_router},
     /// };
     ///
     /// struct Database {/* ... */}
@@ -345,8 +342,7 @@ impl RouterBuilder {
     /// # }
     ///
     /// pub fn router() -> Router {
-    ///     Router::builder()
-    ///         .route(get_user)
+    ///     module_router!()
     ///         .app_context(Database::connect())
     ///         .build()
     /// }

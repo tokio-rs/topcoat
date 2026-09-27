@@ -136,7 +136,7 @@ search_results(query: $(query.get()), limit: limit)
 
 Register a shard on the [`Router`] so the browser can request new content. It implements [`Route`], so pass its name to `.route()`:
 
-```rust
+```rust,standalone_crate
 use topcoat::router::module_router;
 # use topcoat::{Result, router::Router, runtime::shard, view::{View, view}};
 # #[shard]

@@ -6,7 +6,7 @@ A handler whose path string starts with `./` is served below the module path. Ab
 
 Call `module_router!()` from the root module of the route tree. That module maps to `/`. The macro returns a `RouterBuilder`, so add everything else your application needs on that builder before calling `.build()`.
 
-```rust
+```rust,standalone_crate
 // src/app.rs
 use topcoat::router::{Router, module_router};
 
@@ -36,7 +36,7 @@ Every module-derived `#[page]`, `#[layout]`, `#[layer]`, and `#[route]` under th
 
 Call `RouterBuilderDiscoverExt::discover` to add explicit-path handlers and other items collected through discovery:
 
-```rust
+```rust,standalone_crate
 use topcoat::router::{Router, RouterBuilderDiscoverExt, module_router};
 
 pub fn router() -> Router {
@@ -328,7 +328,7 @@ Adding an absolute path string to `#[page]`, `#[layout]`, `#[layer]`, or `#[rout
 
 `module_router!()` discovers module-derived handlers. Register an absolute-path handler by name:
 
-```rust
+```rust,standalone_crate
 use topcoat::router::module_router;
 # use topcoat::{Result, router::page, view::{View, view}};
 #[page("/legacy")]

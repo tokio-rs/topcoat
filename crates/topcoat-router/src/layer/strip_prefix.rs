@@ -19,7 +19,7 @@ use crate::{
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,standalone_crate
 /// use topcoat::{
 ///     Result,
 ///     context::Cx,
@@ -40,9 +40,11 @@ use crate::{
 ///     }
 /// }
 ///
+/// # fn main() {
 /// let router = module_router!()
 ///     .layer(StripPrefixLayer::new("/res"))
 ///     .build();
+/// # }
 /// ```
 ///
 /// # Matching the prefix

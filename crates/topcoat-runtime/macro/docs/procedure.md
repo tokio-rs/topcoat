@@ -65,7 +65,7 @@ Awaiting a call yields the procedure's `Ok` value. If the procedure returns `Err
 
 Register a procedure on the [`Router`] before calling it from the browser. It implements [`Route`], so pass its name to `.route()`:
 
-```rust
+```rust,standalone_crate
 use topcoat::router::module_router;
 # use topcoat::{Result, router::Router, runtime::procedure};
 # #[procedure]

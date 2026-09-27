@@ -8,10 +8,7 @@ pub(crate) mod signed;
 pub(crate) mod upload;
 pub(crate) mod users;
 
-use topcoat::{
-    Result,
-    router::route,
-};
+use topcoat::{Result, router::route};
 
 use crate::Csv;
 

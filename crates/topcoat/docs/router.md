@@ -1,6 +1,6 @@
 A [`Router`] matches requests to handlers. [Module routing](macro@module_router) is the recommended default. It derives paths from your Rust module tree, so handlers omit path strings. Call [`module_router!`] in the root of that tree, then [`build`](RouterBuilder::build). Pass the finished router to [`start`](crate::start) to serve requests.
 
-```rust
+```rust,standalone_crate
 use topcoat::router::{Router, module_router};
 
 // src/app.rs: this module maps to /.
@@ -11,7 +11,7 @@ pub fn router() -> Router {
 
 Declare child modules with `mod`, just as in any Rust application. A `#[page]` in `app::about` serves `/about`, and one in `app::settings::profile` serves `/settings/profile`. The function name does not affect the URL. See the [module routing guide](macro@module_router) for setup, parameters, groups, and segment overrides.
 
-The feature examples below use this module tree, with file comments showing where each handler belongs. Explicit paths and manual registration remain available when URLs should be independent of module structure. The sections on manual registration and `discover()` show those alternatives.
+Explicit paths and manual registration remain available when URLs should be independent of module structure. The sections on manual registration and `discover()` show those alternatives.
 
 # Paths
 
@@ -247,10 +247,10 @@ A [`StatusCode`] in a `view!`'s body sets the response status, and a [`HeaderMap
 use topcoat::{
     Result,
     context::Cx,
-    router::{path_param, 
+    router::{
         Slot, StatusCode,
         error::{NotFoundError, RouterErrorExt},
-        layout, page,
+        layout, page, path_param,
     },
     view::{View, error_boundary, view},
 };
@@ -294,6 +294,7 @@ async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
         </html>
     })
 }
+# fn main() {}
 ```
 
 See the [`view!`](crate::view::view!) macro docs for the full placement and precedence rules, and the [`error`](mod@error) module docs for catching errors.
@@ -356,7 +357,7 @@ For application assets such as images and stylesheets, we recommend the [asset s
 
 Enable the `fs` feature to serve files from a directory. Import [`RouterBuilderDirectoryExt`] and call [`public_dir`](RouterBuilderDirectoryExt::public_dir) to serve them at the site root:
 
-```rust
+```rust,standalone_crate
 # #[cfg(feature = "fs")]
 # {
 use topcoat::router::{RouterBuilderDirectoryExt, module_router};
@@ -369,7 +370,7 @@ This serves `./public/logo.svg` at `/logo.svg` and `./public/css/site.css` at `/
 
 Use [`serve_dir`](RouterBuilderDirectoryExt::serve_dir) to choose a different route path. Its final catch-all parameter selects the file within the directory:
 
-```rust
+```rust,standalone_crate
 # #[cfg(feature = "fs")]
 # {
 use topcoat::router::{RouterBuilderDirectoryExt, module_router};

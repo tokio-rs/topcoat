@@ -94,6 +94,7 @@ mod settings {
         }
     }
 }
+# fn main() {}
 ```
 
 A request to `/settings/profile` renders `root_layout` > `settings_layout` > `profile`.

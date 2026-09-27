@@ -8,7 +8,7 @@ Values are identified by their Rust type. The router accepts one value of each t
 
 Build the router and chain `.app_context(value)` for every value you want to share:
 
-```rust
+```rust,standalone_crate
 use topcoat::router::{Router, RouterBuilderDiscoverExt, module_router};
 
 pub fn router() -> Router {
@@ -22,7 +22,7 @@ pub fn router() -> Router {
 
 Registering two values of the same type panics. Wrap them in distinct types when you need to share both:
 
-```rust
+```rust,standalone_crate
 use topcoat::router::module_router;
 struct PrimaryDb(Database);
 struct ReplicaDb(Database);

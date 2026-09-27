@@ -2,7 +2,7 @@ Topcoat reads and writes cookies through a jar shared by the request. Register `
 
 Cookies are part of the default feature set, and everything below is re-exported from `topcoat::cookie`. Topcoat builds on the `cookie` crate: a cookie is a [`Cookie`], and signing and encryption use its [`Key`].
 
-```rust
+```rust,standalone_crate
 use topcoat::router::module_router;
 use topcoat::{
     cookie::RouterBuilderCookieExt,
@@ -236,7 +236,7 @@ Signed and private jars can be combined with prefixes and attribute defaults.
 
 Share a [`Key`] across requests by registering it as [app context](crate::context::app_context):
 
-```rust
+```rust,standalone_crate
 use topcoat::{
     cookie::{Key, RouterBuilderCookieExt},
     router::{Router, RouterBuilderDiscoverExt, module_router},

@@ -20,7 +20,7 @@ cargo add tokio --features rt-multi-thread,macros
 
 Replace `src/main.rs` with:
 
-```rust
+```rust,standalone_crate
 use topcoat::{
     Result,
     router::{module_router, page},
