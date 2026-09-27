@@ -1,7 +1,5 @@
 Declare email with [`mail!`] and deliver it with [`send`]. A [`Transport`] determines how messages are delivered.
 
-The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
-
 Everything below is re-exported from `topcoat::mail` and gated behind the `mail` feature. The SMTP transport additionally needs the `mail-smtp` feature.
 
 ```toml

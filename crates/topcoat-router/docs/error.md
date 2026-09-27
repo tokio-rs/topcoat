@@ -1,7 +1,5 @@
 Turning handler errors into HTTP responses.
 
-The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
-
 Handlers return a `Result`. An unhandled router error selects an HTTP error or redirect response. Other errors produce `500 Internal Server Error`.
 
 # Constructors

@@ -1,7 +1,5 @@
 [htmx](https://htmx.org) updates parts of a page with HTML from the server. Attributes such as `hx-get` send requests and select where the response appears.
 
-The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
-
 Topcoat reads htmx request headers and sets response headers that control how the browser applies an update.
 
 Everything below is re-exported from `topcoat::htmx` and gated behind the `htmx` feature.

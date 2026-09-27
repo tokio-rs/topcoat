@@ -1,6 +1,6 @@
 Declares a layout that wraps inner pages.
 
-Use `#[layout]` without a path string with [module routing](macro.module_router.html), the recommended default. The enclosing module determines the URL prefix. A path starting with `./` extends the module path. An absolute path, such as `#[layout("/settings")]`, chooses the URL independently of the module tree and requires separate registration.
+Use `#[layout]` without a path string with [module routing](macro.module_router.html). The enclosing module determines the URL prefix. A path starting with `./` extends the module path. An absolute path, such as `#[layout("/settings")]`, chooses the URL independently of the module tree and requires separate registration.
 
 [`module_router!`](macro.module_router.html) registers module-derived handlers. For explicit paths, pass the function name to [`RouterBuilder::layout`](struct.RouterBuilder.html#method.layout) or use [`discover`](trait.RouterBuilderDiscoverExt.html).
 

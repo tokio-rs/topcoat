@@ -1,7 +1,5 @@
 [Datastar](https://data-star.dev) updates HTML and reactive signals from server responses. Use `data-*` attributes to bind signals to elements and actions such as `@get` to send requests.
 
-The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
-
 Topcoat extracts signals from requests and creates Datastar responses. Return one update from a handler or send several over a [server-sent event stream](crate::router::content::sse).
 
 Everything below is re-exported from `topcoat::datastar` and gated behind the `datastar` feature, which also enables the router's `sse` feature.

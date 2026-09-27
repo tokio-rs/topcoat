@@ -64,8 +64,6 @@ async fn hello(name: &str) -> Result<impl View> {
 }
 ```
 
-Module routing is the recommended default. `module_router!()` derives URLs from Rust modules, so handlers use `#[page]` or `#[route(GET)]` without a path string. See the [module routing guide](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html) for nested routes, layouts, and path parameters. Explicit paths are available when you need to choose URLs independently of the module tree.
-
 ## What makes Topcoat different
 
 ### Client reactivity without the boilerplate

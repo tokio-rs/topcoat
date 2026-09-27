@@ -56,7 +56,7 @@ async fn hello(name: &str) -> Result<impl View> {
 }
 ```
 
-Module routing is the recommended default. `module_router!()` uses its enclosing module as `/`, so the `home` page above serves `/`. To add `/about`, declare `mod about;` in `main.rs` and put a `#[page]` handler in `src/about.rs`. See the [module routing guide](crate::router::module_router) for nested modules, layouts, and path parameters.
+`module_router!()` uses its enclosing module as `/`, so the `home` page above serves `/`. To add `/about`, declare `mod about;` in `main.rs` and put a `#[page]` handler in `src/about.rs`. See the [module routing guide](crate::router::module_router) for nested modules, layouts, and path parameters.
 
 Run `cargo run` to serve the app at <http://127.0.0.1:3000>. For automatic rebuilds while you work, install the Topcoat CLI.
 

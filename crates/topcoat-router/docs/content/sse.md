@@ -1,7 +1,5 @@
 Server-sent events for Topcoat routes.
 
-The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
-
 Server-sent events (SSE) send events from the server to a client over one HTTP response. Enable the `sse` feature and return an [`Sse`] response containing a stream of [`Event`]s. In a browser, use `EventSource` to subscribe and reconnect when the connection is lost.
 
 # Streaming events

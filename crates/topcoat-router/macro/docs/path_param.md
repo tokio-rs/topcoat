@@ -10,7 +10,7 @@ path_param!(post_id: u64);
 
 # Matching the URL
 
-The declaration emits a [`segment!`](macro.segment.html) override. Under [module routing](macro.module_router.html), the recommended default, it changes the declaring module's segment to the parameter, so the page does not write a path.
+The declaration emits a [`segment!`](macro.segment.html) override. Under [module routing](macro.module_router.html), it changes the declaring module's segment to the parameter, so the page does not write a path.
 
 ```rust
 // src/app/posts/id.rs serves /posts/{post_id}.

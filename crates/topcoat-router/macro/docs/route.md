@@ -6,7 +6,7 @@ A route always declares its HTTP methods as the first argument:
 - a bracketed list (`[GET, POST]`) responding to each listed method, or
 - `*`, responding to every method. A route declaring a specific method takes precedence over a `*` route at the same path.
 
-Use `#[route(GET)]` without a path string with [module routing](macro.module_router.html), the recommended default. The enclosing module determines the URL. A path starting with `./` extends the module path. An absolute path, such as `#[route(GET "/api/health")]`, chooses the URL independently of the module tree and requires separate registration.
+Use `#[route(GET)]` without a path string with [module routing](macro.module_router.html). The enclosing module determines the URL. A path starting with `./` extends the module path. An absolute path, such as `#[route(GET "/api/health")]`, chooses the URL independently of the module tree and requires separate registration.
 
 [`module_router!`](macro.module_router.html) registers module-derived handlers. For explicit paths, pass the function name to [`RouterBuilder::route`](struct.RouterBuilder.html#method.route) or use [`discover`](trait.RouterBuilderDiscoverExt.html).
 

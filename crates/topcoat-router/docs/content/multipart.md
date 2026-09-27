@@ -1,7 +1,5 @@
 Multipart form data for Topcoat routes.
 
-The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
-
 Enable the `multipart` feature to read `multipart/form-data`, the format used by browser forms that upload files. The [`Multipart`] extractor yields each form field as a [`Field`].
 
 # Reading fields

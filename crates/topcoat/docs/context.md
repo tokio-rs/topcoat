@@ -1,7 +1,5 @@
 [`Cx`] gives handlers and components access to request data and shared application values.
 
-The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
-
 Add `cx: &Cx` to a handler or component's parameters when it needs context. Topcoat supplies it automatically.
 
 # Router request helpers

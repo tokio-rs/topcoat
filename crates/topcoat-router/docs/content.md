@@ -1,7 +1,5 @@
 Request extractors and response types for Topcoat handlers.
 
-The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
-
 A handler's parameters describe the request body it accepts. Its return type describes the response it sends. This module provides types for both roles.
 
 # Reading a request body

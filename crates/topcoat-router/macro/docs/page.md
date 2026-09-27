@@ -1,6 +1,6 @@
 Declares a page handler.
 
-Use `#[page]` without a path string with [module routing](macro.module_router.html), the recommended default. The enclosing module determines the URL. A path starting with `./` extends the module path. An absolute path, such as `#[page("/about")]`, chooses the URL independently of the module tree and requires separate registration.
+Use `#[page]` without a path string with [module routing](macro.module_router.html). The enclosing module determines the URL. A path starting with `./` extends the module path. An absolute path, such as `#[page("/about")]`, chooses the URL independently of the module tree and requires separate registration.
 
 A page serves `GET` by default. To serve other methods, name them in the attribute, using the same forms as [`#[route]`](attr.route.html): a single method (`#[page(POST)]`), a bracketed list (`[GET, POST]`), or `*` for every method.
 

@@ -1,6 +1,6 @@
 Declares a layer that wraps request handling under its path.
 
-Use `#[layer]` without a path string with [module routing](macro.module_router.html), the recommended default. The enclosing module determines the URL prefix. A path starting with `./` extends the module path. An absolute path, such as `#[layer("/admin")]`, chooses the URL independently of the module tree and requires separate registration.
+Use `#[layer]` without a path string with [module routing](macro.module_router.html). The enclosing module determines the URL prefix. A path starting with `./` extends the module path. An absolute path, such as `#[layer("/admin")]`, chooses the URL independently of the module tree and requires separate registration.
 
 For a matched handler, the prefix is checked when the router is built, comparing the layer's path to the handler's registered path segment by segment; the request URL is not consulted. A handler is wrapped only when its leading segments spell out the layer's path exactly: a layer at `/docs/admin` wraps neither a page at `/docs/{something}` nor one at `/docs/{*path}`, even though both serve URLs under `/docs/admin`. A parameter segment only matches a parameter of the same name, and group segments count, so a layer at `/dashboard` does not wrap a page at `/(auth)/dashboard` although that page is served at `/dashboard`.
 

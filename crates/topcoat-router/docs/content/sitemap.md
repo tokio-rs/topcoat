@@ -1,7 +1,5 @@
 XML sitemaps for Topcoat routes.
 
-The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
-
 A [sitemap](https://www.sitemaps.org) lists URLs for crawlers to discover. Enable the `sitemap` feature and return a [`Sitemap`] from a route to serve an XML sitemap.
 
 # Serving a sitemap

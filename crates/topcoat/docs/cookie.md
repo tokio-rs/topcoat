@@ -1,7 +1,5 @@
 Topcoat reads and writes cookies through a jar shared by the request. Register `.cookies()` on the router, then call `cookies(cx)` to read cookies or queue changes. When the handler returns, Topcoat adds the changes to the response as `Set-Cookie` headers. This also works when the handler returns an error or redirect.
 
-The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
-
 Cookies are part of the default feature set, and everything below is re-exported from `topcoat::cookie`. Topcoat builds on the `cookie` crate: a cookie is a [`Cookie`], and signing and encryption use its [`Key`].
 
 ```rust

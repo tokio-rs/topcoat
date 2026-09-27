@@ -1,7 +1,5 @@
 WebSocket connections for Topcoat routes.
 
-The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
-
 A WebSocket lets a client and server exchange messages over a persistent connection. Enable the `websocket` feature to accept upgrade requests with [`WebSocketUpgrade`] and exchange messages through [`WebSocket`].
 
 # Upgrading a request

@@ -1,7 +1,5 @@
 Topcoat manages session tokens. Your application stores each token's hash and expiry, associates it with a user, and checks that record on later requests. You choose the database and schema.
 
-The handler examples use [module routing](https://docs.rs/topcoat/latest/topcoat/router/macro.module_router.html), the recommended default. File comments show where each handler belongs under an `app` module that calls `module_router!()`.
-
 Sessions are part of the default feature set, and everything below is re-exported from `topcoat::session`.
 
 # The model
