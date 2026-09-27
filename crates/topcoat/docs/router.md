@@ -1,4 +1,8 @@
-A [`Router`] matches requests to handlers. [Module routing](macro@module_router) is the recommended default. It derives paths from your Rust module tree, so handlers omit path strings. Call [`module_router!`] in the root of that tree, then [`build`](RouterBuilder::build). Pass the finished router to [`start`](crate::start) to serve requests.
+A [`Router`] matches requests to handlers. You can derive paths from Rust modules or write them directly on handlers. [Module routing](macro@module_router) is the recommended default. Both approaches build the same router, which you pass to [`start`](crate::start) to serve requests.
+
+# Module routing
+
+Call [`module_router!`] in the root of your route tree, then [`build`](RouterBuilder::build). Handlers omit path strings and take their paths from the enclosing modules:
 
 ```rust,standalone_crate
 use topcoat::router::{Router, module_router};
@@ -11,9 +15,39 @@ pub fn router() -> Router {
 
 Declare child modules with `mod`, just as in any Rust application. A `#[page]` in `app::about` serves `/about`, and one in `app::settings::profile` serves `/settings/profile`. The function name does not affect the URL. See the [module routing guide](macro@module_router) for setup, parameters, groups, and segment overrides.
 
-Explicit paths and manual registration remain available when URLs should be independent of module structure. The sections on manual registration and `discover()` show those alternatives.
+# Explicit paths
 
-# Paths
+To choose paths directly, put an absolute path in each handler's attribute and register the handlers on [`Router::builder`]. Their Rust module locations do not affect the URLs:
+
+```rust
+use topcoat::{
+    Result,
+    router::{Router, page, route},
+    view::{View, view},
+};
+
+#[page("/")]
+async fn home() -> Result<impl View> {
+    Ok(view! { <h1>"Home"</h1> })
+}
+
+#[route(GET "/api/health")]
+async fn health() -> Result<&'static str> {
+    Ok("ok")
+}
+
+pub fn router() -> Router {
+    Router::builder().page(home).route(health).build()
+}
+```
+
+Layouts and layers work the same way: `#[layout("/settings")]` and `#[layer("/api")]` declare path prefixes, and `.layout(...)` and `.layer(...)` register them. See [manual registration](#manual-registration) for all four handler kinds together.
+
+With the `discover` feature enabled, `Router::builder().discover().build()` collects explicit-path handlers automatically. Import [`RouterBuilderDiscoverExt`] to use it. This changes registration only; you still write paths in the attributes. See [auto-discovery](#auto-discovery-with-discover) for details.
+
+You can also combine the approaches. `module_router!()` collects module-derived handlers; chain `.page(home)` or `.route(health)` to add an explicit-path handler, or `.discover()` to collect them all.
+
+# Path syntax
 
 Explicit route paths use Topcoat's [`Path`] syntax. A path is made of `/`-separated segments, and each segment is one of four kinds.
 
@@ -305,7 +339,7 @@ The router applies an [`OriginPolicy`] to every request before any layer or hand
 
 # Manual registration
 
-For routes with explicit paths, build a router by chaining `.page()`, `.layout()`, `.layer()`, and `.route()`, then calling [`build`](RouterBuilder::build). This is an alternative to the recommended [module routing](macro@module_router):
+For routes with explicit paths, register each handler with `.page()`, `.layout()`, `.layer()`, or `.route()`, then call [`build`](RouterBuilder::build):
 
 ```rust
 # use topcoat::{Result, context::Cx, router::{Body, Next, Slot, layer, layout, page, response::Response, route}, view::{View, view}};
