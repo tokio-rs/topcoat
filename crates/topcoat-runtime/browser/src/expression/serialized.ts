@@ -29,6 +29,7 @@ export interface SerializedSequence {
 export type DehydratedSurrogate =
 	| SerializedInteger
 	| SerializedSequence
+	| DehydratedSurrogate[]
 	| null
 	| boolean
 	| number

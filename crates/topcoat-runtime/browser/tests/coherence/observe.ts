@@ -6,6 +6,7 @@ import { Ref } from "../../src/surrogate/ref";
 import { Result } from "../../src/surrogate/result";
 import { Slice } from "../../src/surrogate/sequence";
 import { Str } from "../../src/surrogate/string";
+import { Tuple } from "../../src/surrogate/tuple";
 
 export type Value =
 	| { type: "Unit" | "None" }
@@ -94,8 +95,10 @@ export function observe(value: unknown): Value {
 			value: observe(Reflect.get(value, "value")),
 		};
 	}
-	if (Array.isArray(value)) {
-		return { type: "Tuple", value: value.map(observe) };
+	if (value instanceof Tuple) {
+		const items: unknown = Reflect.get(value, "items");
+		if (!Array.isArray(items)) throw new Error("Invalid Tuple storage");
+		return { type: "Tuple", value: items.map(observe) };
 	}
 	throw new Error(
 		`Unsupported coherence value: ${Object.prototype.toString.call(value)}`,

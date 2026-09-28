@@ -62,7 +62,7 @@ Runtime types expose a subset of their Rust APIs:
 - `Option<T>`: `is_some`, `is_none`, `unwrap`, and `expect`.
 - `Result<T, E>`: `is_ok`, `is_err`, `ok`, `err`, `unwrap`, `expect`, `unwrap_err`, and `expect_err`.
 - `Vec<T>`, `[T; N]`, and slices: `len`, `is_empty`, `get`, `index`, `first`, `last`, `to_vec`, and `to_owned`. Vectors and arrays also support `as_slice` and `clone`. Lengths and indexes are `usize`. `get` returns `None` for an out-of-bounds index; `index` panics. Both borrow the element. Elements must belong to the shared vocabulary.
-- Tuples of vocabulary types.
+- Tuples of vocabulary types: field access such as `pair.0`, and `clone`. A field of a borrowed tuple, such as `values.index(0).0`, borrows the element. A tuple renders its elements one after another with no separator. Tuples do not support comparisons.
 - [`Signal`]: `get` and `set`, plus a shorter spelling for common writes: `toggle` on a `bool` signal, `increment` and `decrement` on a numeric signal, and `push_str` on a `String` signal.
 
 Operations follow Rust semantics in both languages. For strings, `len` counts UTF-8 bytes, comparisons use code point order, and trimming uses Unicode `White_Space`. This means trimming keeps U+FEFF and removes U+0085.

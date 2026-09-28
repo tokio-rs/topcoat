@@ -25,6 +25,7 @@ use serde::{Deserialize, Serialize, de};
 pub use signal::*;
 pub use slice::*;
 pub use string::*;
+pub use tuple::*;
 pub use vec::*;
 
 pub trait Surrogated {

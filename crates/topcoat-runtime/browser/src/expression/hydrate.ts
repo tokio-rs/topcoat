@@ -7,6 +7,7 @@ import { Ref } from "../surrogate/ref";
 import { Result } from "../surrogate/result";
 import { FixedArray, Slice, Vec } from "../surrogate/sequence";
 import { String as RuntimeString, Str } from "../surrogate/string";
+import { Tuple } from "../surrogate/tuple";
 import type { Context } from "./context";
 import type { DehydratedSurrogate } from "./serialized";
 
@@ -26,6 +27,9 @@ export function hydrate(value: DehydratedSurrogate, cx: Context): unknown {
 		case "function":
 			throw new Error(`Unknown surrogate type: ${typeof value}`);
 		case "object":
+			if (Array.isArray(value)) {
+				return new Tuple(value.map((item) => hydrate(item, cx)));
+			}
 			switch (value.t) {
 				case "u8":
 				case "u16":

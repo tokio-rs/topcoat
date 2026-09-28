@@ -9,3 +9,4 @@ export * from "./ref";
 export * from "./result";
 export * from "./sequence";
 export * from "./signal";
+export * from "./tuple";

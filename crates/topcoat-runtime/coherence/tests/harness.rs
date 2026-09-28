@@ -96,27 +96,20 @@ fn missing_baseline_is_an_error() {
 #[test]
 fn exception_baselines_require_exact_outcomes() {
     for (value, source, expected) in [
-        (1.5, "cx.hydrate(1.5)", "now passes"),
+        (3.0, "cx.hydrate(3)", "now passes"),
         (
-            1.5,
-            "(() => { throw new TypeError('Unknown surrogate type: undefined'); })()",
+            3.0,
+            "(() => { throw new SyntaxError('Illegal break statement'); })()",
             "changed",
         ),
-        (
-            2.5,
-            "(() => { throw new Error('Unknown surrogate type: undefined'); })()",
-            "changed",
-        ),
-        (1.5, "({ unexpected: true })", "Unsupported coherence value"),
+        (2.5, "(() => { break; })()", "changed"),
+        (3.0, "({ unexpected: true })", "Unsupported coherence value"),
     ] {
         let case = Case::evaluated(
-            "changed tuple failure",
+            "changed break failure",
             Expr::evaluate(|| value, Js::source(source)),
         );
-        let report = format!(
-            "{:#}",
-            case.check_known("captured_tuple_field").unwrap_err()
-        );
+        let report = format!("{:#}", case.check_known("break_inside_if").unwrap_err());
         assert!(report.contains(expected));
     }
 }

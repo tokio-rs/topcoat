@@ -101,6 +101,7 @@ fn conversion_preserves_compound_values() {
     check_conversion(Err::<bool, _>(String::from("error")));
     check_conversion(vec![1i64, i64::MAX]);
     check_conversion([true, false]);
+    check_conversion((1.5, Some(2u8), (String::from("nested"),)));
 }
 
 #[test]
@@ -114,7 +115,6 @@ fn conversion_preserves_borrowed_values() {
 
 #[test]
 fn conversions_share_the_known_capture_limitations() {
-    Case::evaluated("converted tuple", Expr::from((1.5, 2.5))).assert_known("captured_tuple_value");
     Case::evaluated("converted NaN", Expr::from(f64::NAN)).assert_known("captured_nan");
     Case::evaluated("converted infinity", Expr::from(f64::INFINITY))
         .assert_known("captured_infinity");
