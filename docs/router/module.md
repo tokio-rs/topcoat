@@ -175,7 +175,9 @@ The same form works for `#[layout]`, `#[layer]`, and `#[route]`.
 
 # Dynamic path parameters
 
-Use `module_param!` to make a module's URL segment a path parameter. Give the parameter a name and, optionally, a type to parse it as. For example, `module_param!(post_id: u64)` gives the module a `{post_id}` segment and creates the `PostId` type used to read its value.
+[`path_param!`](macro.path_param.html) declares a path parameter that you can use in a handler's path, such as `#[page("./{post_id}")]`. [`module_param!`](macro.module_param.html) makes the same declaration and also uses the parameter as the module's URL segment. Both accept the same options, and you read their values with `path_param::<T>(cx)`.
+
+For example, `module_param!(post_id: u64)` gives the module a `{post_id}` segment and creates the `PostId` type used to read its value:
 
 ```text
 src/
@@ -224,43 +226,6 @@ A module adds one URL segment and can contain one `module_param!`. To put severa
 | `app::organizations::organization_id::users::user_id` | `/organizations/{organization_id}/users/{user_id}` |
 
 Handlers and layouts in descendant modules can read parameters declared by ancestor modules if the Rust types are visible there.
-
-## Parameters in relative paths
-
-You can also keep several parameters in one module. Declare each with `path_param!`, then add its name in braces to a handler's [relative path](#relative-paths). This creates the same parameter types as `module_param!` and keeps the module's URL segment unchanged.
-
-```rust
-// src/app/posts.rs
-use topcoat::{
-    Result,
-    context::Cx,
-    router::{page, path_param},
-    view::{View, view},
-};
-
-path_param!(post_id: u64, error = bad_request);
-path_param!(comment_id: u64, error = bad_request);
-
-// GET /posts
-#[page]
-async fn posts() -> Result<impl View> {
-    Ok(view! { <h1>"Posts"</h1> })
-}
-
-// GET /posts/{post_id}
-#[page("./{post_id}")]
-async fn post(cx: &Cx) -> Result<impl View> {
-    let post_id = path_param::<PostId>(cx)?;
-    Ok(view! { <h1>"Post " (post_id)</h1> })
-}
-
-// GET /posts/{post_id}/comments/{comment_id}
-#[page("./{post_id}/comments/{comment_id}")]
-async fn comment(cx: &Cx) -> Result<impl View> {
-    let comment_id = path_param::<CommentId>(cx)?;
-    Ok(view! { <h1>"Comment " (comment_id)</h1> })
-}
-```
 
 # Catch-all parameters
 

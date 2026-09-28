@@ -8,6 +8,8 @@ path_param!(post_id: u64);
 // Generates `struct PostId(u64)`.
 ```
 
+`path_param!` only declares the parameter. You add it to a route by writing `{post_id}` in the handler's path. [`module_param!`](macro.module_param.html) makes the same declaration and also sets the module's URL segment to `{post_id}`.
+
 # Matching the URL
 
 Add the parameter name in braces to the route path, such as `{post_id}`. With [module routing](macro.module_router.html), use a path starting with `./` to add it after the module's path.
@@ -24,20 +26,6 @@ async fn post() -> Result<impl View> {
 ```
 
 You can declare several parameters in one module and use them in your handler paths. `path_param!` leaves the module's URL segment unchanged.
-
-```rust
-// src/app/posts.rs serves /posts/{post_id}/comments/{comment_id}.
-# use topcoat::{Result, router::{page, path_param}, view::{View, view}};
-path_param!(post_id: u64);
-path_param!(comment_id: u64);
-
-#[page("./{post_id}/comments/{comment_id}")]
-async fn comment() -> Result<impl View> {
-    Ok(view! { "comment" })
-}
-```
-
-Use [`module_param!`](macro.module_param.html) when the parameter should be the module's URL segment. It accepts the same options and creates the same type as `path_param!`.
 
 Reading a parameter that the matched route did not capture panics.
 

@@ -1,6 +1,8 @@
-Uses a path parameter as the module's URL segment.
+Declares a path parameter and uses it as the module's URL segment.
 
-With [module routing](macro.module_router.html), `module_param!(post_id: u64)` gives the module a `{post_id}` segment. A page in that module can use `#[page]` without a path.
+`module_param!` does everything [`path_param!`](macro.path_param.html) does and also sets the module's segment for [module routing](macro.module_router.html). Both macros accept the same options and create the same type for reading values and building links.
+
+For example, `module_param!(post_id: u64)` gives the module a `{post_id}` segment. A page in that module can use `#[page]` without a path.
 
 ```rust
 // src/app/posts/post_id.rs serves /posts/{post_id}.
@@ -16,7 +18,7 @@ async fn post(cx: &Cx) -> Result<impl View> {
 
 Read the value with [`path_param::<PostId>(cx)`](fn.path_param.html). To build a link, pass a value such as `PostId(42)` to [`href!`](macro.href.html).
 
-`module_param!` accepts the same options and creates the same type as [`path_param!`](macro.path_param.html). See that guide for parsing, error handling, visibility, and building URLs.
+See [`path_param!`](macro.path_param.html) for parsing, error handling, visibility, and building URLs.
 
 The name in `module_param!` sets the parameter name in the URL. In this example, naming the file `id.rs` would still give the page the path `/posts/{post_id}`.
 
