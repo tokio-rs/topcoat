@@ -2,10 +2,11 @@
 
 mod error;
 
-use std::{collections::BTreeSet, io::Read, path::PathBuf, time::Instant};
+use std::{collections::BTreeSet, io::Read, path::Path, process::Stdio, time::Instant};
 
 use clap::Args;
 use console::style;
+use tokio::{io::AsyncWriteExt, process::Command};
 use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
 
 use crate::fmt::error::Error;
@@ -16,6 +17,10 @@ pub struct FmtCommand {
     #[arg(long)]
     /// If specified, reads the standard input and formats to standard output.
     stdin: bool,
+
+    /// Run rustfmt before formatting macro bodies. Requires rustfmt on PATH.
+    #[arg(long)]
+    rustfmt: bool,
 
     /// Comma-separated list of macro names to register and format.
     ///
@@ -135,7 +140,7 @@ impl FmtCommand {
             let mut modified = 0;
             let mut failed = 0;
             for file in &files {
-                match format_file(file, &registry) {
+                match self.format_file(file, &registry).await {
                     Ok(true) => {
                         count += 1;
                         modified += 1;
@@ -153,7 +158,7 @@ impl FmtCommand {
             if self.stdin {
                 let mut buf = String::new();
                 std::io::stdin().read_to_string(&mut buf)?;
-                buf = pretty_print_str(&registry, &buf)?;
+                buf = self.format_source(&buf, &registry, None).await?;
                 print!("{buf}");
             } else if failed > 0 {
                 eprintln!(
@@ -187,15 +192,53 @@ impl FmtCommand {
             }
         }
     }
-}
 
-fn format_file(path: &PathBuf, registry: &Registry) -> Result<bool, error::Error> {
-    let input = std::fs::read_to_string(path)?;
-    let output = pretty_print_str(registry, &input)?;
-    if output == input {
-        Ok(false)
-    } else {
-        std::fs::write(path, output)?;
-        Ok(true)
+    async fn format_file(&self, path: &Path, registry: &Registry) -> Result<bool, Error> {
+        let input = std::fs::read_to_string(path)?;
+        let output = self.format_source(&input, registry, path.parent()).await?;
+        if output == input {
+            Ok(false)
+        } else {
+            std::fs::write(path, output)?;
+            Ok(true)
+        }
+    }
+
+    async fn format_source(
+        &self,
+        input: &str,
+        registry: &Registry,
+        directory: Option<&Path>,
+    ) -> Result<String, Error> {
+        if !self.rustfmt {
+            return Ok(pretty_print_str(registry, input)?);
+        }
+
+        let mut command = Command::new("rustfmt");
+        command
+            .args(["--emit", "stdout"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .kill_on_drop(true);
+        if let Some(directory) = directory.filter(|path| !path.as_os_str().is_empty()) {
+            command.current_dir(directory);
+        }
+        let mut child = command.spawn().map_err(Error::RustfmtIo)?;
+        let mut stdin = child.stdin.take().expect("rustfmt stdin is piped");
+        // Drain stdout while writing stdin so large sources cannot fill both pipes.
+        let (write_result, output) = tokio::join!(
+            async move { stdin.write_all(input.as_bytes()).await },
+            child.wait_with_output(),
+        );
+        let output = output.map_err(Error::RustfmtIo)?;
+        if !output.status.success() {
+            return Err(Error::RustfmtFailed(output.status));
+        }
+        write_result.map_err(Error::RustfmtIo)?;
+        let source = String::from_utf8(output.stdout).map_err(|error| {
+            Error::RustfmtIo(std::io::Error::new(std::io::ErrorKind::InvalidData, error))
+        })?;
+        Ok(pretty_print_str(registry, &source)?)
     }
 }

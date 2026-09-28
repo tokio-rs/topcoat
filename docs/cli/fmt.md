@@ -1,4 +1,4 @@
-`topcoat fmt` formats Topcoat macro bodies in Rust source files. Run it alongside `rustfmt`, which formats the surrounding Rust code.
+`topcoat fmt` formats Topcoat macro bodies in Rust source files. Add `--rustfmt` to format the surrounding Rust code too.
 
 # Running the formatter
 
@@ -26,6 +26,22 @@ topcoat fmt --stdin < src/main.rs > /tmp/main.rs
 
 In stdin mode, the formatted source is written to stdout instead of updating files on disk.
 
+Pass `--rustfmt` to run `rustfmt` first, then format Topcoat macro bodies:
+
+```sh
+topcoat fmt --rustfmt
+topcoat fmt --stdin --rustfmt < src/main.rs > /tmp/main.rs
+```
+
+This requires `rustfmt` on `PATH`. Install it with `rustup component add rustfmt`. Both formatters must succeed before a file is written or the formatted stdin is emitted. Errors go to stderr and cause a nonzero exit status.
+
+Rustfmt searches for `rustfmt.toml` or `.rustfmt.toml` from each source file's directory, or from the current directory in stdin mode. Because the source is passed through stdin, rustfmt does not infer the Rust edition from `Cargo.toml`. Set the edition in your rustfmt configuration, for example:
+
+```toml
+# rustfmt.toml
+edition = "2024"
+```
+
 By default, the formatter handles all supported macros. Pass a comma-separated list with `--macros` to format only those macros:
 
 ```sh
@@ -34,7 +50,7 @@ topcoat fmt --macros view,class
 
 # Supported syntax
 
-The formatter changes only supported macro bodies. For example, it formats the HTML inside `view!`:
+Without `--rustfmt`, the formatter changes only supported macro bodies. For example, it formats the HTML inside `view!`:
 
 ```rust
 // src/app.rs
@@ -53,6 +69,18 @@ async fn page() -> topcoat::Result<impl View> {
 Macros are identified by their names at the call site. A macro imported or re-exported under a different name will not be formatted.
 
 # Editor integration
+
+## rust-analyzer
+
+Set `rustfmt.overrideCommand` to run both formatters with a single command. For example, in VS Code's `settings.json`:
+
+```json
+{
+  "rust-analyzer.rustfmt.overrideCommand": ["topcoat", "fmt", "--stdin", "--rustfmt"]
+}
+```
+
+The command reads the editor buffer from stdin and writes the formatted source to stdout. It works without a shell or wrapper script. Set the Rust edition in `rustfmt.toml` as described above.
 
 ## Neovim
 

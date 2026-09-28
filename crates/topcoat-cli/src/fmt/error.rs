@@ -5,6 +5,8 @@ pub enum Error {
     Glob(glob::GlobError),
     Pattern(glob::PatternError),
     Io(std::io::Error),
+    RustfmtIo(std::io::Error),
+    RustfmtFailed(std::process::ExitStatus),
     Syntax { errors: Vec<FormatError> },
 }
 
@@ -14,6 +16,8 @@ impl std::fmt::Display for Error {
             Self::Glob(inner) => write!(f, "{inner}")?,
             Self::Pattern(inner) => write!(f, "{inner}")?,
             Self::Io(inner) => write!(f, "{inner}")?,
+            Self::RustfmtIo(inner) => write!(f, "failed to run rustfmt: {inner}")?,
+            Self::RustfmtFailed(status) => write!(f, "rustfmt failed with {status}")?,
             Self::Syntax { errors } => {
                 write!(f, "syntax errors while formatting view macro:")?;
                 for error in errors {
