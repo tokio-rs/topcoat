@@ -97,8 +97,7 @@ mod tests {
 
     #[test]
     fn view_accepts_incomplete_runtime_expression() {
-        let view = syn::parse_str::<crate::view::View>("<input @input=$(|e: Event| e.)>")
-            .unwrap();
+        let view = syn::parse_str::<crate::view::View>("<input @input=$(|e: Event| e.)>").unwrap();
         let expanded = view.to_token_stream().to_string();
         let runtime = quote! { #topcoat_runtime_macro::expr! { |e: Event| e. } }.to_string();
         assert!(expanded.contains(&runtime));
