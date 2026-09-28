@@ -6,11 +6,8 @@ use quote::quote;
 #[doc = include_str!("../docs/expr.md")]
 #[proc_macro]
 pub fn expr(tokens: TokenStream) -> TokenStream {
-    let parsed = syn::parse_macro_input!(tokens as topcoat_runtime_grammar::expr::Expr);
-    match parsed.expr_to_tokens() {
-        Ok(ts) => ts.into(),
-        Err(err) => err.to_compile_error().into(),
-    }
+    let parsed = syn::parse_macro_input!(tokens as topcoat_runtime_grammar::expr::ExprInput);
+    quote! { #parsed }.into()
 }
 
 #[doc = include_str!("../docs/procedure.md")]

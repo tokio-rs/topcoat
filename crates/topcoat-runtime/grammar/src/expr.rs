@@ -25,11 +25,42 @@ mod pat;
 mod stmt;
 
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
 use topcoat_core_grammar::paths::topcoat_runtime;
 
 use crate::expr::{js::Js, name_resolver::NameResolver};
+
+/// An `expr!` body whose tokens are retained when parsing or lowering fails.
+pub struct ExprInput {
+    pub tokens: TokenStream,
+}
+
+impl Parse for ExprInput {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        Ok(Self {
+            tokens: input.parse()?,
+        })
+    }
+}
+
+impl ToTokens for ExprInput {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match syn::parse2::<Expr>(self.tokens.clone()).and_then(|expr| expr.expr_to_tokens()) {
+            Ok(expanded) => tokens.extend(expanded),
+            Err(error) => {
+                let error = error.to_compile_error();
+                let original = &self.tokens;
+                // Preserve the Rust context and source spans for IDE analysis.
+                quote! {{
+                    #error;
+                    #original
+                }}
+                .to_tokens(tokens);
+            }
+        }
+    }
+}
 
 /// A parsed `expr! { ... }` body. Lowering checks which expression forms
 /// are supported.
@@ -124,6 +155,40 @@ impl Expr {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn failed_expansion_preserves_input() {
+        for source in ["|e: Event| e.", "|e: Event| [e.target]"] {
+            let input: ExprInput = syn::parse_str(source).unwrap();
+            let expanded = input.to_token_stream();
+            let mut tokens = expanded.into_iter();
+            let Some(proc_macro2::TokenTree::Group(block)) = tokens.next() else {
+                panic!("expected a fallback block");
+            };
+            assert_eq!(block.delimiter(), proc_macro2::Delimiter::Brace);
+            assert!(tokens.next().is_none());
+            let body = block.stream().to_string();
+            assert!(body.contains("compile_error"));
+            assert!(body.ends_with(&input.tokens.to_string()));
+        }
+    }
+
+    #[test]
+    fn successful_expansion_uses_normal_lowering() {
+        for source in [
+            "true",
+            "true,",
+            "if active { count.get() } else { 0 }",
+            "|e: Event| e.__completion_marker",
+        ] {
+            let input: ExprInput = syn::parse_str(source).unwrap();
+            let parsed: Expr = syn::parse_str(source).unwrap();
+            assert_eq!(
+                input.to_token_stream().to_string(),
+                parsed.expr_to_tokens().unwrap().to_string(),
+            );
+        }
+    }
 
     #[test]
     fn optional_trailing_comma_preserves_the_expression() {
