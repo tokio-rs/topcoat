@@ -175,7 +175,7 @@ The same form works for `#[layout]`, `#[layer]`, and `#[route]`.
 
 # Dynamic path parameters
 
-[`path_param!`](macro.path_param.html) declares a path parameter that you can use in a handler's path, such as `#[page("./{post_id}")]`. [`module_param!`](macro.module_param.html) makes the same declaration and also uses the parameter as the module's URL segment. Both accept the same options, and you read their values with `path_param::<T>(cx)`.
+[`path_param!`](macro.path_param.html) declares a path parameter. For module routing, use [`module_param!`](macro.module_param.html), which makes the same declaration and also uses the parameter as the module's URL segment. Both accept the same options, and you read their values with `path_param::<T>(cx)`.
 
 For example, `module_param!(post_id: u64)` gives the module a `{post_id}` segment and creates the `PostId` type used to read its value:
 
