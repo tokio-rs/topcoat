@@ -14,9 +14,8 @@ use crate::{
 /// the fallback renders with the page and the child replaces it when ready.
 ///
 /// Set `mode: SuspenseMode::Wait` to wait for the child's initial content
-/// without showing the fallback. When `mode` is omitted,
-/// [`SuspenseMode::resolve`] selects it from the context and defaults to
-/// [`SuspenseMode::Stream`].
+/// without showing the fallback. When `mode` is omitted, [`suspense_mode`]
+/// selects it from the context and defaults to [`SuspenseMode::Stream`].
 ///
 /// Errors from the child are not caught; wrap the child in an
 /// [`error_boundary`](super::error_boundary) to handle them.
@@ -59,14 +58,15 @@ pub async fn suspense(
     #[default]
     child: Child<'_>,
     /// Whether to show the fallback or wait for the child's initial content.
-    /// Defaults to the mode selected by [`SuspenseMode::resolve`].
+    /// Defaults to the mode selected by [`suspense_mode`].
     #[into]
     #[default]
     mode: Option<SuspenseMode>,
 ) -> Result<impl View> {
     const SITE: SiteKey = SiteKey::new(file!(), line!(), column!(), 0);
     let region = RegionId::new(identity(cx), SITE);
-    let wait = SuspenseMode::resolve(cx, mode) == SuspenseMode::Wait;
+    let mode = mode.unwrap_or_else(|| suspense_mode(cx));
+    let wait = mode == SuspenseMode::Wait;
     Ok(SuspenseView::new(region, fallback, child, wait))
 }
 
@@ -107,7 +107,7 @@ pub async fn suspense(
 ///
 /// Use [`RouterSuspenseExt::suspense`] to set a default for a router, or put a
 /// `SuspenseMode` in the request context to override it for a request. See
-/// [`resolve`](Self::resolve) for the order in which modes are selected.
+/// [`suspense_mode`] for the order in which modes are selected.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SuspenseMode {
     /// Shows the fallback if the child's initial content is not ready, then
@@ -118,22 +118,19 @@ pub enum SuspenseMode {
     Wait,
 }
 
-impl SuspenseMode {
-    /// Selects a mode from an explicit value and the context.
-    ///
-    /// Returns the first available value in this order:
-    ///
-    /// 1. `explicit`.
-    /// 2. A `SuspenseMode` in the request context.
-    /// 3. A `SuspenseMode` in the app context.
-    /// 4. [`SuspenseMode::Stream`].
-    #[must_use]
-    pub fn resolve(cx: &Cx, explicit: Option<Self>) -> Self {
-        explicit
-            .or_else(|| try_request_context::<Self>(cx).copied())
-            .or_else(|| try_app_context::<Self>(cx).copied())
-            .unwrap_or_default()
-    }
+/// Returns the suspense mode for boundaries that do not choose one.
+///
+/// Returns the first available value in this order:
+///
+/// 1. A `SuspenseMode` in the request context.
+/// 2. A `SuspenseMode` in the app context.
+/// 3. [`SuspenseMode::Stream`].
+#[must_use]
+pub fn suspense_mode(cx: &Cx) -> SuspenseMode {
+    try_request_context::<SuspenseMode>(cx)
+        .or_else(|| try_app_context::<SuspenseMode>(cx))
+        .copied()
+        .unwrap_or_default()
 }
 
 /// Configures the default suspense mode on a [`RouterBuilder`](crate::router::RouterBuilder).
