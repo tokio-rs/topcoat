@@ -1,10 +1,10 @@
-//! Renders a page or shard over a WebSocket opened at its URL.
+//! Renders pages and shards over one WebSocket per document.
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
+use tokio::{sync::mpsc, task::JoinHandle};
 use topcoat_core::{context::Cx, error::Result};
 use topcoat_router::{
     Body, HeaderMap, HeaderName, HeaderValue, Method, RemoteAddr, Router, Uri,
@@ -13,12 +13,12 @@ use topcoat_router::{
         websocket::{Message, WebSocket, WebSocketUpgrade},
     },
     header,
-    request::{FromRequest, IDENTITY_HEADER, Request, extensions, headers, method, uri},
+    request::{FromRequest, IDENTITY_HEADER, Request, extensions, headers, method},
     response::Response,
     router,
 };
 
-use crate::{ConnectedRender, RUNTIME_PROTOCOL, SignalValues};
+use crate::{ConnectedRender, RUNTIME_HEADER, RUNTIME_PROTOCOL};
 
 /// Checks for a `GET` that requests the runtime WebSocket subprotocol.
 pub(super) fn requested(cx: &Cx) -> bool {
@@ -38,68 +38,90 @@ fn requests_runtime_protocol(headers: &HeaderMap) -> bool {
 /// Opens the WebSocket and starts handling render requests.
 pub(super) async fn accept(cx: &Cx, body: Body) -> Result<Response> {
     let upgrade = WebSocketUpgrade::from_request(cx, body).await?;
-    let target = Arc::new(ConnectionTarget::from_handshake(cx));
+    let connection = Arc::new(Connection::from_handshake(cx));
     upgrade
         .protocols([RUNTIME_PROTOCOL])
-        .on_upgrade(move |socket| run(target, socket))
+        .on_upgrade(move |socket| run(connection, socket))
 }
 
-/// The browser's request for a new render.
-///
-/// A request naming a shard identity renders the shard endpoint at the
-/// connection's URL. The whole message is then the endpoint's request body,
-/// so it also carries the shard's arguments and signal values. Other
-/// requests render the page.
+/// A message from the browser.
 #[derive(Debug, Deserialize)]
-struct RenderRequest {
-    /// The run id chosen by the browser. Sent back before any output so
-    /// the browser can identify which render it belongs to.
-    #[serde(default)]
+#[serde(untagged)]
+enum ClientMessage {
+    /// Stops a run. Output the run already sent may still arrive.
+    Stop { stop: u64 },
+    /// Starts a new run alongside any others.
+    Run(RunRequest),
+}
+
+/// The browser's request for a connected render.
+///
+/// The fields describe an HTTP request, the same one the browser would
+/// send to re-render the content without a connection.
+#[derive(Debug, Deserialize)]
+struct RunRequest {
+    /// The run id chosen by the browser. Every message of the run's output
+    /// carries it.
     run: u64,
-    /// The identity of the shard invocation to render.
+    method: String,
+    /// An absolute path, with an optional query.
+    path: String,
+    /// Headers added to the ones from the handshake. See
+    /// [`allowed_header`].
     #[serde(default)]
-    shard: Option<String>,
-    /// The signal values to use for a page render.
+    headers: HashMap<String, String>,
     #[serde(default)]
-    signals: SignalValues,
+    body: String,
 }
 
-/// A render request and the message text it was parsed from.
-struct Render {
-    request: RenderRequest,
-    /// Sent as the request body of a shard render.
-    text: String,
-}
-
-/// A connection message for identifying runs, redirects, and errors.
+/// A frame reporting a redirect or error instead of rendered output.
 #[derive(Serialize)]
 #[serde(tag = "t", rename_all = "snake_case")]
-enum ConnectionMessage<'a> {
-    /// Identifies all following output until the next run announcement.
-    Run { id: u64 },
+enum ConnectionFrame<'a> {
     /// Tells the browser to navigate after a render returned a redirect.
     Redirect { location: &'a str },
     /// Reports a failed render or an invalid request from the browser.
     Error { status: u16 },
 }
 
-impl ConnectionMessage<'_> {
-    fn to_message(&self) -> Message {
-        Message::text(serde_json::to_string(self).expect("a connection message serializes"))
+impl ConnectionFrame<'_> {
+    fn to_message(&self, run: Option<u64>) -> Message {
+        let frame = serde_json::to_string(self).expect("a connection frame serializes");
+        envelope(run, &frame)
     }
 }
 
-/// The router, URL, and request details used for every render on a connection.
-struct ConnectionTarget {
+/// Wraps one JSON frame in a message naming its run.
+///
+/// Runs share the connection, so their output interleaves. The browser
+/// routes each frame by its run and drops frames of runs it has stopped.
+/// A message without a run answers a message that could not be parsed.
+fn envelope(run: Option<u64>, frame: &str) -> Message {
+    let frame = frame.trim_end();
+    Message::text(match run {
+        Some(run) => format!("{{\"run\":{run},\"frame\":{frame}}}"),
+        None => format!("{{\"frame\":{frame}}}"),
+    })
+}
+
+/// Checks whether a run request may set a header: the content type, and
+/// the headers that mark shard and page re-renders. Everything else comes
+/// from the handshake, so a run cannot change the credentials, origin, or
+/// host the handshake established.
+fn allowed_header(name: &HeaderName) -> bool {
+    *name == header::CONTENT_TYPE || name == IDENTITY_HEADER || *name == RUNTIME_HEADER
+}
+
+/// The router and request details shared by every render on a connection.
+struct Connection {
     router: Router,
-    uri: Uri,
     /// Headers from the handshake, with WebSocket headers and
     /// `Accept-Encoding` removed.
     headers: HeaderMap,
     remote: Option<RemoteAddr>,
 }
 
-impl ConnectionTarget {
+impl Connection {
     fn from_handshake(cx: &Cx) -> Self {
         let mut headers = headers(cx).clone();
         for name in [
@@ -115,79 +137,61 @@ impl ConnectionTarget {
         }
         Self {
             router: router(cx),
-            uri: uri(cx).clone(),
             headers,
             remote: extensions(cx).get::<RemoteAddr>().copied(),
         }
     }
 
-    /// Builds a request for the connection's URL.
-    fn request(&self, method: Method, headers: HeaderMap, body: Body) -> Request {
-        let mut request = Request::new(body);
+    /// Builds the HTTP request a run describes. Returns `None` for an
+    /// invalid method, header, or path, a path that is not absolute, or a
+    /// header that [`allowed_header`] rejects.
+    fn request(&self, run: RunRequest) -> Option<Request> {
+        let method = Method::from_bytes(run.method.as_bytes()).ok()?;
+        let uri = Uri::try_from(run.path).ok()?;
+        if uri.scheme().is_some() || !uri.path().starts_with('/') {
+            return None;
+        }
+        let mut headers = self.headers.clone();
+        for (name, value) in run.headers {
+            let name = HeaderName::try_from(name).ok()?;
+            if !allowed_header(&name) {
+                return None;
+            }
+            headers.insert(name, HeaderValue::try_from(value).ok()?);
+        }
+
+        let mut request = Request::new(Body::from(run.body));
         *request.method_mut() = method;
-        *request.uri_mut() = self.uri.clone();
+        *request.uri_mut() = uri;
         *request.headers_mut() = headers;
         if let Some(remote) = self.remote {
             request.extensions_mut().insert(remote);
         }
-        request
+        Some(request)
     }
 
-    /// Renders the page or shard and sends its output to `out`.
-    /// Stops when rendering finishes or the receiver closes.
-    async fn render(&self, render: Render, out: mpsc::Sender<Message>) {
-        let Render { request, text } = render;
-        let run = ConnectionMessage::Run { id: request.run }.to_message();
-        if out.send(run).await.is_err() {
+    /// Dispatches the run's request as a connected render and sends its
+    /// output to `out`. Stops when rendering finishes or the receiver
+    /// closes.
+    async fn render(&self, run: RunRequest, out: mpsc::Sender<Message>) {
+        let id = Some(run.run);
+        let Some(request) = self.request(run) else {
+            let error = ConnectionFrame::Error { status: 400 };
+            let _ = out.send(error.to_message(id)).await;
             return;
-        }
-
-        let response = match request.shard {
-            // A shard endpoint reads its arguments and signal values from
-            // the body and its identity from a header, like an HTTP
-            // re-render of the shard.
-            Some(identity) => {
-                let Ok(identity) = HeaderValue::try_from(identity) else {
-                    let _ = out
-                        .send(ConnectionMessage::Error { status: 400 }.to_message())
-                        .await;
-                    return;
-                };
-                let mut headers = self.headers.clone();
-                headers.insert(
-                    header::CONTENT_TYPE,
-                    HeaderValue::from_static("application/json"),
-                );
-                headers.insert(HeaderName::from_static(IDENTITY_HEADER), identity);
-                self.router
-                    .handle_with(
-                        self.request(Method::POST, headers, Body::from(text)),
-                        (ConnectedRender, ViewResponseDelivery::Frames),
-                    )
-                    .await
-            }
-            None => {
-                self.router
-                    .handle_with(
-                        self.request(Method::GET, self.headers.clone(), Body::empty()),
-                        (
-                            ConnectedRender,
-                            request.signals,
-                            ViewResponseDelivery::Frames,
-                        ),
-                    )
-                    .await
-            }
         };
+        let response = self
+            .router
+            .handle_with(request, (ConnectedRender, ViewResponseDelivery::Frames))
+            .await;
 
         let status = response.status();
         if status.is_redirection()
             && let Some(location) = response.headers().get(header::LOCATION)
             && let Ok(location) = location.to_str()
         {
-            let _ = out
-                .send(ConnectionMessage::Redirect { location }.to_message())
-                .await;
+            let redirect = ConnectionFrame::Redirect { location };
+            let _ = out.send(redirect.to_message(id)).await;
             return;
         }
         let has_frames = response
@@ -195,25 +199,18 @@ impl ConnectionTarget {
             .get(header::CONTENT_TYPE)
             .is_some_and(|value| value == "application/x-ndjson");
         if !status.is_success() || !has_frames {
-            let _ = out
-                .send(
-                    ConnectionMessage::Error {
-                        status: status.as_u16(),
-                    }
-                    .to_message(),
-                )
-                .await;
+            let error = ConnectionFrame::Error {
+                status: status.as_u16(),
+            };
+            let _ = out.send(error.to_message(id)).await;
             return;
         }
 
         let mut frames = response.into_body().into_data_stream();
         while let Some(frame) = frames.next().await {
-            let message = match frame {
-                Ok(bytes) => match String::from_utf8(bytes.to_vec()) {
-                    Ok(text) => Message::text(text),
-                    Err(_) => ConnectionMessage::Error { status: 500 }.to_message(),
-                },
-                Err(_) => ConnectionMessage::Error { status: 500 }.to_message(),
+            let message = match frame.as_deref().map(std::str::from_utf8) {
+                Ok(Ok(text)) => envelope(id, text),
+                _ => ConnectionFrame::Error { status: 500 }.to_message(id),
             };
             if out.send(message).await.is_err() {
                 return;
@@ -222,13 +219,12 @@ impl ConnectionTarget {
     }
 }
 
-/// Handles render requests until the browser disconnects.
+/// Handles run requests until the browser disconnects.
 ///
-/// Each request cancels the previous render and waits for it to stop before
-/// starting another. Aborting alone is not enough because a task running
-/// on another worker can still send output until it yields. Waiting keeps
-/// that output ahead of the next run announcement in the queue.
-async fn run(target: Arc<ConnectionTarget>, socket: WebSocket) {
+/// Runs proceed side by side until they finish, the browser stops them, or
+/// the connection closes. A stopped run can still send output until its
+/// task next yields; the browser drops that output by its run id.
+async fn run(connection: Arc<Connection>, socket: WebSocket) {
     let (mut sink, mut stream) = socket.split();
     let (out, mut queue) = mpsc::channel::<Message>(16);
 
@@ -241,35 +237,41 @@ async fn run(target: Arc<ConnectionTarget>, socket: WebSocket) {
     };
 
     let receive = async move {
-        let mut current: Option<tokio::task::JoinHandle<()>> = None;
+        let mut runs = HashMap::<u64, JoinHandle<()>>::new();
         while let Some(Ok(message)) = stream.next().await {
             let Message::Text(text) = message else {
                 continue;
             };
-            let Ok(request) = serde_json::from_str::<RenderRequest>(text.as_str()) else {
-                let error = ConnectionMessage::Error { status: 400 }.to_message();
-                if out.send(error).await.is_err() {
-                    break;
+            let request = match serde_json::from_str::<ClientMessage>(text.as_str()) {
+                Ok(ClientMessage::Run(request)) => request,
+                Ok(ClientMessage::Stop { stop }) => {
+                    if let Some(run) = runs.remove(&stop) {
+                        run.abort();
+                    }
+                    continue;
                 }
-                continue;
+                Err(_) => {
+                    let error = ConnectionFrame::Error { status: 400 }.to_message(None);
+                    if out.send(error).await.is_err() {
+                        break;
+                    }
+                    continue;
+                }
             };
-            if let Some(current) = current.take() {
-                current.abort();
-                // Wait until the old render can no longer send frames.
-                let _ = current.await;
-            }
-            let render = Render {
-                request,
-                text: text.as_str().to_owned(),
-            };
-            let target = Arc::clone(&target);
+            runs.retain(|_, run| !run.is_finished());
+            let id = request.run;
+            let connection = Arc::clone(&connection);
             let out = out.clone();
-            current = Some(tokio::spawn(async move {
-                target.render(render, out).await;
-            }));
+            let handle = tokio::spawn(async move {
+                connection.render(request, out).await;
+            });
+            // A reused id replaces the run that had it.
+            if let Some(previous) = runs.insert(id, handle) {
+                previous.abort();
+            }
         }
-        if let Some(current) = current {
-            current.abort();
+        for run in runs.values() {
+            run.abort();
         }
         // The forwarder finishes after all senders close and queued messages are sent.
     };

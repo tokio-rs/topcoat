@@ -6,7 +6,7 @@ import { Runtime } from "../runtime";
 import type { Scope } from "../scope";
 import type { SignalId } from "../signal-registry";
 import { F64 } from "../surrogate";
-import { RUNTIME_PROTOCOL } from "./connection";
+import { type RerunRequest, RUNTIME_PROTOCOL } from "./connection";
 import { newRender, type ServerMessage } from "./frames";
 import { RUNTIME_HEADER } from "./request";
 import { ShardUnit } from "./shard";
@@ -267,15 +267,11 @@ class ScriptedUnit extends RenderUnit {
 
 	protected readInputs(): void {}
 
-	protected url(): string {
-		return "/scripted";
+	rerunRequest(): RerunRequest {
+		return { url: "/scripted", headers: {}, body: "" };
 	}
 
-	renderInputs(): object {
-		return {};
-	}
-
-	protected request(): Promise<Response> {
+	protected override request(): Promise<Response> {
 		this.requests.push(this.requests.length);
 		return Promise.resolve(new Response(snapshot(""), { status: 200 }));
 	}
@@ -715,28 +711,45 @@ it("a page whose content asks for a connection opens one at its own URL once the
 		expect(socket.protocol).toBe(RUNTIME_PROTOCOL);
 
 		socket.open();
-		expect(socket.sent).toEqual([{ run: 1, signals: { a: 1 } }]);
+		// The run carries the same request as an HTTP page rerun.
+		expect(socket.sent).toEqual([
+			{
+				run: 1,
+				method: "POST",
+				path: "/room?q=1",
+				headers: {
+					"Content-Type": "application/json",
+					[RUNTIME_HEADER]: "true",
+				},
+				body: JSON.stringify({ signals: { a: 1 } }),
+			},
+		]);
 
-		// Changing the signal requests another run on the same connection.
+		// Changing the signal replaces the run on the same connection.
 		runtime.context.signal("a").set(new F64(2));
 		await settle();
-		expect(socket.sent).toEqual([
-			{ run: 1, signals: { a: 1 } },
-			{ run: 2, signals: { a: 2 } },
+		expect(socket.sent.slice(1)).toEqual([
+			{ stop: 1 },
+			expect.objectContaining({
+				run: 2,
+				body: JSON.stringify({ signals: { a: 2 } }),
+			}),
 		]);
 		expect(stub.url()).toBe(undefined);
 
 		// Receiving new page content leaves the connection open.
-		socket.receive({ t: "run", id: 2 });
 		socket.receive({
-			t: "snapshot",
-			html: `<!doctype html><html><body>${declaration("a", 2)}<!--::topcoat::dep("a")--><!--::topcoat::connect--><p>2</p></body></html>`,
+			run: 2,
+			frame: {
+				t: "snapshot",
+				html: `<!doctype html><html><body>${declaration("a", 2)}<!--::topcoat::dep("a")--><!--::topcoat::connect--><p>2</p></body></html>`,
+			},
 		});
 		expect(document.querySelector("p")?.textContent).toBe("2");
 		expect(FakeSocket.opened).toHaveLength(1);
 		runtime.context.signal("a").set(new F64(3));
 		await settle();
-		expect(socket.sent).toHaveLength(3);
+		expect(socket.sent.at(-1)).toMatchObject({ run: 3 });
 	} finally {
 		runtime.page.dispose();
 	}
@@ -770,6 +783,7 @@ it("while the connection is not open, a re-render posts over HTTP", async () => 
 
 		expect(stub.url()).toBe("https://app.example/room?q=1");
 		expect(socket.sent).toHaveLength(1);
+		expect(stub.request()?.body).toBe(JSON.stringify({ signals: { a: 2 } }));
 	} finally {
 		runtime.page.dispose();
 	}
@@ -780,7 +794,7 @@ function shardMarkup(content: string): string {
 	return `<!--::topcoat::shard::start("/feed", "id", [])-->${content}<!--::topcoat::shard::end("id")-->`;
 }
 
-it("a shard whose content asks for a connection opens one at its endpoint and renders over it", async () => {
+it("a shard whose content asks for a connection renders over the page's socket at its endpoint", async () => {
 	installSocket();
 	const stub = stubFetch(500, "Internal Server Error");
 	document.body.innerHTML = `<p>outside</p>${shardMarkup(
@@ -792,30 +806,47 @@ it("a shard whose content asks for a connection opens one at its endpoint and re
 		await settle();
 		expect(FakeSocket.opened).toHaveLength(1);
 		const socket = FakeSocket.opened[0] as FakeSocket;
-		expect(socket.url).toBe("wss://app.example/feed");
+		expect(socket.url).toBe("wss://app.example/room?q=1");
 
 		socket.open();
+		// The run carries the same request as an HTTP shard re-render.
 		expect(socket.sent).toEqual([
-			{ run: 1, shard: "id", args: [], signals: { b: 1 } },
+			{
+				run: 1,
+				method: "POST",
+				path: "/feed",
+				headers: {
+					"Content-Type": "application/json",
+					"X-Topcoat-Identity": "id",
+				},
+				body: JSON.stringify({ args: [], signals: { b: 1 } }),
+			},
 		]);
 
 		// The snapshot replaces only the shard's content.
-		socket.receive({ t: "run", id: 1 });
 		socket.receive({
-			t: "snapshot",
-			html: `${declaration("b", 1)}<!--::topcoat::dep("b")--><!--::topcoat::connect--><p>2</p>`,
+			run: 1,
+			frame: {
+				t: "snapshot",
+				html: `${declaration("b", 1)}<!--::topcoat::dep("b")--><!--::topcoat::connect--><p>2</p>`,
+			},
 		});
 		expect(document.body.textContent).toContain("outside");
 		expect(document.querySelectorAll("p")[1]?.textContent).toBe("2");
 
 		runtime.context.signal("b").set(new F64(2));
 		await settle();
-		expect(socket.sent).toHaveLength(2);
-		expect(socket.sent[1]).toMatchObject({ run: 2, signals: { b: 2 } });
+		expect(socket.sent.at(-1)).toMatchObject({
+			run: 2,
+			path: "/feed",
+			body: JSON.stringify({ args: [], signals: { b: 2 } }),
+		});
 		expect(stub.url()).toBe(undefined);
 	} finally {
 		runtime.page.dispose();
 	}
+	// Disposal closes the socket once the current task ends.
+	await Promise.resolve();
 	expect(FakeSocket.opened[0]?.readyState).toBe(3);
 });
 
@@ -836,7 +867,7 @@ it("a shard inside a page that connects opens no connection of its own", async (
 	}
 });
 
-it("a shard that needs a connection re-runs its connected page when its input changes", async () => {
+it("a shard that needs a connection inside a connected page re-runs on its own when its input changes", async () => {
 	installSocket();
 	const stub = stubFetch(500, "Internal Server Error");
 	document.body.innerHTML = `${shardMarkup(
@@ -848,13 +879,16 @@ it("a shard that needs a connection re-runs its connected page when its input ch
 		await settle();
 		const socket = FakeSocket.opened[0] as FakeSocket;
 		socket.open();
+		expect(socket.sent).toEqual([
+			expect.objectContaining({ path: "/room?q=1" }),
+		]);
 
 		runtime.context.signal("b").set(new F64(2));
 		await settle();
 
-		expect(socket.sent).toEqual([
-			{ run: 1, signals: { b: 1 } },
-			{ run: 2, signals: { b: 2 } },
+		// The page's run keeps going; the shard runs next to it.
+		expect(socket.sent.slice(1)).toEqual([
+			expect.objectContaining({ run: 2, path: "/feed" }),
 		]);
 		expect(stub.url()).toBe(undefined);
 	} finally {
@@ -862,7 +896,26 @@ it("a shard that needs a connection re-runs its connected page when its input ch
 	}
 });
 
-it("a page snapshot that replaces a connected shard closes the shard's connection", async () => {
+it("sibling shards that need a connection share one socket", async () => {
+	installSocket();
+	document.body.innerHTML = `${shardMarkup(`<!--::topcoat::connect-->`)}<!--::topcoat::shard::start("/other", "other", [])--><!--::topcoat::connect--><!--::topcoat::shard::end("other")-->`;
+	const runtime = new Runtime();
+	runtime.start(document);
+	try {
+		await settle();
+		expect(FakeSocket.opened).toHaveLength(1);
+		const socket = FakeSocket.opened[0] as FakeSocket;
+		socket.open();
+		expect(socket.sent.map((message) => message.path)).toEqual([
+			"/feed",
+			"/other",
+		]);
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
+it("a page snapshot that replaces the last connected shard stops its run and closes the socket", async () => {
 	installSocket();
 	document.body.innerHTML = shardMarkup(`<!--::topcoat::connect-->`);
 	stubFetch(200, "OK", snapshot(`<p>plain</p>`));
@@ -874,7 +927,9 @@ it("a page snapshot that replaces a connected shard closes the shard's connectio
 		socket.open();
 
 		await refetch(runtime.page)();
+		await settle();
 
+		expect(socket.sent.at(-1)).toEqual({ stop: 1 });
 		expect(socket.readyState).toBe(3);
 		expect(FakeSocket.opened).toHaveLength(1);
 	} finally {

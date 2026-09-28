@@ -1,13 +1,18 @@
-//! Tests page rendering over a runtime WebSocket.
+//! Tests page and shard rendering over a runtime WebSocket.
 //!
-//! The client connects at the page's URL using the `topcoat-runtime`
-//! subprotocol. Each render request runs the page as a connected `GET`
-//! and sends its content back as frames.
+//! The client connects at a page's URL using the `topcoat-runtime`
+//! subprotocol. Each run request describes the HTTP request that re-renders
+//! a page or shard. The server dispatches it as a connected render and sends
+//! the content back as frames, each tagged with its run.
 
-use std::{io, net::SocketAddr, time::Duration};
+use std::{io, net::SocketAddr, sync::LazyLock, time::Duration};
 
 use futures_util::{SinkExt, StreamExt};
-use tokio::{net::TcpListener, sync::oneshot, task::JoinHandle};
+use tokio::{
+    net::TcpListener,
+    sync::{Notify, oneshot},
+    task::JoinHandle,
+};
 use tokio_tungstenite::{
     MaybeTlsStream, WebSocketStream,
     tungstenite::{Message, client::IntoClientRequest},
@@ -56,10 +61,37 @@ async fn slow(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <main>
             (live! {
-                let token = emit! { <p>"one"</p> }?;
+                let token = emit! { <p>"slow"</p> }?;
                 if connected(cx) {
                     std::future::pending::<()>().await;
                 }
+                Ok(token)
+            })
+        </main>
+    })
+}
+
+/// Notified when the render of [`endless`] is dropped.
+static ENDLESS_DROPPED: LazyLock<Notify> = LazyLock::new(Notify::new);
+
+/// Notifies [`ENDLESS_DROPPED`] when dropped.
+struct NotifyOnDrop;
+
+impl Drop for NotifyOnDrop {
+    fn drop(&mut self) {
+        ENDLESS_DROPPED.notify_one();
+    }
+}
+
+/// Renders until its run is stopped, reporting when that happens.
+#[page("/endless")]
+async fn endless() -> Result<impl View> {
+    Ok(view! {
+        <main>
+            (live! {
+                let _guard = NotifyOnDrop;
+                let token = emit! { <p>"endless"</p> }?;
+                std::future::pending::<()>().await;
                 Ok(token)
             })
         </main>
@@ -77,7 +109,7 @@ async fn ticker() -> Result<impl View> {
     })
 }
 
-/// Hosts a live shard, whose updates travel over the page's connection.
+/// Hosts a live shard, whose updates travel with the page's run.
 #[page("/shards")]
 async fn shards() -> Result<impl View> {
     Ok(view! { <main>ticker()</main> })
@@ -129,6 +161,7 @@ fn router() -> Router {
     Router::builder()
         .page(room)
         .page(slow)
+        .page(endless)
         .page(shards)
         .page(away)
         .page(broken)
@@ -181,26 +214,55 @@ async fn connect(addr: SocketAddr, path: &str) -> Client {
     client
 }
 
-/// Requests a render with the supplied run id and JSON signal values.
-async fn request_run(client: &mut Client, run: u64, signals: &str) {
+/// Sends `message` as JSON text.
+async fn send(client: &mut Client, message: serde_json::Value) {
     client
-        .send(Message::text(format!(
-            "{{\"run\":{run},\"signals\":{signals}}}"
-        )))
+        .send(Message::text(message.to_string()))
         .await
         .unwrap();
 }
 
-/// Requests a shard render at the root identity with the supplied run id,
-/// JSON arguments, and JSON signal values.
-async fn request_shard_run(client: &mut Client, run: u64, args: &str, signals: &str) {
-    let identity = Identity::ROOT;
-    client
-        .send(Message::text(format!(
-            "{{\"run\":{run},\"shard\":\"{identity}\",\"args\":{args},\"signals\":{signals}}}"
-        )))
-        .await
-        .unwrap();
+/// Requests a run of the page at `path`, as an HTTP page rerun would, with
+/// the supplied signal values.
+async fn request_page_run(client: &mut Client, run: u64, path: &str, signals: serde_json::Value) {
+    send(
+        client,
+        serde_json::json!({
+            "run": run,
+            "method": "POST",
+            "path": path,
+            "headers": {
+                "Content-Type": "application/json",
+                "X-Topcoat-Runtime": "true",
+            },
+            "body": serde_json::json!({ "signals": signals }).to_string(),
+        }),
+    )
+    .await;
+}
+
+/// Requests a run of the `/feed` shard at the root identity, as an HTTP
+/// shard re-render would, with the supplied arguments and signal values.
+async fn request_shard_run(
+    client: &mut Client,
+    run: u64,
+    args: serde_json::Value,
+    signals: serde_json::Value,
+) {
+    send(
+        client,
+        serde_json::json!({
+            "run": run,
+            "method": "POST",
+            "path": "/feed",
+            "headers": {
+                "Content-Type": "application/json",
+                "X-Topcoat-Identity": Identity::ROOT.to_string(),
+            },
+            "body": serde_json::json!({ "args": args, "signals": signals }).to_string(),
+        }),
+    )
+    .await;
 }
 
 /// Parses the next text message as JSON, failing the test if it does not
@@ -217,6 +279,13 @@ async fn next_json(client: &mut Client) -> serde_json::Value {
     serde_json::from_str(text.as_str()).unwrap()
 }
 
+/// Returns the next frame, asserting that it belongs to `run`.
+async fn next_frame(client: &mut Client, run: u64) -> serde_json::Value {
+    let mut message = next_json(client).await;
+    assert_eq!(message["run"], run, "{message}");
+    message["frame"].take()
+}
+
 /// Finds the last signal declaration in `html` and returns its id.
 fn last_signal_id(html: &str) -> &str {
     let declaration = html.rfind("::topcoat::signal(").expect(html);
@@ -227,17 +296,13 @@ fn last_signal_id(html: &str) -> &str {
 }
 
 #[tokio::test]
-async fn a_run_renders_the_page_connected_and_streams_its_frames() {
+async fn a_page_run_renders_the_page_connected_and_streams_its_frames() {
     let (addr, shutdown_tx, server) = spawn_server().await;
     let mut client = connect(addr, "/room").await;
 
-    request_run(&mut client, 1, "{}").await;
+    request_page_run(&mut client, 1, "/room", serde_json::json!({})).await;
 
-    assert_eq!(
-        next_json(&mut client).await,
-        serde_json::json!({ "t": "run", "id": 1 })
-    );
-    let snapshot = next_json(&mut client).await;
+    let snapshot = next_frame(&mut client, 1).await;
     assert_eq!(snapshot["t"], "snapshot");
     let html = snapshot["html"].as_str().unwrap();
     assert!(html.contains("connected: true"), "{html}");
@@ -245,7 +310,7 @@ async fn a_run_renders_the_page_connected_and_streams_its_frames() {
     assert!(html.contains("<!--::topcoat::connect-->"), "{html}");
     assert!(html.contains("<p>one</p>"), "{html}");
     // The second emission must update the region from the initial HTML.
-    let swap = next_json(&mut client).await;
+    let swap = next_frame(&mut client, 1).await;
     assert_eq!(swap["t"], "swap");
     assert_eq!(swap["html"], "<p>two</p>");
     let region = swap["region"].as_str().unwrap();
@@ -259,14 +324,13 @@ async fn a_run_renders_the_page_connected_and_streams_its_frames() {
 }
 
 #[tokio::test]
-async fn a_live_shard_streams_its_updates_over_the_page_connection() {
+async fn a_live_shard_streams_its_updates_with_the_page_run() {
     let (addr, shutdown_tx, server) = spawn_server().await;
     let mut client = connect(addr, "/shards").await;
 
-    request_run(&mut client, 1, "{}").await;
+    request_page_run(&mut client, 1, "/shards", serde_json::json!({})).await;
 
-    assert_eq!(next_json(&mut client).await["t"], "run");
-    let snapshot = next_json(&mut client).await;
+    let snapshot = next_frame(&mut client, 1).await;
     assert_eq!(snapshot["t"], "snapshot");
     let html = snapshot["html"].as_str().unwrap();
     assert!(html.contains("<p>tick</p>"), "{html}");
@@ -274,7 +338,7 @@ async fn a_live_shard_streams_its_updates_over_the_page_connection() {
 
     // The shard's region updates through the page's run, and its markers
     // lie inside the shard's, so the browser attributes it to the shard.
-    let swap = next_json(&mut client).await;
+    let swap = next_frame(&mut client, 1).await;
     assert_eq!(swap["t"], "swap");
     assert!(swap["html"].as_str().unwrap().contains("<p>tock</p>"));
     let region = swap["region"].as_str().unwrap();
@@ -293,24 +357,26 @@ async fn a_live_shard_streams_its_updates_over_the_page_connection() {
 }
 
 #[tokio::test]
-async fn a_shard_run_renders_the_shard_endpoint_connected() {
+async fn a_shard_run_on_a_page_connection_renders_the_shard_endpoint_connected() {
     let (addr, shutdown_tx, server) = spawn_server().await;
-    let mut client = connect(addr, "/feed").await;
+    let mut client = connect(addr, "/room").await;
 
-    request_shard_run(&mut client, 1, r#"["news"]"#, "{}").await;
+    request_shard_run(
+        &mut client,
+        1,
+        serde_json::json!(["news"]),
+        serde_json::json!({}),
+    )
+    .await;
 
-    assert_eq!(
-        next_json(&mut client).await,
-        serde_json::json!({ "t": "run", "id": 1 })
-    );
-    let snapshot = next_json(&mut client).await;
+    let snapshot = next_frame(&mut client, 1).await;
     assert_eq!(snapshot["t"], "snapshot", "{snapshot}");
     let html = snapshot["html"].as_str().unwrap();
     assert!(html.contains("news connected: true"), "{html}");
     assert!(html.contains("<!--::topcoat::connect-->"), "{html}");
     // The endpoint renders the shard's content without its scope markers.
     assert!(!html.contains("::topcoat::shard::start("), "{html}");
-    let swap = next_json(&mut client).await;
+    let swap = next_frame(&mut client, 1).await;
     assert_eq!(swap["t"], "swap");
     assert_eq!(swap["html"], "<p>pushed</p>");
 
@@ -319,20 +385,71 @@ async fn a_shard_run_renders_the_shard_endpoint_connected() {
 }
 
 #[tokio::test]
+async fn runs_proceed_side_by_side_on_one_connection() {
+    let (addr, shutdown_tx, server) = spawn_server().await;
+    let mut client = connect(addr, "/slow").await;
+
+    // The page's run never finishes while connected.
+    request_page_run(&mut client, 1, "/slow", serde_json::json!({})).await;
+    let snapshot = next_frame(&mut client, 1).await;
+    assert!(snapshot["html"].as_str().unwrap().contains("slow"));
+
+    // A shard run starts without ending the page's run.
+    request_shard_run(
+        &mut client,
+        2,
+        serde_json::json!(["news"]),
+        serde_json::json!({}),
+    )
+    .await;
+    let snapshot = next_frame(&mut client, 2).await;
+    assert!(snapshot["html"].as_str().unwrap().contains("news"));
+    assert_eq!(next_frame(&mut client, 2).await["t"], "swap");
+
+    // The page's run is still going, so another run of it can replace it.
+    request_page_run(&mut client, 3, "/slow", serde_json::json!({})).await;
+    assert_eq!(next_frame(&mut client, 3).await["t"], "snapshot");
+
+    client.close(None).await.unwrap();
+    shut_down(shutdown_tx, server).await;
+}
+
+#[tokio::test]
+async fn stopping_a_run_drops_its_render() {
+    let (addr, shutdown_tx, server) = spawn_server().await;
+    let mut client = connect(addr, "/endless").await;
+
+    request_page_run(&mut client, 1, "/endless", serde_json::json!({})).await;
+    assert_eq!(next_frame(&mut client, 1).await["t"], "snapshot");
+
+    send(&mut client, serde_json::json!({ "stop": 1 })).await;
+    tokio::time::timeout(Duration::from_secs(5), ENDLESS_DROPPED.notified())
+        .await
+        .expect("the stopped render is dropped");
+
+    client.close(None).await.unwrap();
+    shut_down(shutdown_tx, server).await;
+}
+
+#[tokio::test]
 async fn a_shard_run_restores_the_signal_values_it_is_sent() {
     let (addr, shutdown_tx, server) = spawn_server().await;
-    let mut client = connect(addr, "/feed").await;
+    let mut client = connect(addr, "/room").await;
 
-    request_shard_run(&mut client, 1, r#"["news"]"#, "{}").await;
-    let _run = next_json(&mut client).await;
-    let snapshot = next_json(&mut client).await;
+    let args = serde_json::json!(["news"]);
+    request_shard_run(&mut client, 1, args.clone(), serde_json::json!({})).await;
+    let snapshot = next_frame(&mut client, 1).await;
     let id = last_signal_id(snapshot["html"].as_str().unwrap()).to_owned();
-    let _swap = next_json(&mut client).await;
 
-    request_shard_run(&mut client, 2, r#"["news"]"#, &format!(r#"{{"{id}":7}}"#)).await;
-    assert_eq!(next_json(&mut client).await["t"], "run");
-    let snapshot = next_json(&mut client).await;
-    let html = snapshot["html"].as_str().unwrap();
+    request_shard_run(&mut client, 2, args, serde_json::json!({ id: 7 })).await;
+    // Frames of the first run may still arrive before the second's.
+    let html = loop {
+        let mut message = next_json(&mut client).await;
+        if message["run"] == 2 {
+            break message["frame"]["html"].take();
+        }
+    };
+    let html = html.as_str().unwrap();
     assert!(html.contains("count: 7"), "{html}");
 
     client.close(None).await.unwrap();
@@ -340,13 +457,18 @@ async fn a_shard_run_restores_the_signal_values_it_is_sent() {
 }
 
 #[tokio::test]
-async fn a_shard_run_with_invalid_arguments_sends_an_error_message() {
+async fn a_shard_run_with_invalid_arguments_sends_an_error_frame() {
     let (addr, shutdown_tx, server) = spawn_server().await;
-    let mut client = connect(addr, "/feed").await;
+    let mut client = connect(addr, "/room").await;
 
-    request_shard_run(&mut client, 1, "[1,2,3]", "{}").await;
-    assert_eq!(next_json(&mut client).await["t"], "run");
-    let error = next_json(&mut client).await;
+    request_shard_run(
+        &mut client,
+        1,
+        serde_json::json!([1, 2, 3]),
+        serde_json::json!({}),
+    )
+    .await;
+    let error = next_frame(&mut client, 1).await;
     assert_eq!(error["t"], "error");
     assert!(
         (400..500).contains(&error["status"].as_u64().unwrap()),
@@ -358,22 +480,17 @@ async fn a_shard_run_with_invalid_arguments_sends_an_error_message() {
 }
 
 #[tokio::test]
-async fn a_run_restores_the_signal_values_it_is_sent() {
+async fn a_page_run_restores_the_signal_values_it_is_sent() {
     let (addr, shutdown_tx, server) = spawn_server().await;
     let mut client = connect(addr, "/room").await;
 
-    request_run(&mut client, 1, "{}").await;
-    let _run = next_json(&mut client).await;
-    let snapshot = next_json(&mut client).await;
+    request_page_run(&mut client, 1, "/room", serde_json::json!({})).await;
+    let snapshot = next_frame(&mut client, 1).await;
     let id = last_signal_id(snapshot["html"].as_str().unwrap()).to_owned();
-    let _swap = next_json(&mut client).await;
+    let _swap = next_frame(&mut client, 1).await;
 
-    request_run(&mut client, 2, &format!("{{\"{id}\":\"changed\"}}")).await;
-    assert_eq!(
-        next_json(&mut client).await,
-        serde_json::json!({ "t": "run", "id": 2 })
-    );
-    let snapshot = next_json(&mut client).await;
+    request_page_run(&mut client, 2, "/room", serde_json::json!({ id: "changed" })).await;
+    let snapshot = next_frame(&mut client, 2).await;
     let html = snapshot["html"].as_str().unwrap();
     assert!(html.contains("query: changed"), "{html}");
 
@@ -382,37 +499,61 @@ async fn a_run_restores_the_signal_values_it_is_sent() {
 }
 
 #[tokio::test]
-async fn a_new_run_supersedes_a_run_that_never_finishes() {
+async fn a_run_may_only_set_runtime_headers() {
     let (addr, shutdown_tx, server) = spawn_server().await;
-    let mut client = connect(addr, "/slow").await;
+    let mut client = connect(addr, "/room").await;
 
-    request_run(&mut client, 1, "{}").await;
-    assert_eq!(next_json(&mut client).await["t"], "run");
-    assert_eq!(next_json(&mut client).await["t"], "snapshot");
-
-    // Request a new render while the first is still waiting for updates.
-    // The next messages must belong to the new run.
-    request_run(&mut client, 2, "{}").await;
+    send(
+        &mut client,
+        serde_json::json!({
+            "run": 1,
+            "method": "POST",
+            "path": "/room",
+            "headers": { "X-Topcoat-Runtime": "true", "Cookie": "session=other" },
+            "body": "{}",
+        }),
+    )
+    .await;
     assert_eq!(
-        next_json(&mut client).await,
-        serde_json::json!({ "t": "run", "id": 2 })
+        next_frame(&mut client, 1).await,
+        serde_json::json!({ "t": "error", "status": 400 })
     );
-    assert_eq!(next_json(&mut client).await["t"], "snapshot");
 
-    // Disconnecting must also stop a render that is still waiting.
     client.close(None).await.unwrap();
     shut_down(shutdown_tx, server).await;
 }
 
 #[tokio::test]
-async fn a_redirecting_page_sends_a_redirect_message() {
+async fn a_run_to_another_host_is_refused() {
+    let (addr, shutdown_tx, server) = spawn_server().await;
+    let mut client = connect(addr, "/room").await;
+
+    send(
+        &mut client,
+        serde_json::json!({
+            "run": 1,
+            "method": "GET",
+            "path": "https://other.example/room",
+        }),
+    )
+    .await;
+    assert_eq!(
+        next_frame(&mut client, 1).await,
+        serde_json::json!({ "t": "error", "status": 400 })
+    );
+
+    client.close(None).await.unwrap();
+    shut_down(shutdown_tx, server).await;
+}
+
+#[tokio::test]
+async fn a_redirecting_page_sends_a_redirect_frame() {
     let (addr, shutdown_tx, server) = spawn_server().await;
     let mut client = connect(addr, "/away").await;
 
-    request_run(&mut client, 1, "{}").await;
-    assert_eq!(next_json(&mut client).await["t"], "run");
+    request_page_run(&mut client, 1, "/away", serde_json::json!({})).await;
     assert_eq!(
-        next_json(&mut client).await,
+        next_frame(&mut client, 1).await,
         serde_json::json!({ "t": "redirect", "location": "/target" })
     );
 
@@ -421,14 +562,13 @@ async fn a_redirecting_page_sends_a_redirect_message() {
 }
 
 #[tokio::test]
-async fn a_failing_page_sends_an_error_message_with_its_status() {
+async fn a_failing_page_sends_an_error_frame_with_its_status() {
     let (addr, shutdown_tx, server) = spawn_server().await;
     let mut client = connect(addr, "/broken").await;
 
-    request_run(&mut client, 1, "{}").await;
-    assert_eq!(next_json(&mut client).await["t"], "run");
+    request_page_run(&mut client, 1, "/broken", serde_json::json!({})).await;
     assert_eq!(
-        next_json(&mut client).await,
+        next_frame(&mut client, 1).await,
         serde_json::json!({ "t": "error", "status": 400 })
     );
 
@@ -437,18 +577,18 @@ async fn a_failing_page_sends_an_error_message_with_its_status() {
 }
 
 #[tokio::test]
-async fn a_malformed_render_request_is_answered_and_the_connection_stays_open() {
+async fn a_malformed_message_is_answered_and_the_connection_stays_open() {
     let (addr, shutdown_tx, server) = spawn_server().await;
     let mut client = connect(addr, "/room").await;
 
     client.send(Message::text("not json")).await.unwrap();
     assert_eq!(
         next_json(&mut client).await,
-        serde_json::json!({ "t": "error", "status": 400 })
+        serde_json::json!({ "frame": { "t": "error", "status": 400 } })
     );
 
-    request_run(&mut client, 1, "{}").await;
-    assert_eq!(next_json(&mut client).await["t"], "run");
+    request_page_run(&mut client, 1, "/room", serde_json::json!({})).await;
+    assert_eq!(next_frame(&mut client, 1).await["t"], "snapshot");
 
     client.close(None).await.unwrap();
     shut_down(shutdown_tx, server).await;

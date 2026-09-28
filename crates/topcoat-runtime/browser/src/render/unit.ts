@@ -4,7 +4,7 @@ import type { Effect } from "../reactivity";
 import type { Runtime } from "../runtime";
 import { Scope } from "../scope";
 import type { SignalId } from "../signal-registry";
-import { Connection, type ConnectionTarget } from "./connection";
+import type { ConnectionTarget, RerunRequest } from "./connection";
 import {
 	applyFrame,
 	FRAMES_MEDIA_TYPE,
@@ -20,10 +20,11 @@ import { RenderRequest } from "./request";
  * subscribes to inputs and server-read dependencies. Replacing content rebuilds
  * the scope and effect so subscriptions reflect the new content.
  *
- * When the content requests a connection and no enclosing unit provides
- * one, the unit opens a WebSocket at its URL and uses it for renders while
- * connected. It keeps the connection for the rest of its lifetime, even if
- * later content no longer needs it.
+ * When the content requests a connection and no enclosing unit's content
+ * does, the unit joins the document's connection, which renders it again
+ * once the socket opens. While the socket is open, a unit whose content
+ * requests a connection re-runs over it on its own, even inside an
+ * enclosing unit that is connected too.
  */
 export abstract class RenderUnit implements ConnectionTarget {
 	protected readonly lifetime: Scope;
@@ -31,7 +32,6 @@ export abstract class RenderUnit implements ConnectionTarget {
 	/** Names the unit in error messages. */
 	protected abstract readonly label: string;
 	private readonly requestController: RenderRequest;
-	private connection: Connection | null = null;
 	/** Watches the signals used by the current content. */
 	private watch: Effect | null = null;
 	/**
@@ -48,6 +48,11 @@ export abstract class RenderUnit implements ConnectionTarget {
 		this.requestController = new RenderRequest(
 			this.lifetime.abortSignal,
 			(error) => runtime.reportError(error),
+		);
+		this.lifetime.abortSignal.addEventListener(
+			"abort",
+			() => runtime.connection.remove(this),
+			{ once: true },
 		);
 	}
 
@@ -73,14 +78,23 @@ export abstract class RenderUnit implements ConnectionTarget {
 	 */
 	protected abstract readInputs(): void;
 
+	/** Describes the request that renders the unit with its current inputs. */
+	abstract rerunRequest(): RerunRequest;
+
 	/**
 	 * Requests the unit's content from the server with its current inputs,
 	 * accepting a response of the `accept` media type.
 	 */
-	protected abstract request(
-		signal: AbortSignal,
-		accept: string,
-	): Promise<Response>;
+	protected request(signal: AbortSignal, accept: string): Promise<Response> {
+		const { url, headers, body } = this.rerunRequest();
+		return fetch(url, {
+			method: "POST",
+			cache: "no-store",
+			headers: { ...headers, Accept: accept },
+			body,
+			signal,
+		});
+	}
 
 	/**
 	 * Parses `html` into the nodes the content becomes, or returns `null` to
@@ -98,12 +112,6 @@ export abstract class RenderUnit implements ConnectionTarget {
 		adoptable: Set<SignalId>,
 	): void;
 
-	/** Returns the HTTP URL of the unit's renders, where it connects. */
-	protected abstract url(): string;
-
-	/** Collects the fields to send with a render request. */
-	abstract renderInputs(): object;
-
 	reportError(error: unknown): void {
 		this.runtime.reportError(error);
 	}
@@ -116,35 +124,47 @@ export abstract class RenderUnit implements ConnectionTarget {
 	}
 
 	/**
-	 * Checks whether an enclosing unit renders this unit's content over its
-	 * own connection, or is about to.
+	 * Checks whether an enclosing unit's content requests a connection, so
+	 * that unit's connected render includes this unit's content.
 	 */
 	private get coveredByAncestor(): boolean {
 		for (const unit of this.ancestors()) {
-			if (unit.connection !== null || unit.requiresConnection) return true;
+			if (unit.requiresConnection) return true;
 		}
 		return false;
 	}
 
 	/**
-	 * Opens a connection if the content needs one and no enclosing unit
-	 * provides it. Waits for the document to finish loading so all initial
-	 * HTTP updates arrive before the first render over the connection.
+	 * Joins the document's connection if the content needs one and no
+	 * enclosing unit's content does, and leaves it otherwise. Waits for the
+	 * document to finish loading so all initial HTTP updates arrive before
+	 * the first render over the connection.
 	 */
-	private connectIfRequired(loaded = document.readyState === "complete"): void {
-		if (this.isDisposed || this.connection !== null) return;
-		if (!this.requiresConnection) return;
+	private syncConnection(loaded = document.readyState === "complete"): void {
+		if (this.isDisposed) return;
+		const { connection } = this.runtime;
+		if (!this.requiresConnection || this.coveredByAncestor) {
+			connection.leave(this);
+			return;
+		}
 		if (!loaded) {
-			window.addEventListener("load", () => this.connectIfRequired(true), {
+			window.addEventListener("load", () => this.syncConnection(true), {
 				once: true,
 				signal: this.lifetime.abortSignal,
 			});
 			return;
 		}
-		if (this.coveredByAncestor) return;
-		const url = new URL(this.url(), location.href);
-		url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-		this.connection = new Connection(url.href, this, this.lifetime.abortSignal);
+		connection.join(this);
+	}
+
+	/** Starts a connected render if the content still needs its own. */
+	connectionOpened(): void {
+		const { connection } = this.runtime;
+		if (this.requiresConnection && !this.coveredByAncestor) {
+			connection.run(this);
+		} else {
+			connection.leave(this);
+		}
 	}
 
 	/**
@@ -154,7 +174,7 @@ export abstract class RenderUnit implements ConnectionTarget {
 	 * connects instead.
 	 */
 	protected scheduleConnection(): void {
-		this.connectIfRequired();
+		this.syncConnection();
 	}
 
 	/**
@@ -196,22 +216,18 @@ export abstract class RenderUnit implements ConnectionTarget {
 	/**
 	 * Re-runs this unit immediately with its current inputs.
 	 *
-	 * While the unit's connection is open, the run goes over it. Content
-	 * that needs a connection inside a connected unit re-runs that unit, so
-	 * it stays connected. Otherwise the unit posts an HTTP request, whose
+	 * Content that needs a connection re-runs over the document's connection
+	 * while it is open, without re-running any enclosing unit. Otherwise the
+	 * unit stops its connected run, if any, and posts an HTTP request, whose
 	 * response arrives as frames: a snapshot replacing the content, then a
 	 * swap for each later update of a live region.
 	 */
 	refresh(): Promise<void> {
-		if (this.connection?.isOpen) {
-			this.connection.requestRun();
+		const { connection } = this.runtime;
+		if (this.requiresConnection && connection.run(this)) {
 			return Promise.resolve();
 		}
-		if (this.requiresConnection) {
-			for (const unit of this.ancestors()) {
-				if (unit.connection?.isOpen) return unit.refresh();
-			}
-		}
+		connection.stop(this);
 		const render = newRender();
 		return this.requestController.run(
 			(signal) => this.request(signal, FRAMES_MEDIA_TYPE),

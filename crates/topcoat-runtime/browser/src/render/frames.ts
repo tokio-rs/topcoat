@@ -3,7 +3,6 @@ export const FRAMES_MEDIA_TYPE = "application/x-ndjson";
 
 /** A frame of rendered output sent by the server. */
 export type ServerMessage =
-	| { t: "run"; id: number }
 	| { t: "snapshot"; html: string }
 	| { t: "swap"; region: string; html: string }
 	| { t: "redirect"; location: string }
@@ -30,9 +29,8 @@ export interface FrameTarget {
 }
 
 /**
- * Applies one frame of the render identified by `render` to `target`. A
- * run announcement carries no output and is ignored. `label` names the
- * render in the error a failure frame becomes.
+ * Applies one frame of the render identified by `render` to `target`.
+ * `label` names the render in the error a failure frame becomes.
  */
 export function applyFrame(
 	target: FrameTarget,
@@ -52,8 +50,6 @@ export function applyFrame(
 			break;
 		case "error":
 			throw new Error(`${label} render failed: ${frame.status}`);
-		case "run":
-			break;
 	}
 }
 

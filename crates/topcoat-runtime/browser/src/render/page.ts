@@ -3,11 +3,11 @@ import {
 	type DevRuntimeDetail,
 } from "../../../../topcoat-core/browser/dev";
 import { morph } from "../../../../topcoat-core/browser/morph";
-import type { DehydratedSurrogate } from "../expression/serialized";
 import { untrack } from "../reactivity";
 import type { Runtime } from "../runtime";
 import type { Scope } from "../scope";
 import type { SignalId } from "../signal-registry";
+import type { RerunRequest } from "./connection";
 import { newRender } from "./frames";
 import { RUNTIME_HEADER } from "./request";
 import { RenderUnit } from "./unit";
@@ -25,13 +25,21 @@ export class PageUnit extends RenderUnit {
 
 	protected readInputs(): void {}
 
-	protected url(): string {
-		return pageUrl();
-	}
-
-	renderInputs(): { signals: Record<SignalId, DehydratedSurrogate> } {
+	/**
+	 * Posts to the page URL with the runtime header, which asks the server
+	 * to rerun the page as a GET with the supplied signal values.
+	 */
+	rerunRequest(): RerunRequest {
 		// Include nested signals to preserve state across the whole page.
-		return { signals: untrack(() => this.contentScope.collectSignalValues()) };
+		const signals = untrack(() => this.contentScope.collectSignalValues());
+		return {
+			url: pageUrl(),
+			headers: {
+				"Content-Type": "application/json",
+				[RUNTIME_HEADER]: "true",
+			},
+			body: JSON.stringify({ signals }),
+		};
 	}
 
 	/** Lets a dev refresh update the whole document with this page's state. */
@@ -55,22 +63,6 @@ export class PageUnit extends RenderUnit {
 		);
 	}
 
-	protected request(signal: AbortSignal, accept: string): Promise<Response> {
-		// The runtime header asks the server to rerun this URL as a GET
-		// with the supplied signal values.
-		return fetch(pageUrl(), {
-			method: "POST",
-			cache: "no-store",
-			headers: {
-				Accept: accept,
-				"Content-Type": "application/json",
-				[RUNTIME_HEADER]: "true",
-			},
-			body: JSON.stringify(this.renderInputs()),
-			signal,
-		});
-	}
-
 	protected prepare(html: string): Node[] | null {
 		const doc = new DOMParser().parseFromString(html, "text/html");
 		return Array.from(doc.body.childNodes);
@@ -92,6 +84,6 @@ export class PageUnit extends RenderUnit {
  * Returns the page URL without its fragment. Joining these parts keeps
  * paths starting with two slashes on the current origin.
  */
-function pageUrl(): string {
+export function pageUrl(): string {
 	return `${location.origin}${location.pathname}${location.search}`;
 }
