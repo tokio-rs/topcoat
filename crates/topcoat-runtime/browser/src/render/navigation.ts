@@ -275,6 +275,9 @@ export class NavigationController {
 						throw new Error(`Navigation render failed: ${frame.status}`);
 				}
 			}
+			// A response without a snapshot leaves nothing to show, so the
+			// browser loads the destination instead.
+			if (!committed && isCurrent()) load(destination, mode);
 		} catch (error) {
 			if (!isCurrent()) return;
 			if (!committed) {
@@ -415,7 +418,8 @@ export class NavigationController {
 		if (link.hasAttribute("download") || !link.hasAttribute("href")) {
 			return null;
 		}
-		if (link.target !== "" && link.target !== "_self") return null;
+		const target = effectiveTarget(link).toLowerCase();
+		if (target !== "" && target !== "_self") return null;
 		let url: URL;
 		try {
 			url = new URL(link.href, location.href);
@@ -478,6 +482,18 @@ function findLink(event: Event): HTMLAnchorElement | null {
 		}
 	}
 	return null;
+}
+
+/**
+ * Returns the browsing context `link` opens in: its own `target`, or the
+ * target of the document's first `<base>` element that sets one.
+ */
+function effectiveTarget(link: HTMLAnchorElement): string {
+	if (link.hasAttribute("target")) return link.getAttribute("target") ?? "";
+	return (
+		link.ownerDocument.querySelector("base[target]")?.getAttribute("target") ??
+		""
+	);
 }
 
 function policy(link: HTMLAnchorElement): string | null {

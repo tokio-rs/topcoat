@@ -218,6 +218,54 @@ it("respects a click the application already canceled", async () => {
 	expect(location.pathname).toBe("/");
 });
 
+it("leaves a link that inherits another target from the base element to the browser", async () => {
+	const calls = stubFetch(() => snapshot(page("Next", "")));
+	mount(`<a data-topcoat-link="intent" href="/next">x</a>`);
+	const base = document.createElement("base");
+	base.target = "_blank";
+	document.head.append(base);
+
+	link().dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+	const handled = click(link());
+	await settle();
+
+	expect(handled).toBe(false);
+	expect(calls).toHaveLength(0);
+	expect(location.pathname).toBe("/");
+});
+
+it("follows a link whose own target overrides the base element's", async () => {
+	// The destination keeps the base element, so it can replace the page.
+	stubFetch(() =>
+		snapshot(
+			`<html><head><base target="_blank"><title>Next</title></head><body><p>next page</p></body></html>`,
+		),
+	);
+	mount(`<a data-topcoat-link="never" href="/next" target="_self">x</a>`);
+	const base = document.createElement("base");
+	base.target = "_blank";
+	document.head.append(base);
+
+	const handled = click(link());
+	await settle();
+
+	expect(handled).toBe(true);
+	expect(location.pathname).toBe("/next");
+});
+
+it("loads the destination in the browser when the response ends without a snapshot", async () => {
+	stubFetch(() => new Response("", { headers: { "Content-Type": FRAMES } }));
+	mount(`<p>home</p><a data-topcoat-link="never" href="/next">x</a>`);
+
+	const handled = click(link());
+	await settle();
+
+	expect(handled).toBe(true);
+	expect(location.assign).toHaveBeenCalledWith(`${location.origin}/next`);
+	expect(location.pathname).toBe("/");
+	expect(document.body.textContent).toContain("home");
+});
+
 it("keeps the current page until the destination's snapshot arrives, and lets a newer navigation win", async () => {
 	const slow = streamed();
 	stubFetch((path) =>
