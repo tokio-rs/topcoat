@@ -30,21 +30,21 @@ afterEach(() => {
 const declaration = (id: string, value: number) =>
 	`<!--::topcoat::signal({"t":"signal","id":"${id}","v":${value}})-->`;
 
-/** Encodes a frame as the line the server sends it as. */
+/** Converts a frame to JSON followed by a newline, matching the server format. */
 const line = (frame: ServerMessage) => `${JSON.stringify(frame)}\n`;
 
-/** The document a page renders, with a title and body content. */
+/** Builds an HTML document with the given title and body. */
 const page = (title: string, body: string) =>
 	`<html><head><title>${title}</title></head><body>${body}</body></html>`;
 
-/** A framed response holding one snapshot of `html`. */
+/** Creates a response with a single HTML snapshot frame. */
 function snapshot(html: string, headers: Record<string, string> = {}) {
 	return new Response(line({ t: "snapshot", html }), {
 		headers: { "Content-Type": FRAMES, ...headers },
 	});
 }
 
-/** A framed response whose body the test feeds one frame at a time. */
+/** Creates a response that the test can send frames through as needed. */
 function streamed() {
 	let controller!: ReadableStreamDefaultController<Uint8Array>;
 	const body = new ReadableStream<Uint8Array>({
@@ -64,8 +64,8 @@ function streamed() {
 type Call = { url: string; init: RequestInit };
 
 /**
- * Answers fetches with the responses `respond` returns for their URL
- * paths, recording each request.
+ * Records each fetch request and calls `respond` with its URL path to
+ * get the response.
  */
 function stubFetch(respond: (path: string) => Response | Promise<Response>) {
 	const calls: Call[] = [];
@@ -80,7 +80,7 @@ function stubFetch(respond: (path: string) => Response | Promise<Response>) {
 	return calls;
 }
 
-/** Loads `body` as the current document and starts a runtime on it. */
+/** Sets up a document with `body` and starts the runtime. */
 function mount(body: string): Runtime {
 	document.documentElement.innerHTML = `<head><title>Home</title></head><body>${body}</body>`;
 	runtime = new Runtime();
@@ -88,7 +88,7 @@ function mount(body: string): Runtime {
 	return runtime;
 }
 
-/** Waits for pending fetches, frames, and the updates they cause. */
+/** Lets queued requests, response frames, and page updates run. */
 async function settle(): Promise<void> {
 	for (let i = 0; i < 5; i += 1) {
 		flushEffects();
@@ -98,8 +98,8 @@ async function settle(): Promise<void> {
 }
 
 /**
- * Clicks `element` and returns whether the runtime took over the click.
- * The browser's own handling of the click is suppressed.
+ * Sends a click to `element` and reports whether the runtime handled it.
+ * Prevents the browser from following the link itself.
  */
 function click(element: Element, init: MouseEventInit = {}): boolean {
 	const event = new MouseEvent("click", {
@@ -110,7 +110,7 @@ function click(element: Element, init: MouseEventInit = {}): boolean {
 		...init,
 	});
 	let handled = false;
-	// The runtime listened first, so this sees its decision.
+	// This listener runs after the runtime's click handler.
 	const suppress = (seen: Event) => {
 		handled = seen.defaultPrevented;
 		seen.preventDefault();
@@ -152,7 +152,7 @@ it("follows a link in place, keeping the signals the destination declares again"
 	expect(location.pathname).toBe("/next");
 	expect(document.title).toBe("Next");
 	expect(document.body.textContent).toContain("next page");
-	// The browser's value wins over the destination's declaration.
+	// Keep the browser's signal value instead of the new page's initial value.
 	expect(rt.registry.read("a")).toEqual(new F64(5));
 	expect(rt.registry.has("b")).toBe(false);
 });
@@ -243,7 +243,7 @@ it("keeps the current page until the destination's snapshot arrives, and lets a 
 	expect(location.pathname).toBe("/fast");
 	expect(document.body.textContent).toContain("fast page");
 	expect(document.body.textContent).not.toContain("slow page");
-	// The superseded navigation does not fall back to a browser load.
+	// The canceled navigation must not trigger a full page load.
 	expect(location.assign).not.toHaveBeenCalled();
 	expect(location.replace).not.toHaveBeenCalled();
 });
@@ -343,7 +343,7 @@ it("shows the previous page again on a traversal and restores its scroll positio
 	expect(location.pathname).toBe("/next");
 	expect(history.scrollRestoration).toBe("manual");
 
-	// What the browser does when the user goes back.
+	// Simulate pressing the browser's back button.
 	history.go(-1);
 	await settle();
 

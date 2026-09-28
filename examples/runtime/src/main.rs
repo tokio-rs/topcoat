@@ -42,8 +42,8 @@ async fn layout(slot: Slot<'_>) -> Result<impl View> {
                 topcoat::runtime::script()
             </head>
             <body>
-                // Links navigate without reloading the document, and
-                // prefetch their page when hovered or focused.
+                // These links update the page without a full reload.
+                // Hovering or focusing a link starts loading its page early.
                 <nav>
                     link(href: href!(counter::page), "counter")
                     " | "

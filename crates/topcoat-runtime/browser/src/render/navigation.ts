@@ -3,27 +3,27 @@ import { newRender, type RenderToken } from "./frames";
 import { PageRequest, type PageResponseHead, PrefetchCache } from "./prefetch";
 
 /**
- * Opts an anchor into runtime navigation. Its value is the prefetch policy:
+ * Enables runtime navigation on a link. The value sets when to prefetch:
  * `never`, `intent`, or `viewport`.
  */
 export const LINK_ATTRIBUTE = "data-topcoat-link";
 
-/** How long the pointer rests on a link before it is prefetched. */
+/** The hover delay before loading a linked page, in milliseconds. */
 const INTENT_DELAY = 80;
-/** How long scrolling pauses before the position is saved to history. */
+/** The delay after scrolling stops before saving the position, in milliseconds. */
 const SCROLL_SAVE_DELAY = 150;
-/** The key of the runtime's entry in a history entry's state. */
+/** The property used to store runtime data in history state. */
 const STATE_KEY = "topcoat";
 
 /**
- * How a navigation changes the session history: it adds an entry, replaces
- * the current one, or shows an entry the user traversed to.
+ * Whether to add a history entry, replace the current entry, or open an
+ * existing entry after the user goes back or forward.
  */
 type HistoryMode = "push" | "replace" | "traverse";
 
 type ScrollPosition = { x: number; y: number };
 
-/** The script types a browser executes. */
+/** Script types to check when deciding whether a page needs new scripts. */
 const SCRIPT_TYPES = new Set([
 	"",
 	"module",
@@ -32,31 +32,31 @@ const SCRIPT_TYPES = new Set([
 ]);
 
 /**
- * Owns navigations between pages of the document.
+ * Opens pages by updating the current document.
  *
- * A click on an opted-in link, or a traversal of an entry the controller
- * created, requests the destination as a page rerun with the document's
- * signal values. The current page stays visible until the destination's
- * snapshot arrives. The snapshot then replaces the document, and later
- * frames update its live regions. A newer navigation stops an older one
- * from committing or applying further frames.
+ * Handles links marked for runtime navigation and back or forward visits
+ * to its history entries. It asks the server to render the requested page
+ * with the current signal values. The current page stays visible until
+ * the new page's HTML arrives. After replacing the page, it applies any
+ * live updates that follow. Starting another navigation stops the earlier
+ * one from changing the document.
  *
- * Links can prefetch their destination ahead of a click. A navigation takes
- * over a matching prefetch, including one still streaming.
+ * Links can load pages before the user follows them. Navigation reuses a
+ * matching prefetch request, even if its response is still arriving.
  */
 export class NavigationController {
 	private readonly controller = new AbortController();
 	private readonly prefetches = new PrefetchCache();
-	/** The page request of the latest navigation. */
+	/** The request for the most recently opened page. */
 	private current: PageRequest | null = null;
 	private generation = 0;
-	/** Settles when the latest navigation's response has ended. */
+	/** Resolves when the most recent navigation finishes receiving its response. */
 	private streaming: Promise<void> | null = null;
-	/** The URL of the displayed document, without its fragment. */
+	/** The current page's URL with the # fragment removed. */
 	private documentUrl = "";
-	/** The scripts the document has loaded. */
+	/** Scripts already loaded in this document. */
 	private readonly scripts = new Set<string>();
-	/** Whether the controller restores the scroll position of its entries. */
+	/** Whether this controller is responsible for restoring scroll positions. */
 	private managesScroll = false;
 	private scrollTimer: ReturnType<typeof setTimeout> | null = null;
 	private hovered: HTMLAnchorElement | null = null;
@@ -65,14 +65,14 @@ export class NavigationController {
 
 	constructor(private readonly runtime: Runtime) {}
 
-	/** Starts handling link clicks, history traversals, and prefetching. */
+	/** Listens for link clicks, back and forward visits, and prefetch triggers. */
 	start(): void {
 		this.documentUrl = documentUrl(location.href);
 		this.prefetches.listen(this.controller.signal);
 		for (const key of scriptKeys(document, location.href)) {
 			this.scripts.add(key);
 		}
-		// A reload of an entry this controller scrolled keeps its position.
+		// Restore the saved scroll position when the user reloads this page.
 		const scroll = savedScroll(history.state);
 		if (scroll !== null) {
 			this.manageScroll();
@@ -135,14 +135,14 @@ export class NavigationController {
 	}
 
 	/**
-	 * Settles once the latest navigation's response has ended, or is `null`
-	 * when no navigation is streaming.
+	 * Resolves when the latest navigation finishes receiving its response.
+	 * Returns `null` if no navigation is waiting for response data.
 	 */
 	get pending(): Promise<void> | null {
 		return this.streaming;
 	}
 
-	/** Prefetches `link` once it becomes visible, until `lifetime` aborts. */
+	/** Loads the linked page when visible. Stops watching when `lifetime` aborts. */
 	observe(link: HTMLAnchorElement, lifetime: AbortSignal): void {
 		if (typeof IntersectionObserver === "undefined" || lifetime.aborted) {
 			return;
@@ -151,7 +151,7 @@ export class NavigationController {
 			for (const entry of entries) {
 				if (!entry.isIntersecting) continue;
 				const target = entry.target as HTMLAnchorElement;
-				// A skipped prefetch tries again when the link reappears.
+				// If loading was skipped, retry when the link comes back into view.
 				if (this.prefetch(target)) this.viewport?.unobserve(target);
 			}
 		});
@@ -163,8 +163,8 @@ export class NavigationController {
 	}
 
 	/**
-	 * Prefetches the destination of `link` with the current signal values.
-	 * Returns whether the destination is prefetched or needs no prefetch.
+	 * Loads the linked page early using the current signal values.
+	 * Returns true if a prefetch exists, has started, or is unnecessary.
 	 */
 	prefetch(link: HTMLAnchorElement): boolean {
 		const url = this.destination(link);
@@ -176,8 +176,8 @@ export class NavigationController {
 	}
 
 	/**
-	 * Navigates to `url`. `scroll` is the position to restore when showing
-	 * a traversed entry.
+	 * Opens `url`. For back or forward visits, `scroll` gives the saved
+	 * position to return to.
 	 */
 	async navigate(
 		url: URL,
@@ -208,7 +208,7 @@ export class NavigationController {
 		}
 	}
 
-	/** Reads a navigation's response, committing its snapshot. */
+	/** Reads the response and displays the page and its live updates. */
 	private async follow(
 		request: PageRequest,
 		url: URL,
@@ -228,7 +228,7 @@ export class NavigationController {
 			load(url, mode);
 			return;
 		}
-		// A redirect keeps the fragment of the requested URL.
+		// Keep the original fragment if the redirect does not supply one.
 		const destination = new URL(head.url, location.href);
 		if (destination.hash === "") destination.hash = url.hash;
 
@@ -286,9 +286,9 @@ export class NavigationController {
 	}
 
 	/**
-	 * Checks that `next` can replace the document in place: it uses the
-	 * same doctype and base URL, and loads no script the document has not
-	 * loaded, as inserted scripts do not run.
+	 * Checks whether `next` can be displayed without a full reload. The
+	 * doctype and base element must match, and every script must already be
+	 * loaded. Scripts inserted during a page update do not run.
 	 */
 	private canCommit(next: Document, url: URL): boolean {
 		const doctype = (doc: Document) => {
@@ -304,7 +304,7 @@ export class NavigationController {
 		);
 	}
 
-	/** Makes `next` the displayed document at `url`. */
+	/** Displays `next` and updates the URL, history, scroll position, and focus. */
 	private commit(
 		next: Document,
 		url: URL,
@@ -312,7 +312,7 @@ export class NavigationController {
 		scroll: ScrollPosition | null,
 		render: RenderToken,
 	): void {
-		// Prefetches used the previous page's signals and server state.
+		// Discard pages loaded with the old page's signals and server state.
 		this.prefetches.clear();
 		this.cancelHover();
 		this.manageScroll();
@@ -360,18 +360,18 @@ export class NavigationController {
 		const url = this.destination(link);
 		if (url === null) return;
 		event.preventDefault();
-		// Following a link to the current URL replaces its entry.
+		// Reuse the history entry when opening the current URL again.
 		void this.navigate(url, url.href === location.href ? "replace" : "push");
 	}
 
 	private onPopState(): void {
 		if (this.scrollTimer !== null) {
-			// The pending position belongs to the entry the user left.
+			// Do not save the previous page's scroll position in this entry.
 			clearTimeout(this.scrollTimer);
 			this.scrollTimer = null;
 		}
 		const state: unknown = history.state;
-		// Entries with state of their own belong to the application.
+		// Leave history entries with application state to the application.
 		if (state !== null && !hasEntry(state)) return;
 		const url = new URL(location.href);
 		const scroll = savedScroll(state);
@@ -379,7 +379,7 @@ export class NavigationController {
 			void this.navigate(url, "traverse", scroll);
 			return;
 		}
-		// A fragment change within the displayed document.
+		// The URL points to another fragment on the same page.
 		if (!this.managesScroll) return;
 		if (scroll !== null) {
 			window.scrollTo(scroll.x, scroll.y);
@@ -408,8 +408,8 @@ export class NavigationController {
 	}
 
 	/**
-	 * Returns the URL `link` navigates to at runtime, or `null` when the
-	 * browser handles the link itself.
+	 * Returns the link's URL if runtime navigation can handle it.
+	 * Returns `null` to let the browser handle the link as usual.
 	 */
 	private destination(link: HTMLAnchorElement): URL | null {
 		if (link.hasAttribute("download") || !link.hasAttribute("href")) {
@@ -424,7 +424,7 @@ export class NavigationController {
 		}
 		if (url.origin !== location.origin) return null;
 		if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-		// Same-document fragment links keep normal fragment navigation.
+		// Let the browser scroll to fragments on the current page.
 		if (
 			url.href.includes("#") &&
 			documentUrl(url.href) === documentUrl(location.href)
@@ -435,8 +435,8 @@ export class NavigationController {
 	}
 
 	/**
-	 * Takes over scroll restoration, so traversing to one of this
-	 * document's entries restores the position saved with it.
+	 * Disables automatic browser scroll restoration. This controller then
+	 * restores the saved position when the user goes back or forward.
 	 */
 	private manageScroll(): void {
 		if (this.managesScroll) return;
@@ -454,7 +454,7 @@ export class NavigationController {
 		}, SCROLL_SAVE_DELAY);
 	}
 
-	/** Saves the scroll position in the current history entry. */
+	/** Records where the page is scrolled in the current history entry. */
 	private saveScroll(): void {
 		if (!this.managesScroll) return;
 		if (this.scrollTimer !== null) clearTimeout(this.scrollTimer);
@@ -464,13 +464,13 @@ export class NavigationController {
 	}
 }
 
-/** Returns `url` without its fragment. */
+/** Removes the # fragment from `url`, if present. */
 function documentUrl(url: string): string {
 	const index = url.indexOf("#");
 	return index === -1 ? url : url.slice(0, index);
 }
 
-/** Finds the innermost anchor the event passed through, if it opted in. */
+/** Finds the event's nearest anchor if it is marked for runtime navigation. */
 function findLink(event: Event): HTMLAnchorElement | null {
 	for (const target of event.composedPath()) {
 		if (target instanceof HTMLAnchorElement) {
@@ -484,7 +484,7 @@ function policy(link: HTMLAnchorElement): string | null {
 	return link.getAttribute(LINK_ATTRIBUTE);
 }
 
-/** Checks whether the user asked the browser to reduce data usage. */
+/** Returns whether the browser's data-saving setting is enabled. */
 function savesData(): boolean {
 	const connection = (
 		navigator as Navigator & { connection?: { saveData?: boolean } }
@@ -492,7 +492,7 @@ function savesData(): boolean {
 	return connection?.saveData === true;
 }
 
-/** Identifies the scripts in `doc` that the browser executes. */
+/** Builds comparison keys for executable scripts in `doc`. */
 function scriptKeys(doc: Document, base: string): string[] {
 	const keys: string[] = [];
 	for (const script of Array.from(doc.scripts)) {
@@ -509,7 +509,7 @@ function scriptKeys(doc: Document, base: string): string[] {
 	return keys;
 }
 
-/** Leaves the navigation to the browser. */
+/** Opens the URL with a normal browser page load. */
 function load(url: URL, mode: HistoryMode): void {
 	if (mode === "push") {
 		location.assign(url.href);
@@ -518,7 +518,7 @@ function load(url: URL, mode: HistoryMode): void {
 	}
 }
 
-/** Returns the element a URL's fragment points at. */
+/** Finds the element named by the URL's # fragment. */
 function fragmentTarget(url: URL): HTMLElement | null {
 	let id: string;
 	try {
@@ -536,8 +536,8 @@ function fragmentTarget(url: URL): HTMLElement | null {
 }
 
 /**
- * Starts sequential focus navigation at the fragment target or the top of
- * the new page, unless an element asks for focus.
+ * Moves focus to the fragment target or the new page's body so keyboard
+ * navigation starts there. An element with `autofocus` takes priority.
  */
 function resetFocus(target: HTMLElement | null): void {
 	const autofocus = document.querySelector("[autofocus]");
@@ -564,14 +564,14 @@ function hasEntry(state: unknown): state is Record<string, unknown> {
 	return typeof state === "object" && state !== null && STATE_KEY in state;
 }
 
-/** Returns the scroll position saved in a history entry's state. */
+/** Reads the stored scroll position from a history entry. */
 function savedScroll(state: unknown): ScrollPosition | null {
 	if (!hasEntry(state)) return null;
 	const entry = state[STATE_KEY] as { scroll?: ScrollPosition | null };
 	return entry.scroll ?? null;
 }
 
-/** Returns `state` with the runtime's entry holding `scroll`. */
+/** Copies the history state and sets the runtime's saved scroll position. */
 function withScroll(
 	state: unknown,
 	scroll: ScrollPosition | null,

@@ -135,11 +135,10 @@ export abstract class RenderUnit implements ConnectionTarget {
 	}
 
 	/**
-	 * Joins the document's connection if the content needs one and no
-	 * enclosing unit's content does, and leaves it otherwise. Waits for the
-	 * document, or the navigation that produced it, to finish loading so
-	 * all initial HTTP updates arrive before the first render over the
-	 * connection.
+	 * Uses the document's connection when this content needs it and no
+	 * parent unit already provides it. Leaves the connection otherwise.
+	 * Waits for the page load or navigation response to finish, so all HTTP
+	 * updates arrive before rendering over the connection starts.
 	 */
 	private syncConnection(): void {
 		if (this.isDisposed) return;

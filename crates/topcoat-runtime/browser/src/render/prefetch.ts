@@ -1,62 +1,62 @@
 import { FRAMES_MEDIA_TYPE, readFrames, type ServerMessage } from "./frames";
 import { RUNTIME_HEADER } from "./request";
 
-/** How long a prefetched page stays usable. */
+/** How long to keep a prefetched page, in milliseconds. */
 const PREFETCH_TTL = 30_000;
-/** The most prefetched pages kept at once; the oldest is dropped first. */
+/** Cache size limit. New entries replace the oldest when the cache is full. */
 const MAX_PREFETCHES = 8;
-/** The most prefetches loading at once; further prefetches are skipped. */
+/** Limit on simultaneous prefetch requests. Skip new requests at this limit. */
 const MAX_LOADING = 2;
-/** The most frame text a prefetch buffers before it is dropped. */
+/** Limit on buffered HTML text. Cancel prefetches that exceed it. */
 const MAX_BUFFERED = 1024 * 1024;
 
-/** Discards every prefetched page, for example after a procedure call. */
+/** Event name used to tell caches to discard their prefetched pages. */
 export const INVALIDATE_PREFETCHES_EVENT = "topcoat:invalidate-prefetches";
 
-/** Signals that server state may have changed since pages were prefetched. */
+/** Tells caches to clear pages that may be out of date after a server change. */
 export function invalidatePrefetches(): void {
 	if (typeof window === "undefined") return;
 	window.dispatchEvent(new Event(INVALIDATE_PREFETCHES_EVENT));
 }
 
-/** What the response to a page request turned out to be. */
+/** Details about a page response, available before its body finishes loading. */
 export type PageResponseHead = {
-	/** The URL the response came from, after any HTTP redirects. */
+	/** The final response URL after following HTTP redirects. */
 	url: string;
-	/** Whether the response carries render frames rather than other content. */
+	/** Whether the response uses the runtime's render frame format. */
 	frames: boolean;
-	/** Until when, in `performance.now()` time, a prefetch may be used. */
+	/** Expiration time for reusing this response, measured by `performance.now()`. */
 	usableUntil: number;
 };
 
 /**
- * Renders a page at a URL with a set of signal values, the way a page
- * rerun does, and keeps its frames until they are read.
+ * Requests a server render with the supplied signal values and stores
+ * response frames until a reader consumes them.
  *
- * Reading starts from the first frame, whether the frames arrived before
- * or after reading began, so a prefetched page can be handed to a
- * navigation that continues the same response.
+ * A reader gets every frame in order, starting with any already received.
+ * This lets navigation reuse a prefetch response and keep reading it as
+ * more frames arrive.
  */
 export class PageRequest {
 	readonly head: Promise<PageResponseHead>;
-	/** The head once it has arrived. */
+	/** Response details, or `null` while waiting for the headers. */
 	private arrived: PageResponseHead | null = null;
 	private readonly controller = new AbortController();
 	private readonly buffer: ServerMessage[] = [];
 	private buffered = 0;
-	/** The buffer limit while nobody reads, or `null` without one. */
+	/** Buffer size limit before reading starts. `null` means no limit. */
 	private limit: number | null;
 	private finished = false;
 	private failure: unknown = null;
 	private wake: (() => void) | null = null;
-	/** Settled once the response has ended, failed, or been aborted. */
+	/** Resolves when the response finishes, fails, or is canceled. */
 	readonly done: Promise<void>;
 	private resolveDone!: () => void;
 
 	constructor(
-		/** The requested URL, without a fragment. */
+		/** The page URL with the # fragment removed. */
 		readonly url: string,
-		/** The JSON request body carrying the signal values. */
+		/** Signal values encoded as a JSON request body. */
 		readonly body: string,
 		limit: number | null = null,
 	) {
@@ -65,7 +65,7 @@ export class PageRequest {
 			this.resolveDone = resolve;
 		});
 		this.head = this.start();
-		// A caller that never reads the head must not see an unhandled rejection.
+		// Handle rejection even if the caller never awaits the response details.
 		this.head.catch(() => undefined);
 	}
 
@@ -78,8 +78,8 @@ export class PageRequest {
 	}
 
 	/**
-	 * Whether the response can still be used. A response still on its way
-	 * is as fresh as a new request.
+	 * Returns false if the request failed or the response expired.
+	 * A request still waiting for headers can be reused.
 	 */
 	get usable(): boolean {
 		if (this.failed) return false;
@@ -93,7 +93,7 @@ export class PageRequest {
 		this.fail(new DOMException("Page request aborted", "AbortError"));
 	}
 
-	/** Yields every frame of the response, waiting for those still to come. */
+	/** Reads buffered frames, then waits for more until the response ends. */
 	async *frames(): AsyncGenerator<ServerMessage> {
 		this.limit = null;
 		for (;;) {
@@ -140,7 +140,7 @@ export class PageRequest {
 		if (frames) {
 			void this.pump(response);
 		} else {
-			// Other content is loaded by the browser instead.
+			// Let a normal browser page load handle other response formats.
 			this.controller.abort();
 			this.finish();
 		}
@@ -186,8 +186,8 @@ export class PageRequest {
 }
 
 /**
- * Returns how long a response may be reused, in milliseconds, honoring
- * the response's cache restrictions.
+ * Reads the cache headers to determine how long this response can be
+ * reused, in milliseconds, up to the prefetch time limit.
  */
 function usableFor(headers: Headers): number {
 	const directives = (headers.get("Cache-Control") ?? "")
@@ -207,15 +207,15 @@ function usableFor(headers: Headers): number {
 }
 
 /**
- * A small, short-lived set of prefetched pages, private to this document.
+ * Keeps a limited number of prefetched pages briefly in this document.
  *
- * A prefetch is tied to the signal values it was rendered with, and can
- * only be used by a navigation to the same URL with the same values.
+ * A page can be reused only if the requested URL and signal values match
+ * those used to render it.
  */
 export class PrefetchCache {
 	private readonly entries = new Map<string, PageRequest>();
 
-	/** Clears the cache on each invalidation until `lifetime` aborts. */
+	/** Listens for cache-clear events until `lifetime` is aborted. */
 	listen(lifetime: AbortSignal): void {
 		window.addEventListener(INVALIDATE_PREFETCHES_EVENT, () => this.clear(), {
 			signal: lifetime,
@@ -223,9 +223,9 @@ export class PrefetchCache {
 	}
 
 	/**
-	 * Starts prefetching `url` with the signal values in `body`, unless an
-	 * equivalent prefetch exists or too many are already loading. Returns
-	 * whether the page is prefetched.
+	 * Loads `url` early using the signal values in `body`. Reuses an existing
+	 * matching request and skips new requests if too many are loading.
+	 * Returns true if a matching prefetch exists or has just started.
 	 */
 	prefetch(url: string, body: string): boolean {
 		const existing = this.entries.get(url);
@@ -251,7 +251,7 @@ export class PrefetchCache {
 			if (oldest === undefined) break;
 			this.drop(oldest);
 		}
-		// Expire entries that nobody claims.
+		// Remove this entry after the time limit if it is still in the cache.
 		setTimeout(() => {
 			if (this.entries.get(url) === request) this.drop(url);
 		}, PREFETCH_TTL);
@@ -259,9 +259,9 @@ export class PrefetchCache {
 	}
 
 	/**
-	 * Hands over the prefetch of `url` if it was rendered with the signal
-	 * values in `body` and is still usable. The prefetch leaves the cache
-	 * either way.
+	 * Removes the cached request for `url` and returns it if it is still
+	 * usable and its signal values match `body`. Otherwise, cancels the
+	 * request and returns `null`.
 	 */
 	take(url: string, body: string): PageRequest | null {
 		const request = this.entries.get(url);

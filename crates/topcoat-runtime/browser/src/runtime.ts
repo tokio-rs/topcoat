@@ -18,9 +18,9 @@ export class Runtime {
 	);
 	/** The page: the outermost unit, owning every signal in the document. */
 	readonly page: PageUnit = new PageUnit(this);
-	/** Navigates between pages without loading a new document. */
+	/** Opens pages by updating the existing document. */
 	readonly navigation: NavigationController = new NavigationController(this);
-	/** Whether the document's `load` event has fired. */
+	/** Records whether the document's `load` event has been observed. */
 	private loaded = false;
 
 	start(root: ParentNode): void {
@@ -30,9 +30,10 @@ export class Runtime {
 	}
 
 	/**
-	 * Checks whether the document has finished loading, including the
-	 * response of a navigation in progress. If it has not, calls `callback`
-	 * once it has, unless `signal` aborts first.
+	 * Returns true if the document and any active navigation response have
+	 * finished loading. Otherwise, returns false and calls `callback` when
+	 * the load event fires or the pending navigation finishes, unless
+	 * `signal` is aborted first.
 	 */
 	whenLoaded(callback: () => void, signal: AbortSignal): boolean {
 		if (!this.loaded && document.readyState !== "complete") {

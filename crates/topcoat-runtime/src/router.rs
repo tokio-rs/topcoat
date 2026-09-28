@@ -23,12 +23,12 @@ pub trait RouterBuilderRuntimeExt {
     #[must_use]
     fn runtime(self) -> Self;
 
-    /// Sets the default prefetch mode for the router's links.
+    /// Sets when links in this router load their pages ahead of time.
     ///
-    /// Stores `mode` in the app context, where
-    /// [`prefetch_mode`](crate::prefetch_mode) finds it. A link's
-    /// `prefetch` argument or a `PrefetchMode` in the request context
-    /// overrides this default.
+    /// This sets the app context value read by
+    /// [`prefetch_mode`](crate::prefetch_mode). You can override it with a
+    /// `PrefetchMode` in the request context or with a link's `prefetch`
+    /// argument.
     ///
     /// ```rust
     /// use topcoat_router::Router;
@@ -42,7 +42,7 @@ pub trait RouterBuilderRuntimeExt {
     ///
     /// # Panics
     ///
-    /// Panics if a `PrefetchMode` is already registered in the app context.
+    /// Panics if the app context already contains a `PrefetchMode`.
     #[must_use]
     #[track_caller]
     fn prefetch(self, mode: PrefetchMode) -> Self;

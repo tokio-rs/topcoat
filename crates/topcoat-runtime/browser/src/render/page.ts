@@ -41,8 +41,8 @@ export class PageUnit extends RenderUnit {
 	}
 
 	/**
-	 * Returns the JSON body carrying the document's signal values, which
-	 * renders any page with the state the browser holds.
+	 * Builds a JSON request body containing this document's signal values
+	 * so the server can render a page with the browser's current state.
 	 */
 	signalBody(): string {
 		// Include nested signals to preserve state across the whole page.
@@ -51,14 +51,14 @@ export class PageUnit extends RenderUnit {
 	}
 
 	/**
-	 * Replaces the whole document with `next`, a navigation's destination,
-	 * which becomes the content of `render`. Keeps the signals the
-	 * destination declares again and stops the page's connected render.
+	 * Displays `next` as the new page and associates it with `render`.
+	 * Signals declared on both pages keep their values. Stops the previous
+	 * page's render over the WebSocket connection.
 	 */
 	replaceDocument(next: Document, render: RenderToken): void {
 		if (this.isDisposed) return;
 		this.runtime.connection.stop(this);
-		// The focused element would otherwise survive the morph in place.
+		// Clear focus so the page update can replace the focused element too.
 		const active = document.activeElement;
 		if (active instanceof HTMLElement) active.blur();
 		this.replace((scope, adoptable) => {

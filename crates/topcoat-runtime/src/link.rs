@@ -1,4 +1,4 @@
-// Links to the router extension become plain text without the router.
+// Show router links as plain text when the router feature is disabled.
 #![cfg_attr(not(feature = "router"), allow(rustdoc::broken_intra_doc_links))]
 
 use topcoat_core::{
@@ -8,34 +8,32 @@ use topcoat_core::{
 use topcoat_view::{AttributeValueViewParts, Attributes, Child, View};
 use topcoat_view_macro::{component, view};
 
-/// The attribute that opts an anchor into runtime navigation. Its value is
-/// the prefetch mode.
+/// Enables runtime navigation on an anchor and sets its prefetch mode.
 const LINK_ATTRIBUTE: &str = "data-topcoat-link";
 
-/// When the browser runtime fetches a link's destination ahead of a click.
+/// Controls when the browser loads a linked page before the user follows it.
 ///
-/// Prefetching is a best-effort optimization. The runtime may skip it, for
-/// example when the browser asks to save data. A prefetch renders the
-/// destination on the server, so pages must be safe to render
-/// speculatively.
+/// Loading a page early, or prefetching, can make navigation faster. The
+/// runtime may skip it, for example if the browser is set to save data.
+/// Prefetching renders the page on the server even if the user never opens
+/// it, so rendering a page must be safe in that case.
 ///
-/// Pass `prefetch` to [`link`] to choose the mode for one link. Links
-/// without one use [`prefetch_mode`], which reads a default from the
-/// context.
+/// Set the `prefetch` argument on [`link`] to choose when to load that page.
+/// Otherwise, the link uses the default returned by [`prefetch_mode`].
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PrefetchMode {
-    /// Fetches the destination only when the link is followed.
+    /// Loads the page only after the user follows the link.
     Never,
-    /// Fetches the destination after the pointer rests on the link, or as
-    /// soon as the link receives focus. This is the default.
+    /// Loads the page after the user hovers over the link briefly or as
+    /// soon as the link gets focus. This is the default.
     #[default]
     Intent,
-    /// Fetches the destination once the link becomes visible.
+    /// Loads the page when the link comes into view.
     Viewport,
 }
 
 impl PrefetchMode {
-    /// Returns the attribute value the browser runtime reads.
+    /// Returns the mode's name for use in the HTML attribute.
     const fn as_str(self) -> &'static str {
         match self {
             Self::Never => "never",
@@ -45,18 +43,18 @@ impl PrefetchMode {
     }
 }
 
-/// Returns the prefetch mode for links that do not choose one.
+/// Returns the default prefetch mode for links in this context.
 ///
-/// Returns the first available value in this order:
+/// Checks these sources in order and uses the first value it finds:
 ///
 /// 1. A `PrefetchMode` in the request context.
 /// 2. A `PrefetchMode` in the app context.
 /// 3. [`PrefetchMode::Intent`].
 ///
-/// Set the app default with
+/// Set the default for the app with
 /// [`RouterBuilderRuntimeExt::prefetch`](crate::RouterBuilderRuntimeExt::prefetch),
-/// or add a `PrefetchMode` to a scope with [`Cx::with`] to override it for
-/// the links rendered there.
+/// or use [`Cx::with`] to set a `PrefetchMode` for links rendered in a
+/// particular scope.
 #[must_use]
 pub fn prefetch_mode(cx: &Cx) -> PrefetchMode {
     try_request_context::<PrefetchMode>(cx)
@@ -65,19 +63,18 @@ pub fn prefetch_mode(cx: &Cx) -> PrefetchMode {
         .unwrap_or_default()
 }
 
-/// Builds the attributes of an anchor that navigates with the browser
-/// runtime.
+/// Creates attributes that let an `<a>` element use runtime navigation.
 ///
-/// The result holds the `href` for `href` and the attribute that enables
-/// runtime navigation with the `prefetch` mode. Spread it into an `<a>`
-/// element to give custom markup the behavior of [`link`]. Pass an
+/// Spread the returned attributes into your own `<a>` element to give it
+/// the same behavior as [`link`]. They set its `href` and enable runtime
+/// navigation with the chosen `prefetch` mode. Use an
 /// [`href!`](https://docs.rs/topcoat/latest/topcoat/router/macro.href.html)
-/// value for internal destinations, and [`prefetch_mode`] to use the
-/// context's default mode.
+/// value for a page in your app. Call [`prefetch_mode`] to get the default
+/// mode for the current context.
 ///
-/// The anchor works as a normal link without JavaScript, and the browser
-/// keeps handling modified clicks, other targets, downloads, and external
-/// destinations.
+/// Without JavaScript, the element still works as a regular link. The
+/// browser also handles clicks with modifier keys, links to other windows
+/// or frames, downloads, and links to other sites as usual.
 #[must_use]
 pub fn link_attrs(
     cx: &Cx,
@@ -90,19 +87,19 @@ pub fn link_attrs(
     attrs
 }
 
-/// An anchor that navigates with the browser runtime.
+/// A link that opens a page without reloading the whole document.
 ///
-/// Following the link renders the destination on the server and updates
-/// the document in place, keeping the signals the destination declares
-/// again. The anchor works as a normal link without JavaScript, and the
-/// browser keeps handling modified clicks, other targets, downloads, and
-/// external destinations.
+/// The runtime asks the server to render the linked page, then updates the
+/// current document with the result. Signals declared on both pages keep
+/// their values. Without JavaScript, this works as a regular link. The
+/// browser handles clicks with modifier keys, links to other windows or
+/// frames, downloads, and links to other sites as usual.
 ///
-/// When `prefetch` is omitted, [`prefetch_mode`] selects the mode from the
-/// context. `attrs` adds attributes to the `<a>` element, such as classes
-/// or `aria-*` attributes; `href` and `prefetch` take precedence over the
-/// attributes they produce. Use [`link_attrs`] to give the same behavior to
-/// custom markup.
+/// Set `prefetch` to choose when to load the page ahead of time. If you omit
+/// it, the link uses [`prefetch_mode`]. Pass `attrs` to add classes or other
+/// HTML attributes. The `href` and `prefetch` arguments override any
+/// matching attributes in `attrs`. Use [`link_attrs`] to add this behavior
+/// to your own `<a>` markup.
 ///
 /// ```
 /// use topcoat::view::view;
@@ -119,17 +116,17 @@ pub fn link_attrs(
 #[component]
 pub async fn link<H>(
     cx: &Cx,
-    /// The destination. Use an `href!` value for internal pages.
+    /// The URL to open. Use `href!` for pages in your app.
     href: H,
-    /// When to fetch the destination ahead of a click. Defaults to the
-    /// mode selected by [`prefetch_mode`].
+    /// When to load the page before the user follows the link. Uses
+    /// [`prefetch_mode`] if omitted.
     #[into]
     #[default]
     prefetch: Option<PrefetchMode>,
-    /// Extra attributes for the `<a>` element.
+    /// Additional HTML attributes to put on the link.
     #[default]
     mut attrs: Attributes,
-    /// The link's content.
+    /// The text or other content inside the link.
     #[default]
     child: Child<'_>,
 ) -> Result<impl View>
@@ -155,7 +152,7 @@ mod tests {
 
     use super::*;
 
-    /// Polls a future until it completes, without waiting between polls.
+    /// Runs a future to completion by polling it repeatedly without a pause.
     fn block_on<F: Future>(future: F) -> F::Output {
         let mut future = pin!(future);
         let mut cx = Context::from_waker(Waker::noop());
@@ -207,7 +204,7 @@ mod tests {
         assert!(html.contains(r#"class="nav""#), "{html}");
         assert!(html.contains(r#"aria-current="page""#), "{html}");
         assert!(html.contains(">Account</a>"), "{html}");
-        // Links prefetch on intent unless told otherwise.
+        // The default mode loads the page on hover or focus.
         assert!(html.contains(r#"data-topcoat-link="intent""#), "{html}");
     }
 

@@ -13,9 +13,9 @@ use crate::{
 /// If the child is ready immediately, the fallback never appears. Otherwise,
 /// the fallback renders with the page and the child replaces it when ready.
 ///
-/// Set `mode: SuspenseMode::Wait` to wait for the child's initial content
-/// without showing the fallback. When `mode` is omitted, [`suspense_mode`]
-/// selects it from the context and defaults to [`SuspenseMode::Stream`].
+/// Use `mode: SuspenseMode::Wait` to wait for the child's first content
+/// instead of showing the fallback. If you omit `mode`, [`suspense_mode`]
+/// checks the context and uses [`SuspenseMode::Stream`] if no mode is set.
 ///
 /// Errors from the child are not caught; wrap the child in an
 /// [`error_boundary`](super::error_boundary) to handle them.
@@ -57,8 +57,8 @@ pub async fn suspense(
     /// The content that replaces the fallback once it has rendered.
     #[default]
     child: Child<'_>,
-    /// Whether to show the fallback or wait for the child's initial content.
-    /// Defaults to the mode selected by [`suspense_mode`].
+    /// Whether to show a fallback while loading or wait for the first content.
+    /// Uses [`suspense_mode`] if omitted.
     #[into]
     #[default]
     mode: Option<SuspenseMode>,
@@ -105,9 +105,9 @@ pub async fn suspense(
 /// }
 /// ```
 ///
-/// Use [`RouterSuspenseExt::suspense`] to set a default for a router, or put a
-/// `SuspenseMode` in the request context to override it for a request. See
-/// [`suspense_mode`] for the order in which modes are selected.
+/// Set the router's default with [`RouterSuspenseExt::suspense`]. To use a
+/// different mode for a request, add a `SuspenseMode` to its context. See
+/// [`suspense_mode`] for how the default is chosen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SuspenseMode {
     /// Shows the fallback if the child's initial content is not ready, then
@@ -118,9 +118,9 @@ pub enum SuspenseMode {
     Wait,
 }
 
-/// Returns the suspense mode for boundaries that do not choose one.
+/// Returns the default mode for [`suspense`] in this context.
 ///
-/// Returns the first available value in this order:
+/// Checks these sources in order and uses the first value it finds:
 ///
 /// 1. A `SuspenseMode` in the request context.
 /// 2. A `SuspenseMode` in the app context.
