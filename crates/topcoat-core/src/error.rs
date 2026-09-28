@@ -2,6 +2,7 @@ use std::{
     any::Any,
     backtrace::{Backtrace, BacktraceStatus},
     fmt::{self, Debug, Display},
+    ops::Deref,
     sync::Arc,
 };
 
@@ -266,6 +267,15 @@ impl Debug for Error {
     }
 }
 
+/// Borrows the stored error as an error trait object.
+impl Deref for Error {
+    type Target = dyn std::error::Error + Send + Sync + 'static;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.error()
+    }
+}
+
 impl<E> From<E> for Error
 where
     E: std::error::Error + Send + Sync + 'static,
@@ -511,6 +521,53 @@ mod tests {
         fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
             Some(&self.cause)
         }
+    }
+
+    #[test]
+    fn thiserror_transparent_forwards_display_and_source() {
+        #[derive(Debug, thiserror::Error)]
+        enum AppError {
+            #[error(transparent)]
+            Topcoat(#[from] Error),
+        }
+
+        let cause = Failure("boom");
+        let expected_cause = cause.to_string();
+        let error = Error::from(WithCause { cause });
+        let expected_message = error.to_string();
+        let app_error = AppError::from(error);
+
+        assert_eq!(app_error.to_string(), expected_message);
+        let source = std::error::Error::source(&app_error).unwrap();
+        assert!(source.is::<Failure>());
+        assert_eq!(source.to_string(), expected_cause);
+        assert!(source.source().is_none());
+
+        let app_error = AppError::from(Error::from(Failure("leaf")));
+        assert!(std::error::Error::source(&app_error).is_none());
+    }
+
+    #[test]
+    fn thiserror_from_preserves_the_stored_error_as_source() {
+        #[derive(Debug, thiserror::Error)]
+        enum AppError {
+            #[error("operation failed")]
+            Topcoat(#[from] Error),
+        }
+
+        let cause = Failure("boom");
+        let expected_cause = cause.to_string();
+        let error = Error::from(WithCause { cause });
+        let expected_message = error.to_string();
+        let app_error = AppError::from(error);
+
+        let source = std::error::Error::source(&app_error).unwrap();
+        assert!(source.is::<WithCause>());
+        assert_eq!(source.to_string(), expected_message);
+        let cause = source.source().unwrap();
+        assert!(cause.is::<Failure>());
+        assert_eq!(cause.to_string(), expected_cause);
+        assert!(cause.source().is_none());
     }
 
     #[test]
