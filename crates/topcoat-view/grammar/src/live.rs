@@ -1,4 +1,4 @@
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
     parse::{Parse, ParseStream},
@@ -19,14 +19,14 @@ use crate::{
 
 pub struct Live {
     pub cx: Option<LeadingCx>,
-    pub body: Vec<syn::Stmt>,
+    pub body: TokenStream,
 }
 
 impl Parse for Live {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
             cx: input.call(LeadingCx::parse_option)?,
-            body: input.call(syn::Block::parse_within)?,
+            body: input.parse()?,
         })
     }
 }
@@ -35,11 +35,7 @@ impl ToTokens for Live {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         // Read the input span: line!() and column!() would name the outer
         // view! invocation and merge its distinct live! sites.
-        let start = self
-            .body
-            .first()
-            .map_or_else(Span::call_site, Spanned::span)
-            .start();
+        let start = self.body.span().start();
         let line = u32::try_from(start.line).expect("source line fits in u32");
         let column = u32::try_from(start.column + 1).expect("source column fits in u32");
         let site = quote! {
@@ -60,7 +56,7 @@ impl ToTokens for Live {
                 __region,
                 async move {
                     let __cx: &#topcoat_context::Cx = &__cx;
-                    #(#body)*
+                    #body
                 },
             )
         }}
@@ -72,10 +68,16 @@ impl ToTokens for Live {
 impl topcoat_core_grammar::pretty::PrettyPrint for Live {
     /// Keeps statements on separate lines, preserving comments and blank lines.
     fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        use syn::parse::Parser;
+
         self.cx.pretty_print(printer);
-        for (index, stmt) in self.body.iter().enumerate() {
+        let Ok(body) = syn::Block::parse_within.parse2(self.body.clone()) else {
+            syn::Expr::Verbatim(self.body.clone()).pretty_print(printer);
+            return;
+        };
+        for (index, stmt) in body.iter().enumerate() {
             stmt.pretty_print(printer);
-            if index < self.body.len() - 1 {
+            if index < body.len() - 1 {
                 printer.scan_same_line_trivia();
                 printer.scan_force_break();
                 printer.scan_break();
@@ -178,5 +180,48 @@ mod tests {
             .to_string();
         assert!(tokens.contains("async move {"), "{tokens}");
         assert!(tokens.contains("let x = 1 ;"), "{tokens}");
+    }
+
+    #[test]
+    fn incomplete_live_bodies_are_forwarded() {
+        for source in [
+            "let x = value.;",
+            "let x = call(,);",
+            "let x = module::;",
+            "if ready { let x = ; }",
+            "let f = |value| value.;",
+            "match value { Some(x) => x., None => () }",
+        ] {
+            for prefix in ["", "cx => "] {
+                let live = syn::parse_str::<Live>(&format!("{prefix}{source}")).unwrap();
+                let original: TokenStream = source.parse().unwrap();
+                assert_eq!(live.body.to_string(), original.to_string());
+                let expanded = live.to_token_stream().to_string();
+                assert!(expanded.contains(&original.to_string()), "{expanded}");
+                assert!(expanded.contains("async move {"), "{expanded}");
+            }
+        }
+    }
+
+    #[test]
+    fn live_body_preserves_its_source_location() {
+        let live = syn::parse_str::<Live>("cx =>\n    let x = value.;").unwrap();
+        assert_eq!(
+            live.body.span().start(),
+            proc_macro2::LineColumn { line: 2, column: 4 },
+        );
+    }
+
+    #[cfg(feature = "pretty")]
+    #[test]
+    fn incomplete_live_body_formats_verbatim() {
+        use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
+
+        let registry = Registry::one::<Live>("live");
+        let body = "let value = source; // keep this comment\n    let next = value.;";
+        let source = format!("live! {{ {body} }}");
+        let formatted = pretty_print_str(&registry, &source).unwrap();
+        assert!(formatted.contains(body), "{formatted}");
+        assert_eq!(pretty_print_str(&registry, &formatted).unwrap(), formatted);
     }
 }
