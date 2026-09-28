@@ -40,11 +40,8 @@ impl AttributeBuilder {
         self.nodes.push(Node::Insert { tokens, capacity });
     }
 
-    pub fn local_binding(&mut self, pat: &Pat, expr: &Expr) {
-        self.nodes.push(Node::Local {
-            pat: pat.clone(),
-            expr: Box::new(expr.clone()),
-        });
+    pub fn local_binding(&mut self, tokens: TokenStream) {
+        self.nodes.push(Node::Local { tokens });
     }
 
     pub fn statement(&mut self, tokens: TokenStream) {

@@ -37,11 +37,10 @@ impl Scope {
         let mut output = TokenStream::new();
         for node in nodes {
             match node {
-                Node::Insert { tokens, .. } | Node::Statement { tokens } => {
+                Node::Insert { tokens, .. }
+                | Node::Local { tokens }
+                | Node::Statement { tokens } => {
                     quote! { #tokens }
-                }
-                Node::Local { pat, expr } => {
-                    quote! { let #pat = #expr; }
                 }
                 Node::For { pat, expr, body } => {
                     let body = Self::emit_nodes(&body.nodes);
@@ -180,7 +179,7 @@ mod tests {
     #[test]
     fn let_and_statement_are_emitted_verbatim() {
         let mut builder = AttributeBuilder::new();
-        builder.local_binding(&syn::parse_quote!(x), &syn::parse_quote!(value));
+        builder.local_binding(quote! { let x = value; });
         builder.statement(quote! { break; });
         let out = rendered(builder);
         assert!(out.contains("let x = value"));

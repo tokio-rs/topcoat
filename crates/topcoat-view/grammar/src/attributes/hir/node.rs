@@ -13,7 +13,7 @@ pub(crate) enum Node {
         capacity: usize,
     },
     /// A `let pat = expr;` binding, in scope for the nodes that follow it.
-    Local { pat: Pat, expr: Box<Expr> },
+    Local { tokens: TokenStream },
     /// A verbatim Rust statement.
     Statement { tokens: TokenStream },
     /// A `for` loop whose body is lowered into a nested scope.

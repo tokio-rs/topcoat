@@ -175,7 +175,7 @@ mod tests {
     #[test]
     fn a_root_view_is_driven_inside_the_template_block() {
         let mut builder = ViewBuilder::new();
-        builder.local_binding(&syn::parse_quote!(x), &syn::parse_quote!(&value()));
+        builder.local_binding(quote! { let x = &value(); });
         builder.expr(ExprKind::Node, quote! { x });
         let out = rendered(builder);
         // The binding borrows a temporary that lives until the end of its
@@ -394,7 +394,7 @@ mod tests {
     #[test]
     fn local_binding_emits_let_statement() {
         let mut builder = ViewBuilder::new();
-        builder.local_binding(&syn::parse_quote!(x), &syn::parse_quote!(value));
+        builder.local_binding(quote! { let x = value; });
         builder.str_unescaped("ok");
         let out = rendered(builder);
         assert!(out.contains("let x = value"));

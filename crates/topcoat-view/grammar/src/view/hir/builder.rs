@@ -82,12 +82,9 @@ impl ViewBuilder {
         self.nodes.push(Node::ExprNode(ExprNode { kind, tokens }));
     }
 
-    pub fn local_binding(&mut self, pat: &Pat, expr: &Expr) {
+    pub fn local_binding(&mut self, tokens: TokenStream) {
         // Locals do not need flush because they don't affect static segments.
-        self.nodes.push(Node::Local(Local {
-            pat: pat.clone(),
-            expr: Box::new(expr.clone()),
-        }));
+        self.nodes.push(Node::Local(Local { tokens }));
     }
 
     pub fn statement(&mut self, tokens: TokenStream) {
