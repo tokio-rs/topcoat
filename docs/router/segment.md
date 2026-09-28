@@ -16,7 +16,7 @@ A `Param` or `CatchAll` segment without a `rename` is named after the module, as
 
 A `CatchAll` matches one or more remaining URL segments, including `/` separators, and must be the last served segment in the path.
 
-`raw_path_params` reports both views of it: the encoded tail and its separately decoded segments. Use `path_param!(*name)` to read the segments through a typed accessor instead.
+`raw_path_params` reports both views of it: the encoded tail and its separately decoded segments. Use `module_param!(*name)` in place of the manual override to read the segments through a typed accessor instead.
 
 # Examples
 

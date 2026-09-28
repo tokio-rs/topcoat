@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     context::{Cx, app_context},
-    router::{error::RouterErrorExt, page, path_param},
+    router::{error::RouterErrorExt, module_param, page, path_param},
     view::{View, view},
 };
 
@@ -10,7 +10,7 @@ use crate::{
     catalog::{Catalog, Product, format_rating},
 };
 
-path_param!(product_id: u32, error = not_found);
+module_param!(product_id: u32, error = not_found);
 
 #[page]
 async fn product_detail(cx: &Cx) -> Result<impl View> {

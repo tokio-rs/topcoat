@@ -250,14 +250,22 @@ mod threads {
     #[page("./{thread_id}")]
     async fn thread(cx: &Cx) -> Result<impl View> {
         let thread_id = path_param::<ThreadId>(cx)?;
-        Ok(view! { "thread " (thread_id) })
+        Ok(view! {
+            "thread "
+            (thread_id)
+        })
     }
 
     #[page("./{thread_id}/replies/{reply_id}")]
     async fn reply(cx: &Cx) -> Result<impl View> {
         let thread_id = path_param::<ThreadId>(cx)?;
         let reply_id = path_param::<ReplyId>(cx)?;
-        Ok(view! { "reply " (reply_id) " in " (thread_id) })
+        Ok(view! {
+            "reply "
+            (reply_id)
+            " in "
+            (thread_id)
+        })
     }
 }
 
