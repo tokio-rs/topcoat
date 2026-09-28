@@ -195,7 +195,12 @@ it("a page replacement releases nested shards and adopts surviving signals", asy
 			<!--::topcoat::shard::end("1")-->
 		<!--::topcoat::shard::end("0")-->
 	`;
-	vi.stubGlobal("location", { pathname: "/", search: "" });
+	vi.stubGlobal("location", {
+		href: "http://localhost/",
+		origin: "http://localhost",
+		pathname: "/",
+		search: "",
+	});
 	let finishShard!: (response: Response) => void;
 	const pendingShard = new Promise<Response>((resolve) => {
 		finishShard = resolve;

@@ -7,7 +7,7 @@ use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
     context::Cx,
     router::{RouterBuilderDiscoverExt, Slot, error::redirect, href, layout, module_router, page},
-    runtime::RouterBuilderRuntimeExt,
+    runtime::{RouterBuilderRuntimeExt, link},
     view::{View, view},
 };
 
@@ -42,12 +42,14 @@ async fn layout(slot: Slot<'_>) -> Result<impl View> {
                 topcoat::runtime::script()
             </head>
             <body>
+                // Links navigate without reloading the document, and
+                // prefetch their page when hovered or focused.
                 <nav>
-                    <a href=(href!(counter::page))>"counter"</a>
+                    link(href: href!(counter::page), "counter")
                     " | "
-                    <a href=(href!(show::page))>"show"</a>
+                    link(href: href!(show::page), "show")
                     " | "
-                    <a href=(href!(sort::page))>"sort"</a>
+                    link(href: href!(sort::page), "sort")
                 </nav>
 
                 <hr>

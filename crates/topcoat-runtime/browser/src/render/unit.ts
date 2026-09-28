@@ -137,24 +137,22 @@ export abstract class RenderUnit implements ConnectionTarget {
 	/**
 	 * Joins the document's connection if the content needs one and no
 	 * enclosing unit's content does, and leaves it otherwise. Waits for the
-	 * document to finish loading so all initial HTTP updates arrive before
-	 * the first render over the connection.
+	 * document, or the navigation that produced it, to finish loading so
+	 * all initial HTTP updates arrive before the first render over the
+	 * connection.
 	 */
-	private syncConnection(loaded = document.readyState === "complete"): void {
+	private syncConnection(): void {
 		if (this.isDisposed) return;
 		const { connection } = this.runtime;
 		if (!this.requiresConnection || this.coveredByAncestor) {
 			connection.leave(this);
 			return;
 		}
-		if (!loaded) {
-			window.addEventListener("load", () => this.syncConnection(true), {
-				once: true,
-				signal: this.lifetime.abortSignal,
-			});
-			return;
-		}
-		connection.join(this);
+		const loaded = this.runtime.whenLoaded(
+			() => this.syncConnection(),
+			this.lifetime.abortSignal,
+		);
+		if (loaded) connection.join(this);
 	}
 
 	/** Starts a connected render if the content still needs its own. */

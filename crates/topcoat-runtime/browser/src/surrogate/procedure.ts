@@ -1,5 +1,6 @@
 import type { Context } from "../expression/context";
 import { dehydrate } from "../expression/dehydrate";
+import { invalidatePrefetches } from "../render/prefetch";
 import { Future } from "./future";
 
 export class Procedure<A extends unknown[] = unknown[], R = unknown> {
@@ -15,7 +16,7 @@ export class Procedure<A extends unknown[] = unknown[], R = unknown> {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(args.map(dehydrate)),
-			});
+			}).finally(invalidatePrefetches);
 			if (!response.ok) {
 				throw new Error(
 					`Procedure call failed: ${response.status} ${response.statusText}`,

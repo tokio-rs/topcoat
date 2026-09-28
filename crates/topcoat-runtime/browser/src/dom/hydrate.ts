@@ -1,3 +1,4 @@
+import { LINK_ATTRIBUTE } from "../render/navigation";
 import { ShardUnit } from "../render/shard";
 import { type Region, Scope } from "../scope";
 import type { SignalId } from "../signal-registry";
@@ -71,6 +72,12 @@ function processElement(el: Element, scope: Scope): void {
 	for (const attr of Array.from(el.attributes)) {
 		setupBinding(el, attr, scope);
 		setupEventHandler(el, attr, scope);
+	}
+	if (
+		el instanceof HTMLAnchorElement &&
+		el.getAttribute(LINK_ATTRIBUTE) === "viewport"
+	) {
+		scope.runtime.navigation.observe(el, scope.abortSignal);
 	}
 }
 
