@@ -23,14 +23,14 @@ use crate::{
 /// use topcoat::{
 ///     Result,
 ///     context::Cx,
-///     router::{StripPrefixLayer, module_router, path_param, request::uri, route},
+///     router::{StripPrefixLayer, module_param, module_router, request::uri, route},
 /// };
 ///
 /// mod res {
 ///     mod path {
 ///         use super::super::*;
 ///
-///         path_param!(*path);
+///         module_param!(*path);
 ///
 ///         #[route(GET)]
 ///         async fn files(cx: &Cx) -> Result<String> {

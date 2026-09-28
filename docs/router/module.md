@@ -175,7 +175,7 @@ The same form works for `#[layout]`, `#[layer]`, and `#[route]`.
 
 # Dynamic path parameters
 
-Call `path_param!` inside the module that should become dynamic. The declaration names the URL parameter and may name the type used to parse each captured segment. The macro changes that module's segment to the parameter and generates the Pascal-cased type used to read it.
+Call `module_param!` inside the module that should become dynamic. The declaration names the URL parameter and may name the type used to parse each captured segment. The macro changes that module's segment to the parameter and generates the Pascal-cased type used to read it.
 
 ```text
 src/
@@ -191,11 +191,11 @@ src/
 use topcoat::{
     Result,
     context::Cx,
-    router::{page, path_param},
+    router::{module_param, page, path_param},
     view::{View, view},
 };
 
-path_param!(post_id: u64, error = bad_request);
+module_param!(post_id: u64, error = bad_request);
 
 #[page]
 async fn post(cx: &Cx) -> Result<impl View> {
@@ -210,13 +210,13 @@ The parameter name comes from `post_id` in the declaration, not from the filenam
 
 `path_param::<T>(cx)` returns a request-scoped value:
 
-- After `path_param!(slug)`, `path_param::<Slug>(cx)` returns the percent-decoded segment as `&str` and cannot fail.
-- After `path_param!(post_id: u64)`, `path_param::<PostId>(cx)` parses with `FromStr`. Without `error = ...`, the function returns `Result<&u64, &<u64 as FromStr>::Err>`.
+- After `module_param!(slug)`, `path_param::<Slug>(cx)` returns the percent-decoded segment as `&str` and cannot fail.
+- After `module_param!(post_id: u64)`, `path_param::<PostId>(cx)` parses with `FromStr`. Without `error = ...`, the function returns `Result<&u64, &<u64 as FromStr>::Err>`.
 - An `error = ...` option maps a parse failure to a router error. See the [`path_param!` reference](https://docs.rs/topcoat/latest/topcoat/router/macro.path_param.html) for the supported forms.
 
 Parsing occurs once per request. Later calls return the memoized result.
 
-A module contributes one segment, so it can declare one `path_param!`. Use nested modules for multiple parameters:
+A module contributes one segment, so it can declare one `module_param!`. Use nested modules for multiple parameters:
 
 | Module | Route path |
 |---|---|
@@ -225,14 +225,51 @@ A module contributes one segment, so it can declare one `path_param!`. Use neste
 
 Handlers and layouts in descendant modules can read parameters declared by ancestor modules if the Rust types are visible there.
 
+## Parameters in relative paths
+
+To keep parameters in one module instead, declare them with `path_param!` and write them in [relative paths](#relative-paths). `path_param!` generates the same type as `module_param!` but leaves the module's segment unchanged, so one module can declare several.
+
+```rust
+// src/app/posts.rs
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{page, path_param},
+    view::{View, view},
+};
+
+path_param!(post_id: u64, error = bad_request);
+path_param!(comment_id: u64, error = bad_request);
+
+// GET /posts
+#[page]
+async fn posts() -> Result<impl View> {
+    Ok(view! { <h1>"Posts"</h1> })
+}
+
+// GET /posts/{post_id}
+#[page("./{post_id}")]
+async fn post(cx: &Cx) -> Result<impl View> {
+    let post_id = path_param::<PostId>(cx)?;
+    Ok(view! { <h1>"Post " (post_id)</h1> })
+}
+
+// GET /posts/{post_id}/comments/{comment_id}
+#[page("./{post_id}/comments/{comment_id}")]
+async fn comment(cx: &Cx) -> Result<impl View> {
+    let comment_id = path_param::<CommentId>(cx)?;
+    Ok(view! { <h1>"Comment " (comment_id)</h1> })
+}
+```
+
 # Catch-all parameters
 
 Prefix a parameter name with `*` when its module should capture the remaining path.
 
 ```rust
 // src/app/docs/path.rs contributes /docs/{*path}.
-# use topcoat::router::path_param;
-path_param!(*path);
+# use topcoat::router::module_param;
+module_param!(*path);
 ```
 
 The declaration emits a `CatchAll` segment override. The module must be the last served segment, and the catch-all matches at least one segment.
@@ -288,7 +325,7 @@ async fn posts(cx: &Cx) -> Result<impl View> {
 
 `Static` is the default kind for regular modules. `Group` is the default for modules whose names start with `_`. A rename is used as written; Topcoat does not kebab-case it.
 
-`path_param!` emits a `Param` or `CatchAll` segment override, so do not combine it with `segment!` in the same module. A manual override creates the route capture but does not define a typed accessor.
+`module_param!` emits a `Param` or `CatchAll` segment override, so do not combine it with `segment!` in the same module. A manual override creates the route capture but does not define a typed accessor.
 
 # Groups
 

@@ -60,11 +60,11 @@ mod posts {
         use topcoat::{
             Result,
             context::Cx,
-            router::{page, path_param},
+            router::{module_param, page, path_param},
             view::{View, view},
         };
 
-        path_param!(post_id: u32, error = not_found);
+        module_param!(post_id: u32, error = not_found);
 
         #[page]
         async fn post(cx: &Cx) -> Result<impl View> {
@@ -118,7 +118,7 @@ async fn group_modules_are_left_out_of_the_url() {
 }
 
 #[tokio::test]
-async fn path_param_modules_capture_their_segment() {
+async fn module_param_modules_capture_their_segment() {
     let router = router();
     let (status, body) = send(&router, "/posts/42").await;
     assert_eq!(status, 200);
@@ -229,6 +229,38 @@ mod api {
     }
 }
 
+// `path_param!` leaves the module's segment alone, so a module can serve
+// its own path and parameters in relative paths below it.
+mod threads {
+    use topcoat::{
+        Result,
+        context::Cx,
+        router::{page, path_param},
+        view::{View, view},
+    };
+
+    path_param!(thread_id: u32, error = not_found);
+    path_param!(reply_id: u32, error = not_found);
+
+    #[page]
+    async fn threads() -> Result<impl View> {
+        Ok(view! { "threads" })
+    }
+
+    #[page("./{thread_id}")]
+    async fn thread(cx: &Cx) -> Result<impl View> {
+        let thread_id = path_param::<ThreadId>(cx)?;
+        Ok(view! { "thread " (thread_id) })
+    }
+
+    #[page("./{thread_id}/replies/{reply_id}")]
+    async fn reply(cx: &Cx) -> Result<impl View> {
+        let thread_id = path_param::<ThreadId>(cx)?;
+        let reply_id = path_param::<ReplyId>(cx)?;
+        Ok(view! { "reply " (reply_id) " in " (thread_id) })
+    }
+}
+
 #[tokio::test]
 async fn relative_page_at_the_root_module() {
     let (status, body) = send(&router(), "/about").await;
@@ -277,4 +309,20 @@ async fn relative_layer_runs_only_below_its_path() {
     let (_, headers, _) = send_full(&router, "/api/v1/health").await;
     assert_eq!(headers.get("x-api").unwrap(), "1");
     assert_eq!(headers.get("x-api-version").unwrap(), "1");
+}
+
+#[tokio::test]
+async fn path_params_in_relative_paths_keep_the_module_segment() {
+    let router = router();
+    let (status, body) = send(&router, "/threads").await;
+    assert_eq!(status, 200);
+    assert_eq!(body, "<main>threads</main>");
+
+    let (status, body) = send(&router, "/threads/3").await;
+    assert_eq!(status, 200);
+    assert_eq!(body, "<main>thread 3</main>");
+
+    let (status, body) = send(&router, "/threads/3/replies/8").await;
+    assert_eq!(status, 200);
+    assert_eq!(body, "<main>reply 8 in 3</main>");
 }

@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{error::RouterErrorExt, href, page, path_param},
+    router::{error::RouterErrorExt, href, module_param, page, path_param},
     runtime::{Event, procedure, signal},
     view::{View, attributes, view},
 };
@@ -15,7 +15,7 @@ use crate::{
 
 // The declaration turns this module's segment into a parameter, so the page
 // below renders at /menu/{slug}.
-path_param!(pub slug);
+module_param!(pub slug);
 
 #[page]
 pub async fn page(cx: &Cx) -> Result<impl View> {

@@ -40,7 +40,7 @@ use topcoat::{
     context::Cx,
     router::{
         error::{SeeOther, bad_request, see_other},
-        href, page, path_param, route,
+        href, module_param, page, path_param, route,
     },
     view::{View, view},
 };
@@ -63,7 +63,7 @@ async fn posts(cx: &Cx) -> Result<impl View> {
 pub mod post_id {
     use super::*;
 
-    path_param!(pub post_id: u64, error = bad_request);
+    module_param!(pub post_id: u64, error = bad_request);
 
     #[page]
     pub async fn post(cx: &Cx) -> Result<impl View> {

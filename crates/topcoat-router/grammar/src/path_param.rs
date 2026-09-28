@@ -8,7 +8,7 @@ use syn::{
 };
 use topcoat_core_grammar::{
     ParseOption,
-    paths::{topcoat_context, topcoat_context_macro, topcoat_router, topcoat_router_macro},
+    paths::{topcoat_context, topcoat_context_macro, topcoat_router},
 };
 
 use super::common::ErrorAttr;
@@ -24,7 +24,7 @@ pub struct PathParam {
 }
 
 impl PathParam {
-    fn is_catch_all(&self) -> bool {
+    pub(crate) fn is_catch_all(&self) -> bool {
         self.star_token.is_some()
     }
 
@@ -44,7 +44,7 @@ impl PathParam {
         )
     }
 
-    fn name_string(&self) -> String {
+    pub(crate) fn name_string(&self) -> String {
         self.name.unraw().to_string()
     }
 
@@ -283,17 +283,6 @@ impl PathParam {
             }
         }
     }
-
-    fn segment(&self) -> TokenStream {
-        let name = self.name_string();
-        let kind = if self.is_catch_all() {
-            quote! { CatchAll }
-        } else {
-            quote! { Param }
-        };
-
-        quote! { #topcoat_router_macro::segment!(kind = #kind, rename = #name); }
-    }
 }
 
 impl Parse for PathParam {
@@ -325,13 +314,11 @@ impl ToTokens for PathParam {
         let item = self.item();
         let path_param_impl = self.path_param_impl();
         let href_param_impl = self.href_param_impl();
-        let segment = self.segment();
 
         quote! {
             #item
             #path_param_impl
             #href_param_impl
-            #segment
         }
         .to_tokens(tokens);
     }

@@ -1,11 +1,11 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{error::RouterErrorExt, page, path_param},
+    router::{error::RouterErrorExt, module_param, page, path_param},
     view::{View, view},
 };
 
-path_param!(pub(crate) post_id: u64, error = bad_request);
+module_param!(pub(crate) post_id: u64, error = bad_request);
 
 // ok_or_not_found turns the None into a 404, which the layout's error boundary catches.
 #[page]

@@ -1,11 +1,11 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{href, page, path_param},
+    router::{href, module_param, page, path_param},
     view::{View, view},
 };
 
-path_param!(pub(crate)
+module_param!(pub(crate)
     post_id: u32,
     error = bad_request("Post ID must be a number!"),
 );

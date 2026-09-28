@@ -121,9 +121,9 @@ async fn home() -> Result<impl View> {
 
 mod users {
     mod id {
-        use topcoat::{Result, router::{page, path_param}, view::{View, view}};
+        use topcoat::{Result, router::{module_param, page}, view::{View, view}};
 
-        path_param!(id);
+        module_param!(id);
 
         #[page]
         async fn user_profile() -> Result<impl View> {
@@ -263,7 +263,7 @@ Call [`path_param!`](macro@path_param) with the parameter name from the URL. The
 - An `error = ...` option maps parse failures to a router error. See [`path_param!`](macro@path_param) for the supported forms.
 
 ```rust
-// src/app/posts/post_id.rs
+// src/app/posts.rs
 use topcoat::{
     Result,
     context::Cx,
@@ -273,7 +273,7 @@ use topcoat::{
 
 path_param!(post_id: u64, error = bad_request);
 
-#[page]
+#[page("./{post_id}")]
 async fn post(cx: &Cx) -> Result<impl View> {
     let post_id = path_param::<PostId>(cx)?;
     Ok(view! { <h1>"Post " (post_id)</h1> })
@@ -284,7 +284,7 @@ Parsing occurs once per request and the result is memoized.
 
 Prefix the name with `*` to capture the remaining path as decoded segments. After `path_param!(*doc_path)`, `path_param::<DocPath>(cx)` returns [`CatchAllSegments`]. After `path_param!(*ids: u32)`, `path_param::<Ids>(cx)` returns `Result<&[u32], _>`.
 
-With [`module_router!`], a declaration inside a non-root route module also changes that module's segment to the parameter. See [`module_router!`] for module structure, nested parameters, and catch-all parameters.
+With [`module_router!`], declare the parameter with [`module_param!`](macro@module_param) instead to turn its module into the parameter, so the module's handlers do not write a path. See [`module_router!`] for module structure, nested parameters, and catch-all parameters.
 
 ## Query parameters
 
@@ -348,7 +348,7 @@ use topcoat::{
     router::{
         Slot, StatusCode,
         error::{NotFoundError, RouterErrorExt},
-        layout, page, path_param,
+        layout, module_param, page,
     },
     view::{View, error_boundary, view},
 };
@@ -359,7 +359,7 @@ mod posts {
     mod id {
         use super::super::*;
 
-        path_param!(id);
+        module_param!(id);
 
         #[page]
         async fn post(cx: &Cx) -> Result<impl View> {

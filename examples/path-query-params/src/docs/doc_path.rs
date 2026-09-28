@@ -1,13 +1,13 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{href, page, path_param},
+    router::{href, module_param, page, path_param},
     view::{View, view},
 };
 
 use crate::home;
 
-path_param!(pub(crate) *doc_path);
+module_param!(pub(crate) *doc_path);
 
 #[page]
 pub(crate) async fn document(cx: &Cx) -> Result<impl View> {

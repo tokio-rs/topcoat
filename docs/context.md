@@ -54,7 +54,7 @@ A handler reached through a [rewrite](crate::router::error#rewrites) sees the re
 The [`path_param!`](macro@crate::router::path_param) macro and [`#[query_params]`](macro@crate::router::query_params) attribute declare typed values that you read with the [`path_param::<T>(cx)`](fn@crate::router::path_param) and [`query_params::<T>(cx)`](fn@crate::router::query_params) functions. Topcoat parses typed path parameters and query structs lazily and memoizes them for the request.
 
 ```rust
-// src/app/posts/post_id.rs
+// src/app/posts.rs
 use topcoat::{
     Result,
     context::Cx,
@@ -69,7 +69,7 @@ struct PostQuery {
     preview: Option<bool>,
 }
 
-#[page]
+#[page("./{post_id}")]
 async fn post(cx: &Cx) -> Result<impl View> {
     let post_id = path_param::<PostId>(cx)?;
     let query = query_params::<PostQuery>(cx)?;

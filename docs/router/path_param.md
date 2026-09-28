@@ -10,32 +10,34 @@ path_param!(post_id: u64);
 
 # Matching the URL
 
-The declaration emits a [`segment!`](macro.segment.html) override. Under [module routing](macro.module_router.html), it changes the declaring module's segment to the parameter, so the page does not write a path.
+Write a placeholder with the declaration's name in the route path. Under [module routing](macro.module_router.html), a relative path places the parameter below the module's own path.
 
 ```rust
-// src/app/posts/id.rs serves /posts/{post_id}.
+// src/app/posts.rs serves /posts/{post_id}.
 # use topcoat::{Result, router::{page, path_param}, view::{View, view}};
 path_param!(post_id: u64);
 
-#[page]
+#[page("./{post_id}")]
 async fn post() -> Result<impl View> {
     Ok(view! { "post" })
 }
 ```
 
-For an explicit route path, write a placeholder with the declaration's name.
+The declaration does not change the module's own segment, so one module can declare several parameters and use them in several relative paths.
 
 ```rust
+// src/app/posts.rs serves /posts/{post_id}/comments/{comment_id}.
 # use topcoat::{Result, router::{page, path_param}, view::{View, view}};
 path_param!(post_id: u64);
+path_param!(comment_id: u64);
 
-#[page("/posts/{post_id}")]
-async fn post() -> Result<impl View> {
-    Ok(view! { "post" })
+#[page("./{post_id}/comments/{comment_id}")]
+async fn comment() -> Result<impl View> {
+    Ok(view! { "comment" })
 }
 ```
 
-A module contributes one segment and can declare one path parameter. Put another parameter in a descendant module.
+To turn the module itself into the parameter, declare it with [`module_param!`](macro.module_param.html) instead. It accepts the same input and generates the same type.
 
 Reading a parameter that the matched route did not capture panics.
 
@@ -44,11 +46,11 @@ Reading a parameter that the matched route did not capture panics.
 [`path_param::<T>(cx)`](fn.path_param.html) reads the parameter from the matched route. A declaration with `: Type` parses the segment with [`FromStr`](core::str::FromStr) and memoizes the result for the request.
 
 ```rust
-// src/app/posts/post_id.rs
+// src/app/posts.rs
 # use topcoat::{context::Cx, Result, router::{error::RouterErrorExt, page, path_param}, view::{View, view}};
 path_param!(post_id: u64);
 
-#[page]
+#[page("./{post_id}")]
 async fn post(cx: &Cx) -> Result<impl View> {
     let post_id: &u64 = path_param::<PostId>(cx).ok_or_not_found()?;
     Ok(view! { "post " (post_id) })
@@ -58,11 +60,11 @@ async fn post(cx: &Cx) -> Result<impl View> {
 Without a type, `path_param::<Slug>(cx)` returns the percent-decoded segment as `&str` without allocating or failing.
 
 ```rust
-// src/app/posts/slug.rs
+// src/app/posts.rs
 # use topcoat::{context::Cx, Result, router::{page, path_param}, view::{View, view}};
 path_param!(slug);
 
-#[page]
+#[page("./{slug}")]
 async fn post(cx: &Cx) -> Result<impl View> {
     let slug: &str = path_param::<Slug>(cx);
     Ok(view! { "slug " (slug) })
@@ -76,11 +78,11 @@ The unparsed declaration generates `struct Slug<T: AsRef<str> = String>(T)`. `St
 `error = ...` maps a parse failure to a router error, so a handler can use `?`.
 
 ```rust
-// src/app/posts/post_id.rs
+// src/app/posts.rs
 # use topcoat::{context::Cx, Result, router::{page, path_param}, view::{View, view}};
 path_param!(post_id: u64, error = not_found);
 
-#[page]
+#[page("./{post_id}")]
 async fn post(cx: &Cx) -> Result<impl View> {
     let post_id = path_param::<PostId>(cx)?;
     Ok(view! { "post " (post_id) })
@@ -126,11 +128,11 @@ Keep the declaration private when only descendant modules read it. Use the narro
 Prefix the name with `*` to capture the remaining path as separate decoded segments. A catch-all must be the last served segment and matches at least one segment.
 
 ```rust
-// src/app/docs/doc_path.rs
+// src/app/docs.rs
 # use topcoat::{context::Cx, Result, router::{CatchAllSegments, page, path_param}, view::{View, view}};
 path_param!(*doc_path);
 
-#[page]
+#[page("./{*doc_path}")]
 async fn document(cx: &Cx) -> Result<impl View> {
     let path: CatchAllSegments<'_> = path_param::<DocPath>(cx);
     let path = path.collect::<std::path::PathBuf>();
@@ -143,11 +145,11 @@ async fn document(cx: &Cx) -> Result<impl View> {
 A typed catch-all parses each segment and returns a memoized slice.
 
 ```rust
-// src/app/archive/ids.rs
+// src/app/archive.rs
 # use topcoat::{context::Cx, Result, router::{page, path_param}, view::{View, view}};
 path_param!(*ids: u32, error = bad_request);
 
-#[page]
+#[page("./{*ids}")]
 async fn archive(cx: &Cx) -> Result<impl View> {
     let ids: &[u32] = path_param::<Ids>(cx)?;
     Ok(view! { (format!("{ids:?}")) })
@@ -168,28 +170,24 @@ Pass the generated type to [`href!`](macro.href.html) to fill the matching param
 # use topcoat::{Result, router::{href, page, path_param}, view::{View, view}};
 // src/app.rs
 mod posts {
-    pub mod post_id {
-        use super::super::*;
+    use super::*;
 
-        path_param!(pub post_id: u64);
+    path_param!(pub post_id: u64);
 
-        #[page]
-        pub async fn post() -> Result<impl View> {
-            Ok(view! { "post" })
-        }
+    #[page("./{post_id}")]
+    pub async fn post() -> Result<impl View> {
+        Ok(view! { "post" })
     }
 }
 
 mod docs {
-    pub mod doc_path {
-        use super::super::*;
+    use super::*;
 
-        path_param!(pub *doc_path);
+    path_param!(pub *doc_path);
 
-        #[page]
-        pub async fn document() -> Result<impl View> {
-            Ok(view! { "doc" })
-        }
+    #[page("./{*doc_path}")]
+    pub async fn document() -> Result<impl View> {
+        Ok(view! { "doc" })
     }
 }
 
@@ -197,9 +195,9 @@ mod docs {
 async fn home() -> Result<impl View> {
     Ok(view! {
         // /posts/1
-        <a href=(href!(posts::post_id::post, posts::post_id::PostId(1)))>"The first post"</a>
+        <a href=(href!(posts::post, posts::PostId(1)))>"The first post"</a>
         // /docs/guides/getting%20started
-        <a href=(href!(docs::doc_path::document, docs::doc_path::DocPath(["guides", "getting started"])))>"Guides"</a>
+        <a href=(href!(docs::document, docs::DocPath(["guides", "getting started"])))>"Guides"</a>
     })
 }
 # fn main() {}
@@ -218,5 +216,4 @@ Empty values, `.`, and `..` panic because browsers treat them as path structure 
 - Parsed segment types must implement [`FromStr`](core::str::FromStr).
 - Parsed segment types must implement [`Display`](core::fmt::Display) to be filled into an [`href`](fn.href.html).
 - The parsed segment type and its `<T as FromStr>::Err` must be `Send + Sync + 'static` so the result can be [memoized](../context/attr.memoize.html).
-- The parameter name in an explicit route must match the declaration.
-- A module can contain either one `path_param!` declaration or one manual `segment!` override.
+- The parameter name in the route path must match the declaration.

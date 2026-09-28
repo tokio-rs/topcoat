@@ -61,6 +61,14 @@ pub fn path_param(tokens: TokenStream) -> TokenStream {
     quote! { #path_param }.into()
 }
 
+#[doc = include_str!("../docs/module_param.md")]
+#[proc_macro]
+pub fn module_param(tokens: TokenStream) -> TokenStream {
+    let module_param =
+        syn::parse_macro_input!(tokens as topcoat_router_grammar::module_param::ModuleParam);
+    quote! { #module_param }.into()
+}
+
 #[doc = include_str!("../docs/query_params.md")]
 #[proc_macro_attribute]
 pub fn query_params(attr: TokenStream, item: TokenStream) -> TokenStream {
