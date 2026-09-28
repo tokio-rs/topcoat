@@ -9,10 +9,17 @@ use topcoat_core_grammar::ParseOption;
 use crate::view::hir::{ExprKind, LowerView, ViewBuilder};
 
 /// A parenthesized Rust expression embedded as a child node, e.g. `(5 + 6)`.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct TemplateExpr {
     pub paren: syn::token::Paren,
-    pub expr: syn::Expr,
+    pub expr: TokenStream,
+}
+
+impl PartialEq for TemplateExpr {
+    fn eq(&self, other: &Self) -> bool {
+        self.paren == other.paren
+            && syn::Expr::Verbatim(self.expr.clone()) == syn::Expr::Verbatim(other.expr.clone())
+    }
 }
 
 impl LowerView for TemplateExpr {
@@ -48,7 +55,9 @@ impl ToTokens for TemplateExpr {
 impl topcoat_core_grammar::pretty::PrettyPrint for TemplateExpr {
     fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         "(".pretty_print(printer);
-        self.expr.pretty_print(printer);
+        syn::parse2::<syn::Expr>(self.expr.clone())
+            .unwrap_or_else(|_| syn::Expr::Verbatim(self.expr.clone()))
+            .pretty_print(printer);
         ")".pretty_print(printer);
     }
 }
@@ -85,5 +94,60 @@ mod tests {
     #[test]
     fn requires_parentheses() {
         assert!(syn::parse_str::<TemplateExpr>("value").is_err());
+    }
+
+    #[test]
+    fn forwards_incomplete_expressions() {
+        for source in [
+            "value.",
+            "String::",
+            "call(,)",
+            "{ let broken = ; value. }",
+            "|value: String| value.",
+        ] {
+            let expr = parse(&format!("({source})"));
+            let original: TokenStream = source.parse().unwrap();
+            assert_eq!(expr.to_token_stream().to_string(), original.to_string());
+        }
+    }
+
+    #[test]
+    fn incomplete_expressions_expand_in_view_and_emit() {
+        for source in [
+            "<p>(value.)</p>",
+            "<input value=(value.)>",
+            "<input (value.)=\"text\">",
+            "<input (value.)>",
+            "<input :value=(value.)>",
+            "<(value.)></(value.)>",
+        ] {
+            let view = syn::parse_str::<crate::view::View>(source).unwrap();
+            let emit = syn::parse_str::<crate::live::Emit>(source).unwrap();
+            for expanded in [view.to_token_stream(), emit.to_token_stream()] {
+                assert!(expanded.to_string().contains("value ."), "{expanded}");
+            }
+        }
+    }
+
+    #[cfg(feature = "pretty")]
+    #[test]
+    fn formats_expression_tokens() {
+        use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
+
+        let mut registry = Registry::new();
+        registry.register_macro::<crate::view::View>("view");
+        registry.register_macro::<crate::live::Emit>("emit");
+        for name in ["view", "emit"] {
+            for (input, expected) in [
+                ("value . len ()", "value.len()"),
+                ("value.", "value."),
+                ("value /* keep */ .", "value /* keep */ ."),
+            ] {
+                let source = format!("{name}! {{ <p>({input})</p> }}");
+                let formatted = pretty_print_str(&registry, &source).unwrap();
+                assert!(formatted.contains(&format!("({expected})")), "{formatted}");
+                assert_eq!(pretty_print_str(&registry, &formatted).unwrap(), formatted);
+            }
+        }
     }
 }

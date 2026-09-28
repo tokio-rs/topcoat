@@ -1,9 +1,9 @@
 use std::fmt::Display;
 
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
 use syn::{
-    Expr, Ident, LitStr,
+    Ident, LitStr,
     ext::IdentExt,
     parse::{Parse, ParseStream},
     spanned::Spanned,
@@ -74,7 +74,7 @@ impl ElementName {
     /// Returns the underlying expression if this name was written as
     /// `(expr)`, otherwise `None`.
     #[must_use]
-    pub fn expr(&self) -> Option<&Expr> {
+    pub fn expr(&self) -> Option<&TokenStream> {
         match self {
             Self::Expr(inner) => Some(&inner.expr),
             _ => None,
