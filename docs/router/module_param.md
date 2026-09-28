@@ -1,6 +1,6 @@
-Declares a typed path parameter and turns the enclosing module into that parameter.
+Uses a path parameter as the module's URL segment.
 
-Under [module routing](macro.module_router.html), `module_param!` changes the module's URL segment to the parameter, so its handlers do not write a path.
+With [module routing](macro.module_router.html), `module_param!(post_id: u64)` gives the module a `{post_id}` segment. A page in that module can use `#[page]` without a path.
 
 ```rust
 // src/app/posts/post_id.rs serves /posts/{post_id}.
@@ -14,11 +14,13 @@ async fn post(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-The macro takes the same input as [`path_param!`](macro.path_param.html) and generates the same type, so read the value with [`path_param::<T>(cx)`](fn.path_param.html) and fill it into an [`href!`](macro.href.html) as usual. See [`path_param!`](macro.path_param.html) for parsing, errors, visibility, and URL building.
+Read the value with [`path_param::<PostId>(cx)`](fn.path_param.html). To build a link, pass a value such as `PostId(42)` to [`href!`](macro.href.html).
 
-The parameter name in the URL comes from the declaration, not from the file name. The file above could be named `id.rs` and would still serve `/posts/{post_id}`.
+`module_param!` accepts the same options and creates the same type as [`path_param!`](macro.path_param.html). See that guide for parsing, error handling, visibility, and building URLs.
 
-Prefix the name with `*` to turn the module into a catch-all instead. It must be the last served segment.
+The name in `module_param!` sets the parameter name in the URL. In this example, naming the file `id.rs` would still give the page the path `/posts/{post_id}`.
+
+Put `*` before the name to match the rest of the URL path. This catch-all must come last in the route and match at least one segment.
 
 ```rust
 // src/app/docs/doc_path.rs serves /docs/{*doc_path}.
@@ -26,6 +28,6 @@ Prefix the name with `*` to turn the module into a catch-all instead. It must be
 module_param!(*doc_path);
 ```
 
-A module contributes one segment, so it can contain only one `module_param!` or [`segment!`](macro.segment.html). Put another parameter in a descendant module, or declare it with `path_param!` and use it in a relative path such as `#[page("./{comment_id}")]`.
+A module adds one URL segment. It can contain one `module_param!` or one [`segment!`](macro.segment.html), but not both. To add another parameter, use `module_param!` in a child module, or use `path_param!` with a relative path such as `#[page("./{comment_id}")]`.
 
-`module_param!` has no effect on handlers with absolute paths or on a regular [`Router`](struct.Router.html).
+The module's segment only applies to module routing. It does not change absolute handler paths or paths registered with a regular [`Router`](struct.Router.html).

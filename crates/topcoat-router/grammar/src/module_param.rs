@@ -5,8 +5,7 @@ use topcoat_core_grammar::paths::topcoat_router_macro;
 
 use super::path_param::PathParam;
 
-/// The input to `module_param!`: a `path_param!` declaration that also
-/// becomes its module's segment.
+/// A path parameter declaration that also sets the module's URL segment.
 pub struct ModuleParam {
     pub param: PathParam,
 }

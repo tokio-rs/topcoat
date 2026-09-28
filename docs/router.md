@@ -284,7 +284,7 @@ Parsing occurs once per request and the result is memoized.
 
 Prefix the name with `*` to capture the remaining path as decoded segments. After `path_param!(*doc_path)`, `path_param::<DocPath>(cx)` returns [`CatchAllSegments`]. After `path_param!(*ids: u32)`, `path_param::<Ids>(cx)` returns `Result<&[u32], _>`.
 
-With [`module_router!`], declare the parameter with [`module_param!`](macro@module_param) instead to turn its module into the parameter, so the module's handlers do not write a path. See [`module_router!`] for module structure, nested parameters, and catch-all parameters.
+With [`module_router!`], use [`module_param!`](macro@module_param) when the parameter should be the module's URL segment. Handlers in that module can then use `#[page]` or `#[route]` without a path. The [`module_router!`] guide shows how to arrange modules for nested and catch-all parameters.
 
 ## Query parameters
 

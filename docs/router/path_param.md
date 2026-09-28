@@ -10,7 +10,7 @@ path_param!(post_id: u64);
 
 # Matching the URL
 
-Write a placeholder with the declaration's name in the route path. Under [module routing](macro.module_router.html), a relative path places the parameter below the module's own path.
+Add the parameter name in braces to the route path, such as `{post_id}`. With [module routing](macro.module_router.html), use a path starting with `./` to add it after the module's path.
 
 ```rust
 // src/app/posts.rs serves /posts/{post_id}.
@@ -23,7 +23,7 @@ async fn post() -> Result<impl View> {
 }
 ```
 
-The declaration does not change the module's own segment, so one module can declare several parameters and use them in several relative paths.
+You can declare several parameters in one module and use them in your handler paths. `path_param!` leaves the module's URL segment unchanged.
 
 ```rust
 // src/app/posts.rs serves /posts/{post_id}/comments/{comment_id}.
@@ -37,7 +37,7 @@ async fn comment() -> Result<impl View> {
 }
 ```
 
-To turn the module itself into the parameter, declare it with [`module_param!`](macro.module_param.html) instead. It accepts the same input and generates the same type.
+Use [`module_param!`](macro.module_param.html) when the parameter should be the module's URL segment. It accepts the same options and creates the same type as `path_param!`.
 
 Reading a parameter that the matched route did not capture panics.
 

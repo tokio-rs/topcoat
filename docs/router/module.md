@@ -175,7 +175,7 @@ The same form works for `#[layout]`, `#[layer]`, and `#[route]`.
 
 # Dynamic path parameters
 
-Call `module_param!` inside the module that should become dynamic. The declaration names the URL parameter and may name the type used to parse each captured segment. The macro changes that module's segment to the parameter and generates the Pascal-cased type used to read it.
+Use `module_param!` to make a module's URL segment a path parameter. Give the parameter a name and, optionally, a type to parse it as. For example, `module_param!(post_id: u64)` gives the module a `{post_id}` segment and creates the `PostId` type used to read its value.
 
 ```text
 src/
@@ -210,13 +210,13 @@ The parameter name comes from `post_id` in the declaration, not from the filenam
 
 `path_param::<T>(cx)` returns a request-scoped value:
 
-- After `module_param!(slug)`, `path_param::<Slug>(cx)` returns the percent-decoded segment as `&str` and cannot fail.
-- After `module_param!(post_id: u64)`, `path_param::<PostId>(cx)` parses with `FromStr`. Without `error = ...`, the function returns `Result<&u64, &<u64 as FromStr>::Err>`.
+- With `module_param!(slug)`, `path_param::<Slug>(cx)` returns the decoded segment as `&str`. It does not parse the value, so there is no parse error to handle.
+- With `module_param!(post_id: u64)`, `path_param::<PostId>(cx)` parses the value using `FromStr` and returns `Result<&u64, &<u64 as FromStr>::Err>`.
 - An `error = ...` option maps a parse failure to a router error. See the [`path_param!` reference](https://docs.rs/topcoat/latest/topcoat/router/macro.path_param.html) for the supported forms.
 
 Parsing occurs once per request. Later calls return the memoized result.
 
-A module contributes one segment, so it can declare one `module_param!`. Use nested modules for multiple parameters:
+A module adds one URL segment and can contain one `module_param!`. To put several parameters in a route, declare them in nested modules:
 
 | Module | Route path |
 |---|---|
@@ -227,7 +227,7 @@ Handlers and layouts in descendant modules can read parameters declared by ances
 
 ## Parameters in relative paths
 
-To keep parameters in one module instead, declare them with `path_param!` and write them in [relative paths](#relative-paths). `path_param!` generates the same type as `module_param!` but leaves the module's segment unchanged, so one module can declare several.
+You can also keep several parameters in one module. Declare each with `path_param!`, then add its name in braces to a handler's [relative path](#relative-paths). This creates the same parameter types as `module_param!` and keeps the module's URL segment unchanged.
 
 ```rust
 // src/app/posts.rs
@@ -325,7 +325,7 @@ async fn posts(cx: &Cx) -> Result<impl View> {
 
 `Static` is the default kind for regular modules. `Group` is the default for modules whose names start with `_`. A rename is used as written; Topcoat does not kebab-case it.
 
-`module_param!` emits a `Param` or `CatchAll` segment override, so do not combine it with `segment!` in the same module. A manual override creates the route capture but does not define a typed accessor.
+`module_param!` already sets the module's segment to `Param` or `CatchAll`. Use either `module_param!` or `segment!` in a module, not both. Using `segment!` alone captures the parameter but does not create a type for reading it with `path_param::<T>(cx)`.
 
 # Groups
 

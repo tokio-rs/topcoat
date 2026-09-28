@@ -12,11 +12,11 @@ The macro takes comma-separated `key = value` attributes, each at most once:
 - `kind = Param`: a dynamic `{name}` parameter, matching one segment.
 - `kind = CatchAll`: a wildcard `{*name}` tail, matching all remaining segments.
 
-A `Param` or `CatchAll` segment without a `rename` is named after the module, as-is. Declaring a [`module_param!`](macro.module_param.html) in a module emits the matching segment override automatically, so do not also call `segment!` in that module. A manual `Param` or `CatchAll` declaration creates a captured segment but no typed accessor; read it with [`raw_path_params`](fn.raw_path_params.html).
+A `Param` or `CatchAll` segment uses the module's exact name unless you set `rename`. [`module_param!`](macro.module_param.html) sets the segment kind and name for you, so do not also use `segment!` in that module. If you use `segment!` alone, read the captured value with [`raw_path_params`](fn.raw_path_params.html). It does not create a type for reading the value with `path_param::<T>(cx)`.
 
 A `CatchAll` matches one or more remaining URL segments, including `/` separators, and must be the last served segment in the path.
 
-`raw_path_params` reports both views of it: the encoded tail and its separately decoded segments. Use `module_param!(*name)` in place of the manual override to read the segments through a typed accessor instead.
+For a catch-all, `raw_path_params` provides the rest of the path as an encoded string and as separate decoded segments. To read those segments with `path_param::<T>(cx)`, replace the `segment!` declaration with `module_param!(*name)`.
 
 # Examples
 
