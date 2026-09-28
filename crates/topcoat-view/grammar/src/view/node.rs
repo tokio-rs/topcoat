@@ -25,7 +25,7 @@ pub enum Node {
     Component(Component),
     Expr(TemplateExpr),
     RuntimeExpr(RuntimeExpr),
-    If(TemplateIf<Nodes>),
+    If(Box<TemplateIf<Nodes>>),
     Local(TemplateLocal),
     ForLoop(ForLoop),
     Continue(TemplateContinue),
