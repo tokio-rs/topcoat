@@ -8,7 +8,8 @@ mod expr;
 mod js;
 #[cfg(feature = "router")]
 mod layer;
-mod navigation;
+#[path = "link.rs"]
+mod link_;
 #[cfg(feature = "router")]
 mod procedure;
 mod router;
@@ -27,7 +28,7 @@ pub use expr::*;
 pub use js::*;
 #[cfg(feature = "router")]
 pub use layer::*;
-pub use navigation::*;
+pub use link_::*;
 #[cfg(feature = "router")]
 pub use procedure::*;
 pub use router::*;

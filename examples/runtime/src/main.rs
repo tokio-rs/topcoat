@@ -18,6 +18,7 @@ async fn main() {
             .assets(AssetBundle::load().unwrap())
             .discover()
             .runtime()
+            .prefetch(topcoat::runtime::PrefetchMode::Viewport)
             .build(),
     )
     .await
