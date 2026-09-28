@@ -406,7 +406,7 @@ async fn runs_proceed_side_by_side_on_one_connection() {
     assert!(snapshot["html"].as_str().unwrap().contains("news"));
     assert_eq!(next_frame(&mut client, 2).await["t"], "swap");
 
-    // The page's run is still going, so another run of it can replace it.
+    // Further runs keep starting while the first page run is still going.
     request_page_run(&mut client, 3, "/slow", serde_json::json!({})).await;
     assert_eq!(next_frame(&mut client, 3).await["t"], "snapshot");
 
@@ -489,7 +489,13 @@ async fn a_page_run_restores_the_signal_values_it_is_sent() {
     let id = last_signal_id(snapshot["html"].as_str().unwrap()).to_owned();
     let _swap = next_frame(&mut client, 1).await;
 
-    request_page_run(&mut client, 2, "/room", serde_json::json!({ id: "changed" })).await;
+    request_page_run(
+        &mut client,
+        2,
+        "/room",
+        serde_json::json!({ id: "changed" }),
+    )
+    .await;
     let snapshot = next_frame(&mut client, 2).await;
     let html = snapshot["html"].as_str().unwrap();
     assert!(html.contains("query: changed"), "{html}");
