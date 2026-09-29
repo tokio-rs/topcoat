@@ -209,12 +209,12 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 - [Source code formatting](https://github.com/tokio-rs/topcoat/blob/main/docs/cli/fmt.md): `topcoat fmt` for macro bodies.
 
 **Rendering**
-- [The `view!` macro](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html): templating syntax, control flow, conditional attributes.
-- [The `#[component]` macro](https://docs.rs/topcoat/latest/topcoat/view/attr.component.html): async functions as components, with child content.
-- [The `attributes!` macro](https://docs.rs/topcoat/latest/topcoat/view/macro.attributes.html): reusable runtime attribute fragments.
-- [The `class!` macro](https://docs.rs/topcoat/latest/topcoat/view/macro.class.html): space-separated class lists from static and conditional entries.
-- The [`suspense`](https://docs.rs/topcoat/latest/topcoat/view/struct.suspense.html) and [`error_boundary`](https://docs.rs/topcoat/latest/topcoat/view/struct.error_boundary.html) components: show fallback content while loading or when rendering fails.
-- [The `live!` and `emit!` macros](https://docs.rs/topcoat/latest/topcoat/view/macro.live.html): stream updates to part of a page.
+- [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html) mixes HTML, Rust expressions, control flow, and component calls.
+- [`#[component]`](https://docs.rs/topcoat/latest/topcoat/view/attr.component.html) makes async functions callable from markup with named arguments and child content.
+- [`attributes!`](https://docs.rs/topcoat/latest/topcoat/view/macro.attributes.html) collects attributes to pass through components and spread onto elements.
+- [`class!`](https://docs.rs/topcoat/latest/topcoat/view/macro.class.html) joins base, optional, and conditional CSS classes.
+- [`suspense`](https://docs.rs/topcoat/latest/topcoat/view/struct.suspense.html) shows a fallback while content loads. [`error_boundary`](https://docs.rs/topcoat/latest/topcoat/view/struct.error_boundary.html) shows one if rendering fails.
+- [`live!` and `emit!`](https://docs.rs/topcoat/latest/topcoat/view/macro.live.html) replace part of a page as async work produces new HTML.
 
 **Routing**
 - [Router](https://docs.rs/topcoat/latest/topcoat/router/index.html): pages, layouts, and API routes; manual and auto-discovered.
