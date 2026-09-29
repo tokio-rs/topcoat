@@ -87,32 +87,7 @@ pub fn link_attrs(
     attrs
 }
 
-/// A link that opens a page without reloading the whole document.
-///
-/// The runtime asks the server to render the linked page, then updates the
-/// current document with the result. Signals declared on both pages keep
-/// their values. Without JavaScript, this works as a regular link. The
-/// browser handles clicks with modifier keys, links to other windows or
-/// frames, downloads, and links to other sites as usual.
-///
-/// Set `prefetch` to choose when to load the page ahead of time. If you omit
-/// it, the link uses [`prefetch_mode`]. Pass `attrs` to add classes or other
-/// HTML attributes. The `href` and `prefetch` arguments override any
-/// matching attributes in `attrs`. Use [`link_attrs`] to add this behavior
-/// to your own `<a>` markup.
-///
-/// ```
-/// use topcoat::view::view;
-/// use topcoat_runtime::{PrefetchMode, link};
-///
-/// # #[topcoat::view::component]
-/// # async fn example() -> topcoat::Result<impl topcoat::view::View> {
-/// Ok(view! {
-///     link(href: "/products", "Products")
-///     link(href: "/reports", prefetch: PrefetchMode::Never, "Reports")
-/// })
-/// # }
-/// ```
+#[doc = include_str!("../docs/link.md")]
 #[component]
 pub async fn link<H>(
     cx: &Cx,

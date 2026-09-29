@@ -2,6 +2,8 @@ Topcoat's runtime adds browser interactions to server-rendered pages. Write stat
 
 The runtime is **highly experimental**. Expressions support a limited set of Rust types and operations, and the API may change.
 
+Use [`link`](struct.link.html) for navigation without a full document reload, with prefetching and support for custom anchors.
+
 # Setup
 
 Interactive pages need the runtime's browser script. `script()` renders the script tag; include it in your document head:

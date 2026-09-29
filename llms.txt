@@ -56,6 +56,8 @@ Defaults include router/view/runtime/serve/discover, asset/compression/cookie/se
 
 Setup: `module_router!().discover().assets(AssetBundle::load()?).runtime().build()`; include `topcoat::runtime::script()` in `<head>`. Register application layers before `.runtime()`. Procedures/shards need discovery or `.route(name)`. [Runtime](docs/runtime.md).
 
+- [Navigation](docs/runtime/link.md): `runtime::link(href: href!(page), "Page")` opens server-rendered pages without a full reload and preserves signals shared by both pages. Prefetch defaults to `PrefetchMode::Intent` (hover/focus/touch); `Viewport` loads visible links, `Never` waits for navigation. Override per link with `prefetch:`, per scope with `cx.with(mode)`, or per app with `.prefetch(mode)` (`RouterBuilderRuntimeExt`). `prefetch_mode(cx)` reads the context default; `link_attrs(cx, href!(page), prefetch_mode(cx))` adds the same behavior to custom anchors. Plain `<a>` links retain normal navigation.
+
 ```rust
 // Inside a component/page with cx: &Cx; import runtime::{signal, Event}.
 let query = signal(cx, String::new);

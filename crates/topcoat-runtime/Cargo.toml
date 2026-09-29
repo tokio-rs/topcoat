@@ -38,7 +38,7 @@ tokio = { workspace = true, optional = true, features = ["rt", "sync"] }
 
 [dev-dependencies]
 # We cannot use `workspace = true` with `default-features = false`.
-topcoat = { path = "../topcoat", default-features = false, features = ["view"] }
+topcoat = { path = "../topcoat", default-features = false, features = ["asset", "router", "runtime", "view"] }
 
 [lints]
 workspace = true
