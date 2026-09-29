@@ -213,7 +213,8 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 - [The `#[component]` macro](https://docs.rs/topcoat/latest/topcoat/view/attr.component.html): async functions as components, with child content.
 - [The `attributes!` macro](https://docs.rs/topcoat/latest/topcoat/view/macro.attributes.html): reusable runtime attribute fragments.
 - [The `class!` macro](https://docs.rs/topcoat/latest/topcoat/view/macro.class.html): space-separated class lists from static and conditional entries.
-- [The `live!` and `emit!` macros](https://docs.rs/topcoat/latest/topcoat/view/macro.live.html): stream slow parts of a page in after the rest, with the `suspense` and `error_boundary` components built on them.
+- The [`suspense`](https://docs.rs/topcoat/latest/topcoat/view/struct.suspense.html) and [`error_boundary`](https://docs.rs/topcoat/latest/topcoat/view/struct.error_boundary.html) components: show fallback content while loading or when rendering fails.
+- [The `live!` and `emit!` macros](https://docs.rs/topcoat/latest/topcoat/view/macro.live.html): stream updates to part of a page.
 
 **Routing**
 - [Router](https://docs.rs/topcoat/latest/topcoat/router/index.html): pages, layouts, and API routes; manual and auto-discovered.
@@ -235,10 +236,10 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 
 **Client reactivity**
 - [The runtime](https://docs.rs/topcoat/latest/topcoat/runtime/index.html): signals, `$(...)` expressions, `@` event handlers, and `:` bind attributes.
-- [Client-side navigation](https://docs.rs/topcoat/latest/topcoat/runtime/struct.link.html): links, prefetching, and navigation without a full document reload.
 - [Expressions](https://docs.rs/topcoat/latest/topcoat/runtime/macro.expr.html): the dual Rust/JavaScript expression language and its vocabulary.
 - [Procedures](https://docs.rs/topcoat/latest/topcoat/runtime/attr.procedure.html): async server functions callable from the browser.
 - [Shards](https://docs.rs/topcoat/latest/topcoat/runtime/attr.shard.html): components that re-render on the server when their arguments change.
+- [Client-side navigation](https://docs.rs/topcoat/latest/topcoat/runtime/struct.link.html): links, prefetching, and navigation without a full document reload.
 
 **Miscellaneous**
 - [Topcoat UI](https://github.com/tokio-rs/topcoat/blob/main/docs/ui.md): premade components vendored into your project for you to edit.
@@ -264,7 +265,6 @@ Planned features we'd like to bring to Topcoat. Have an idea? [Open an issue](ht
 - [ ] `OpenAPI` endpoints
 - [ ] Docs for how to deploy Topcoat
 - [ ] Pre-rendering for static pages
-- [ ] Client-side navigation + prefetching
 - [ ] `WebTransport`
 - [ ] Image optimization / resizing
 - [ ] Markdown support
