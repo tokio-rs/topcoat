@@ -9,7 +9,7 @@ mod ui;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "topcoat")]
+#[command(name = "topcoat", version)]
 pub struct TopcoatCli {
     #[command(subcommand)]
     command: Command,
