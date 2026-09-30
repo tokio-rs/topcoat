@@ -48,7 +48,12 @@ impl Bundler {
 
     /// Scan `binary` for embedded assets and sync them into `out_dir`.
     ///
-    /// Reuses unchanged files from the existing manifest and removes files
+    /// Writes the bundle into `out_dir` itself — the standard layout for a
+    /// project-local target directory. For a shared target directory
+    /// (`CARGO_TARGET_DIR`), prefer [`bundle_as`](Self::bundle_as), which
+    /// gives each app its own subdirectory.
+    ///
+    /// Reuses unchanged files from the existing manifests and removes files
     /// that are no longer referenced. Remote assets are downloaded into the
     /// cache before bundling.
     ///
@@ -68,13 +73,46 @@ impl Bundler {
     /// Assets with the same output filename must have the same content type.
     /// Otherwise, returns [`BundleError::ConflictingContentTypes`].
     pub fn bundle(&self, binary: &[u8], out_dir: impl AsRef<Path>) -> BundleResult {
+        self.bundle_inner(binary, out_dir, MANIFEST_NAME)
+    }
+
+    /// [`bundle`](Self::bundle) for a shared target directory: writes the
+    /// bundle into the per-app subdirectory `out_dir/<manifest_stem>/`
+    /// instead of `out_dir` itself.
+    ///
+    /// Each app passing its own executable's file stem bundles into its own
+    /// directory, so several apps sharing one target directory never
+    /// collect each other's assets: a bundle only ever touches
+    /// `out_dir/<manifest_stem>/`. `out_dir` itself is left alone — any
+    /// `manifest.toml` there belongs to whoever wrote it.
+    ///
+    /// # Errors
+    ///
+    /// Same as [`bundle`](Self::bundle).
+    pub fn bundle_as(
+        &self,
+        binary: &[u8],
+        out_dir: impl AsRef<Path>,
+        manifest_stem: &str,
+    ) -> BundleResult {
         let out_dir = out_dir.as_ref();
+        let app_dir = out_dir.join(manifest_stem);
+        self.bundle_inner(binary, &app_dir, MANIFEST_NAME)
+    }
+
+    fn bundle_inner(
+        &self,
+        binary: &[u8],
+        out_dir: impl AsRef<Path>,
+        manifest_file_name: &str,
+    ) -> BundleResult {
+        let out_dir = out_dir.as_ref();
+        let manifest_path = out_dir.join(manifest_file_name);
         fs::create_dir_all(out_dir).map_err(|source| AssetError::ManifestIo {
             path: out_dir.to_path_buf(),
             source,
         })?;
 
-        let manifest_path = out_dir.join(MANIFEST_NAME);
         let existing: HashMap<_, _> = match Manifest::load(&manifest_path) {
             Ok(manifest) => manifest
                 .assets
@@ -318,7 +356,7 @@ mod tests {
     use std::{env, path::PathBuf};
 
     use super::*;
-    use crate::{AssetOptions, ENCODED_ASSET_SIZE};
+    use crate::{AssetBundle, AssetOptions, ENCODED_ASSET_SIZE};
 
     /// A fresh directory under the system temp directory.
     fn temp_dir(name: &str) -> PathBuf {
@@ -407,6 +445,15 @@ mod tests {
             drop(config);
 
             (result, events.into_iter().collect())
+        }
+
+        fn bundle_as(&self, out: &Path, parallelism: usize, manifest_stem: &str) -> BundleResult {
+            let (config, _events) = BundlerConfig::new()
+                .cache_dir(self.root.join("cache"))
+                .parallelism(parallelism)
+                .event_channel();
+
+            Bundler::new(&config).bundle_as(&self.binary, out, manifest_stem)
         }
 
         fn manifest(out: &Path) -> Manifest {
@@ -830,5 +877,81 @@ mod tests {
                 .count(),
             4
         );
+    }
+
+    #[test]
+    fn a_shared_directory_keeps_other_apps_bundles() {
+        let mut app_a = Fixture::new("shared-a");
+        let a_id = app_a.declare("a.txt", "app a");
+        let mut app_b = Fixture::new("shared-b");
+        let b_id = app_b.declare("b.txt", "app b");
+
+        let out = app_a.root.join("shared-out");
+        app_a.bundle_as(&out, 2, "app-a").unwrap();
+        app_b.bundle_as(&out, 2, "app-b").unwrap();
+
+        // Re-bundling app A must not touch app B's bundle.
+        app_a.bundle_as(&out, 2, "app-a").unwrap();
+
+        assert!(out.join("app-a").join(MANIFEST_NAME).is_file());
+        assert!(out.join("app-b").join(MANIFEST_NAME).is_file());
+        assert!(
+            AssetBundle::load_dir(out.join("app-a"))
+                .unwrap()
+                .get(a_id)
+                .is_some()
+        );
+        assert!(
+            AssetBundle::load_dir(out.join("app-b"))
+                .unwrap()
+                .get(b_id)
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn gc_scopes_to_the_apps_own_directory() {
+        let mut app_a = Fixture::new("gc-a");
+        let a_id = app_a.declare("a.txt", "app a");
+        let stale_id = app_a.declare("stale.txt", "stale contents");
+        let mut app_b = Fixture::new("gc-b");
+        let b_id = app_b.declare("b.txt", "app b");
+
+        let out = app_a.root.join("gc-out");
+        app_a.bundle_as(&out, 2, "app-a").unwrap();
+        app_b.bundle_as(&out, 2, "app-b").unwrap();
+        let stale_file = AssetBundle::load_dir(out.join("app-a"))
+            .unwrap()
+            .get(stale_id)
+            .map(|asset| asset.name().to_owned())
+            .unwrap();
+
+        // App A drops one asset; the file goes away from app A's directory.
+        app_a.keep_declarations(1);
+        app_a.bundle_as(&out, 2, "app-a").unwrap();
+
+        let bundle = AssetBundle::load_dir(out.join("app-a")).unwrap();
+        assert!(bundle.get(a_id).is_some());
+        assert!(bundle.get(stale_id).is_none());
+        assert!(!out.join("app-a").join(&stale_file).exists());
+        // App B's directory is untouched.
+        assert!(
+            AssetBundle::load_dir(out.join("app-b"))
+                .unwrap()
+                .get(b_id)
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn the_flat_layout_loads() {
+        let mut app = Fixture::new("flat-load");
+        let id = app.declare("a.txt", "app a");
+
+        let out = app.out();
+        app.bundle(&out, 2).0.unwrap();
+
+        let bundle = AssetBundle::load_dir(&out).unwrap();
+        assert!(bundle.get(id).is_some());
     }
 }

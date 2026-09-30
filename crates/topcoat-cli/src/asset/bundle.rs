@@ -65,9 +65,24 @@ pub(crate) async fn run_bundle(
     // `bundle` blocks on filesystem and network I/O, so run it off the runtime.
     let bytes = bytes.to_vec();
     let bundle_dir = out_dir.clone();
+    // A unified target directory (`CARGO_TARGET_DIR`) hosts several apps'
+    // bundles, so each app isolates into its own `assets/<exe-stem>/`
+    // subdirectory and never collects another app's assets. A
+    // project-local target directory keeps the flat layout.
+    let has_shared_dir = std::env::var_os("CARGO_TARGET_DIR").is_some();
+    let manifest_stem = exe
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .ok_or("built executable has no file stem")?
+        .to_owned();
     tokio::task::spawn_blocking(move || {
         let config = topcoat_asset::BundlerConfig::new().cache_dir(cache_dir);
-        topcoat_asset::Bundler::new(&config).bundle(&bytes, &bundle_dir)
+        let bundler = topcoat_asset::Bundler::new(&config);
+        if has_shared_dir {
+            bundler.bundle_as(&bytes, &bundle_dir, &manifest_stem)
+        } else {
+            bundler.bundle(&bytes, &bundle_dir)
+        }
     })
     .await??;
     Ok(out_dir)

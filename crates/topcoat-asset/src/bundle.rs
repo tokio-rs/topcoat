@@ -21,9 +21,16 @@ impl AssetBundle {
     /// Deploy this directory alongside the binary from the same build.
     /// Use [`load_dir`](Self::load_dir) for a custom location.
     ///
+    /// When the app was bundled with a shared target directory
+    /// (`CARGO_TARGET_DIR`), the CLI writes the bundle into the
+    /// `assets/<exe-stem>/` subdirectory so several apps sharing the
+    /// directory never collect each other's assets; that subdirectory is
+    /// loaded when present. A flat `assets/manifest.toml` — the layout a
+    /// project-local target directory produces — is loaded otherwise.
+    ///
     /// # Errors
     ///
-    /// Returns [`io::ErrorKind::NotFound`] if the bundle manifest is missing.
+    /// Returns [`io::ErrorKind::NotFound`] if neither layout is found.
     /// Other errors can occur when locating the executable or loading the
     /// manifest through [`load_dir`](Self::load_dir).
     pub fn load() -> io::Result<Self> {
@@ -38,14 +45,22 @@ impl AssetBundle {
             })?
             .join("assets");
 
-        if !dir.join(MANIFEST_NAME).is_file() {
-            return Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                format!("no asset bundle at {}", dir.display()),
-            ));
+        // A shared target directory layout first (`assets/<exe-stem>/`),
+        // then the flat layout.
+        if let Some(stem) = exe.file_stem().and_then(|stem| stem.to_str()) {
+            let app_dir = dir.join(stem);
+            if app_dir.join(MANIFEST_NAME).is_file() {
+                return Self::load_dir(app_dir);
+            }
+        }
+        if dir.join(MANIFEST_NAME).is_file() {
+            return Self::load_dir(dir);
         }
 
-        Self::load_dir(dir)
+        Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("no asset bundle at {}", dir.display()),
+        ))
     }
 
     /// Load a bundle from a specific directory.

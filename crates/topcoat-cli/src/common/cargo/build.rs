@@ -104,6 +104,13 @@ impl BuildOpts {
         // force cache-busting rebuilds.
         for (k, _) in std::env::vars_os() {
             let key = k.to_string_lossy();
+
+            // CARGO_TARGET_DIR is kept: it only
+            // sets the output directory, and stripping it would make the inner
+            // build write to ./target while the user's builds go elsewhere.
+            if key == "CARGO_TARGET_DIR" {
+                continue;
+            }
             if key.starts_with("CARGO")
                 || key == "RUSTC"
                 || key == "RUSTC_WRAPPER"

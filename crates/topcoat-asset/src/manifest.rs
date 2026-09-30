@@ -65,7 +65,7 @@ impl Manifest {
 
 /// One row in a [`Manifest`]: an asset ID, its bundled filename, the SHA-256
 /// hex digest of the file's contents, and the `Content-Type` it is served with.
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ManifestEntry {
     pub id: AssetId,
     pub file: String,

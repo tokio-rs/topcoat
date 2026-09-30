@@ -58,8 +58,20 @@ fn bundle_dirs(target_dir: &Path) -> Vec<PathBuf> {
     candidates
         .into_iter()
         .map(|dir| dir.join(OUT_SUBDIR))
-        .filter(|dir| dir.join(topcoat_asset::MANIFEST_NAME).is_file())
+        .filter(|dir| has_manifest(dir))
         .collect()
+}
+
+/// A bundle directory holds `manifest.toml` directly (flat layout), or one
+/// `manifest.toml` per app in `<exe-stem>/` subdirectories (shared target
+/// directory layout).
+fn has_manifest(dir: &Path) -> bool {
+    if dir.join(topcoat_asset::MANIFEST_NAME).is_file() {
+        return true;
+    }
+    subdirs(dir)
+        .iter()
+        .any(|sub| sub.join(topcoat_asset::MANIFEST_NAME).is_file())
 }
 
 fn subdirs(dir: &Path) -> Vec<PathBuf> {
