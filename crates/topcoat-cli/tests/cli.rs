@@ -18,7 +18,7 @@ fn help_and_version_accept_cargo_and_direct_invocations() {
                 "{binary} {prefix:?} {args:?}: {}",
                 String::from_utf8_lossy(&output.stderr),
             );
-            assert!(!output.stdout.is_empty());
+            assert_ne!(output.stdout.as_slice(), b"");
         }
     }
 }

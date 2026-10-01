@@ -434,7 +434,7 @@ mod tests {
         let cx = cx_with(&["theme=dark"]);
         let _ = cookies(&cx).get("theme");
 
-        assert!(set_cookies(&cx).is_empty());
+        assert_eq!(set_cookies(&cx), Vec::<String>::new());
     }
 
     #[test]

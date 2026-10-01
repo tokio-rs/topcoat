@@ -267,7 +267,7 @@ mod tests {
     #[test]
     fn parses_plain_ident() {
         let ident = parse("div");
-        assert!(ident.rest.is_empty());
+        assert_eq!(ident.rest, Vec::<HtmlIdentSegment>::new());
         assert_eq!(ident.to_string(), "div");
     }
 

@@ -128,7 +128,7 @@ async fn files_use_nearest_rustfmt_config_without_following_modules() {
     let path = project.path.join("src/main.rs");
     std::fs::write(&path, "mod missing;\nasync fn main(){let x=1;}\n").unwrap();
     let output = run(project.command(&["--rustfmt", "src/main.rs"]), "").await;
-    assert!(formatted(output).is_empty());
+    assert_eq!(formatted(output), "");
     let source = std::fs::read_to_string(path).unwrap();
     assert!(source.contains("async fn main() {\n  let x = 1;\n}"));
 }
@@ -142,7 +142,10 @@ async fn default_file_discovery_runs_both_formatters() {
         "fn main(){view!{<div id = \"greeting\"><p>\"hello\"</p></div>}}",
     )
     .unwrap();
-    assert!(formatted(run(project.command(&["--rustfmt"]), "").await).is_empty());
+    assert_eq!(
+        formatted(run(project.command(&["--rustfmt"]), "").await),
+        ""
+    );
     let output = std::fs::read_to_string(path).unwrap();
     assert!(output.starts_with("fn main() {\n"));
     assert!(output.contains("<div id=\"greeting\">"));
@@ -154,8 +157,8 @@ async fn formatter_errors_leave_files_unchanged_and_emit_no_source() {
     for input in ["fn main( {", "fn main(){view!{<div></span>}}"] {
         let output = run(project.command(&["--stdin", "--rustfmt"]), input).await;
         assert!(!output.status.success());
-        assert!(output.stdout.is_empty());
-        assert!(!output.stderr.is_empty());
+        assert_eq!(output.stdout.as_slice(), b"");
+        assert_ne!(output.stderr.as_slice(), b"");
 
         let path = project.path.join("main.rs");
         std::fs::write(&path, input).unwrap();
@@ -172,7 +175,7 @@ async fn missing_rustfmt_reports_failure_without_emitting_source() {
     command.env("PATH", "");
     let output = run(command, "fn main() {}").await;
     assert!(!output.status.success());
-    assert!(output.stdout.is_empty());
+    assert_eq!(output.stdout.as_slice(), b"");
     assert!(String::from_utf8_lossy(&output.stderr).contains("rustfmt"));
 }
 

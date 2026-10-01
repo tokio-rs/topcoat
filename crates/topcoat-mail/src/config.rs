@@ -121,7 +121,7 @@ mod tests {
 
         let receipt = send(&cx, mail()?).await?;
 
-        assert!(!receipt.message_id().is_empty());
+        assert_ne!(receipt.message_id(), "");
         assert_eq!(transport.sent().len(), 1);
         assert_eq!(transport.sent()[0].subject(), "Hello");
 

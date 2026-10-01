@@ -11,7 +11,7 @@ async fn empty_body_builds_a_default_mail() -> Result<()> {
     let mail = mail! {}?;
 
     assert_eq!(mail.from(), None);
-    assert!(mail.to().is_empty());
+    assert_eq!(mail.to(), []);
     assert_eq!(mail.subject(), "");
     assert!(mail.html().is_none());
     assert_eq!(mail.text(), &TextBody::FromHtml);
