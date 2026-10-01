@@ -23,6 +23,7 @@ function start(script: HTMLScriptElement): void {
 	);
 	const events: Record<DevEvent, () => void> = {
 		reload: () => {
+			status.hide();
 			void refresh.refresh();
 		},
 		rebuilding: () => {

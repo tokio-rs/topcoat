@@ -1,12 +1,10 @@
-/** The media type of a framed render response: one JSON frame per line. */
-export const FRAMES_MEDIA_TYPE = "application/x-ndjson";
+import type { ServerMessage } from "../../../../topcoat-core/browser/frames";
 
-/** A frame of rendered output sent by the server. */
-export type ServerMessage =
-	| { t: "snapshot"; html: string }
-	| { t: "swap"; region: string; html: string }
-	| { t: "redirect"; location: string }
-	| { t: "error"; status: number };
+export {
+	FRAMES_MEDIA_TYPE,
+	readFrames,
+	type ServerMessage,
+} from "../../../../topcoat-core/browser/frames";
 
 /**
  * Identifies one render's output. Content remembers the render that
@@ -50,46 +48,5 @@ export function applyFrame(
 			break;
 		case "error":
 			throw new Error(`${label} render failed: ${frame.status}`);
-	}
-}
-
-/**
- * Reads the frames of a framed response as they arrive.
- *
- * A frame is complete once its line ends, so a partially received frame
- * waits for the rest of its bytes. Reading stops when the response ends or
- * the caller stops iterating.
- */
-export async function* readFrames(
-	response: Response,
-): AsyncGenerator<ServerMessage> {
-	const body = response.body;
-	if (body === null) {
-		yield* parseLines((await response.text()).split("\n"));
-		return;
-	}
-	const reader = body.getReader();
-	const decoder = new TextDecoder();
-	let pending = "";
-	try {
-		for (;;) {
-			const { done, value } = await reader.read();
-			pending += decoder.decode(value, { stream: !done });
-			const lines = pending.split("\n");
-			pending = lines.pop() ?? "";
-			yield* parseLines(lines);
-			if (done) break;
-		}
-	} finally {
-		reader.releaseLock();
-	}
-	yield* parseLines([pending]);
-}
-
-/** Parses each non-empty line as a frame. */
-function* parseLines(lines: string[]): Generator<ServerMessage> {
-	for (const line of lines) {
-		if (line.trim() === "") continue;
-		yield JSON.parse(line) as ServerMessage;
 	}
 }

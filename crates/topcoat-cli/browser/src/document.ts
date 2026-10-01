@@ -30,3 +30,28 @@ export function morphDocument(next: Document): void {
 	morph(root, null, null, fresh.childNodes, { preserveFormState: true });
 	window.scrollTo({ left: scrollX, top: scrollY, behavior: "instant" });
 }
+
+/** Applies a streamed region update on a page without the runtime. */
+export function morphRegion(id: string, html: string): void {
+	const walker = document.createTreeWalker(document, NodeFilter.SHOW_COMMENT);
+	let start: Comment | null = null;
+	for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+		const comment = node as Comment;
+		if (comment.data.trim() === `::topcoat::region::start(${id})`) {
+			start = comment;
+		} else if (comment.data.trim() === `::topcoat::region::end(${id})`) {
+			const parent = start?.parentNode;
+			if (!(parent instanceof Element) || comment.parentNode !== parent) return;
+			// Parse in the region's context, including table and SVG content.
+			const context = document.createElementNS(
+				parent.namespaceURI,
+				parent.localName,
+			);
+			context.innerHTML = html;
+			morph(parent, start, comment, context.childNodes, {
+				preserveFormState: true,
+			});
+			return;
+		}
+	}
+}

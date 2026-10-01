@@ -30,9 +30,9 @@ export class Runtime {
 	}
 
 	/**
-	 * Returns true if the document and any active navigation response have
+	 * Returns true if the document and any navigation or dev response have
 	 * finished loading. Otherwise, returns false and calls `callback` when
-	 * the load event fires or the pending navigation finishes, unless
+	 * the load event fires or the pending response finishes, unless
 	 * `signal` is aborted first.
 	 */
 	whenLoaded(callback: () => void, signal: AbortSignal): boolean {
@@ -44,7 +44,7 @@ export class Runtime {
 			window.addEventListener("load", loaded, { once: true, signal });
 			return false;
 		}
-		const pending = this.navigation.pending;
+		const pending = this.page.pendingRefresh ?? this.navigation.pending;
 		if (pending === null) return true;
 		void pending.then(() => {
 			if (!signal.aborted) callback();
