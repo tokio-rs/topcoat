@@ -110,7 +110,6 @@ impl Attributes {
 
     /// Returns an iterator over attribute keys and captured values.
     #[inline]
-    #[must_use]
     pub fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
         self.into_iter()
     }
