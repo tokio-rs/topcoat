@@ -97,23 +97,6 @@ impl BuildOpts {
     /// The `cargo build` invocation for these options.
     fn command(&self) -> Command {
         let mut cmd = Command::new("cargo");
-        // Strip env vars inherited from the outer `cargo run` that invoked
-        // us, so the inner build has the same fingerprint as a plain `cargo
-        // build` the user would run by hand. Otherwise CARGO/RUSTC/
-        // RUSTC_WRAPPER/etc. shift the rustc/profile fingerprint hashes and
-        // force cache-busting rebuilds.
-        for (k, _) in std::env::vars_os() {
-            let key = k.to_string_lossy();
-            if key.starts_with("CARGO")
-                || key == "RUSTC"
-                || key == "RUSTC_WRAPPER"
-                || key == "RUSTC_WORKSPACE_WRAPPER"
-                || key == "RUSTUP_TOOLCHAIN"
-                || key == "RUSTFLAGS"
-            {
-                cmd.env_remove(&k);
-            }
-        }
         cmd.args(["build", "--message-format=json-diagnostic-rendered-ansi"]);
         cmd.env("CARGO_TERM_PROGRESS_WHEN", "always");
         cmd.env("CARGO_TERM_PROGRESS_WIDTH", "80");
