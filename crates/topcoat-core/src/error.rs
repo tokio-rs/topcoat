@@ -213,6 +213,7 @@ impl Error {
     /// `RUST_BACKTRACE` and `RUST_LIB_BACKTRACE` environment variables; check
     /// [`Backtrace::status`] before relying on its contents.
     #[inline]
+    #[must_use]
     pub fn backtrace(&self) -> &Backtrace {
         self.0.backtrace()
     }
