@@ -121,7 +121,7 @@ impl ToTokens for Shard {
         // The scope stays a view rather than settling the handler's content,
         // so a live shard body keeps streaming its updates through the
         // enclosing content.
-        let path = EndpointPath::resolve(self.attr.path.as_ref(), SHARD_ROUTE_PREFIX);
+        let path = EndpointPath::resolve(self.attr.path.as_ref(), SHARD_ROUTE_PREFIX, ident);
         let url = EndpointPath::url(&path);
         let docs = item.attrs.iter().filter(|attr| attr.path().is_ident("doc"));
         let marker = quote! {

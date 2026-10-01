@@ -110,9 +110,7 @@ where
 {
     let prefetch = prefetch.unwrap_or_else(|| prefetch_mode(cx));
     attrs.extend(link_attrs(cx, href, prefetch));
-    Ok(view! {
-        <a (attrs)>(child)</a>
-    })
+    Ok(view! { <a (attrs)>(child)</a> })
 }
 
 #[cfg(test)]
@@ -187,7 +185,8 @@ mod tests {
     fn explicit_props_take_precedence_over_forwarded_attributes() {
         let cx = &Cx::default();
         let attrs = attributes! { cx => href="/elsewhere" data-topcoat-link="viewport" };
-        let html = render(view! { cx =>
+        let html = render(view! {
+            cx =>
             link(href: "/account", prefetch: PrefetchMode::Never, attrs: attrs)
         });
 
@@ -215,7 +214,8 @@ mod tests {
         let html = render(view! { cx => link(href: "/", "Home") });
         assert!(html.contains(r#"data-topcoat-link="viewport""#), "{html}");
 
-        let explicit = render(view! { cx =>
+        let explicit = render(view! {
+            cx =>
             link(href: "/", prefetch: PrefetchMode::Never, "Home")
         });
         assert!(

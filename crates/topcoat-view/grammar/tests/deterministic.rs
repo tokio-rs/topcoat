@@ -13,12 +13,12 @@ use topcoat_view_grammar::{
 fn view() {
     let inputs = [
         r#"<!DOCTYPE html> <p class="a b" id=(id)>"text " (value)</p> <br>"#,
-        r#"cx => <ul> #[key(item.id)] for item in items { <li>(item.name)</li> } </ul>"#,
+        r"cx => <ul> #[key(item.id)] for item in items { <li>(item.name)</li> } </ul>",
         r#"if ok { <p>"yes"</p> } else if other { "maybe" } else { <p>"no"</p> }"#,
         r#"match state { State::A => <p>"a"</p>, State::B => { <p>"b"</p> <p>"c"</p> } }"#,
         r#"let label = format!("{n}"); <p>(label)</p>"#,
-        r#"<input :value=$(query.get()) @input=$(|e: Event| query.set(e.target.value))>"#,
-        r#"<div disabled=(true) title=(None::<&str>) (attrs)>(slot)</div>"#,
+        r"<input :value=$(query.get()) @input=$(|e: Event| query.set(e.target.value))>",
+        r"<div disabled=(true) title=(None::<&str>) (attrs)>(slot)</div>",
         r#"panel(title: "Hi", <p>"Child"</p>) panel(title: "Empty")"#,
         r#"<(tag)>"body"</(tag)>"#,
         r#"<(outer)><(inner)>"body"</(inner)></(outer)>"#,

@@ -167,7 +167,7 @@ impl ToTokens for Procedure {
 
         // The route serving calls at the endpoint's path, dispatching them to
         // the bridge.
-        let path = EndpointPath::resolve(self.0.path.as_ref(), PROCEDURE_ROUTE_PREFIX);
+        let path = EndpointPath::resolve(self.0.path.as_ref(), PROCEDURE_ROUTE_PREFIX, ident);
         let url = EndpointPath::url(&path);
         let route = quote! {
             impl #topcoat_router::Route for #ident {

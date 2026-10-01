@@ -1,7 +1,7 @@
 use std::{cell::Cell, rc::Rc};
 
 use proc_macro2::{Span, TokenStream};
-use syn::{Expr, Pat, Path};
+use syn::{Expr, Ident, Pat, Path};
 
 use super::{
     Component, ExprKind, ExprNode, ForLoop, IfElse, Local, MatchArm, MatchExpr, Node, Scope,
@@ -27,6 +27,9 @@ pub(crate) struct ViewBuilder {
     /// the nested builders of one expansion so every site gets a distinct
     /// ordinal.
     sites: Rc<Cell<u32>>,
+    /// Numbers the bindings of element name expressions, shared across the
+    /// nested builders of one expansion so every binding gets a distinct name.
+    element_names: Rc<Cell<u32>>,
 }
 
 impl ViewBuilder {
@@ -35,17 +38,26 @@ impl ViewBuilder {
             nodes: Vec::new(),
             static_segment: String::new(),
             sites: Rc::new(Cell::new(0)),
+            element_names: Rc::new(Cell::new(0)),
         }
     }
 
-    /// Returns a builder for a nested scope, sharing this builder's site
-    /// numbering.
+    /// Returns a builder for a nested scope, sharing this builder's site and
+    /// element name numbering.
     fn nested(&self) -> Self {
         Self {
             nodes: Vec::new(),
             static_segment: String::new(),
             sites: Rc::clone(&self.sites),
+            element_names: Rc::clone(&self.element_names),
         }
+    }
+
+    /// Returns a new identifier to bind an element name expression to.
+    pub fn element_name_ident(&self) -> Ident {
+        let index = self.element_names.get();
+        self.element_names.set(index + 1);
+        Ident::new(&format!("__element_name_{index}"), Span::call_site())
     }
 
     fn flush(&mut self) {

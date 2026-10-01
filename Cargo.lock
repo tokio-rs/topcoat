@@ -3497,7 +3497,6 @@ dependencies = [
 name = "topcoat-runtime-grammar"
 version = "0.9.0"
 dependencies = [
- "getrandom 0.4.2",
  "proc-macro2",
  "quote",
  "serde",
