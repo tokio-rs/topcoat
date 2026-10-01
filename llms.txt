@@ -99,6 +99,6 @@ Ok(view! {
 
 ## Working in this repository
 
-[`topcoat fmt`](docs/cli/fmt.md) formats macro bodies. Add `--rustfmt` to run rustfmt first; `--stdin --rustfmt` supports editor overrides. Rustfmt must be on PATH; set `edition` in `rustfmt.toml` because input is piped to rustfmt.
+[`topcoat fmt`](docs/cli/fmt.md) formats macro bodies. Add `--check` to report inputs needing formatting without writing files or emitting formatted source; exits nonzero for formatting differences or errors. Add `--rustfmt` to run rustfmt first; `--stdin --rustfmt` supports editor overrides. Rustfmt must be on PATH; set `edition` in `rustfmt.toml` because input is piped to rustfmt.
 
 For framework changes, also read [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).

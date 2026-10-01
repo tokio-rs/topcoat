@@ -18,6 +18,10 @@ pub struct FmtCommand {
     /// If specified, reads the standard input and formats to standard output.
     stdin: bool,
 
+    /// Check formatting without writing files or emitting formatted source.
+    #[arg(long)]
+    check: bool,
+
     /// Run rustfmt before formatting macro bodies. Requires rustfmt on PATH.
     #[arg(long)]
     rustfmt: bool,
@@ -144,6 +148,9 @@ impl FmtCommand {
                     Ok(true) => {
                         count += 1;
                         modified += 1;
+                        if self.check {
+                            eprintln!("{}: needs formatting", file.display());
+                        }
                     }
                     Ok(false) => {
                         count += 1;
@@ -158,8 +165,29 @@ impl FmtCommand {
             if self.stdin {
                 let mut buf = String::new();
                 std::io::stdin().read_to_string(&mut buf)?;
-                buf = self.format_source(&buf, &registry, None).await?;
-                print!("{buf}");
+                let output = self.format_source(&buf, &registry, None).await?;
+                if self.check {
+                    count += 1;
+                    if output != buf {
+                        modified += 1;
+                        eprintln!("stdin: needs formatting");
+                    }
+                } else {
+                    print!("{output}");
+                    return Ok(());
+                }
+            }
+
+            if self.check {
+                let summary = format!(
+                    "checked {count} inputs ({modified} need formatting), {failed} failed in {:.0?}",
+                    start.elapsed()
+                );
+                if modified > 0 || failed > 0 {
+                    eprintln!("{}", style(summary).red());
+                    std::process::exit(1);
+                }
+                eprintln!("{}", style(summary).green());
             } else if failed > 0 {
                 eprintln!(
                     "{}",
@@ -199,7 +227,9 @@ impl FmtCommand {
         if output == input {
             Ok(false)
         } else {
-            std::fs::write(path, output)?;
+            if !self.check {
+                std::fs::write(path, output)?;
+            }
             Ok(true)
         }
     }

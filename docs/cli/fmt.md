@@ -18,6 +18,13 @@ topcoat fmt src/main.rs src/app
 
 Pass file or directory paths to limit the files to format. The command searches directories recursively for Rust files.
 
+Use `--check` to check formatting without writing files. The command reports each file that needs formatting on stderr and exits with status 1 if any input needs formatting or cannot be formatted. It exits with status 0 when all inputs are already formatted.
+
+```sh
+topcoat fmt --check
+topcoat fmt --check --rustfmt src
+```
+
 For editor integrations and other tools, use stdin/stdout mode:
 
 ```sh
@@ -25,6 +32,8 @@ topcoat fmt --stdin < src/main.rs > /tmp/main.rs
 ```
 
 In stdin mode, the formatted source is written to stdout instead of updating files on disk.
+
+With `--stdin --check`, the command checks the input without emitting formatted source. Diagnostics go to stderr, with the same exit statuses as file checks.
 
 Pass `--rustfmt` to run `rustfmt` first, then format Topcoat macro bodies:
 

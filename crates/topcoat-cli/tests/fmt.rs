@@ -72,6 +72,112 @@ fn formatted(output: Output) -> String {
 }
 
 #[tokio::test]
+async fn check_reports_all_unformatted_files_without_writing() {
+    let project = Project::new();
+    let input = "fn main(){view!{<div id = \"greeting\"/>}}\n";
+    for name in ["first.rs", "second.rs"] {
+        std::fs::write(project.path.join(name), input).unwrap();
+    }
+
+    let mut command = project.command(&["--check"]);
+    command.env("PATH", "");
+    let output = run(command, "").await;
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.stdout.as_slice(), b"");
+    let diagnostics = String::from_utf8_lossy(&output.stderr);
+    for name in ["first.rs", "second.rs"] {
+        assert!(diagnostics.contains(name));
+        assert_eq!(
+            std::fs::read_to_string(project.path.join(name)).unwrap(),
+            input
+        );
+    }
+
+    formatted(run(project.command(&[]), "").await);
+    assert_eq!(formatted(run(project.command(&["--check"]), "").await), "");
+}
+
+#[tokio::test]
+async fn check_respects_file_and_macro_selection() {
+    let project = Project::new();
+    std::fs::write(project.path.join("clean.rs"), "fn main() {}\n").unwrap();
+    let input = "fn main(){view!{<div id = \"greeting\"/>}}\n";
+    std::fs::write(project.path.join("dirty.rs"), input).unwrap();
+
+    formatted(run(project.command(&["--check", "clean.rs"]), "").await);
+    formatted(run(project.command(&["--check", "--macros", "class"]), "").await);
+    assert_eq!(
+        std::fs::read_to_string(project.path.join("dirty.rs")).unwrap(),
+        input
+    );
+}
+
+#[tokio::test]
+async fn check_with_rustfmt_detects_rust_changes_without_writing() {
+    let project = Project::new();
+    let path = project.path.join("main.rs");
+    let input = "fn main(){let x=1;}\n";
+    std::fs::write(&path, input).unwrap();
+    formatted(run(project.command(&["--check", "main.rs"]), "").await);
+
+    let output = run(project.command(&["--check", "--rustfmt", "main.rs"]), "").await;
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.stdout.as_slice(), b"");
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), input);
+
+    formatted(run(project.command(&["--rustfmt", "main.rs"]), "").await);
+    formatted(run(project.command(&["--check", "--rustfmt", "main.rs"]), "").await);
+}
+
+#[tokio::test]
+async fn check_stdin_emits_no_source() {
+    let project = Project::new();
+    for args in [vec!["--stdin"], vec!["--stdin", "--rustfmt"]] {
+        let input = "fn main(){view!{<div id = \"greeting\"/>}}\n";
+        let clean = formatted(run(project.command(&args), input).await);
+        let mut check_args = args;
+        check_args.push("--check");
+
+        let output = run(project.command(&check_args), input).await;
+        assert_eq!(output.status.code(), Some(1));
+        assert_eq!(output.stdout.as_slice(), b"");
+        assert!(String::from_utf8_lossy(&output.stderr).contains("stdin"));
+        assert_eq!(
+            formatted(run(project.command(&check_args), &clean).await),
+            ""
+        );
+    }
+}
+
+#[tokio::test]
+async fn check_reports_errors_and_continues_checking_files() {
+    let project = Project::new();
+    let invalid = "fn main(){view!{<div></span>}}";
+    let dirty = "fn main(){view!{<div id = \"greeting\"/>}}";
+    for (name, source) in [("a_invalid.rs", invalid), ("b_dirty.rs", dirty)] {
+        std::fs::write(project.path.join(name), source).unwrap();
+    }
+
+    let output = run(project.command(&["--check"]), "").await;
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.stdout.as_slice(), b"");
+    let diagnostics = String::from_utf8_lossy(&output.stderr);
+    for (name, source) in [("a_invalid.rs", invalid), ("b_dirty.rs", dirty)] {
+        assert!(diagnostics.contains(name));
+        assert_eq!(
+            std::fs::read_to_string(project.path.join(name)).unwrap(),
+            source
+        );
+    }
+
+    let output = run(project.command(&["--check", "a_invalid.rs"]), "").await;
+    assert_eq!(output.status.code(), Some(1));
+    let output = run(project.command(&["--stdin", "--check"]), invalid).await;
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.stdout.as_slice(), b"");
+}
+
+#[tokio::test]
 async fn stdin_formats_rust_then_macros_and_is_idempotent() {
     let project = Project::new();
     let input =
