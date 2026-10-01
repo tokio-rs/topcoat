@@ -39,6 +39,10 @@ enum Command {
 }
 
 pub async fn run() {
+    run_from(std::env::args_os()).await;
+}
+
+pub async fn run_from(args: impl IntoIterator<Item = std::ffi::OsString>) {
     common::version::warn_on_mismatch();
-    TopcoatCli::parse().run().await;
+    TopcoatCli::parse_from(args).run().await;
 }
