@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cli-v0.9.0...topcoat-cli-v0.10.0) - 2026-10-03
+
+### Added
+
+- *(cli)* --check flag for topcoat fmt ([#482](https://github.com/tokio-rs/topcoat/pull/482))
+- *(cli)* add --version flag support ([#472](https://github.com/tokio-rs/topcoat/pull/472))
+- *(cli)* --rustfmt cli flag to run rustfmt automatically ([#456](https://github.com/tokio-rs/topcoat/pull/456))
+- *(ui)* implement new --all flag for `ui add` CLI command ([#450](https://github.com/tokio-rs/topcoat/pull/450))
+
+### Fixed
+
+- *(cli)* stop stripping cargo environment variables ([#483](https://github.com/tokio-rs/topcoat/pull/483))
+- *(cli)* dev server `live!` reload ([#481](https://github.com/tokio-rs/topcoat/pull/481))
+- *(cli)* `cargo topcoat` not working ([#480](https://github.com/tokio-rs/topcoat/pull/480))
+- *(cli)* honor `[package] default-run` in `topcoat dev` ([#477](https://github.com/tokio-rs/topcoat/pull/477))
+
+### Other
+
+- restructure repository documentation ([#454](https://github.com/tokio-rs/topcoat/pull/454))
+- *(router)* use module router as the recommended example router ([#453](https://github.com/tokio-rs/topcoat/pull/453))
+
 ## [0.9.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cli-v0.8.1...topcoat-cli-v0.9.0) - 2026-09-24
 
 ### Added

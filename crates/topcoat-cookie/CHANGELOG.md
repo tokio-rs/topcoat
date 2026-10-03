@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cookie-v0.9.0...topcoat-cookie-v0.10.0) - 2026-10-03
+
+### Fixed
+
+- *(cli)* `cargo topcoat` not working ([#480](https://github.com/tokio-rs/topcoat/pull/480))
+
+### Other
+
+- *(router)* use module router as the recommended example router ([#453](https://github.com/tokio-rs/topcoat/pull/453))
+
 ## [0.9.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cookie-v0.8.1...topcoat-cookie-v0.9.0) - 2026-09-24
 
 ### Other

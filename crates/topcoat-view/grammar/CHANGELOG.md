@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0](https://github.com/tokio-rs/topcoat/compare/topcoat-view-grammar-v0.9.0...topcoat-view-grammar-v0.10.0) - 2026-10-03
+
+### Fixed
+
+- non-deterministic macros ([#485](https://github.com/tokio-rs/topcoat/pull/485))
+- *(cli)* `cargo topcoat` not working ([#480](https://github.com/tokio-rs/topcoat/pull/480))
+- *(view)* rust analyzer auto completions breaking when the current rust code macro input is invalid ([#457](https://github.com/tokio-rs/topcoat/pull/457))
+
 ## [0.9.0](https://github.com/tokio-rs/topcoat/compare/topcoat-view-grammar-v0.8.1...topcoat-view-grammar-v0.9.0) - 2026-09-24
 
 ### Added
