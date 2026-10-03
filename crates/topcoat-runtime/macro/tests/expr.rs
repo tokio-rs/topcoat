@@ -445,6 +445,8 @@ async fn observed_expressions(cx: &Cx) -> Result<impl View> {
     let text = signal(cx, || String::from("hello"));
     assert!(!expr!(count.get()).is_static());
     assert!(!expr!(text.read().len()).is_static());
+    assert!(!expr!((count.get(), text.get())).is_static());
+    assert!(!expr!(((), (text.read().len(),))).is_static());
     assert!(expr!(count).is_static());
     assert!(expr!(if false { count.get() } else { 0 }).is_static());
     assert!(!expr!(if count.get() > 0 { "yes" } else { "no" }).is_static());

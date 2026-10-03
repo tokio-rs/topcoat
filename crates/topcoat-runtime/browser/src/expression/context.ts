@@ -1,5 +1,5 @@
 import type { SignalId, SignalRegistry } from "../signal-registry";
-import { Option, Record, Result, WriteSignal } from "../surrogate";
+import { Option, Record, Result, Tuple, WriteSignal } from "../surrogate";
 import { hydrate } from "./hydrate";
 import type { DehydratedSurrogate } from "./serialized";
 
@@ -37,5 +37,9 @@ export class Context {
 
 	record(fields: { [field: string]: unknown }): Record {
 		return new Record(Object.entries(fields));
+	}
+
+	tuple(items: readonly unknown[]): Tuple {
+		return new Tuple(items);
 	}
 }
