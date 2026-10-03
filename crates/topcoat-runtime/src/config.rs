@@ -5,6 +5,8 @@
 /// to use the default settings.
 #[derive(Debug, Clone)]
 pub struct RuntimeConfig {
+    // Read only by the WebSocket layer, which native servers compile.
+    #[cfg_attr(any(not(feature = "router"), target_family = "wasm"), allow(dead_code))]
     pub(crate) max_runs_per_connection: usize,
 }
 

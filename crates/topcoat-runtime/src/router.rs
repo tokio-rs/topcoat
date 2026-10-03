@@ -1,11 +1,8 @@
-#[cfg(feature = "router")]
 use topcoat_router::RouterBuilder;
 
-#[cfg(feature = "router")]
 use crate::{PrefetchMode, RuntimeConfig, RuntimeLayer};
 
 /// Sets up the browser runtime on a [`RouterBuilder`].
-#[cfg(feature = "router")]
 pub trait RouterBuilderRuntimeExt {
     /// Registers the runtime `config` on the app context and enables page
     /// reruns by registering a [`RuntimeLayer`].
@@ -63,7 +60,6 @@ pub trait RouterBuilderRuntimeExt {
     fn prefetch(self, mode: PrefetchMode) -> Self;
 }
 
-#[cfg(feature = "router")]
 impl RouterBuilderRuntimeExt for RouterBuilder {
     #[track_caller]
     fn runtime(self, config: RuntimeConfig) -> Self {
