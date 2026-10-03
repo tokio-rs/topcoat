@@ -96,11 +96,16 @@ export class Connection {
 	}
 
 	/**
-	 * Makes `target` a member, opening the socket if needed. A new member
-	 * of an open connection runs right away.
+	 * Makes `target` a member, opening the socket if needed. A member of
+	 * an open connection without a current run runs right away.
 	 */
 	join(target: ConnectionTarget): void {
-		if (this.members.has(target)) return;
+		if (this.members.has(target)) {
+			// A member whose run was stopped, such as a page after
+			// navigation, needs a new one.
+			if (this.isOpen && !this.runIds.has(target)) this.run(target);
+			return;
+		}
 		this.members.add(target);
 		if (this.isOpen) {
 			this.run(target);

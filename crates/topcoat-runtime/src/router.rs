@@ -2,16 +2,13 @@
 use topcoat_router::RouterBuilder;
 
 #[cfg(feature = "router")]
-use crate::{PrefetchMode, RuntimeLayer};
-
-/// Marks a router's app context as configured for the browser runtime.
-#[derive(Debug, Clone, Copy)]
-pub struct RuntimeSetup;
+use crate::{PrefetchMode, RuntimeConfig, RuntimeLayer};
 
 /// Sets up the browser runtime on a [`RouterBuilder`].
 #[cfg(feature = "router")]
 pub trait RouterBuilderRuntimeExt {
-    /// Enables page reruns by registering a [`RuntimeLayer`].
+    /// Registers the runtime `config` on the app context and enables page
+    /// reruns by registering a [`RuntimeLayer`].
     ///
     /// Call this once when building a router that serves interactive pages.
     /// Register your application's pathless layers first so the runtime
@@ -20,8 +17,26 @@ pub trait RouterBuilderRuntimeExt {
     ///
     /// Register procedures and shards separately through discovery or
     /// explicit registration.
+    ///
+    /// ```rust
+    /// use topcoat_router::Router;
+    /// use topcoat_runtime::{RouterBuilderRuntimeExt, RuntimeConfig};
+    ///
+    /// let router = Router::builder()
+    ///     .runtime(
+    ///         RuntimeConfig::builder()
+    ///             .max_runs_per_connection(128)
+    ///             .build(),
+    ///     )
+    ///     .build();
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the app context already contains a [`RuntimeConfig`].
     #[must_use]
-    fn runtime(self) -> Self;
+    #[track_caller]
+    fn runtime(self, config: RuntimeConfig) -> Self;
 
     /// Sets when links in this router load their pages ahead of time.
     ///
@@ -32,10 +47,10 @@ pub trait RouterBuilderRuntimeExt {
     ///
     /// ```rust
     /// use topcoat_router::Router;
-    /// use topcoat_runtime::{PrefetchMode, RouterBuilderRuntimeExt};
+    /// use topcoat_runtime::{PrefetchMode, RouterBuilderRuntimeExt, RuntimeConfig};
     ///
     /// let router = Router::builder()
-    ///     .runtime()
+    ///     .runtime(RuntimeConfig::default())
     ///     .prefetch(PrefetchMode::Viewport)
     ///     .build();
     /// ```
@@ -50,8 +65,9 @@ pub trait RouterBuilderRuntimeExt {
 
 #[cfg(feature = "router")]
 impl RouterBuilderRuntimeExt for RouterBuilder {
-    fn runtime(self) -> Self {
-        self.layer(RuntimeLayer).app_context(RuntimeSetup)
+    #[track_caller]
+    fn runtime(self, config: RuntimeConfig) -> Self {
+        self.layer(RuntimeLayer).app_context(config)
     }
 
     #[track_caller]

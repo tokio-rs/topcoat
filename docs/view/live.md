@@ -75,7 +75,9 @@ Returning `Ok(EmitToken)` satisfies the return type but does not emit content. T
 
 # Long-lived Connections
 
-Call [`connected(cx)`] to keep a live region updating after the HTTP response finishes. During HTTP rendering, it returns `false` and asks the browser to connect the enclosing page or shard. Once the response finishes, the browser opens a WebSocket and renders that page or shard again, with `connected(cx)` returning `true`. Enable `.runtime()` on the router and include `topcoat::runtime::script()` in the document, as shown in the [runtime setup guide].
+Call [`connected(cx)`] to keep a live region updating after the HTTP response finishes. During HTTP rendering, it returns `false` and asks the browser to connect the enclosing page or shard. Once the response finishes, the browser opens a WebSocket and renders that page or shard again, with `connected(cx)` returning `true`. This needs the runtime; see the [runtime setup guide].
+
+One WebSocket carries the connected renders of a whole browser tab: one for each connected page or shard that is not inside another one. The server limits how many run at once on each WebSocket and refuses more with `429 Too Many Requests`. The limit is 64 by default; change it with `RuntimeConfig::builder().max_runs_per_connection(n)`.
 
 The same live body runs from the top on both renders. Emit the current content during the HTTP render, then finish. During the connected render, emit fresh content and keep listening for changes. For example, a chat can subscribe to message notifications and reload the list each time one arrives:
 

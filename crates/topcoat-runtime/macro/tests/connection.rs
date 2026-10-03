@@ -26,7 +26,7 @@ use topcoat::{
         error::{bad_request, redirect},
         page, to_bytes,
     },
-    runtime::{RUNTIME_PROTOCOL, RouterBuilderRuntimeExt, connected, shard, signal},
+    runtime::{RUNTIME_PROTOCOL, RouterBuilderRuntimeExt, RuntimeConfig, connected, shard, signal},
     view::{View, emit, live, view},
 };
 
@@ -158,6 +158,10 @@ async fn broken() -> Result<impl View> {
 }
 
 fn router() -> Router {
+    router_with(RuntimeConfig::default())
+}
+
+fn router_with(config: RuntimeConfig) -> Router {
     Router::builder()
         .page(room)
         .page(slow)
@@ -166,17 +170,23 @@ fn router() -> Router {
         .page(away)
         .page(broken)
         .route(feed)
-        .runtime()
+        .runtime(config)
         .build()
 }
 
 /// Starts a server on an available port. Sending on the returned channel
 /// shuts it down.
 async fn spawn_server() -> (SocketAddr, oneshot::Sender<()>, JoinHandle<io::Result<()>>) {
+    serve(router()).await
+}
+
+/// Starts a server for `router` on an available port. Sending on the
+/// returned channel shuts it down.
+async fn serve(router: Router) -> (SocketAddr, oneshot::Sender<()>, JoinHandle<io::Result<()>>) {
     let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
     let addr = listener.local_addr().unwrap();
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
-    let server = tokio::spawn(topcoat::serve_until(listener, router(), async {
+    let server = tokio::spawn(topcoat::serve_until(listener, router, async {
         let _ = shutdown_rx.await;
     }));
     (addr, shutdown_tx, server)
@@ -426,6 +436,37 @@ async fn stopping_a_run_drops_its_render() {
     tokio::time::timeout(Duration::from_secs(5), ENDLESS_DROPPED.notified())
         .await
         .expect("the stopped render is dropped");
+
+    client.close(None).await.unwrap();
+    shut_down(shutdown_tx, server).await;
+}
+
+#[tokio::test]
+async fn a_connection_refuses_new_runs_beyond_its_limit_until_one_stops() {
+    let config = RuntimeConfig::builder().max_runs_per_connection(2).build();
+    let (addr, shutdown_tx, server) = serve(router_with(config)).await;
+    let mut client = connect(addr, "/slow").await;
+
+    // Both runs stay open while connected.
+    for run in [1, 2] {
+        request_page_run(&mut client, run, "/slow", serde_json::json!({})).await;
+        assert_eq!(next_frame(&mut client, run).await["t"], "snapshot");
+    }
+
+    request_page_run(&mut client, 3, "/slow", serde_json::json!({})).await;
+    assert_eq!(
+        next_frame(&mut client, 3).await,
+        serde_json::json!({ "t": "error", "status": 429 })
+    );
+
+    // Reusing an id replaces its run instead of adding one.
+    request_page_run(&mut client, 2, "/slow", serde_json::json!({})).await;
+    assert_eq!(next_frame(&mut client, 2).await["t"], "snapshot");
+
+    // A stopped run frees its place.
+    send(&mut client, serde_json::json!({ "stop": 1 })).await;
+    request_page_run(&mut client, 4, "/slow", serde_json::json!({})).await;
+    assert_eq!(next_frame(&mut client, 4).await["t"], "snapshot");
 
     client.close(None).await.unwrap();
     shut_down(shutdown_tx, server).await;

@@ -26,7 +26,9 @@ pub const RUNTIME_PROTOCOL: &str = "topcoat-runtime";
 ///   connection describes an HTTP request: a method, a path, a body, and a few runtime headers,
 ///   such as [`RUNTIME_HEADER`] for a page rerun. The layer dispatches it with the handshake's
 ///   other headers as a connected render. Renders run side by side, and each message sent back
-///   names the render it belongs to.
+///   names the render it belongs to. A connection may have at most
+///   [`max_runs_per_connection`](crate::RuntimeConfigBuilder::max_runs_per_connection) renders at
+///   once.
 ///
 /// WebSocket connections are supported on native servers. HTTP page reruns
 /// are also available on WebAssembly.
