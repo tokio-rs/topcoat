@@ -28,7 +28,7 @@ mod about {
 # fn main() {}
 ```
 
-With module routing, this links to `/about`. Links need the runtime; see the [runtime setup guide].
+With module routing, this links to `/about`. Enable `.runtime()` on the router, load the asset bundle, and include `topcoat::runtime::script()` in the document head. See the [runtime setup guide] for the full setup.
 
 The component renders an ordinary `<a>`, so the link also works without JavaScript. Use a plain `<a href=(href!(about::page))>` when you want a normal page load.
 
@@ -66,11 +66,11 @@ Set the default for the app with [`RouterBuilderRuntimeExt::prefetch`](crate::Ro
 ```rust
 use topcoat::{
     router::Router,
-    runtime::{PrefetchMode, RouterBuilderRuntimeExt, RuntimeConfig},
+    runtime::{PrefetchMode, RouterBuilderRuntimeExt},
 };
 
 let router = Router::builder()
-    .runtime(RuntimeConfig::default())
+    .runtime()
     .prefetch(PrefetchMode::Viewport)
     .build();
 ```

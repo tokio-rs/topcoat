@@ -63,7 +63,7 @@ use topcoat::{
     font::fontsource::fontsource_font,
     icon::{icon, iconify::iconify_icon},
     router::{RouterBuilderDiscoverExt, module_router, page},
-    runtime::{Event, RouterBuilderRuntimeExt, RuntimeConfig, Signal, expr, shard, signal},
+    runtime::{Event, RouterBuilderRuntimeExt, Signal, expr, shard, signal},
     tailwind,
     view::{Child, View, attributes, component, view},
 };
@@ -82,7 +82,7 @@ async fn main() {
     let router = module_router!()
         .assets(AssetBundle::load().unwrap())
         .discover()
-        .runtime(RuntimeConfig::default())
+        .runtime()
         .build();
 
     topcoat::start(router).await.unwrap();

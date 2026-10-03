@@ -22,11 +22,11 @@ use topcoat::{
     context::Cx,
     core::identity::Identity,
     router::{
-        Body, Router,
+        Body, Router, RouterBuilder,
         error::{bad_request, redirect},
         page, to_bytes,
     },
-    runtime::{RUNTIME_PROTOCOL, RouterBuilderRuntimeExt, RuntimeConfig, connected, shard, signal},
+    runtime::{RUNTIME_PROTOCOL, RouterBuilderRuntimeExt, connected, shard, signal},
     view::{View, emit, live, view},
 };
 
@@ -157,11 +157,7 @@ async fn broken() -> Result<impl View> {
     Ok(view! { <p>"never"</p> })
 }
 
-fn router() -> Router {
-    router_with(RuntimeConfig::default())
-}
-
-fn router_with(config: RuntimeConfig) -> Router {
+fn builder() -> RouterBuilder {
     Router::builder()
         .page(room)
         .page(slow)
@@ -170,8 +166,11 @@ fn router_with(config: RuntimeConfig) -> Router {
         .page(away)
         .page(broken)
         .route(feed)
-        .runtime(config)
-        .build()
+        .runtime()
+}
+
+fn router() -> Router {
+    builder().build()
 }
 
 /// Starts a server on an available port. Sending on the returned channel
@@ -443,8 +442,7 @@ async fn stopping_a_run_drops_its_render() {
 
 #[tokio::test]
 async fn a_connection_refuses_new_runs_beyond_its_limit_until_one_stops() {
-    let config = RuntimeConfig::builder().max_runs_per_connection(2).build();
-    let (addr, shutdown_tx, server) = serve(router_with(config)).await;
+    let (addr, shutdown_tx, server) = serve(builder().max_runs_per_connection(2).build()).await;
     let mut client = connect(addr, "/slow").await;
 
     // Both runs stay open while connected.

@@ -8,7 +8,7 @@ use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
     context::Cx,
     router::{RouterBuilderDiscoverExt, Slot, error::redirect, href, layout, module_router, page},
-    runtime::{RouterBuilderRuntimeExt, RuntimeConfig},
+    runtime::RouterBuilderRuntimeExt,
     view::{View, view},
 };
 
@@ -21,7 +21,7 @@ async fn main() {
             .assets(AssetBundle::load().unwrap())
             .app_context(Chat::default())
             .discover()
-            .runtime(RuntimeConfig::default())
+            .runtime()
             .build(),
     )
     .await

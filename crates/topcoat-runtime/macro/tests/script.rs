@@ -5,7 +5,7 @@
 use topcoat::{
     asset::{AssetConfig, Manifest, ManifestEntry},
     context::{Cx, CxTestBuilder},
-    runtime::{RuntimeConfig, SCRIPT},
+    runtime::{RuntimeSetup, SCRIPT},
     view::{ViewExt, view},
 };
 
@@ -28,7 +28,7 @@ fn asset_config() -> AssetConfig {
 async fn the_script_renders_on_a_router_set_up_for_the_runtime() {
     let cx = &CxTestBuilder::new()
         .app_context(asset_config())
-        .app_context(RuntimeConfig::default())
+        .app_context(RuntimeSetup)
         .build();
     let html = view! { cx => topcoat::runtime::script() }
         .single()
@@ -39,14 +39,14 @@ async fn the_script_renders_on_a_router_set_up_for_the_runtime() {
 }
 
 #[tokio::test]
-#[should_panic(expected = "the browser runtime is not set up")]
+#[should_panic(expected = "call `.runtime()` on the router builder")]
 async fn the_script_panics_on_a_router_without_the_runtime() {
     let cx = &CxTestBuilder::new().app_context(asset_config()).build();
     let _ = view! { cx => topcoat::runtime::script() }.single().await;
 }
 
 #[tokio::test]
-#[should_panic(expected = "the browser runtime is not set up")]
+#[should_panic(expected = "call `.runtime()` on the router builder")]
 async fn the_check_runs_before_the_asset_is_resolved() {
     let cx = &Cx::default();
     let _ = view! { cx => topcoat::runtime::script() }.single().await;

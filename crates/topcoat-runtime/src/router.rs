@@ -1,11 +1,17 @@
+#[cfg(feature = "router")]
 use topcoat_router::RouterBuilder;
 
-use crate::{PrefetchMode, RuntimeConfig, RuntimeLayer};
+#[cfg(feature = "router")]
+use crate::{MaxRunsPerConnection, PrefetchMode, RuntimeLayer};
+
+/// Marks a router's app context as configured for the browser runtime.
+#[derive(Debug, Clone, Copy)]
+pub struct RuntimeSetup;
 
 /// Sets up the browser runtime on a [`RouterBuilder`].
+#[cfg(feature = "router")]
 pub trait RouterBuilderRuntimeExt {
-    /// Registers the runtime `config` on the app context and enables page
-    /// reruns by registering a [`RuntimeLayer`].
+    /// Enables page reruns by registering a [`RuntimeLayer`].
     ///
     /// Call this once when building a router that serves interactive pages.
     /// Register your application's pathless layers first so the runtime
@@ -14,26 +20,8 @@ pub trait RouterBuilderRuntimeExt {
     ///
     /// Register procedures and shards separately through discovery or
     /// explicit registration.
-    ///
-    /// ```rust
-    /// use topcoat_router::Router;
-    /// use topcoat_runtime::{RouterBuilderRuntimeExt, RuntimeConfig};
-    ///
-    /// let router = Router::builder()
-    ///     .runtime(
-    ///         RuntimeConfig::builder()
-    ///             .max_runs_per_connection(128)
-    ///             .build(),
-    ///     )
-    ///     .build();
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// Panics if the app context already contains a [`RuntimeConfig`].
     #[must_use]
-    #[track_caller]
-    fn runtime(self, config: RuntimeConfig) -> Self;
+    fn runtime(self) -> Self;
 
     /// Sets when links in this router load their pages ahead of time.
     ///
@@ -44,10 +32,10 @@ pub trait RouterBuilderRuntimeExt {
     ///
     /// ```rust
     /// use topcoat_router::Router;
-    /// use topcoat_runtime::{PrefetchMode, RouterBuilderRuntimeExt, RuntimeConfig};
+    /// use topcoat_runtime::{PrefetchMode, RouterBuilderRuntimeExt};
     ///
     /// let router = Router::builder()
-    ///     .runtime(RuntimeConfig::default())
+    ///     .runtime()
     ///     .prefetch(PrefetchMode::Viewport)
     ///     .build();
     /// ```
@@ -58,16 +46,46 @@ pub trait RouterBuilderRuntimeExt {
     #[must_use]
     #[track_caller]
     fn prefetch(self, mode: PrefetchMode) -> Self;
+
+    /// Sets how many connected renders one runtime connection may have at
+    /// once. The default is 64.
+    ///
+    /// The browser keeps one connected render for each live page or shard
+    /// that is not inside another one. Once a connection reaches the limit,
+    /// the server answers further render requests with
+    /// `429 Too Many Requests` until a render finishes or is stopped.
+    ///
+    /// ```rust
+    /// use topcoat_router::Router;
+    /// use topcoat_runtime::RouterBuilderRuntimeExt;
+    ///
+    /// let router = Router::builder()
+    ///     .runtime()
+    ///     .max_runs_per_connection(128)
+    ///     .build();
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the limit was already set.
+    #[must_use]
+    #[track_caller]
+    fn max_runs_per_connection(self, max: usize) -> Self;
 }
 
+#[cfg(feature = "router")]
 impl RouterBuilderRuntimeExt for RouterBuilder {
-    #[track_caller]
-    fn runtime(self, config: RuntimeConfig) -> Self {
-        self.layer(RuntimeLayer).app_context(config)
+    fn runtime(self) -> Self {
+        self.layer(RuntimeLayer).app_context(RuntimeSetup)
     }
 
     #[track_caller]
     fn prefetch(self, mode: PrefetchMode) -> Self {
         self.app_context(mode)
+    }
+
+    #[track_caller]
+    fn max_runs_per_connection(self, max: usize) -> Self {
+        self.app_context(MaxRunsPerConnection(max))
     }
 }

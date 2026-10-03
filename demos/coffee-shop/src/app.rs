@@ -14,7 +14,7 @@ use topcoat::{
         error::{SeeOther, see_other},
         href, layout, module_router, page, route,
     },
-    runtime::{RouterBuilderRuntimeExt, RuntimeConfig},
+    runtime::RouterBuilderRuntimeExt,
     tailwind,
     view::{View, attributes, class, view},
 };
@@ -41,7 +41,7 @@ pub fn router(db: Db) -> Router {
         .assets(AssetBundle::load().unwrap())
         .app_context(db)
         .cookies()
-        .runtime(RuntimeConfig::default())
+        .runtime()
         .build()
 }
 

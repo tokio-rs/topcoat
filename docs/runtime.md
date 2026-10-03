@@ -23,27 +23,25 @@ Ok(view! {
 # }
 ```
 
-Call [`runtime`](RouterBuilderRuntimeExt::runtime) with a [`RuntimeConfig`] to enable page reruns, and load the [asset bundle](../asset/index.html) to serve the browser script. Register your application layers before calling `.runtime(config)`:
+Call [`runtime()`](RouterBuilderRuntimeExt::runtime) to enable page reruns, and load the [asset bundle](../asset/index.html) to serve the browser script. Register your application layers before calling `.runtime()`:
 
 ```rust,no_run
 use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
     router::{Router, RouterBuilderDiscoverExt, module_router},
-    runtime::{RouterBuilderRuntimeExt, RuntimeConfig},
+    runtime::RouterBuilderRuntimeExt,
 };
 
 pub fn router() -> Router {
     module_router!()
         .discover()
         .assets(AssetBundle::load().unwrap())
-        .runtime(RuntimeConfig::default())
+        .runtime()
         .build()
 }
 ```
 
-Use [`RuntimeConfig::builder`] to change the defaults, such as how many [connected renders](../view/index.html#long-lived-connections) one browser tab may have at once.
-
-The runtime reruns a page by sending its current signal values to the page's URL. The [`RuntimeLayer`] added by `.runtime(config)` converts this request into a `GET`, so the page and its layouts can render with those values. Registering your layers first lets them handle the rerun as a `GET`. See [`RuntimeLayer`] for the request format and rewrite behavior.
+The runtime reruns a page by sending its current signal values to the page's URL. The [`RuntimeLayer`] added by `.runtime()` converts this request into a `GET`, so the page and its layouts can render with those values. Registering your layers first lets them handle the rerun as a `GET`. See [`RuntimeLayer`] for the request format and rewrite behavior.
 
 `module_router!()` registers pages from the module tree. `.discover()` adds [procedures](#procedures) and [shards](#shards) from your application. To register a procedure or shard explicitly, pass its name to `.route()`.
 

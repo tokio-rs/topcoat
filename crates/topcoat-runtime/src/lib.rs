@@ -2,7 +2,6 @@
 
 mod arguments;
 mod bind_attribute;
-mod config;
 mod connection;
 mod event_handler;
 mod expr;
@@ -15,7 +14,6 @@ mod layer;
 mod link_;
 #[cfg(feature = "router")]
 mod procedure;
-#[cfg(feature = "router")]
 mod router;
 #[cfg(feature = "router")]
 mod shard;
@@ -26,7 +24,6 @@ mod surrogate;
 
 pub use arguments::*;
 pub use bind_attribute::*;
-pub use config::*;
 pub use connection::*;
 pub use event_handler::*;
 pub use expr::*;
@@ -36,7 +33,6 @@ pub use layer::*;
 pub use link_::*;
 #[cfg(feature = "router")]
 pub use procedure::*;
-#[cfg(feature = "router")]
 pub use router::*;
 #[cfg(feature = "router")]
 pub use shard::*;

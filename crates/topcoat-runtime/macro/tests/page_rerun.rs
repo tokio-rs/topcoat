@@ -13,7 +13,7 @@ use topcoat::{
         request::{headers, method, original_method, original_uri, uri},
         route, to_bytes,
     },
-    runtime::{RUNTIME_HEADER, RouterBuilderRuntimeExt, RuntimeConfig, signal},
+    runtime::{RUNTIME_HEADER, RouterBuilderRuntimeExt, signal},
     view::{View, view},
 };
 
@@ -104,7 +104,7 @@ fn builder() -> RouterBuilder {
 }
 
 fn router() -> Router {
-    builder().runtime(RuntimeConfig::default()).build()
+    builder().runtime().build()
 }
 
 /// Sends a request through the router, returning the status and body.
@@ -277,7 +277,7 @@ async fn application_layers_registered_before_the_runtime_see_only_the_rewritten
     let router = builder()
         .layer(Recorder)
         .app_context(Arc::clone(&seen))
-        .runtime(RuntimeConfig::default())
+        .runtime()
         .build();
 
     let (status, _) = rerun(&router, "/search", "{}").await;
