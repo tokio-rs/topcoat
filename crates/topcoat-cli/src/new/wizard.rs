@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use console::style;
 use topcoat_font::fontsource::families;
 
 use super::{
@@ -47,18 +48,23 @@ pub fn ask(input: &mut Input) -> Result<(), String> {
     while let Some(&question) = input.questions().first() {
         let answer = match question {
             Question::Routing => Answer::Routing(select(
-                "How should paths be assigned to handlers?",
+                "Which routing style do you want to use?",
                 &[
-                    (Routing::Module, "Module", "paths follow the module tree"),
+                    (
+                        Routing::Module,
+                        "Module-based",
+                        "route paths are derived from the Rust module tree",
+                    ),
                     (
                         Routing::Discover,
-                        "Discover",
-                        "explicit paths, collected automatically",
+                        "Discovery",
+                        "route paths are specified explicitly; handlers are registered \
+                         automatically",
                     ),
                     (
                         Routing::Manual,
                         "Manual",
-                        "explicit paths, registered by hand",
+                        "route paths are specified explicitly; handlers are registered by hand",
                     ),
                 ],
                 recommended.routing,
@@ -99,7 +105,10 @@ pub fn ask(input: &mut Input) -> Result<(), String> {
                 recommended.interaction,
             )?),
             Question::Ui => Answer::Ui(confirm(
-                "Use Topcoat UI components? They come with Tailwind CSS, Lucide icons, and the Geist font",
+                &format!(
+                    "Use Topcoat UI components?\n{}",
+                    style("Includes Tailwind CSS, Lucide icons, and the Geist font").dim()
+                ),
                 recommended.ui,
             )?),
             Question::Tailwind => {
