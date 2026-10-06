@@ -162,4 +162,64 @@ mod tests {
         let content_type = parts.headers.get(CONTENT_TYPE).unwrap();
         assert!(content_type == "image/svg+xml" || content_type == "text/plain");
     }
+
+    #[cfg(all(feature = "bundler", not(windows)))]
+    #[test]
+    fn serves_a_bundled_filename_with_url_delimiters() {
+        use crate::{Asset, Bundler, BundlerConfig, ENCODED_ASSET_SIZE, RawAsset};
+
+        const NAME: &str = "logo#dark?50%25.svg";
+        const ID: AssetId = AssetId::new("app", "src/lib.rs", NAME, &OPTIONS);
+        static ENCODED: [u8; ENCODED_ASSET_SIZE] =
+            RawAsset::encode(ID, NAME, "app", "/app", "src/lib.rs", &OPTIONS);
+        let asset = Asset::new(&ENCODED);
+        let dir = temp_dir("url-delimiters");
+        let contents = "<svg><!-- logo --></svg>";
+        fs::write(dir.join(NAME), contents).unwrap();
+        let binary = RawAsset::encode(
+            ID,
+            NAME,
+            "app",
+            dir.to_str().unwrap(),
+            "src/lib.rs",
+            &OPTIONS,
+        );
+        let out = dir.join("assets");
+        Bundler::new(&BundlerConfig::new().cache_dir(dir.join("cache")))
+            .bundle(&binary, &out)
+            .unwrap();
+
+        let bundle = AssetBundle::load_dir(out).unwrap();
+        let suffix = bundle
+            .get(ID)
+            .unwrap()
+            .name()
+            .strip_prefix("logo#dark?50%25-")
+            .unwrap()
+            .to_owned();
+        let config = AssetConfig::serve(bundle);
+        let url = config.resolve(asset);
+        assert_eq!(
+            url,
+            format!("{ASSET_ROUTE_PREFIX}/logo%23dark%3F50%2525-{suffix}")
+        );
+
+        let router = Router::builder().assets(config).build();
+        let request = http::Request::builder()
+            .uri(url)
+            .body(Body::empty())
+            .unwrap();
+        tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap()
+            .block_on(async {
+                let response = router.handle(request).await;
+                assert_eq!(response.status(), StatusCode::OK);
+                assert_eq!(response.headers()[CONTENT_TYPE], "image/svg+xml");
+                let bytes = topcoat_router::to_bytes(response.into_body(), usize::MAX)
+                    .await
+                    .unwrap();
+                assert_eq!(bytes, contents);
+            });
+    }
 }

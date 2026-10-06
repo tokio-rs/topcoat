@@ -9,7 +9,7 @@ use std::{
 
 use hyper::{body::Incoming, service::Service};
 use hyper_util::{
-    rt::{TokioExecutor, TokioIo},
+    rt::{TokioExecutor, TokioIo, TokioTimer},
     server::conn::auto,
 };
 use tokio::sync::watch;
@@ -148,7 +148,9 @@ pub async fn internal_serve(
 
             // Serving with upgrade support keeps protocol switches (like
             // WebSockets) working; for ordinary requests it behaves the same.
-            let builder = auto::Builder::new(TokioExecutor::new());
+            let mut builder = auto::Builder::new(TokioExecutor::new());
+            builder.http1().timer(TokioTimer::new());
+            builder.http2().timer(TokioTimer::new());
             let mut connection = pin!(builder.serve_connection_with_upgrades(io, service));
 
             let result = tokio::select! {

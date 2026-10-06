@@ -38,6 +38,7 @@ topcoat-view = { workspace = true, optional = true }
 http.workspace = true
 memchr.workspace = true
 mime_guess = { workspace = true, optional = true }
+percent-encoding.workspace = true
 serde = { workspace = true, features = ["derive"] }
 sha2.workspace = true
 thiserror.workspace = true

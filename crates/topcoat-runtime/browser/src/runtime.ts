@@ -24,7 +24,7 @@ export class Runtime {
 	private loaded = false;
 
 	start(root: ParentNode): void {
-		this.hydrate(root, null, null, this.page.contentScope);
+		hydrateDom(root, null, null, this.page.contentScope);
 		this.page.startWatching();
 		this.navigation.start();
 	}
@@ -56,7 +56,7 @@ export class Runtime {
 		console.error("[topcoat]", error);
 	}
 
-	/** Attaches the markup's resources to its owning scope. */
+	/** Hydrates replacement markup using the current signal values. */
 	hydrate(
 		root: Node,
 		from: Node | null,
@@ -64,6 +64,6 @@ export class Runtime {
 		scope: Scope,
 		adoptable: Set<SignalId> = new Set(),
 	): void {
-		hydrateDom(root, from, to, scope, adoptable);
+		hydrateDom(root, from, to, scope, adoptable, true);
 	}
 }

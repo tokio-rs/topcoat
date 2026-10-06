@@ -3227,6 +3227,7 @@ dependencies = [
  "http",
  "memchr",
  "mime_guess",
+ "percent-encoding",
  "serde",
  "sha2 0.11.0",
  "thiserror",

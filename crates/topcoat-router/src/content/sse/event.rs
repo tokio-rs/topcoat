@@ -181,7 +181,7 @@ impl std::error::Error for InvalidEventError {}
 #[inline]
 #[must_use]
 pub fn last_event_id(cx: &Cx) -> Option<&str> {
-    headers(cx).get("last-event-id")?.to_str().ok()
+    str::from_utf8(headers(cx).get("last-event-id")?.as_bytes()).ok()
 }
 
 /// Appends a `field: value` line to the buffer; an empty field name makes the
@@ -301,6 +301,37 @@ mod tests {
         let (parts, ()) = request.into_parts();
         let cx = CxTestBuilder::new().request_context(parts).build();
         assert_eq!(last_event_id(&cx), Some("42"));
+    }
+
+    #[test]
+    fn last_event_id_reads_utf8() {
+        let id = "event-\u{e9}-\u{1f980}";
+        let request = Request::builder()
+            .uri("/events")
+            .header(
+                "last-event-id",
+                http::HeaderValue::from_bytes(id.as_bytes()).unwrap(),
+            )
+            .body(())
+            .unwrap();
+        let (parts, ()) = request.into_parts();
+        let cx = CxTestBuilder::new().request_context(parts).build();
+        assert_eq!(last_event_id(&cx), Some(id));
+    }
+
+    #[test]
+    fn a_non_utf8_last_event_id_is_none() {
+        let request = Request::builder()
+            .uri("/events")
+            .header(
+                "last-event-id",
+                http::HeaderValue::from_bytes(b"event-\xff").unwrap(),
+            )
+            .body(())
+            .unwrap();
+        let (parts, ()) = request.into_parts();
+        let cx = CxTestBuilder::new().request_context(parts).build();
+        assert_eq!(last_event_id(&cx), None);
     }
 
     #[test]

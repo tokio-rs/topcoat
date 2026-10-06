@@ -110,7 +110,7 @@ impl AssetConfig {
     }
 
     /// Writes the URL `asset` is hosted at, `{base_url}/{bundled-filename}`,
-    /// into `write`.
+    /// into `write`, percent-encoding the filename as a single path segment.
     ///
     /// This is how [`Asset`] values render in views; [`resolve`](Self::resolve)
     /// returns the same URL as a `String`.
@@ -129,7 +129,7 @@ impl AssetConfig {
         };
         write.write_str(self.base_url())?;
         write.write_str("/")?;
-        write.write_str(bundled.name())
+        write!(write, "{}", bundled.encoded_name())
     }
 
     /// Returns the URL `asset` is hosted at, `{base_url}/{bundled-filename}`.
@@ -222,5 +222,46 @@ content_type = "image/png"
             config.resolve(asset),
             "https://cdn.example.com/assets/logo-1a2b3c4d5e6f7a8b.png"
         );
+    }
+
+    #[test]
+    fn percent_encodes_hosted_filenames() {
+        use crate::{MANIFEST_VERSION, ManifestEntry};
+
+        const ID: AssetId = AssetId::new("app", "src/lib.rs", "logo.svg", &AssetOptions::NONE);
+        static ENCODED: [u8; ENCODED_ASSET_SIZE] = RawAsset::encode(
+            ID,
+            "logo.svg",
+            "app",
+            "/app",
+            "src/lib.rs",
+            &AssetOptions::NONE,
+        );
+        let asset = Asset::new(&ENCODED);
+
+        for (filename, encoded) in [
+            ("logo#dark?50%25.svg", "logo%23dark%3F50%2525.svg"),
+            ("logo dark.svg", "logo%20dark.svg"),
+            ("{logo}\\dark.svg", "%7Blogo%7D%5Cdark.svg"),
+            ("logo(1).svg", "logo%281%29.svg"),
+            ("caf\u{e9}.svg", "caf%C3%A9.svg"),
+            ("logo-dark_1.2~.svg", "logo-dark_1.2~.svg"),
+        ] {
+            let manifest = Manifest {
+                version: MANIFEST_VERSION,
+                assets: vec![ManifestEntry {
+                    id: ID,
+                    file: filename.to_owned(),
+                    hash: "0".to_owned(),
+                    content_type: "image/svg+xml".to_owned(),
+                }],
+            };
+            let config = AssetConfig::hosted_at("https://cdn.example.com/assets", manifest);
+
+            assert_eq!(
+                config.resolve(asset),
+                format!("https://cdn.example.com/assets/{encoded}")
+            );
+        }
     }
 }
