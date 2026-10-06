@@ -122,8 +122,8 @@ pub async fn table_head(
     Ok(view! {
         <th
             class=(class!(
-                "h-10 px-3 text-left align-middle font-medium whitespace-nowrap \
-                 text-muted-foreground",
+                "h-10 px-3 text-left align-middle font-medium whitespace-nowrap",
+                "text-muted-foreground",
                 attrs.remove("class"),
             ))
             (attrs)

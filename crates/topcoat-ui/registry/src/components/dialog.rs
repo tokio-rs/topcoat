@@ -8,9 +8,9 @@ use topcoat::{
 ///
 /// Set `display` only for the open state so the native closed state remains hidden.
 const OVERLAY: StaticClass = class!(
-    "fixed inset-0 z-50 size-full max-h-none max-w-none items-start \
-     justify-center overflow-y-auto bg-background/80 p-4 text-foreground backdrop-blur-sm \
-     open:flex",
+    "fixed inset-0 z-50 size-full max-h-none max-w-none items-start",
+    "justify-center overflow-y-auto bg-background/80 p-4 text-foreground backdrop-blur-sm",
+    "open:flex",
 );
 
 /// Classes that fade the overlay in and out.
@@ -18,8 +18,8 @@ const OVERLAY: StaticClass = class!(
 /// `allow-discrete` keeps it displayed through the exit transition. `@starting-style`
 /// supplies the entry transition's initial opacity.
 const FADE: StaticClass = class!(
-    "opacity-0 open:opacity-100 starting:open:opacity-0 \
-     [transition:opacity_200ms_ease-out,display_200ms_allow-discrete]",
+    "opacity-0 open:opacity-100 starting:open:opacity-0",
+    "[transition:opacity_200ms_ease-out,display_200ms_allow-discrete]",
 );
 
 /// A panel displayed over the page.
@@ -83,15 +83,15 @@ pub async fn dialog(
 /// Classes for the dialog panel. Automatic vertical margins center short panels while
 /// keeping the top of an oversized panel reachable by scrolling.
 const CONTENT: StaticClass = class!(
-    "relative my-auto flex w-full max-w-lg flex-col gap-4 rounded-xl \
-     border border-border bg-card p-6 text-card-foreground shadow-sm",
+    "relative my-auto flex w-full max-w-lg flex-col gap-4 rounded-xl",
+    "border border-border bg-card p-6 text-card-foreground shadow-sm",
 );
 
 /// Classes that scale and fade the panel as the dialog opens or closes.
 const MOTION: StaticClass = class!(
-    "scale-95 opacity-0 in-[[open]]:scale-100 in-[[open]]:opacity-100 \
-     starting:in-[[open]]:scale-95 starting:in-[[open]]:opacity-0 \
-     [transition:scale_200ms_ease-out,opacity_200ms_ease-out]",
+    "scale-95 opacity-0 in-[[open]]:scale-100 in-[[open]]:opacity-100",
+    "starting:in-[[open]]:scale-95 starting:in-[[open]]:opacity-0",
+    "[transition:scale_200ms_ease-out,opacity_200ms_ease-out]",
 );
 
 /// The content panel inside a dialog.

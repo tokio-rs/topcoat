@@ -28,9 +28,9 @@ impl AlertVariant {
 
 /// Classes for the alert layout. The icon column collapses when no icon is present.
 const BASE: StaticClass = class!(
-    "grid w-full grid-cols-[0_1fr] items-start gap-y-1 rounded-lg border \
-     bg-background px-4 py-3 text-sm has-[>svg]:grid-cols-[1rem_1fr] has-[>svg]:gap-x-3 \
-     [&>svg]:size-4 [&>svg]:translate-y-0.5",
+    "grid w-full grid-cols-[0_1fr] items-start gap-y-1 rounded-lg border",
+    "bg-background px-4 py-3 text-sm has-[>svg]:grid-cols-[1rem_1fr] has-[>svg]:gap-x-3",
+    "[&>svg]:size-4 [&>svg]:translate-y-0.5",
 );
 
 /// A notice displayed within the page.
