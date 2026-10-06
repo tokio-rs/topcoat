@@ -8,6 +8,7 @@ use topcoat::{
 
 {% if ui -%}
 use crate::components::button::{ButtonSize, ButtonVariant, button};
+use crate::components::input::input;
 {% endif -%}
 use crate::features::todo::Todo;
 
@@ -22,7 +23,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
         <main{{ classes.main }}>
             <h1{{ classes.heading }}>"Todos"</h1>
             <form
-                {{- classes.paragraph }}
+                {{- classes.form }}
                 @submit=$(async |e: Event| {
                     e.prevent_default();
                     add(title.get()).await;
@@ -30,6 +31,18 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                     revision.increment();
                 })
             >
+{%- if ui %}
+                input(
+                    attrs: attributes! {
+                        type="text"
+                        placeholder="What needs doing?"
+                        required=""
+                        :value=$(title.get())
+                        @input=$(|e: Event| title.set(e.target.value))
+                    },
+                )
+                button(attrs: attributes! { type="submit" }, "Add")
+{%- else %}
                 <input
                     {{- classes.input }}
                     type="text"
@@ -39,9 +52,6 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                     @input=$(|e: Event| title.set(e.target.value))
                 >
                 " "
-{%- if ui %}
-                button(attrs: attributes! { type="submit" }, "Add")
-{%- else %}
                 <button{{ classes.button }} type="submit">"Add"</button>
 {%- endif %}
             </form>

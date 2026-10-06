@@ -88,12 +88,13 @@ impl NewCommand {
         let plan = generate::generate(&package, &resolution.options)?;
         publish::publish(&plan, &path)?;
 
-        cliclack::log::success(format!(
-            "Created {} in {}",
-            style(&package).bold(),
-            path.display()
-        ))
-        .ok();
+        // The location is only worth naming when it differs from the package name.
+        let created = if path == Path::new(package.as_str()) {
+            format!("Created {}", style(&package).bold())
+        } else {
+            format!("Created {} in {}", style(&package).bold(), path.display())
+        };
+        cliclack::log::success(created).ok();
         for note in &resolution.notes {
             cliclack::log::info(note).ok();
         }

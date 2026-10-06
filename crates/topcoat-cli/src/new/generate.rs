@@ -31,7 +31,7 @@ const EXAMPLE_ICON_SET: &str = "lucide";
 /// The stylesheet at the package root: plain CSS, the Tailwind input, or the UI theme.
 const STYLESHEET: &str = "styles.css";
 /// The Topcoat UI components the starter pages use.
-const UI_COMPONENTS: &[&str] = &["button", "card"];
+const UI_COMPONENTS: &[&str] = &["button", "card", "input"];
 /// The UI theme's declaration of its sans-serif font, naming the family it expects.
 const THEME_FONT: &str = r#"--font-sans: "Geist", sans-serif;"#;
 
@@ -185,8 +185,11 @@ struct Classes {
     heading: &'static str,
     paragraph: &'static str,
     link: &'static str,
+    /// The form that creates a todo, holding its input and button.
+    form: &'static str,
     /// Buttons, which use the button component instead with Topcoat UI.
     button: &'static str,
+    /// Text inputs, which use the input component instead with Topcoat UI.
     input: &'static str,
     list: &'static str,
     item: &'static str,
@@ -201,8 +204,9 @@ impl Classes {
                 heading: r#" class="text-3xl font-semibold tracking-tight""#,
                 paragraph: r#" class="mt-4""#,
                 link: r#" class="font-medium text-primary underline underline-offset-4""#,
+                form: r#" class="mt-4 flex gap-2""#,
                 button: "",
-                input: r#" class="h-9 rounded-lg border border-input bg-transparent px-3 text-sm""#,
+                input: "",
                 list: r#" class="mt-4 space-y-2""#,
                 item: r#" class="flex items-center gap-2""#,
             }
@@ -212,6 +216,7 @@ impl Classes {
                 heading: r#" class="text-3xl font-bold""#,
                 paragraph: r#" class="mt-4""#,
                 link: r#" class="text-blue-600 underline""#,
+                form: r#" class="mt-4""#,
                 button: r#" class="rounded border px-3 py-1""#,
                 input: r#" class="rounded border px-2 py-1""#,
                 list: r#" class="mt-4 space-y-2""#,
@@ -223,6 +228,7 @@ impl Classes {
                 heading: "",
                 paragraph: "",
                 link: "",
+                form: "",
                 button: "",
                 input: "",
                 list: "",

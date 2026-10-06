@@ -11,6 +11,7 @@ use topcoat::{
 
 {% if ui -%}
 use crate::components::button::{ButtonSize, ButtonVariant, button};
+use crate::components::input::input;
 {% endif -%}
 use crate::features::todo::Todo;
 
@@ -21,14 +22,15 @@ pub async fn page() -> Result<impl View> {
             <h1{{ classes.heading }}>"Todos"</h1>
             // Datastar sends the signals to `create`, then clears the input.
             <form
-                {{- classes.paragraph }}
+                {{- classes.form }}
                 data-on:submit__prevent=(("@post('", href!(create), "'); $title = ''"))
             >
-                <input{{ classes.input }} type="text" data-bind:title="" placeholder="What needs doing?" required="">
-                " "
 {%- if ui %}
+                input(attrs: attributes! { type="text" data-bind:title="" placeholder="What needs doing?" required="" })
                 button(attrs: attributes! { type="submit" }, "Add")
 {%- else %}
+                <input{{ classes.input }} type="text" data-bind:title="" placeholder="What needs doing?" required="">
+                " "
                 <button{{ classes.button }} type="submit">"Add"</button>
 {%- endif %}
             </form>
