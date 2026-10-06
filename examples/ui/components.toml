@@ -72,6 +72,10 @@ file = "src/components/kbd.rs"
 hash = "sha256:6741fe1cf51bea5cfe0d0c8d25548e452661d9017529a7163bc5b60ce725a8d5"
 file = "src/components/label.rs"
 
+[registries.topcoat.components.navigation_menu]
+hash = "sha256:7a18de9c26097daffbbda5ba329e022d95ccc52ac599b0a7ae8b8762ab36c795"
+file = "src/components/navigation_menu.rs"
+
 [registries.topcoat.components.pagination]
 hash = "sha256:e3a01c26e38ad5b5c93c32f56cbd148f1e102d8691a107a837d1b80a15670cfb"
 file = "src/components/pagination.rs"

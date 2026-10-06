@@ -59,6 +59,9 @@ source = "src/components/kbd.rs"
 [components.label]
 source = "src/components/label.rs"
 
+[components.navigation_menu]
+source = "src/components/navigation_menu.rs"
+
 [components.pagination]
 source = "src/components/pagination.rs"
 dependencies = ["button"]
