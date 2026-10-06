@@ -1,4 +1,4 @@
-use super::choice::{DatabaseBackend, Interaction, Routing, value_name};
+use super::choice::{DatabaseBackend, Interaction, Routing};
 
 /// The Iconify set used by Topcoat UI components.
 pub const UI_ICON_SET: &str = "lucide";
@@ -26,50 +26,6 @@ impl ProjectOptions {
             sets.push(UI_ICON_SET);
         }
         sets
-    }
-
-    /// Returns command-line flags that select exactly these options.
-    pub fn to_args(&self) -> Vec<String> {
-        let mut args = Vec::new();
-        let mut push = |flag: &str, value: Option<String>| {
-            args.push(flag.to_string());
-            args.extend(value);
-        };
-
-        push("--routing", Some(value_name(&self.routing)));
-        match &self.database {
-            DatabaseSetup::None => push("--database", Some("none".into())),
-            DatabaseSetup::Toasty { backend } => {
-                push("--database", Some("toasty".into()));
-                push("--database-backend", Some(value_name(backend)));
-            }
-        }
-        push("--interaction", Some(value_name(&self.interaction)));
-        push(
-            if self.tailwind {
-                "--tailwind"
-            } else {
-                "--no-tailwind"
-            },
-            None,
-        );
-        match &self.icons {
-            IconSetup::None => push("--icons", Some("none".into())),
-            IconSetup::Custom => push("--icons", Some("custom".into())),
-            IconSetup::Iconify { set } => {
-                push("--icons", Some("iconify".into()));
-                push("--icon-set", Some(set.clone()));
-            }
-        }
-        match &self.font {
-            FontSetup::None => push("--font", Some("none".into())),
-            FontSetup::Fontsource { family } => {
-                push("--font", Some("fontsource".into()));
-                push("--font-family", Some(family.clone()));
-            }
-        }
-        push(if self.ui { "--ui" } else { "--no-ui" }, None);
-        args
     }
 }
 

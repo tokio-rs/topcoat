@@ -726,29 +726,4 @@ mod tests {
         sets.sort_unstable();
         assert_eq!(sets, [UI_ICON_SET, "tabler"]);
     }
-
-    #[test]
-    fn equivalent_arguments_reproduce_the_options() {
-        let cases: [&[&str]; 3] = [
-            &["--recommended"],
-            &["--minimal"],
-            &[
-                "--minimal",
-                "--routing",
-                "manual",
-                "--icons",
-                "iconify",
-                "--icon-set",
-                "tabler",
-                "--font",
-                "fontsource",
-            ],
-        ];
-        for args in cases {
-            let options = resolve(args).unwrap();
-            let equivalent = options.to_args();
-            assert_eq!(input(&equivalent).questions(), [], "{equivalent:?}");
-            assert_eq!(resolve(&equivalent).unwrap(), options, "{equivalent:?}");
-        }
-    }
 }

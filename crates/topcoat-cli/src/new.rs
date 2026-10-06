@@ -43,7 +43,7 @@ pub struct NewCommand {
 
 impl NewCommand {
     pub fn run(self) {
-        cliclack::intro(style(" topcoat new ").black().on_cyan()).ok();
+        cliclack::intro(style(" Create a new Topcoat project ").black().on_cyan()).ok();
         if let Err(error) = self.run_inner() {
             if error != prompt::CANCELLED {
                 cliclack::outro_cancel(error).ok();
@@ -111,21 +111,6 @@ impl NewCommand {
         }
 
         let quoted = shell_quote(&path);
-        let mut command = vec!["topcoat".to_string(), "new".to_string(), quoted.clone()];
-        if named.is_some() {
-            command.extend(["--name".to_string(), package.to_string()]);
-        }
-        command.extend(resolution.options.to_args());
-        if no_git {
-            command.push("--no-git".to_string());
-        }
-        cliclack::log::remark(format!(
-            "Equivalent command for topcoat-cli {}:\n{}",
-            env!("CARGO_PKG_VERSION"),
-            style(command.join(" ")).dim()
-        ))
-        .ok();
-
         let mut steps = vec![format!("cd {quoted}")];
         if let DatabaseSetup::Toasty { .. } = resolution.options.database {
             steps.push("cargo run -- toasty migration generate".to_string());

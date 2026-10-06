@@ -62,12 +62,3 @@ pub enum Font {
     /// No font integration
     None,
 }
-
-/// Returns the command-line name of `value`, e.g. `toasty`.
-pub fn value_name<T: ValueEnum>(value: &T) -> String {
-    value
-        .to_possible_value()
-        .expect("choice enums have no skipped variants")
-        .get_name()
-        .to_string()
-}
