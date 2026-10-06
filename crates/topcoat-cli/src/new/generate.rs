@@ -68,6 +68,8 @@ struct AppRs<'a> {
     /// Whether the home page uses Topcoat UI components.
     ui: bool,
     routing: Routing,
+    /// Whether the router collects handlers, including fonts, with `.discover()`.
+    discover: bool,
     paths: Paths,
     classes: Classes,
     interaction: Interaction,
@@ -502,6 +504,8 @@ pub fn generate(name: &PackageName, options: &ProjectOptions) -> Result<ProjectP
         title: &title,
         ui,
         routing: options.routing,
+        discover: options.routing == Routing::Discover
+            || (options.routing == Routing::Module && options.interaction == Interaction::Topcoat),
         paths,
         classes,
         interaction: options.interaction,
@@ -678,9 +682,15 @@ mod tests {
     #[test]
     fn fontsource_fonts_are_registered_unless_discovered() {
         let name = PackageName::new("my-app").unwrap();
-        for routing in [Routing::Module, Routing::Discover, Routing::Manual] {
+        for (routing, interaction) in [Routing::Module, Routing::Discover, Routing::Manual]
+            .into_iter()
+            .flat_map(|routing| {
+                [Interaction::None, Interaction::Topcoat].map(|interaction| (routing, interaction))
+            })
+        {
             let options = ProjectOptions {
                 routing,
+                interaction,
                 font: FontSetup::Fontsource {
                     family: "roboto".to_string(),
                 },
@@ -693,8 +703,10 @@ mod tests {
             let app = file(&plan, "src/app.rs").unwrap();
             assert!(app.contains("fontsource_font!(ROBOTO, weight: [400, 700], style: Normal)"));
             assert!(app.contains("font::link(font: ROBOTO)"));
+            // Registering a discovered font again would register its route twice.
             let registered = app.contains(".font(ROBOTO)");
-            assert_eq!(registered, routing != Routing::Discover, "{routing:?}");
+            let discovered = app.contains(".discover()");
+            assert_ne!(registered, discovered, "{routing:?} {interaction:?}");
         }
     }
 

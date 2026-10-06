@@ -11,7 +11,7 @@ use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt, asset},
 {%- endif %}
 {%- if font.is_some() %}
-{%- if routing == Routing::Discover %}
+{%- if discover %}
     font::{Font, fontsource::fontsource_font},
 {%- else %}
     font::{Font, RouterBuilderFontExt, fontsource::fontsource_font},
@@ -91,7 +91,7 @@ pub fn router() -> Router {
 {%- endif %}
 {%- endmatch %}
 {%- if let Some(font) = font %}
-{%- if routing != Routing::Discover %}
+{%- if !discover %}
         .font({{ font.ident }})
 {%- endif %}
 {%- endif %}
