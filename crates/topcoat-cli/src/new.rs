@@ -11,20 +11,18 @@ mod publish;
 mod temp_dir;
 mod wizard;
 
-use std::{
-    io::IsTerminal,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use clap::Args;
 use console::style;
 
 use self::{
+    git::GitInit,
     input::{ChoiceArgs, Input},
     name::PackageName,
     options::DatabaseSetup,
-    wizard::Wizard,
 };
+use crate::common::prompt;
 
 #[derive(Args)]
 pub struct NewCommand {
@@ -45,8 +43,11 @@ pub struct NewCommand {
 
 impl NewCommand {
     pub fn run(self) {
+        cliclack::intro(style(" topcoat new ").black().on_cyan()).ok();
         if let Err(error) = self.run_inner() {
-            eprintln!("{}", style(error).red());
+            if error != prompt::CANCELLED {
+                cliclack::outro_cancel(error).ok();
+            }
             std::process::exit(1);
         }
     }
@@ -61,20 +62,16 @@ impl NewCommand {
         } = self;
 
         // A preset answers every question, so it never prompts.
-        let interactive = choices.preset().is_none()
-            && !no_interactive
-            && std::io::stdin().is_terminal()
-            && std::io::stderr().is_terminal();
-        let wizard = interactive.then(Wizard::new);
+        let interactive = choices.preset().is_none() && !no_interactive && prompt::is_interactive();
 
         let named = name.as_deref().map(PackageName::new).transpose()?;
-        let path = match (path, &wizard) {
-            (Some(path), _) => {
+        let path = match path {
+            Some(path) => {
                 check_destination(&path, named.is_some())?;
                 path
             }
-            (None, Some(wizard)) => wizard.destination(named.is_some())?,
-            (None, None) => {
+            None if interactive => wizard::destination(named.is_some())?,
+            None => {
                 return Err("missing destination: pass the directory to create".to_string());
             }
         };
@@ -84,27 +81,33 @@ impl NewCommand {
         };
 
         let mut input = Input::new(choices);
-        if let Some(wizard) = &wizard {
-            wizard.ask(&mut input)?;
+        if interactive {
+            wizard::ask(&mut input)?;
         }
         let resolution = input.resolve()?;
         let plan = generate::generate(&package, &resolution.options)?;
         publish::publish(&plan, &path)?;
 
-        println!(
-            "{} created {} {}",
-            style("+").green(),
+        cliclack::log::success(format!(
+            "Created {} in {}",
             style(&package).bold(),
-            style(format!("({})", path.display())).dim(),
-        );
+            path.display()
+        ))
+        .ok();
         for note in &resolution.notes {
-            println!("{} {note}", style("!").yellow());
+            cliclack::log::info(note).ok();
         }
-        if !no_git && let Err(error) = git::init(&path) {
-            println!(
-                "{} failed to initialize a Git repository: {error}",
-                style("!").yellow()
-            );
+        if !no_git {
+            match git::init(&path) {
+                Ok(GitInit::Created) => cliclack::log::step("Initialized a Git repository"),
+                Ok(GitInit::Existing) => {
+                    cliclack::log::step("Added to the existing Git repository")
+                }
+                Err(error) => cliclack::log::warning(format!(
+                    "Failed to initialize a Git repository: {error}"
+                )),
+            }
+            .ok();
         }
 
         let quoted = shell_quote(&path);
@@ -116,26 +119,20 @@ impl NewCommand {
         if no_git {
             command.push("--no-git".to_string());
         }
-        println!();
-        println!(
-            "Equivalent command for topcoat-cli {}:",
-            env!("CARGO_PKG_VERSION")
-        );
-        println!("  {}", style(command.join(" ")).dim());
+        cliclack::log::remark(format!(
+            "Equivalent command for topcoat-cli {}:\n{}",
+            env!("CARGO_PKG_VERSION"),
+            style(command.join(" ")).dim()
+        ))
+        .ok();
 
-        println!();
         let mut steps = vec![format!("cd {quoted}")];
         if let DatabaseSetup::Toasty { .. } = resolution.options.database {
-            println!("Create the database tables, then start the development server:");
             steps.push("cargo run -- toasty migration generate".to_string());
             steps.push("cargo run -- toasty migration apply".to_string());
-        } else {
-            println!("Start the development server:");
         }
         steps.push("topcoat dev".to_string());
-        for step in steps {
-            println!("  {}", style(step).bold());
-        }
+        cliclack::outro_note("Next steps", steps.join("\n")).ok();
         Ok(())
     }
 }

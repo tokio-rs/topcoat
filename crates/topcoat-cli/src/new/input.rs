@@ -56,7 +56,8 @@ pub struct ChoiceArgs {
     /// Fontsource family ID [default: inter, or geist with UI]
     #[arg(long, value_name = "FAMILY")]
     font_family: Option<String>,
-    /// Install Topcoat UI components (requires Tailwind and Iconify)
+    /// Install Topcoat UI components (requires Tailwind and Iconify; loads Geist unless --font is
+    /// given)
     #[arg(long, conflicts_with = "no_ui")]
     ui: bool,
     /// Do not install Topcoat UI components
@@ -208,13 +209,16 @@ impl Input {
     }
 
     /// Fills open choices that follow from the choices already made. Topcoat UI
-    /// requires Tailwind and Iconify, and is unavailable without either.
+    /// requires Tailwind and Iconify, and is unavailable without either. It also loads
+    /// its theme's font from Fontsource unless another font choice is made.
     pub fn infer(&mut self) {
         if self.ui.is_some_and(|ui| ui.value) {
             self.tailwind
                 .get_or_insert(Sourced::new(true, Origin::Inferred));
             self.icons
                 .get_or_insert(Sourced::new(Icons::Iconify, Origin::Inferred));
+            self.font
+                .get_or_insert(Sourced::new(Font::Fontsource, Origin::Inferred));
         }
 
         let ui_unavailable = self.tailwind.is_some_and(|tailwind| !tailwind.value)
@@ -255,16 +259,17 @@ impl Input {
         }
     }
 
-    /// The open top-level choices, in the order the wizard asks them.
+    /// The open top-level choices, in the order the wizard asks them. Topcoat UI comes
+    /// before the integrations it requires, so choosing it answers them.
     pub fn questions(&self) -> Vec<Question> {
         [
             (self.routing.is_none(), Question::Routing),
             (self.database.is_none(), Question::Database),
             (self.interaction.is_none(), Question::Interaction),
+            (self.ui.is_none(), Question::Ui),
             (self.tailwind.is_none(), Question::Tailwind),
             (self.icons.is_none(), Question::Icons),
             (self.font.is_none(), Question::Font),
-            (self.ui.is_none(), Question::Ui),
         ]
         .into_iter()
         .filter_map(|(open, question)| open.then_some(question))
@@ -359,22 +364,29 @@ impl Input {
         };
 
         let mut notes = Vec::new();
-        if tailwind.origin == Origin::Inferred {
+        // The wizard's Topcoat UI question already names the integrations it requires.
+        let ui_prompted = ui.origin == Origin::Prompt;
+        if tailwind.origin == Origin::Inferred && !ui_prompted {
             notes.push("Tailwind is enabled because Topcoat UI requires it".to_string());
         }
-        if icons.origin == Origin::Inferred {
+        if icons.origin == Origin::Inferred && !ui_prompted {
             notes.push("Iconify icons are enabled because Topcoat UI requires them".to_string());
+        }
+        if font.origin == Origin::Inferred && !ui_prompted {
+            notes.push(
+                "The Geist font is loaded from Fontsource for the Topcoat UI theme".to_string(),
+            );
         }
         if options.ui && options.font == FontSetup::None {
             notes.push(
-                "the Topcoat UI theme expects the Geist font and falls back to the system font"
+                "The Topcoat UI theme expects the Geist font and falls back to the system font"
                     .to_string(),
             );
         }
         if options.ui && !matches!(&options.icons, IconSetup::Iconify { set } if set == UI_ICON_SET)
         {
             notes.push(format!(
-                "the `{UI_ICON_SET}` icon set is also staged because Topcoat UI components use it"
+                "The `{UI_ICON_SET}` icon set is also staged because Topcoat UI components use it"
             ));
         }
 
@@ -388,10 +400,10 @@ pub enum Question {
     Routing,
     Database,
     Interaction,
+    Ui,
     Tailwind,
     Icons,
     Font,
-    Ui,
 }
 
 impl Question {
@@ -548,7 +560,74 @@ mod tests {
         let questions = input(&["--ui"]).questions();
         assert!(!questions.contains(&Question::Tailwind));
         assert!(!questions.contains(&Question::Icons));
+        assert!(!questions.contains(&Question::Font));
         assert!(questions.contains(&Question::Database));
+    }
+
+    #[test]
+    fn ui_is_asked_before_its_prerequisites() {
+        let mut input = input::<&str>(&[]);
+        while let Some(&question) = input.questions().first() {
+            assert!(
+                !matches!(
+                    question,
+                    Question::Tailwind | Question::Icons | Question::Font
+                ),
+                "{question:?} is asked before Topcoat UI"
+            );
+            if question == Question::Ui {
+                break;
+            }
+            input.answer(match question {
+                Question::Routing => Answer::Routing(Routing::Module),
+                Question::Database => Answer::Database(Database::None),
+                Question::Interaction => Answer::Interaction(Interaction::None),
+                _ => unreachable!("{question:?}"),
+            });
+        }
+
+        input.answer(Answer::Ui(true));
+        assert_eq!(input.questions(), []);
+    }
+
+    #[test]
+    fn ui_loads_geist_unless_a_font_is_chosen() {
+        let options = resolve(&[
+            "--routing",
+            "module",
+            "--database",
+            "none",
+            "--interaction",
+            "none",
+            "--ui",
+        ])
+        .unwrap();
+        assert_eq!(
+            options.font,
+            FontSetup::Fontsource {
+                family: UI_FONT_FAMILY.to_string()
+            }
+        );
+        assert_eq!(
+            options.icons,
+            IconSetup::Iconify {
+                set: UI_ICON_SET.to_string()
+            }
+        );
+
+        let options = resolve(&[
+            "--routing",
+            "module",
+            "--database",
+            "none",
+            "--interaction",
+            "none",
+            "--ui",
+            "--font",
+            "none",
+        ])
+        .unwrap();
+        assert_eq!(options.font, FontSetup::None);
     }
 
     #[test]

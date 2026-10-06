@@ -5,6 +5,7 @@ use console::style;
 use topcoat_ui::manage::{self, InitOptions, Package};
 
 use super::PackageArg;
+use crate::common::prompt;
 
 #[derive(Args)]
 pub(super) struct InitCommand {
@@ -22,7 +23,9 @@ pub(super) struct InitCommand {
 impl InitCommand {
     pub(super) fn run(self) {
         if let Err(error) = self.run_inner() {
-            eprintln!("{}", style(error).red());
+            if error != prompt::CANCELLED {
+                eprintln!("{}", style(error).red());
+            }
             std::process::exit(1);
         }
     }
@@ -98,26 +101,16 @@ impl InitCommand {
 /// input is cancelled or no terminal is available. Non-interactive callers must select
 /// a theme with `--theme`.
 fn choose_theme(themes: &[String]) -> Result<String, String> {
-    use std::io::IsTerminal;
-
-    use dialoguer::{Select, theme::ColorfulTheme};
-
-    if !std::io::stdin().is_terminal() {
+    if !prompt::is_interactive() {
         return Err(format!(
             "no theme selected and no terminal to prompt on; pass --theme <name> (available: {})",
             themes.join(", ")
         ));
     }
 
-    let selection = Select::with_theme(&ColorfulTheme::default())
-        .with_prompt("Choose a theme")
-        .items(themes)
-        .default(0)
-        .interact_opt()
-        .map_err(|error| format!("failed to read input: {error}"))?;
-
-    match selection {
-        Some(index) => Ok(themes[index].clone()),
-        None => Err("no theme selected".to_string()),
+    let mut select = cliclack::select("Choose a theme");
+    for theme in themes {
+        select = select.item(theme.clone(), theme, "");
     }
+    select.interact().map_err(|error| prompt::error(&error))
 }

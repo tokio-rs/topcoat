@@ -39,7 +39,7 @@ pub enum Interaction {
     Datastar,
     /// Alpine with Alpine AJAX
     AlpineAjax,
-    /// Server-rendered pages and ordinary navigation
+    /// No browser interaction library
     None,
 }
 
@@ -50,7 +50,7 @@ pub enum Icons {
     Iconify,
     /// Hand-written SVG icons
     Custom,
-    /// No icons
+    /// No icon integration
     None,
 }
 
@@ -59,7 +59,7 @@ pub enum Icons {
 pub enum Font {
     /// A font family from the Fontsource catalog
     Fontsource,
-    /// The browser's default font
+    /// No font integration
     None,
 }
 
