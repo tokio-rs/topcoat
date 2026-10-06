@@ -55,28 +55,8 @@ fn write_files(plan: &ProjectPlan, destination: &Path) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use super::*;
-
-    /// A directory under the system temporary directory, removed on drop.
-    struct TempDir(PathBuf);
-
-    impl TempDir {
-        fn new(name: &str) -> Self {
-            let path =
-                std::env::temp_dir().join(format!("topcoat-new-{name}-{}", std::process::id()));
-            let _ = std::fs::remove_dir_all(&path);
-            std::fs::create_dir_all(&path).unwrap();
-            Self(path)
-        }
-    }
-
-    impl Drop for TempDir {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.0);
-        }
-    }
+    use crate::new::temp_dir::TempDir;
 
     fn plan() -> ProjectPlan {
         let mut plan = ProjectPlan::default();
@@ -88,7 +68,7 @@ mod tests {
     #[test]
     fn writes_every_file_into_a_new_directory() {
         let temp = TempDir::new("writes");
-        let destination = temp.0.join("nested/my-app");
+        let destination = temp.path().join("nested/my-app");
         publish(&plan(), &destination).unwrap();
 
         for (path, contents) in plan().files() {
@@ -102,7 +82,7 @@ mod tests {
     #[test]
     fn leaves_an_existing_destination_untouched() {
         let temp = TempDir::new("existing");
-        let destination = temp.0.join("my-app");
+        let destination = temp.path().join("my-app");
         std::fs::create_dir(&destination).unwrap();
         std::fs::write(destination.join("Cargo.toml"), "keep me").unwrap();
 
@@ -117,7 +97,7 @@ mod tests {
     #[test]
     fn rejects_an_existing_empty_destination() {
         let temp = TempDir::new("empty");
-        let destination = temp.0.join("my-app");
+        let destination = temp.path().join("my-app");
         std::fs::create_dir(&destination).unwrap();
 
         assert!(publish(&plan(), &destination).is_err());

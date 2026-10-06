@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, path::Path};
 
 /// Names Cargo rejects for new packages: Rust keywords, the standard library crates,
 /// and names with special meaning to Cargo.
@@ -100,6 +100,25 @@ impl PackageName {
         } else {
             Ok(Self(name.to_string()))
         }
+    }
+
+    /// Validates the last component of `path` as a package name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `path` has no last component that is valid UTF-8, or if that
+    /// component is not a valid package name.
+    pub fn from_path(path: &Path) -> Result<Self, String> {
+        let name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| {
+                format!(
+                    "cannot derive a package name from {}; pass --name",
+                    path.display()
+                )
+            })?;
+        Self::new(name)
     }
 
     pub fn as_str(&self) -> &str {

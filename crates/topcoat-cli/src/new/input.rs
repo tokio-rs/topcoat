@@ -7,7 +7,7 @@ use super::{
 };
 
 /// The Iconify set used when none is named.
-const DEFAULT_ICON_SET: &str = "lucide";
+pub const DEFAULT_ICON_SET: &str = "lucide";
 /// The Fontsource family used when none is named.
 const DEFAULT_FONT_FAMILY: &str = "inter";
 /// The Fontsource family used with Topcoat UI when none is named, matching the UI theme.
@@ -131,7 +131,6 @@ pub enum Origin {
     /// A prerequisite of another choice.
     Inferred,
     /// An answer to a wizard question.
-    #[expect(dead_code, reason = "constructed by the wizard")]
     Prompt,
 }
 
@@ -227,6 +226,35 @@ impl Input {
         }
     }
 
+    /// Records the answer to a wizard question, then fills the choices that follow from
+    /// it.
+    pub fn answer(&mut self, answer: Answer) {
+        fn prompt<T>(value: T) -> Sourced<T> {
+            Sourced::new(value, Origin::Prompt)
+        }
+
+        match answer {
+            Answer::Routing(value) => self.routing = Some(prompt(value)),
+            Answer::Database(value) => self.database = Some(prompt(value)),
+            Answer::Interaction(value) => self.interaction = Some(prompt(value)),
+            Answer::Tailwind(value) => self.tailwind = Some(prompt(value)),
+            Answer::Icons(value) => self.icons = Some(prompt(value)),
+            Answer::Font(value) => self.font = Some(prompt(value)),
+            Answer::Ui(value) => self.ui = Some(prompt(value)),
+        }
+        self.infer();
+    }
+
+    /// The Fontsource family used when none is named: the UI theme's font if Topcoat UI
+    /// is selected.
+    pub fn default_font_family(&self) -> &'static str {
+        if self.ui.is_some_and(|ui| ui.value) {
+            UI_FONT_FAMILY
+        } else {
+            DEFAULT_FONT_FAMILY
+        }
+    }
+
     /// The open top-level choices, in the order the wizard asks them.
     pub fn questions(&self) -> Vec<Question> {
         [
@@ -309,20 +337,9 @@ impl Input {
 
         let font_setup = match (font.value, self.font_family.as_deref()) {
             (Font::Fontsource, family) => {
-                let default = if ui.value {
-                    UI_FONT_FAMILY
-                } else {
-                    DEFAULT_FONT_FAMILY
-                };
-                let family = family.unwrap_or(default);
-                if Family::by_id(family).is_none() {
-                    return Err(format!(
-                        "unknown Fontsource family `{family}`; pass a family ID listed at \
-                         https://fontsource.org, such as `{DEFAULT_FONT_FAMILY}`"
-                    ));
-                }
+                let family = family.unwrap_or(self.default_font_family());
                 FontSetup::Fontsource {
-                    family: family.to_string(),
+                    family: font_family_id(family)?,
                 }
             }
             (Font::None, Some(_)) => {
@@ -392,6 +409,18 @@ impl Question {
     }
 }
 
+/// An answer to a wizard question.
+#[derive(Clone, Copy, Debug)]
+pub enum Answer {
+    Routing(Routing),
+    Database(Database),
+    Interaction(Interaction),
+    Tailwind(bool),
+    Icons(Icons),
+    Font(Font),
+    Ui(bool),
+}
+
 /// Validated options and notes about choices made on the user's behalf.
 pub struct Resolution {
     pub options: ProjectOptions,
@@ -426,7 +455,7 @@ fn conflict(message: &str, overrides: [(Origin, &str); 2]) -> String {
 /// Checks that `value` has the form of an Iconify set ID such as `lucide`: lowercase
 /// ASCII letters, digits, and hyphens. Whether the set exists is only known once it is
 /// downloaded.
-fn icon_set_id(value: &str) -> Result<String, String> {
+pub fn icon_set_id(value: &str) -> Result<String, String> {
     let valid = !value.is_empty()
         && value
             .bytes()
@@ -436,6 +465,18 @@ fn icon_set_id(value: &str) -> Result<String, String> {
     } else {
         Err(format!(
             "invalid icon set `{value}`: use lowercase letters, digits, and hyphens"
+        ))
+    }
+}
+
+/// Checks that `value` is the ID of a family in the Fontsource catalog, such as `inter`.
+pub fn font_family_id(value: &str) -> Result<String, String> {
+    if Family::by_id(value).is_some() {
+        Ok(value.to_string())
+    } else {
+        Err(format!(
+            "unknown Fontsource family `{value}`; use a family ID listed at \
+             https://fontsource.org, such as `{DEFAULT_FONT_FAMILY}`"
         ))
     }
 }
@@ -523,6 +564,48 @@ mod tests {
                 .contains(&Question::Ui)
         );
         assert!(input(&["--tailwind"]).questions().contains(&Question::Ui));
+    }
+
+    #[test]
+    fn answers_resolve_like_the_equivalent_flags() {
+        let mut answered = input::<&str>(&[]);
+        for answer in [
+            Answer::Routing(Routing::Discover),
+            Answer::Database(Database::Toasty),
+            Answer::Interaction(Interaction::Htmx),
+            Answer::Tailwind(true),
+            Answer::Icons(Icons::Custom),
+            Answer::Font(Font::Fontsource),
+        ] {
+            answered.answer(answer);
+        }
+        // Custom icons make Topcoat UI unavailable, so it is not asked.
+        assert_eq!(answered.questions(), []);
+
+        let flags = resolve(&[
+            "--routing",
+            "discover",
+            "--database",
+            "toasty",
+            "--interaction",
+            "htmx",
+            "--tailwind",
+            "--icons",
+            "custom",
+            "--font",
+            "fontsource",
+            "--no-ui",
+        ])
+        .unwrap();
+        assert_eq!(answered.resolve().unwrap().options, flags);
+    }
+
+    #[test]
+    fn answering_no_tailwind_makes_ui_unavailable() {
+        let mut input = input(&["--icons", "iconify"]);
+        assert!(input.questions().contains(&Question::Ui));
+        input.answer(Answer::Tailwind(false));
+        assert!(!input.questions().contains(&Question::Ui));
     }
 
     #[test]
