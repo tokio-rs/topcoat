@@ -5,9 +5,9 @@ use topcoat::{
 
 /// Classes that draw a key label in a bordered box.
 const KBD: StaticClass = class!(
-    "inline-flex h-5 w-fit min-w-5 shrink-0 items-center justify-center gap-1 \
-     rounded-sm border border-border bg-foreground/5 px-1.5 font-sans text-xs font-medium \
-     text-muted-foreground",
+    "inline-flex h-5 w-fit min-w-5 shrink-0 items-center justify-center gap-1",
+    "rounded-sm border border-border bg-foreground/5 px-1.5 font-sans text-xs font-medium",
+    "text-muted-foreground",
 );
 
 /// A keyboard key label rendered as `<kbd>`.

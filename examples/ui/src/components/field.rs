@@ -26,9 +26,9 @@ impl FieldOrientation {
                 class!("flex-row items-center gap-3 [&>[data-slot=field-label]]:flex-1")
             }
             Self::Responsive => class!(
-                "flex-col gap-2 @md/field-group:flex-row @md/field-group:items-start \
-                 @md/field-group:gap-4 @md/field-group:[&>[data-slot=field-label]]:w-1/3 \
-                 @md/field-group:[&>[data-slot=field-label]]:shrink-0",
+                "flex-col gap-2 @md/field-group:flex-row @md/field-group:items-start",
+                "@md/field-group:gap-4 @md/field-group:[&>[data-slot=field-label]]:w-1/3",
+                "@md/field-group:[&>[data-slot=field-label]]:shrink-0",
             ),
         }
     }
@@ -170,9 +170,9 @@ pub async fn field_label(
             attrs: attributes! {
                 data-slot="field-label"
                 class=(class!(
-                    "leading-snug group-has-[:disabled]/field:opacity-50 \
-                     group-has-[[aria-invalid=true]]/field:text-destructive \
-                     group-data-[invalid=true]/field:text-destructive",
+                    "leading-snug group-has-[:disabled]/field:opacity-50",
+                    "group-has-[[aria-invalid=true]]/field:text-destructive",
+                    "group-data-[invalid=true]/field:text-destructive",
                     attrs.remove("class"),
                 ))
                 (attrs)

@@ -30,23 +30,23 @@ impl ButtonVariant {
     fn classes(self) -> StaticClass {
         match self {
             Self::Primary => class!(
-                "border-transparent bg-primary text-primary-foreground shadow-xs \
-                 hover:bg-primary/90 active:bg-primary/80",
+                "border-transparent bg-primary text-primary-foreground shadow-xs",
+                "hover:bg-primary/90 active:bg-primary/80",
             ),
             Self::Secondary => class!(
-                "border-transparent bg-foreground/5 text-foreground shadow-xs \
-                 hover:bg-foreground/10 active:bg-foreground/15",
+                "border-transparent bg-foreground/5 text-foreground shadow-xs",
+                "hover:bg-foreground/10 active:bg-foreground/15",
             ),
             Self::Outline => class!(
-                "border-border text-foreground hover:bg-foreground/5 \
-                 active:bg-foreground/10",
+                "border-border text-foreground hover:bg-foreground/5",
+                "active:bg-foreground/10",
             ),
             Self::Ghost => class!(
                 "border-transparent text-foreground hover:bg-foreground/5 active:bg-foreground/10",
             ),
             Self::Destructive => class!(
-                "border-transparent bg-destructive text-destructive-foreground shadow-xs \
-                 hover:bg-destructive/90 active:bg-destructive/80",
+                "border-transparent bg-destructive text-destructive-foreground shadow-xs",
+                "hover:bg-destructive/90 active:bg-destructive/80",
             ),
         }
     }
@@ -84,10 +84,10 @@ impl ButtonSize {
 /// Classes shared by button variants and sizes. A border reserves the same space in
 /// every variant.
 const BASE: StaticClass = class!(
-    "inline-flex shrink-0 items-center justify-center border \
-     text-sm font-medium whitespace-nowrap transition-colors outline-none select-none \
-     focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
-     focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
+    "inline-flex shrink-0 items-center justify-center border",
+    "text-sm font-medium whitespace-nowrap transition-colors outline-none select-none",
+    "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+    "focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
 );
 
 /// Builds the full class list for a button of the given `variant` and `size`.

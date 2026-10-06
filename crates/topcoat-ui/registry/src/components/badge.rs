@@ -37,8 +37,8 @@ impl BadgeVariant {
 
 /// Classes shared by badge variants. A border reserves the same space in every variant.
 const BASE: StaticClass = class!(
-    "inline-flex w-fit shrink-0 items-center justify-center gap-1 rounded-md \
-     border px-2 py-0.5 text-xs font-medium whitespace-nowrap",
+    "inline-flex w-fit shrink-0 items-center justify-center gap-1 rounded-md",
+    "border px-2 py-0.5 text-xs font-medium whitespace-nowrap",
 );
 
 /// Builds the full class list for a badge of the given `variant`.

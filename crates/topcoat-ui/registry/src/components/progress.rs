@@ -6,11 +6,11 @@ use topcoat::{
 /// Classes for the native progress track and fill. Indeterminate animation depends on
 /// the browser and may appear as an empty track.
 const PROGRESS: StaticClass = class!(
-    "h-2 w-full appearance-none overflow-hidden rounded-full \
-     bg-foreground/10 [&::-webkit-progress-bar]:bg-transparent \
-     [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary \
-     [&::-webkit-progress-value]:transition-all \
-     [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-primary",
+    "h-2 w-full appearance-none overflow-hidden rounded-full",
+    "bg-foreground/10 [&::-webkit-progress-bar]:bg-transparent",
+    "[&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary",
+    "[&::-webkit-progress-value]:transition-all",
+    "[&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-primary",
 );
 
 /// A native progress bar.

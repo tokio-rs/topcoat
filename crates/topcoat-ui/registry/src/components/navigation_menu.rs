@@ -100,12 +100,12 @@ pub async fn navigation_menu_item(
 
 /// Classes for top-level triggers and links, with hover, focus, and current-page states.
 const TRIGGER: StaticClass = class!(
-    "inline-flex h-9 shrink-0 items-center justify-center gap-1 rounded-md px-3 text-sm \
-     font-medium whitespace-nowrap text-muted-foreground transition-colors outline-none \
-     hover:bg-foreground/5 hover:text-foreground \
-     focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
-     focus-visible:ring-offset-background \
-     aria-[current=page]:text-foreground disabled:pointer-events-none disabled:opacity-50",
+    "inline-flex h-9 shrink-0 items-center justify-center gap-1 rounded-md px-3 text-sm",
+    "font-medium whitespace-nowrap text-muted-foreground transition-colors outline-none",
+    "hover:bg-foreground/5 hover:text-foreground",
+    "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+    "focus-visible:ring-offset-background",
+    "aria-[current=page]:text-foreground disabled:pointer-events-none disabled:opacity-50",
 );
 
 /// A button that opens the [`navigation_menu_content`] after it.
@@ -122,9 +122,9 @@ pub async fn navigation_menu_trigger(
             type="button"
             class=(class!(
                 TRIGGER,
-                "group-hover/navigation-item:text-foreground \
-                 group-has-[:focus-visible]/navigation-item:text-foreground \
-                 pointer-coarse:group-focus-within/navigation-item:text-foreground",
+                "group-hover/navigation-item:text-foreground",
+                "group-has-[:focus-visible]/navigation-item:text-foreground",
+                "pointer-coarse:group-focus-within/navigation-item:text-foreground",
                 attrs.remove("class"),
             ))
             (attrs)
@@ -148,16 +148,16 @@ pub async fn navigation_menu_trigger(
 /// The top padding bridges the gap to the trigger, so the pointer can move onto the
 /// panel without closing it.
 const LAYER: StaticClass = class!(
-    "invisible absolute top-full left-0 z-50 translate-y-1 pt-2 opacity-0 \
-     [transition:opacity_150ms_ease-out,translate_150ms_ease-out,visibility_150ms_allow-discrete] \
-     group-hover/navigation-item:visible group-hover/navigation-item:translate-y-0 \
-     group-hover/navigation-item:opacity-100 \
-     group-has-[:focus-visible]/navigation-item:visible \
-     group-has-[:focus-visible]/navigation-item:translate-y-0 \
-     group-has-[:focus-visible]/navigation-item:opacity-100 \
-     pointer-coarse:group-focus-within/navigation-item:visible \
-     pointer-coarse:group-focus-within/navigation-item:translate-y-0 \
-     pointer-coarse:group-focus-within/navigation-item:opacity-100",
+    "invisible absolute top-full left-0 z-50 translate-y-1 pt-2 opacity-0",
+    "[transition:opacity_150ms_ease-out,translate_150ms_ease-out,visibility_150ms_allow-discrete]",
+    "group-hover/navigation-item:visible group-hover/navigation-item:translate-y-0",
+    "group-hover/navigation-item:opacity-100",
+    "group-has-[:focus-visible]/navigation-item:visible",
+    "group-has-[:focus-visible]/navigation-item:translate-y-0",
+    "group-has-[:focus-visible]/navigation-item:opacity-100",
+    "pointer-coarse:group-focus-within/navigation-item:visible",
+    "pointer-coarse:group-focus-within/navigation-item:translate-y-0",
+    "pointer-coarse:group-focus-within/navigation-item:opacity-100",
 );
 
 /// The panel a [`navigation_menu_trigger`] opens, holding further links.
@@ -174,8 +174,8 @@ pub async fn navigation_menu_content(
         <div class=(LAYER)>
             <div
                 class=(class!(
-                    "rounded-xl border border-border bg-popover p-1.5 text-popover-foreground \
-                     shadow-sm",
+                    "rounded-xl border border-border bg-popover p-1.5 text-popover-foreground",
+                    "shadow-sm",
                     attrs.remove("class"),
                 ))
                 (attrs)
@@ -204,10 +204,10 @@ impl NavigationMenuLinkVariant {
     fn classes(self) -> StaticClass {
         match self {
             Self::Panel => class!(
-                "flex flex-col gap-1 rounded-lg px-3 py-2.5 text-sm leading-snug \
-                 outline-none transition-colors hover:bg-foreground/5 \
-                 focus-visible:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring \
-                 aria-[current=page]:bg-foreground/5 [&>svg]:size-4 [&>svg]:shrink-0",
+                "flex flex-col gap-1 rounded-lg px-3 py-2.5 text-sm leading-snug",
+                "outline-none transition-colors hover:bg-foreground/5",
+                "focus-visible:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring",
+                "aria-[current=page]:bg-foreground/5 [&>svg]:size-4 [&>svg]:shrink-0",
             ),
             Self::Trigger => TRIGGER,
         }

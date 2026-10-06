@@ -81,8 +81,8 @@ pub async fn dropdown_menu_trigger(
 
 /// Classes for floating menu panels with their own background, border, and text color.
 const PANEL: StaticClass = class!(
-    "absolute z-50 min-w-40 rounded-lg border border-border bg-popover p-1 \
-     text-popover-foreground shadow-sm",
+    "absolute z-50 min-w-40 rounded-lg border border-border bg-popover p-1",
+    "text-popover-foreground shadow-sm",
 );
 
 /// The floating panel of a [`dropdown_menu`], holding the menu's items.
@@ -105,9 +105,9 @@ pub async fn dropdown_menu_content(
 
 /// Classes for a menu item and its interaction states.
 const ITEM: StaticClass = class!(
-    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm \
-     whitespace-nowrap outline-none hover:bg-foreground/5 focus-visible:bg-foreground/5 \
-     active:bg-foreground/10 disabled:pointer-events-none disabled:opacity-50",
+    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
+    "whitespace-nowrap outline-none hover:bg-foreground/5 focus-visible:bg-foreground/5",
+    "active:bg-foreground/10 disabled:pointer-events-none disabled:opacity-50",
 );
 
 /// One action in a [`dropdown_menu_content`], rendered as a `<button>`.
