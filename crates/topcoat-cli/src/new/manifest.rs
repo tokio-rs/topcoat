@@ -122,6 +122,27 @@ impl Manifest {
             document[key] = Item::Table(table);
         }
 
+        let mut dev = Table::new();
+        dev.decor_mut()
+            .set_prefix("\n# Speed up compilation while keeping file and line numbers in error backtraces.\n");
+        dev["debug"] = value("line-tables-only");
+
+        let mut dependencies = Table::new();
+        dependencies
+            .decor_mut()
+            .set_prefix("\n# Speed up compilation by skipping debug information for dependencies.\n");
+        dependencies["debug"] = value(false);
+
+        let mut packages = Table::new();
+        packages.set_implicit(true);
+        packages["*"] = Item::Table(dependencies);
+        dev["package"] = Item::Table(packages);
+
+        let mut profiles = Table::new();
+        profiles.set_implicit(true);
+        profiles["dev"] = Item::Table(dev);
+        document["profile"] = Item::Table(profiles);
+
         document.to_string()
     }
 }
