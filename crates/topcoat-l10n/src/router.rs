@@ -26,8 +26,7 @@ pub trait RouterBuilderL10nExt {
     /// pub fn router() -> Router {
     ///     Router::builder()
     ///         .supported_locales(
-    ///             SupportedLocales::new([locale!("de"), locale!("fr")])
-    ///                 .with_fallback(locale!("en")),
+    ///             SupportedLocales::new([locale!("de"), locale!("fr")]).with_fallback(locale!("en")),
     ///         )
     ///         .build()
     /// }

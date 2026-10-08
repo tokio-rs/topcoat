@@ -8,7 +8,7 @@ use std::{
     str::FromStr,
 };
 
-use icu_locale::LocaleCanonicalizer;
+use icu_locale::{LocaleCanonicalizer, LocaleExpander};
 use icu_locale_core::subtags::Variants;
 pub use language::*;
 pub use region::*;
@@ -151,6 +151,16 @@ impl LanguageIdentifier {
         let mut locale = icu_locale_core::Locale::from(self.0);
         LocaleCanonicalizer::new_common().canonicalize(&mut locale);
         Self(locale.id)
+    }
+
+    /// Fills in the most likely script and region for the language, so `en`
+    /// becomes `en-Latn-US` and `zh-TW` becomes `zh-Hant-TW`.
+    ///
+    /// Subtags that are already present are kept.
+    #[must_use]
+    pub fn maximize(mut self) -> Self {
+        LocaleExpander::new_common().maximize(&mut self.0);
+        self
     }
 
     /// Borrows the `icu_locale_core` identifier.
@@ -323,6 +333,14 @@ mod tests {
         ] {
             assert_eq!(id.clone().canonicalize(), id, "{id}");
         }
+    }
+
+    #[test]
+    fn maximize_fills_in_likely_subtags() {
+        assert_eq!(langid!("en").maximize(), langid!("en-Latn-US"));
+        assert_eq!(langid!("zh-TW").maximize(), langid!("zh-Hant-TW"));
+        assert_eq!(langid!("sr-Latn").maximize(), langid!("sr-Latn-RS"));
+        assert_eq!(langid!("en-GB").maximize(), langid!("en-Latn-GB"));
     }
 
     #[test]
