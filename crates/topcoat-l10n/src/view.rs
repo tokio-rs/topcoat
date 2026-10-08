@@ -15,34 +15,34 @@ impl AttributeValueViewParts for Direction {
     }
 }
 
-/// Implements the attribute and node view traits for a type and references to
-/// it by rendering its [`Display`](std::fmt::Display) text.
-macro_rules! impl_display_view_parts {
+impl AttributeValueViewParts for &LanguageIdentifier {
+    #[inline]
+    fn attribute_present(&self) -> bool {
+        true
+    }
+
+    #[inline]
+    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_string(self.to_string());
+    }
+}
+
+impl AttributeValueViewParts for LanguageIdentifier {
+    #[inline]
+    fn attribute_present(&self) -> bool {
+        true
+    }
+
+    #[inline]
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
+        AttributeValueViewParts::into_view_parts(&self, cx, parts);
+    }
+}
+
+/// Implements the node view trait for a type and references to it by
+/// rendering its [`Display`](std::fmt::Display) text.
+macro_rules! impl_node_view_parts {
     ($ty:ty) => {
-        impl AttributeValueViewParts for &$ty {
-            #[inline]
-            fn attribute_present(&self) -> bool {
-                true
-            }
-
-            #[inline]
-            fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-                parts.push_string(self.to_string());
-            }
-        }
-
-        impl AttributeValueViewParts for $ty {
-            #[inline]
-            fn attribute_present(&self) -> bool {
-                true
-            }
-
-            #[inline]
-            fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
-                AttributeValueViewParts::into_view_parts(&self, cx, parts);
-            }
-        }
-
         impl NodeViewParts for &$ty {
             #[inline]
             fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
@@ -59,5 +59,5 @@ macro_rules! impl_display_view_parts {
     };
 }
 
-impl_display_view_parts!(LanguageIdentifier);
-impl_display_view_parts!(Locale);
+impl_node_view_parts!(LanguageIdentifier);
+impl_node_view_parts!(Locale);

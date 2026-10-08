@@ -19,9 +19,9 @@ use std::fmt::{self, Display};
 ///
 /// #[layout("/")]
 /// async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
-///     let locale = locale(cx);
+///     let id = locale(cx).id();
 ///     Ok(view! {
-///         <html lang=(locale.id()) dir=(locale.id().direction())>
+///         <html lang=(id) dir=(id.direction())>
 ///             <body>(slot)</body>
 ///         </html>
 ///     })
@@ -39,7 +39,7 @@ impl Direction {
     /// Returns the value of the HTML `dir` attribute for this direction.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
-        *self.as_promoted_str()
+        self.as_promoted_str()
     }
 
     /// Returns the text held by a `'static` reference, as the view writer's

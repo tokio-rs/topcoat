@@ -357,10 +357,22 @@ mod tests {
 
     #[test]
     fn direction_follows_the_script() {
-        for id in [langid!("ar"), langid!("he"), langid!("fa-IR"), langid!("ur"), langid!("az-Arab")] {
+        for id in [
+            langid!("ar"),
+            langid!("he"),
+            langid!("fa-IR"),
+            langid!("ur"),
+            langid!("az-Arab"),
+        ] {
             assert_eq!(id.direction(), Direction::Rtl, "{id}");
         }
-        for id in [langid!("en"), langid!("ja"), langid!("az"), langid!("az-Latn"), LanguageIdentifier::UNKNOWN] {
+        for id in [
+            langid!("en"),
+            langid!("ja"),
+            langid!("az"),
+            langid!("az-Latn"),
+            LanguageIdentifier::UNKNOWN,
+        ] {
             assert_eq!(id.direction(), Direction::Ltr, "{id}");
         }
     }
