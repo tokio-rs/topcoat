@@ -2,9 +2,6 @@
 mod todos;
 
 {% endif -%}
-{% if toasty -%}
-use toasty::Db;
-{% endif -%}
 use topcoat::{
     Result,
 {%- if tailwind %}
@@ -27,14 +24,14 @@ use topcoat::{
 {%- match routing %}
 {%- when Routing::Module %}
 {%- if discover %}
-    router::{Router, RouterBuilderDiscoverExt, Slot,{% if example %} href,{% endif %} layout, module_router, page},
+    router::{ {%- if toasty %}RouterBuilder{% else %}Router{% endif %}, RouterBuilderDiscoverExt, Slot,{% if example %} href,{% endif %} layout, module_router, page},
 {%- else %}
-    router::{Router, Slot,{% if example %} href,{% endif %} layout, module_router, page},
+    router::{ {%- if toasty %}RouterBuilder{% else %}Router{% endif %}, Slot,{% if example %} href,{% endif %} layout, module_router, page},
 {%- endif %}
 {%- when Routing::Discover %}
-    router::{Router, RouterBuilderDiscoverExt, Slot,{% if example %} href,{% endif %} layout, page},
+    router::{Router,{% if toasty %} RouterBuilder,{% endif %} RouterBuilderDiscoverExt, Slot,{% if example %} href,{% endif %} layout, page},
 {%- when Routing::Manual %}
-    router::{Router, Slot,{% if example %} href,{% endif %} layout, page},
+    router::{Router,{% if toasty %} RouterBuilder,{% endif %} Slot,{% if example %} href,{% endif %} layout, page},
 {%- endmatch %}
 {%- if interaction == Interaction::Topcoat %}
     runtime::RouterBuilderRuntimeExt,
@@ -64,7 +61,7 @@ const {{ font.ident }}: Font = fontsource_font!({{ font.ident }}{{ font.args }})
 
 /// Builds the application's router.
 {%- if toasty %}
-pub fn router(db: Db) -> Router {
+pub fn router() -> RouterBuilder {
 {%- else %}
 pub fn router() -> Router {
 {%- endif %}
@@ -104,9 +101,7 @@ pub fn router() -> Router {
         .font({{ font.ident }})
 {%- endif %}
 {%- endif %}
-{%- if toasty %}
-        .app_context(db)
-{%- else if example %}
+{%- if example && !toasty %}
         .app_context(crate::features::todo::Todos::default())
 {%- endif %}
         .assets(AssetBundle::load().unwrap())
@@ -114,7 +109,9 @@ pub fn router() -> Router {
         // Lets the browser runtime rerun pages; register it after other layers.
         .runtime()
 {%- endif %}
+{%- if !toasty %}
         .build()
+{%- endif %}
 }
 
 #[layout{{ paths.page("/") }}]

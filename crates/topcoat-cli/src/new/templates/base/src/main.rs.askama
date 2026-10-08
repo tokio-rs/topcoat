@@ -25,7 +25,7 @@ async fn main() {
         return;
     }
 
-    topcoat::start(app::router(db)).await.unwrap();
+    topcoat::start(app::router().app_context(db).build()).await.unwrap();
 {%- else %}
     topcoat::start(app::router()).await.unwrap();
 {%- endif %}
