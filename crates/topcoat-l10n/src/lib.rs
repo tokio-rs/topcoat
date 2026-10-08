@@ -2,6 +2,7 @@
 
 //! Localization for Topcoat.
 
+mod direction;
 mod error;
 mod extensions;
 mod langid;
@@ -11,7 +12,10 @@ mod request;
 #[cfg(feature = "router")]
 mod router;
 mod supported;
+#[cfg(feature = "view")]
+mod view;
 
+pub use direction::*;
 pub use error::*;
 pub use extensions::*;
 pub use langid::*;

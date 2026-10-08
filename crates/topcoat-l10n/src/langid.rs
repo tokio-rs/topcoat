@@ -8,14 +8,14 @@ use std::{
     str::FromStr,
 };
 
-use icu_locale::{LocaleCanonicalizer, LocaleExpander};
+use icu_locale::{LocaleCanonicalizer, LocaleDirectionality, LocaleExpander};
 use icu_locale_core::subtags::Variants;
 pub use language::*;
 pub use region::*;
 pub use script::*;
 pub use variant::*;
 
-use crate::LocaleParseError;
+use crate::{Direction, LocaleParseError};
 
 /// A Unicode language identifier, such as `en`, `de-AT`, or `zh-Hant-TW`.
 ///
@@ -161,6 +161,18 @@ impl LanguageIdentifier {
     pub fn maximize(mut self) -> Self {
         LocaleExpander::new_common().maximize(&mut self.0);
         self
+    }
+
+    /// Returns the direction of the identifier's script, filling in the most
+    /// likely script when none is given. Scripts without a direction are
+    /// treated as left to right.
+    #[must_use]
+    pub fn direction(&self) -> Direction {
+        if LocaleDirectionality::new_common().is_right_to_left(&self.0) {
+            Direction::Rtl
+        } else {
+            Direction::Ltr
+        }
     }
 
     /// Borrows the `icu_locale_core` identifier.
@@ -341,6 +353,16 @@ mod tests {
         assert_eq!(langid!("zh-TW").maximize(), langid!("zh-Hant-TW"));
         assert_eq!(langid!("sr-Latn").maximize(), langid!("sr-Latn-RS"));
         assert_eq!(langid!("en-GB").maximize(), langid!("en-Latn-GB"));
+    }
+
+    #[test]
+    fn direction_follows_the_script() {
+        for id in [langid!("ar"), langid!("he"), langid!("fa-IR"), langid!("ur"), langid!("az-Arab")] {
+            assert_eq!(id.direction(), Direction::Rtl, "{id}");
+        }
+        for id in [langid!("en"), langid!("ja"), langid!("az"), langid!("az-Latn"), LanguageIdentifier::UNKNOWN] {
+            assert_eq!(id.direction(), Direction::Ltr, "{id}");
+        }
     }
 
     #[test]

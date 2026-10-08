@@ -3502,6 +3502,7 @@ dependencies = [
  "topcoat",
  "topcoat-core",
  "topcoat-router",
+ "topcoat-view",
 ]
 
 [[package]]

@@ -178,6 +178,7 @@ view = [
 	"dep:topcoat-view-macro",
 	"topcoat-asset?/view",
 	"topcoat-font?/view",
+	"topcoat-l10n?/view",
 ]
 websocket = [
 	"serve",
