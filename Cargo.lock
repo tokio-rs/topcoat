@@ -84,7 +84,7 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
 name = "alpine-ajax"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "tokio",
  "topcoat",
@@ -160,7 +160,7 @@ checksum = "170433209e817da6aae2c51aa0dd443009a613425dd041ebfb2492d1c4c11a25"
 
 [[package]]
 name = "app-context"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "tokio",
  "topcoat",
@@ -221,7 +221,7 @@ dependencies = [
 
 [[package]]
 name = "asset"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "tokio",
  "topcoat",
@@ -550,7 +550,7 @@ dependencies = [
 
 [[package]]
 name = "coffee-shop"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "serde",
  "toasty",
@@ -603,7 +603,7 @@ checksum = "a6ef517f0926dd24a1582492c791b6a4818a4d94e789a334894aa15b0d12f55c"
 
 [[package]]
 name = "context"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "tokio",
  "topcoat",
@@ -611,7 +611,7 @@ dependencies = [
 
 [[package]]
 name = "cookie"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "serde",
  "tokio",
@@ -775,7 +775,7 @@ checksum = "d7a1e2f27636f116493b8b860f5546edb47c8d8f8ea73e1d2a20be88e28d1fea"
 
 [[package]]
 name = "datastar"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "futures-core",
  "futures-util",
@@ -939,7 +939,7 @@ dependencies = [
 
 [[package]]
 name = "error"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "tokio",
  "topcoat",
@@ -999,7 +999,7 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
 name = "font"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "tokio",
  "topcoat",
@@ -1258,7 +1258,7 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "hello-world"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "tokio",
  "topcoat",
@@ -1310,7 +1310,7 @@ dependencies = [
 
 [[package]]
 name = "htmx"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "tokio",
  "topcoat",
@@ -1407,7 +1407,7 @@ dependencies = [
 
 [[package]]
 name = "icon"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "tokio",
  "topcoat",
@@ -1819,7 +1819,7 @@ checksum = "92daf443525c4cce67b150400bc2316076100ce0b3686209eb8cf3c31612e6f0"
 
 [[package]]
 name = "live"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "tokio",
  "topcoat",
@@ -1842,7 +1842,7 @@ checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
 name = "mail"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "serde",
  "tokio",
@@ -1851,7 +1851,7 @@ dependencies = [
 
 [[package]]
 name = "manual-router"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "tokio",
  "topcoat",
@@ -1915,7 +1915,7 @@ dependencies = [
 
 [[package]]
 name = "module-router"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "tokio",
  "topcoat",
@@ -2074,7 +2074,7 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "path-query-params"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "tokio",
  "topcoat",
@@ -2391,7 +2391,7 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "request-response"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2425,7 +2425,7 @@ dependencies = [
 
 [[package]]
 name = "routerless"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "tokio",
  "topcoat",
@@ -2443,7 +2443,7 @@ dependencies = [
 
 [[package]]
 name = "runtime"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "tokio",
  "topcoat",
@@ -2628,7 +2628,7 @@ dependencies = [
 
 [[package]]
 name = "session"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "serde",
  "tokio",
@@ -2744,7 +2744,7 @@ dependencies = [
 
 [[package]]
 name = "sse"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "futures-core",
  "futures-util",
@@ -2761,7 +2761,7 @@ checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 
 [[package]]
 name = "storefront-topcoat"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2793,7 +2793,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "suspense"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "tokio",
  "topcoat",
@@ -2840,7 +2840,7 @@ dependencies = [
 
 [[package]]
 name = "tailwind"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "tokio",
  "topcoat",
@@ -3078,7 +3078,7 @@ dependencies = [
 
 [[package]]
 name = "toasty-todo"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "serde",
  "toasty",
@@ -3214,7 +3214,7 @@ checksum = "756daf9b1013ebe47a8776667b466417e2d4c5679d441c26230efd9ef78692db"
 
 [[package]]
 name = "topcoat"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "futures-core",
  "futures-util",
@@ -3250,7 +3250,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-alpine-ajax"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "http",
  "tokio",
@@ -3260,7 +3260,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-asset"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "http",
  "memchr",
@@ -3280,7 +3280,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-cli"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "askama",
  "clap",
@@ -3313,7 +3313,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-cookie"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "cookie 0.18.1",
  "getrandom 0.2.17",
@@ -3328,7 +3328,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-core"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "anymap3",
@@ -3344,7 +3344,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-core-grammar"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -3354,7 +3354,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-core-macro"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "quote",
  "serde",
@@ -3367,7 +3367,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-datastar"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "futures-util",
  "http",
@@ -3382,7 +3382,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-font"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "heck",
  "inventory",
@@ -3399,7 +3399,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-font-grammar"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3410,7 +3410,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-font-macro"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "quote",
  "syn 3.0.6",
@@ -3420,7 +3420,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-htmx"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "http",
  "serde",
@@ -3433,7 +3433,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-icon"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3447,7 +3447,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-icon-grammar"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -3460,7 +3460,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-icon-macro"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3471,7 +3471,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-mail"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "lettre",
  "thiserror",
@@ -3484,7 +3484,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-mail-grammar"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3496,7 +3496,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-mail-macro"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "quote",
  "syn 3.0.6",
@@ -3507,7 +3507,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-router"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "bytes",
  "form_urlencoded",
@@ -3546,7 +3546,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-router-grammar"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -3557,7 +3557,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-router-macro"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "http",
  "quote",
@@ -3570,7 +3570,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-runtime"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "futures-util",
  "pin-project-lite",
@@ -3601,7 +3601,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-runtime-grammar"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3615,7 +3615,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-runtime-macro"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "futures-util",
  "http",
@@ -3630,7 +3630,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-session"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "base64",
  "getrandom 0.4.2",
@@ -3646,7 +3646,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-tailwind"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "sha2 0.11.0",
  "thiserror",
@@ -3657,7 +3657,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-ui"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3669,7 +3669,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-ui-registry"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "toml",
  "topcoat",
@@ -3678,7 +3678,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-view"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "criterion",
  "futures-core",
@@ -3694,7 +3694,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-view-grammar"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -3706,7 +3706,7 @@ dependencies = [
 
 [[package]]
 name = "topcoat-view-macro"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "futures-core",
  "quote",
@@ -3821,7 +3821,7 @@ checksum = "40ce102ab67701b8526c123c1bab5cbe42d7040ccfd0f64af1a385808d2f43de"
 
 [[package]]
 name = "ui"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "tokio",
  "topcoat",
@@ -4118,7 +4118,7 @@ dependencies = [
 
 [[package]]
 name = "websocket"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "tokio",
  "topcoat",

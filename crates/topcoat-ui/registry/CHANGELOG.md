@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0](https://github.com/tokio-rs/topcoat/compare/topcoat-ui-registry-v0.10.0...topcoat-ui-registry-v0.11.0) - 2026-10-08
+
+### Added
+
+- *(cli)* [**breaking**] add `topcoat new` command ([#501](https://github.com/tokio-rs/topcoat/pull/501))
+- *(ui)* add navigation menu ([#499](https://github.com/tokio-rs/topcoat/pull/499))
+
 ## [0.9.0](https://github.com/tokio-rs/topcoat/compare/topcoat-ui-registry-v0.8.1...topcoat-ui-registry-v0.9.0) - 2026-09-24
 
 ### Added
