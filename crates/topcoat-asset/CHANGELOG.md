@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0](https://github.com/tokio-rs/topcoat/compare/topcoat-asset-v0.10.0...topcoat-asset-v0.11.0) - 2026-10-08
+
+### Fixed
+
+- *(asset)* percent-encode bundled filenames in urls ([#495](https://github.com/tokio-rs/topcoat/pull/495))
+
 ## [0.10.0](https://github.com/tokio-rs/topcoat/compare/topcoat-asset-v0.9.0...topcoat-asset-v0.10.0) - 2026-10-03
 
 ### Other

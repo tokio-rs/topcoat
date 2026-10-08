@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0](https://github.com/tokio-rs/topcoat/compare/topcoat-router-v0.10.0...topcoat-router-v0.11.0) - 2026-10-08
+
+### Fixed
+
+- *(router)* decode last-event-id headers as utf-8 ([#493](https://github.com/tokio-rs/topcoat/pull/493))
+- *(router)* create Hyper with a default tokio timer ([#497](https://github.com/tokio-rs/topcoat/pull/497))
+
 ## [0.10.0](https://github.com/tokio-rs/topcoat/compare/topcoat-router-v0.9.0...topcoat-router-v0.10.0) - 2026-10-03
 
 ### Added
