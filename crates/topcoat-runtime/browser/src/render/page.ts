@@ -8,7 +8,7 @@ import type { Runtime } from "../runtime";
 import type { Scope } from "../scope";
 import type { SignalId } from "../signal-registry";
 import type { RerunRequest } from "./connection";
-import { newRender, type RenderToken } from "./frames";
+import { FRAMES_MEDIA_TYPE, newRender, type RenderToken } from "./frames";
 import { RUNTIME_HEADER } from "./request";
 import { RenderUnit } from "./unit";
 
@@ -18,6 +18,12 @@ import { RenderUnit } from "./unit";
  */
 export class PageUnit extends RenderUnit {
 	protected readonly label = "Page";
+	private devRefresh: Promise<void> | null = null;
+
+	/** The dev response still streaming into the current document, if any. */
+	get pendingRefresh(): Promise<void> | null {
+		return this.devRefresh;
+	}
 
 	constructor(runtime: Runtime) {
 		super(null, runtime);
@@ -81,15 +87,23 @@ export class PageUnit extends RenderUnit {
 			DEV_RUNTIME_EVENT,
 			(event) => {
 				const { detail } = event as CustomEvent<DevRuntimeDetail>;
+				const render = newRender();
 				detail.runtime = {
-					// The dev client reads the response as a document.
-					request: (signal) => this.request(signal, "text/html"),
+					request: (signal, finished) => {
+						this.devRefresh = finished;
+						void finished.then(() => {
+							if (this.devRefresh === finished) this.devRefresh = null;
+						});
+						return this.request(signal, FRAMES_MEDIA_TYPE);
+					},
 					replace: (update) => {
+						this.runtime.connection.stop(this);
 						this.replace((scope, adoptable) => {
 							update();
 							this.runtime.hydrate(document, null, null, scope, adoptable);
-						}, newRender());
+						}, render);
 					},
+					swap: (region, html) => this.applySwap(region, html, render),
 				};
 			},
 			{ signal: this.lifetime.abortSignal },

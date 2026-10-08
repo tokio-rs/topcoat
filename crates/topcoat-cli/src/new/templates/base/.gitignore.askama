@@ -1,0 +1,4 @@
+/target
+{%- if toasty %}
+/data.db*
+{%- endif %}

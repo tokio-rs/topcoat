@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use percent_encoding::{AsciiSet, CONTROLS, PercentEncode, utf8_percent_encode};
+
 use crate::{AssetBundle, AssetId, Manifest};
 
 /// A single entry inside an [`AssetCatalog`].
@@ -16,6 +18,11 @@ impl BundledAsset {
         &self.file
     }
 
+    /// The filename encoded as a single URL path segment.
+    pub(crate) fn encoded_name(&self) -> PercentEncode<'_> {
+        utf8_percent_encode(self.name(), FILENAME)
+    }
+
     /// `Content-Type` the asset is served with, resolved when the bundle was
     /// built.
     #[must_use]
@@ -23,6 +30,24 @@ impl BundledAsset {
         &self.content_type
     }
 }
+
+/// The URL path encode set plus separators, literal escapes, and parentheses
+/// that the router reserves for groups.
+const FILENAME: &AsciiSet = &CONTROLS
+    .add(b' ')
+    .add(b'"')
+    .add(b'#')
+    .add(b'%')
+    .add(b'(')
+    .add(b')')
+    .add(b'/')
+    .add(b'<')
+    .add(b'>')
+    .add(b'?')
+    .add(b'`')
+    .add(b'{')
+    .add(b'}')
+    .add(b'\\');
 
 /// The mapping from [`AssetId`]s to their bundled filenames and content
 /// types.

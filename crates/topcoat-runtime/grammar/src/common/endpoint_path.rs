@@ -1,12 +1,12 @@
+use std::hash::{DefaultHasher, Hash, Hasher};
+
 use proc_macro2::Span;
 use syn::{
-    LitStr,
+    Ident, LitStr,
     parse::{Parse, ParseStream},
 };
 use topcoat_core_grammar::ParseOption;
 use topcoat_router::{Path, PathSegment};
-
-use crate::common::random_hex;
 
 /// An absolute route path for a procedure or shard endpoint.
 ///
@@ -16,11 +16,24 @@ pub struct EndpointPath {
 }
 
 impl EndpointPath {
-    /// Returns the supplied path or generates a random path under `prefix`.
+    /// Returns the supplied path, or generates a path under `prefix` for the
+    /// function named `ident`.
+    ///
+    /// A generated path is a hash of the function's name and source location,
+    /// so it stays the same until the function is renamed or moved.
     #[must_use]
-    pub fn resolve(path: Option<&Self>, prefix: &str) -> LitStr {
+    pub fn resolve(path: Option<&Self>, prefix: &str, ident: &Ident) -> LitStr {
         path.map_or_else(
-            || LitStr::new(&format!("{prefix}/{}", random_hex()), Span::call_site()),
+            || {
+                let span = ident.span();
+                let start = span.start();
+                let mut hasher = DefaultHasher::new();
+                (span.file(), start.line, start.column, ident.to_string()).hash(&mut hasher);
+                LitStr::new(
+                    &format!("{prefix}/{:016x}", hasher.finish()),
+                    Span::call_site(),
+                )
+            },
             |path| path.lit.clone(),
         )
     }
@@ -101,20 +114,40 @@ mod tests {
         assert!(parse_err(r#""/files/{*rest}""#).contains("parameters"));
     }
 
+    /// Resolves a generated path for an identifier parsed from `source`, so
+    /// that leading whitespace and newlines move its source location.
+    fn generated(source: &str) -> String {
+        let ident: Ident = syn::parse_str(source).unwrap();
+        EndpointPath::resolve(None, "/prefix", &ident).value()
+    }
+
     #[test]
     fn a_named_path_is_served_verbatim() {
         let path: EndpointPath = syn::parse_str(r#""/search""#).unwrap();
+        let ident: Ident = syn::parse_str("search").unwrap();
         assert_eq!(
-            EndpointPath::resolve(Some(&path), "/unused").value(),
+            EndpointPath::resolve(Some(&path), "/unused", &ident).value(),
             "/search"
         );
     }
 
     #[test]
     fn a_missing_path_falls_below_the_prefix() {
-        let path = EndpointPath::resolve(None, "/prefix").value();
+        let path = generated("save");
         let rest = path.strip_prefix("/prefix/").expect(&path);
-        assert_eq!(rest.len(), 32, "{path}");
+        assert!(!rest.is_empty(), "{path}");
+        assert!(rest.chars().all(|c| c.is_ascii_hexdigit()), "{path}");
+    }
+
+    #[test]
+    fn generated_paths_differ_by_name() {
+        assert_ne!(generated("save"), generated("load"));
+    }
+
+    #[test]
+    fn generated_paths_differ_by_location() {
+        assert_ne!(generated("save"), generated("  save"));
+        assert_ne!(generated("save"), generated("\nsave"));
     }
 
     #[test]

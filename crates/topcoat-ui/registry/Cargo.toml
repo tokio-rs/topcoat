@@ -23,12 +23,16 @@ registry = "."
 # references read the staged set.
 [features]
 stage-icons = ["dep:topcoat-icon"]
+# Compiles the manifest and the sources it names into the crate as `FILES`, so a
+# binary can install them without locating this crate on disk.
+embedded = ["dep:toml"]
 
 [dev-dependencies]
 topcoat = { workspace = true, features = ["icon-iconify"] }
 
 [build-dependencies]
 topcoat-icon = { workspace = true, features = ["iconify-build"], optional = true }
+toml = { workspace = true, optional = true }
 
 [lints]
 workspace = true

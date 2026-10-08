@@ -1,0 +1,32 @@
+mod app;
+{%- if ui %}
+mod components;
+{%- endif %}
+{%- if toasty %}
+mod db;
+{%- endif %}
+mod features;
+{%- if custom_icons %}
+mod icons;
+{%- endif %}
+
+#[tokio::main]
+async fn main() {
+{%- if toasty %}
+    let db = db::connect().await.unwrap();
+
+    // `cargo run -- toasty migration <command>` manages the database schema.
+    let mut args = std::env::args().skip(1).peekable();
+    if args.peek().is_some_and(|arg| arg == "toasty") {
+        if let Err(error) = toasty_cli::ToastyCli::new(db).parse_from(args).await {
+            eprintln!("{error:#}");
+            std::process::exit(1);
+        }
+        return;
+    }
+
+    topcoat::start(app::router().app_context(db).build()).await.unwrap();
+{%- else %}
+    topcoat::start(app::router()).await.unwrap();
+{%- endif %}
+}

@@ -55,7 +55,7 @@ impl AssetRoute {
         });
         Self {
             id: RouteId::new(),
-            path: Path::new(&format!("{ASSET_ROUTE_PREFIX}/{name}")).to_owned(),
+            path: Path::new(&format!("{ASSET_ROUTE_PREFIX}/{}", asset.encoded_name())).to_owned(),
             file: dir.join(name),
             content_type,
         }

@@ -1,0 +1,245 @@
+{% if example -%}
+mod todos;
+
+{% endif -%}
+use topcoat::{
+    Result,
+{%- if tailwind %}
+    asset::{AssetBundle, RouterBuilderAssetExt},
+{%- else %}
+    asset::{AssetBundle, RouterBuilderAssetExt, asset},
+{%- endif %}
+{%- if font.is_some() %}
+{%- if discover %}
+    font::{Font, fontsource::fontsource_font},
+{%- else %}
+    font::{Font, RouterBuilderFontExt, fontsource::fontsource_font},
+{%- endif %}
+{%- endif %}
+{%- if iconify_example %}
+    icon::{icon, iconify::iconify_icon},
+{%- else if custom_icons %}
+    icon::icon,
+{%- endif %}
+{%- match routing %}
+{%- when Routing::Module %}
+{%- if discover %}
+    router::{ {%- if toasty %}RouterBuilder{% else %}Router{% endif %}, RouterBuilderDiscoverExt, Slot,{% if example %} href,{% endif %} layout, module_router, page},
+{%- else %}
+    router::{ {%- if toasty %}RouterBuilder{% else %}Router{% endif %}, Slot,{% if example %} href,{% endif %} layout, module_router, page},
+{%- endif %}
+{%- when Routing::Discover %}
+    router::{Router,{% if toasty %} RouterBuilder,{% endif %} RouterBuilderDiscoverExt, Slot,{% if example %} href,{% endif %} layout, page},
+{%- when Routing::Manual %}
+    router::{Router,{% if toasty %} RouterBuilder,{% endif %} Slot,{% if example %} href,{% endif %} layout, page},
+{%- endmatch %}
+{%- if interaction == Interaction::Topcoat %}
+    runtime::RouterBuilderRuntimeExt,
+{%- endif %}
+{%- if tailwind %}
+    tailwind,
+{%- endif %}
+    view::{View,{% if tailwind && (iconify_example || custom_icons) %} attributes,{% endif %} view},
+};
+{%- if ui %}
+{%- if example %}
+
+use crate::components::{
+    button::{ButtonSize, ButtonVariant, button_variants},
+    card::{card, card_content, card_description, card_header, card_title},
+};
+{%- else %}
+
+use crate::components::card::{card, card_description, card_header, card_title};
+{%- endif %}
+{%- endif %}
+{%- if let Some(font) = font %}
+
+/// The {{ font.name }} font family, loaded from Fontsource.
+const {{ font.ident }}: Font = fontsource_font!({{ font.ident }}{{ font.args }});
+{%- endif %}
+
+/// Builds the application's router.
+{%- if toasty %}
+pub fn router() -> RouterBuilder {
+{%- else %}
+pub fn router() -> Router {
+{%- endif %}
+{%- match routing %}
+{%- when Routing::Module %}
+    // The pages and layouts of this module and its submodules, with paths derived
+    // from the module tree.
+    module_router!()
+{%- if discover %}
+        // The runtime's procedures and shards, which have no place in the module tree.
+        .discover()
+{%- endif %}
+{%- when Routing::Discover %}
+    // Every page and layout in the application, at the paths in their attributes.
+    Router::builder()
+        .discover()
+{%- when Routing::Manual %}
+    Router::builder()
+        .layout(root)
+        .page(home)
+{%- if example %}
+        .page(todos::page)
+{%- if interaction == Interaction::Topcoat %}
+        .route(todos::todo_list)
+        .route(todos::add)
+        .route(todos::toggle)
+        .route(todos::remove)
+{%- else %}
+        .route(todos::create)
+        .route(todos::id::toggle)
+        .route(todos::id::delete)
+{%- endif %}
+{%- endif %}
+{%- endmatch %}
+{%- if let Some(font) = font %}
+{%- if !discover %}
+        .font({{ font.ident }})
+{%- endif %}
+{%- endif %}
+{%- if example && !toasty %}
+        .app_context(crate::features::todo::Todos::default())
+{%- endif %}
+        .assets(AssetBundle::load().unwrap())
+{%- if interaction == Interaction::Topcoat %}
+        // Lets the browser runtime rerun pages; register it after other layers.
+        .runtime()
+{%- endif %}
+{%- if !toasty %}
+        .build()
+{%- endif %}
+}
+
+#[layout{{ paths.page("/") }}]
+async fn root(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! {
+        <!DOCTYPE html>
+        <html lang="en">
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <title>{{ title }}</title>
+{%- if tailwind %}
+                <link rel="stylesheet" href=(tailwind::stylesheet!())>
+{%- else %}
+                <link rel="stylesheet" href=(asset!("styles.css"))>
+{%- endif %}
+{%- if let Some(font) = font %}
+                topcoat::font::link(font: {{ font.ident }})
+{%- endif %}
+{%- match interaction %}
+{%- when Interaction::Topcoat %}
+                topcoat::runtime::script()
+{%- when Interaction::Htmx %}
+                <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"></script>
+{%- when Interaction::Datastar %}
+                <script
+                    type="module"
+                    src="https://cdn.jsdelivr.net/gh/starfederation/datastar@1.0.2/bundles/datastar.js"
+                ></script>
+{%- when Interaction::AlpineAjax %}
+                // `defer` ensures that Alpine initializes after the page body has been parsed.
+                <script
+                    defer=""
+                    src="https://cdn.jsdelivr.net/npm/@imacrayon/alpine-ajax@0.12.4/dist/cdn.min.js"
+                ></script>
+                <script defer="" src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.0/dist/cdn.min.js"></script>
+{%- when Interaction::None %}
+{%- endmatch %}
+                topcoat::dev::script()
+            </head>
+{%- if let Some(font) = font %}
+{%- if ui %}
+            <body>(slot)</body>
+{%- else %}
+            <body style=(format!("font-family: {:?}, {{ font.generic }}", {{ font.ident }}.family()))>
+                (slot)
+            </body>
+{%- endif %}
+{%- else %}
+            <body>(slot)</body>
+{%- endif %}
+        </html>
+    })
+}
+{%- if let Some(set) = icon_set_hint %}
+
+// Render an icon from the `{{ set }}` set with `icon(data: iconify_icon!("{{ set }}:<name>"))`,
+// importing `topcoat::icon::{icon, iconify::iconify_icon}`. Browse its icons at
+// https://icon-sets.iconify.design/{{ set }}/.
+{%- endif %}
+
+#[page{{ paths.page("/") }}]
+async fn home() -> Result<impl View> {
+    Ok(view! {
+        <main{{ classes.main }}>
+{%- if ui %}
+            card(
+                card_header(
+                    card_title(
+{%- if iconify_example %}
+                        icon(
+                            data: iconify_icon!("lucide:sparkles"),
+                            attrs: attributes! { class="inline-block" },
+                        )
+                        " "
+{%- endif %}
+                        {{ title }}
+                    )
+                    card_description(
+                        "Edit "
+                        <code>"src/app.rs"</code>
+                        " and save to see your changes."
+                    )
+                )
+{%- if example %}
+                card_content(
+                    // A link styled like a button, with the button component's classes.
+                    <a
+                        class=(button_variants(ButtonVariant::Primary, ButtonSize::Md))
+                        href=(href!(todos::page))
+                    >
+                        "Todo example"
+                    </a>
+                )
+{%- endif %}
+            )
+{%- else %}
+            <h1{{ classes.heading }}>
+{%- if iconify_example %}
+                icon(
+                    data: iconify_icon!("lucide:sparkles"),
+{%- if tailwind %}
+                    attrs: attributes! { class="inline-block" },
+{%- endif %}
+                )
+                " "
+{%- else if custom_icons %}
+                icon(
+                    data: crate::icons::SPARKLE,
+{%- if tailwind %}
+                    attrs: attributes! { class="inline-block" },
+{%- endif %}
+                )
+                " "
+{%- endif %}
+                {{ title }}
+            </h1>
+            <p{{ classes.paragraph }}>
+                "Edit "
+                <code>"src/app.rs"</code>
+                " and save to see your changes."
+            </p>
+{%- if example %}
+            <p{{ classes.paragraph }}>
+                <a{{ classes.link }} href=(href!(todos::page))>"Todo example"</a>
+            </p>
+{%- endif %}
+{%- endif %}
+        </main>
+    })
+}

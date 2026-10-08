@@ -12,6 +12,7 @@ mod list;
 mod module;
 mod package;
 mod remove;
+mod scaffold;
 mod state;
 mod workspace;
 
@@ -20,6 +21,7 @@ pub use init::*;
 pub use list::*;
 pub use package::*;
 pub use remove::*;
+pub use scaffold::*;
 
 /// Answers a confirmation prompt. Return `true` to accept, `false` to decline,
 /// or `Err` to abort the operation with an error.

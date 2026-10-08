@@ -5,7 +5,6 @@ use quote::ToTokens;
 use syn::{
     Expr, Ident, Path, Token, parenthesized,
     parse::{Parse, ParseStream},
-    spanned::Spanned,
     token::Paren,
 };
 use topcoat_core_grammar::ParseOption;
@@ -81,7 +80,7 @@ impl LowerView for Component {
             &self.path,
             self.named_args.clone(),
             &self.children,
-            self.paren_token.span.span(),
+            self.paren_token.span.open(),
         );
     }
 }

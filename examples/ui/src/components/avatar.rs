@@ -108,8 +108,8 @@ pub async fn avatar_fallback(
     Ok(view! {
         <span
             class=(class!(
-                "flex size-full items-center justify-center bg-foreground/10 font-medium \
-                 text-foreground select-none",
+                "flex size-full items-center justify-center bg-foreground/10 font-medium",
+                "text-foreground select-none",
                 attrs.remove("class"),
             ))
             (attrs)

@@ -50,7 +50,7 @@ async fn a_procedure_without_a_path_is_served_below_the_runtime_prefix() {
     let tail = path
         .strip_prefix("/_topcoat/runtime/procedures/")
         .expect(path);
-    assert_eq!(tail.len(), 32, "{path}");
+    assert!(!tail.is_empty(), "{path}");
     assert!(tail.bytes().all(|b| b.is_ascii_hexdigit()), "{path}");
     assert_ne!(without_arguments.path(), with_unit.path());
 }

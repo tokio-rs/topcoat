@@ -100,7 +100,7 @@ mod tests {
         // too, but cargo leaves it in `deps/`; only the uplifted output of
         // the crate being built belongs in the bundle.
         let artifact = artifact(&["cdylib", "rlib"], &["/target/deps/libdep.dylib"]);
-        assert!(artifact.final_outputs().is_empty());
+        assert_eq!(artifact.final_outputs(), Vec::<PathBuf>::new());
     }
 
     #[test]
@@ -108,13 +108,13 @@ mod tests {
         // A workspace build uplifts the proc-macro members' shared objects
         // right next to the application's output.
         let artifact = artifact(&["proc-macro"], &["/target/libmacros.dylib"]);
-        assert!(artifact.final_outputs().is_empty());
+        assert_eq!(artifact.final_outputs(), Vec::<PathBuf>::new());
     }
 
     #[test]
     fn plain_library_dependencies_are_not_scanned() {
         let artifact = artifact(&["lib"], &["/target/deps/libdep.rlib"]);
-        assert!(artifact.final_outputs().is_empty());
+        assert_eq!(artifact.final_outputs(), Vec::<PathBuf>::new());
     }
 
     #[test]

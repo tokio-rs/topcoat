@@ -10,13 +10,20 @@ topcoat fmt
 
 You can also run `cargo topcoat fmt`. Use `topcoat fmt` in editors to avoid starting Cargo for each format request.
 
-With no file arguments, the command scans Rust files under the current directory and writes changes in place.
+With no file arguments, the command scans Rust files under the current directory, skipping ignored files and `target`, and writes changes in place.
 
 ```sh
 topcoat fmt src/main.rs src/app
 ```
 
 Pass file or directory paths to limit the files to format. The command searches directories recursively for Rust files.
+
+Use `--check` to check formatting without writing files. The command reports each file that needs formatting on stderr and exits with status 1 if any input needs formatting or cannot be formatted. It exits with status 0 when all inputs are already formatted.
+
+```sh
+topcoat fmt --check
+topcoat fmt --check --rustfmt src
+```
 
 For editor integrations and other tools, use stdin/stdout mode:
 
@@ -25,6 +32,8 @@ topcoat fmt --stdin < src/main.rs > /tmp/main.rs
 ```
 
 In stdin mode, the formatted source is written to stdout instead of updating files on disk.
+
+With `--stdin --check`, the command checks the input without emitting formatted source. Diagnostics go to stderr, with the same exit statuses as file checks.
 
 Pass `--rustfmt` to run `rustfmt` first, then format Topcoat macro bodies:
 
@@ -35,10 +44,8 @@ topcoat fmt --stdin --rustfmt < src/main.rs > /tmp/main.rs
 
 This requires `rustfmt` on `PATH`. Install it with `rustup component add rustfmt`. Both formatters must succeed before a file is written or the formatted stdin is emitted. Errors go to stderr and cause a nonzero exit status.
 
-Rustfmt searches for `rustfmt.toml` or `.rustfmt.toml` from each source file's directory, or from the current directory in stdin mode. Because the source is passed through stdin, rustfmt does not infer the Rust edition from `Cargo.toml`. Set the edition in your rustfmt configuration, for example:
-
+Note that you must specify the Rust edition manually in **`rustfmt.toml`** (project root):
 ```toml
-# rustfmt.toml
 edition = "2024"
 ```
 
@@ -70,17 +77,20 @@ Macros are identified by their names at the call site. A macro imported or re-ex
 
 # Editor integration
 
-## rust-analyzer
+## rust-analyzer (VS Code, Helix, Zed, etc.)
 
-Set `rustfmt.overrideCommand` to run both formatters with a single command. For example, in VS Code's `settings.json`:
+Add the two files to your project root.
 
-```json
-{
-  "rust-analyzer.rustfmt.overrideCommand": ["topcoat", "fmt", "--stdin", "--rustfmt"]
-}
-```
+1. `rustfmt.toml`
+   ```toml
+   edition = "2024"
+   ```
 
-The command reads the editor buffer from stdin and writes the formatted source to stdout. It works without a shell or wrapper script. Set the Rust edition in `rustfmt.toml` as described above.
+2. `rust-analyzer.toml`
+   ```toml
+   [rustfmt]
+   overrideCommand = ["topcoat", "fmt", "--stdin", "--rustfmt"]
+   ```
 
 ## Neovim
 

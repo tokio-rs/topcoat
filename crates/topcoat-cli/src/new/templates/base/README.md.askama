@@ -1,0 +1,61 @@
+# {{ name }}
+
+A [Topcoat](https://github.com/tokio-rs/topcoat) application.
+
+## Development
+
+Install the Topcoat CLI:
+
+```sh
+cargo install topcoat-cli
+```
+{%- if toasty %}
+{%- if example %}
+
+Create the database tables by generating a migration from the models and applying it:
+{%- else %}
+
+After adding or changing a Toasty model, generate a migration and apply it:
+{%- endif %}
+
+```sh
+cargo run -- toasty migration generate
+cargo run -- toasty migration apply
+```
+{%- if example %}
+
+Run both commands again after changing a model. The database is stored in `data.db`.
+{%- else %}
+
+The database is stored in `data.db`.
+{%- endif %}
+{%- endif %}
+
+Start the development server, which rebuilds the application when you edit its source:
+
+```sh
+topcoat dev
+```
+
+Then open <http://127.0.0.1:3000>.
+
+## Project structure
+
+| Path | Contents |
+| --- | --- |
+| `src/app.rs`, `src/app/` | The route tree: the router, layouts, pages, and routes. |
+| `src/features.rs`, `src/features/` | Everything one feature owns, such as its data and business rules. |
+{%- if ui %}
+| `src/components.rs`, `src/components/` | Shared UI components that belong to no single feature. |
+{%- endif %}
+{%- if toasty %}
+| `src/db.rs` | The database connection. |
+| `toasty/` | The database migrations. Commit them with your code. |
+{%- endif %}
+
+Pages in `app` use features and components. A feature can use shared components but never imports from `app`, and shared components never import from a feature.
+
+## Learn more
+
+- [Getting started](https://github.com/tokio-rs/topcoat/blob/main/docs/getting_started.md)
+- [Guides](https://github.com/tokio-rs/topcoat/tree/main#learn-topcoat)

@@ -1,68 +1,10 @@
 # Getting started
 
-Create a Topcoat app and run it locally with automatic updates as you edit.
-
-## Create a new project
-
-Create a Cargo binary project:
-
-```sh
-cargo new hello-world
-cd hello-world
-```
-
-Add `topcoat` and `tokio`:
-
-```sh
-cargo add topcoat
-cargo add tokio --features rt-multi-thread,macros
-```
-
-Replace `src/main.rs` with:
-
-```rust,standalone_crate
-use topcoat::{
-    Result,
-    router::{module_router, page},
-    view::{View, component, view},
-};
-
-#[tokio::main]
-async fn main() {
-    topcoat::start(module_router!().build()).await.unwrap();
-}
-
-#[page]
-async fn home() -> Result<impl View> {
-    Ok(view! {
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <title>"Hello world"</title>
-                topcoat::dev::script()
-            </head>
-            <body>
-                hello(name: "World")
-            </body>
-        </html>
-    })
-}
-
-#[component]
-async fn hello(name: &str) -> Result<impl View> {
-    Ok(view! {
-        <h1>"Hello, " (name) "!"</h1>
-    })
-}
-```
-
-`module_router!()` uses its enclosing module as `/`, so the `home` page above serves `/`. To add `/about`, declare `mod about;` in `main.rs` and put a `#[page]` handler in `src/about.rs`. See the [module routing guide](crate::router::module_router) for nested modules, layouts, and path parameters.
-
-Run `cargo run` to serve the app at <http://127.0.0.1:3000>. For automatic rebuilds while you work, install the Topcoat CLI.
+Create and run a Topcoat app with `topcoat new`. For setup without the generator, see [Manual setup](https://github.com/tokio-rs/topcoat/blob/main/docs/manual_setup.md).
 
 ## Install the CLI
 
-Install the CLI from crates.io:
+Install [Rust and Cargo](https://www.rust-lang.org/tools/install), then install the Topcoat CLI:
 
 ```sh
 cargo install topcoat-cli
@@ -70,17 +12,37 @@ cargo install topcoat-cli
 
 Make sure Cargo's binary directory is on your `PATH` so you can run `topcoat`. You can also invoke it as `cargo topcoat`.
 
-## Start the dev server
+## Create an app
 
-From the project root:
+Create an app with the recommended settings:
+
+```sh
+topcoat new hello-world --recommended
+cd hello-world
+```
+
+This creates an app with module routing, Topcoat's browser runtime, Tailwind CSS, Topcoat UI, icons, fonts, and a todo example backed by Toasty and SQLite.
+
+Omit `--recommended` to select features interactively, or use `--minimal` for a small app without a database or browser interaction library. See the [`topcoat new` reference](https://github.com/tokio-rs/topcoat/blob/main/docs/cli/new.md) for options.
+
+## Run the app
+
+The recommended setup includes database models. Generate and apply a migration to create their tables:
+
+```sh
+cargo run -- toasty migration generate
+cargo run -- toasty migration apply
+```
+
+Run these commands again after changing a model. SQLite stores the data in `data.db`. Apps without database models, including the minimal preset, can skip this step.
+
+Start the development server:
 
 ```sh
 topcoat dev
 ```
 
-The dev server builds and starts the app, then rebuilds it when source files change. Pages that include `topcoat::dev::script()` update when the new build is ready. Press `r` in the terminal to rebuild manually.
-
-Open <http://127.0.0.1:3000> and you should see **Hello, World!**.
+Open <http://127.0.0.1:3000>. Pages and layouts are in `src/app.rs` and `src/app/`. The dev server rebuilds the app and refreshes the page when source files change. Press `r` in the terminal to rebuild manually.
 
 To override the bind address, set `HOST` and `PORT` before running:
 
@@ -88,10 +50,6 @@ To override the bind address, set `HOST` and `PORT` before running:
 HOST=0.0.0.0 PORT=8080 topcoat dev
 ```
 
-## Improving build times
-
 For ways to reduce rebuild times, see the Cargo book's [build performance chapter](https://doc.rust-lang.org/cargo/guide/build-performance.html).
 
-## Where to next
-
-Choose your next topic from the [guide index](https://github.com/tokio-rs/topcoat/tree/main#learn-topcoat).
+See the [guide index](https://github.com/tokio-rs/topcoat/tree/main#learn-topcoat) for routing, components, and other features.

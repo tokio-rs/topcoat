@@ -2,14 +2,21 @@
 
 mod error;
 
-use std::{collections::BTreeSet, io::Read, path::Path, process::Stdio, time::Instant};
+use std::{
+    collections::BTreeSet,
+    io::Read,
+    path::{Path, PathBuf},
+    process::Stdio,
+    time::Instant,
+};
 
 use clap::Args;
 use console::style;
+use ignore::WalkBuilder;
 use tokio::{io::AsyncWriteExt, process::Command};
 use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
 
-use crate::fmt::error::Error;
+use crate::{common::format, fmt::error::Error};
 
 #[derive(Args)]
 #[command(version, about = "Format the content of view macro invocations in Rust source files.", long_about = None)]
@@ -17,6 +24,10 @@ pub struct FmtCommand {
     #[arg(long)]
     /// If specified, reads the standard input and formats to standard output.
     stdin: bool,
+
+    /// Check formatting without writing files or emitting formatted source.
+    #[arg(long)]
+    check: bool,
 
     /// Run rustfmt before formatting macro bodies. Requires rustfmt on PATH.
     #[arg(long)]
@@ -34,107 +45,30 @@ pub struct FmtCommand {
 
 impl FmtCommand {
     pub async fn run(&self) {
-        let registry = {
-            // The full set of macros `topcoat fmt` knows how to format.
-            const ALL_MACROS: &[&str] = &[
-                "view",
-                "attributes",
-                "class",
-                "live",
-                "emit",
-                "font_face",
-                "font",
-                "fontsource_font_face",
-                "fontsource_font",
-                "mail",
-            ];
-
-            let mut registry = Registry::new();
-
-            let selected: BTreeSet<&str> = match &self.macros {
-                Some(names) => names.iter().map(String::as_str).collect(),
-                None => ALL_MACROS.iter().copied().collect(),
-            };
-
-            for name in &selected {
-                if !ALL_MACROS.contains(name) {
-                    eprintln!(
-                        "{}",
-                        style(format!(
-                            "unknown macro '{name}'; supported macros are: {}",
-                            ALL_MACROS.join(", ")
-                        ))
-                        .red()
-                    );
-                    std::process::exit(1);
+        let registry = match &self.macros {
+            None => format::registry(),
+            Some(names) => {
+                let mut registry = Registry::new();
+                for name in names {
+                    if !format::register(&mut registry, name) {
+                        eprintln!(
+                            "{}",
+                            style(format!(
+                                "unknown macro '{name}'; supported macros are: {}",
+                                format::MACROS.join(", ")
+                            ))
+                            .red()
+                        );
+                        std::process::exit(1);
+                    }
                 }
-            }
-
-            if selected.contains("view") {
-                registry.register_macro::<topcoat_view_grammar::view::View>("view");
-            }
-            if selected.contains("attributes") {
                 registry
-                    .register_macro::<topcoat_view_grammar::attributes::Attributes>("attributes");
             }
-            if selected.contains("class") {
-                registry.register_macro::<topcoat_view_grammar::class::Class>("class");
-            }
-            if selected.contains("live") {
-                registry.register_macro::<topcoat_view_grammar::live::Live>("live");
-            }
-            if selected.contains("emit") {
-                registry.register_macro::<topcoat_view_grammar::live::Emit>("emit");
-            }
-            if selected.contains("font_face") {
-                registry.register_macro::<topcoat_font_grammar::font_face::FontFace>("font_face");
-            }
-            if selected.contains("font") {
-                registry.register_macro::<topcoat_font_grammar::font::Font>("font");
-            }
-            if selected.contains("fontsource_font_face") {
-                registry
-                    .register_macro::<topcoat_font_grammar::fontsource::font_face::FontsourceFontFace>(
-                        "fontsource_font_face",
-                    );
-            }
-            if selected.contains("fontsource_font") {
-                registry.register_macro::<topcoat_font_grammar::fontsource::font::FontsourceFont>(
-                    "fontsource_font",
-                );
-            }
-            if selected.contains("mail") {
-                registry.register_macro::<topcoat_mail_grammar::mail::Mail>("mail");
-            }
-
-            registry
         };
 
         let start = Instant::now();
         let result: Result<(), Error> = async {
-            let mut files = BTreeSet::new();
-
-            let patterns: Vec<&str> = if self.files.is_empty() && !self.stdin {
-                vec!["**/*.rs"]
-            } else {
-                self.files.iter().map(String::as_str).collect()
-            };
-
-            for pattern in patterns {
-                for entry in glob::glob(pattern)? {
-                    let entry = entry?;
-                    if entry.is_dir() {
-                        let dir = entry
-                            .to_str()
-                            .expect("directory does not have a UTF-8 compatible name");
-                        for entry in glob::glob(&format!("{dir}/**/*.rs"))? {
-                            files.insert(entry?);
-                        }
-                    } else {
-                        files.insert(entry);
-                    }
-                }
-            }
+            let files = self.files()?;
 
             let mut count = 0;
             let mut modified = 0;
@@ -144,6 +78,9 @@ impl FmtCommand {
                     Ok(true) => {
                         count += 1;
                         modified += 1;
+                        if self.check {
+                            eprintln!("{}: needs formatting", file.display());
+                        }
                     }
                     Ok(false) => {
                         count += 1;
@@ -158,8 +95,29 @@ impl FmtCommand {
             if self.stdin {
                 let mut buf = String::new();
                 std::io::stdin().read_to_string(&mut buf)?;
-                buf = self.format_source(&buf, &registry, None).await?;
-                print!("{buf}");
+                let output = self.format_source(&buf, &registry, None).await?;
+                if self.check {
+                    count += 1;
+                    if output != buf {
+                        modified += 1;
+                        eprintln!("stdin: needs formatting");
+                    }
+                } else {
+                    print!("{output}");
+                    return Ok(());
+                }
+            }
+
+            if self.check {
+                let summary = format!(
+                    "checked {count} inputs ({modified} need formatting), {failed} failed in {:.0?}",
+                    start.elapsed()
+                );
+                if modified > 0 || failed > 0 {
+                    eprintln!("{}", style(summary).red());
+                    std::process::exit(1);
+                }
+                eprintln!("{}", style(summary).green());
             } else if failed > 0 {
                 eprintln!(
                     "{}",
@@ -193,13 +151,37 @@ impl FmtCommand {
         }
     }
 
+    /// Collects the Rust files to format.
+    fn files(&self) -> Result<BTreeSet<PathBuf>, Error> {
+        let mut files = BTreeSet::new();
+        if self.files.is_empty() {
+            if !self.stdin {
+                rust_files_in(Path::new("."), &mut files)?;
+            }
+            return Ok(files);
+        }
+        for pattern in &self.files {
+            for entry in glob::glob(pattern)? {
+                let entry = entry?;
+                if entry.is_dir() {
+                    rust_files_in(&entry, &mut files)?;
+                } else {
+                    files.insert(entry);
+                }
+            }
+        }
+        Ok(files)
+    }
+
     async fn format_file(&self, path: &Path, registry: &Registry) -> Result<bool, Error> {
         let input = std::fs::read_to_string(path)?;
         let output = self.format_source(&input, registry, path.parent()).await?;
         if output == input {
             Ok(false)
         } else {
-            std::fs::write(path, output)?;
+            if !self.check {
+                std::fs::write(path, output)?;
+            }
             Ok(true)
         }
     }
@@ -241,4 +223,28 @@ impl FmtCommand {
         })?;
         Ok(pretty_print_str(registry, &source)?)
     }
+}
+
+/// Adds the Rust files under `dir` to `files`, skipping ignored files and
+/// Cargo build directories.
+fn rust_files_in(dir: &Path, files: &mut BTreeSet<PathBuf>) -> Result<(), Error> {
+    let walk = WalkBuilder::new(dir)
+        // Projects that are not in a Git repository yet still have a `.gitignore`.
+        .require_git(false)
+        // Cargo marks its build directories with a `CACHEDIR.TAG` file.
+        .filter_entry(|entry| {
+            !entry.file_type().is_some_and(|ty| ty.is_dir())
+                || !entry.path().join("CACHEDIR.TAG").is_file()
+        })
+        .build();
+    for entry in walk {
+        let entry = entry?;
+        let path = entry.path();
+        if entry.file_type().is_some_and(|ty| ty.is_file())
+            && path.extension().is_some_and(|extension| extension == "rs")
+        {
+            files.insert(path.strip_prefix(".").unwrap_or(path).to_owned());
+        }
+    }
+    Ok(())
 }

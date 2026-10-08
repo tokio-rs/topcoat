@@ -26,6 +26,9 @@ syn = { workspace = true, features = ["full"] }
 
 serde_json.workspace = true
 
+[dev-dependencies]
+topcoat-core-grammar = { workspace = true, features = ["testing"] }
+
 [lints]
 workspace = true
 

@@ -445,7 +445,7 @@ mod tests {
             .parse_or_default()
             .update(|cart| cart.items.push("z".to_owned()));
 
-        assert!(jar.added().is_empty());
+        assert_eq!(jar.added(), Vec::<Cookie<'_>>::new());
     }
 
     #[test]
@@ -456,7 +456,7 @@ mod tests {
             .update(|cart| cart.items.push("z".to_owned()))
             .rollback();
 
-        assert!(jar.added().is_empty());
+        assert_eq!(jar.added(), Vec::<Cookie<'_>>::new());
     }
 
     #[test]
@@ -482,7 +482,7 @@ mod tests {
         let removed = parsed.removed();
         assert_eq!(removed.len(), 1);
         assert_eq!(removed[0].name(), "cart");
-        assert!(parsed.added().is_empty());
+        assert_eq!(parsed.added(), Vec::<Cookie<'_>>::new());
 
         // And directly on the unparsed store.
         let unparsed = MockJar::with(&[]);

@@ -2,6 +2,7 @@
 
 import { afterEach, expect, it, vi } from "vitest";
 import { flushEffects } from "../reactivity";
+import { newRender } from "../render/frames";
 import { Runtime } from "../runtime";
 import { F64, WriteSignal } from "../surrogate";
 import { parseComment } from "./markers";
@@ -180,6 +181,72 @@ it("updates bindings and text after events, then stops both on disposal", async 
 		await Promise.resolve();
 		expect(input.value).toBe("3");
 		expect(text.textContent).toBe("3");
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
+it("keeps the server's text node on initial hydration", () => {
+	document.body.innerHTML = `
+		<!--::topcoat::signal({"t":"signal","id":"a","v":1})-->
+		<p><!--::topcoat::expr::start("cx.signal('a').get()")-->1<!--::topcoat::expr::end--></p>
+	`;
+	const paragraph = document.querySelector("p");
+	const serverText = paragraph?.childNodes[1];
+	const runtime = new Runtime();
+	try {
+		runtime.start(document);
+		expect(paragraph?.childNodes[1]).toBe(serverText);
+
+		runtime.context.signal("a").set(new F64(7));
+		flushEffects();
+		expect(paragraph?.textContent).toBe("7");
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
+it.each([
+	"page",
+	"shard",
+	"live region",
+])("reconciles text with retained signals when replacing a %s", (kind) => {
+	const text = `
+			<p><!--::topcoat::expr::start("cx.signal('a').get()")-->1<!--::topcoat::expr::end--></p>
+			<button data-topcoat-on:click="() => cx.signal('a').increment()">add</button>
+		`;
+	const html = `
+			<!--::topcoat::signal({"t":"signal","id":"a","v":1})-->
+			<!--::topcoat::shard::start("/shards/1", "0", [])-->
+				<!--::topcoat::region::start(ab)-->
+					${text}
+				<!--::topcoat::region::end(ab)-->
+			<!--::topcoat::shard::end("0")-->
+		`;
+	document.body.innerHTML = html;
+	const runtime = new Runtime();
+	try {
+		runtime.start(document);
+		const count = runtime.context.signal("a");
+		count.set(new F64(7));
+		flushEffects();
+		expect(document.querySelector("p")?.textContent).toBe("7");
+
+		if (kind === "page") {
+			runtime.page.replaceContent(`<body>${html}</body>`, newRender());
+		} else if (kind === "shard") {
+			const shard = runtime.page.contentScope.findRegion("ab")?.scope.unit;
+			if (!shard) throw new Error("Missing shard");
+			shard.replaceContent(text, newRender());
+		} else {
+			runtime.page.applySwap("ab", text, null);
+		}
+		expect((count.get() as F64).dehydrate()).toBe(7);
+		expect(document.querySelector("p")?.textContent).toBe("7");
+
+		document.querySelector("button")?.click();
+		flushEffects();
+		expect(document.querySelector("p")?.textContent).toBe("8");
 	} finally {
 		runtime.page.dispose();
 	}

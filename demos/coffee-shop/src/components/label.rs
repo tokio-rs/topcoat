@@ -6,11 +6,11 @@ use topcoat::{
 /// Classes that align label content and reflect the disabled state of a nearby or
 /// nested control.
 const LABEL: StaticClass = class!(
-    "flex items-center gap-2 text-sm leading-none font-medium select-none \
-     peer-disabled:pointer-events-none peer-disabled:opacity-50 \
-     peer-has-[:disabled]:pointer-events-none peer-has-[:disabled]:opacity-50 \
-     has-[+:disabled]:pointer-events-none has-[+:disabled]:opacity-50 \
-     has-[:disabled]:pointer-events-none has-[:disabled]:opacity-50",
+    "flex items-center gap-2 text-sm leading-none font-medium select-none",
+    "peer-disabled:pointer-events-none peer-disabled:opacity-50",
+    "peer-has-[:disabled]:pointer-events-none peer-has-[:disabled]:opacity-50",
+    "has-[+:disabled]:pointer-events-none has-[+:disabled]:opacity-50",
+    "has-[:disabled]:pointer-events-none has-[:disabled]:opacity-50",
 );
 
 /// A label for a form control.

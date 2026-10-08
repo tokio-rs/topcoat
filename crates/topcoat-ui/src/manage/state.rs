@@ -86,11 +86,17 @@ impl InstallState {
 
     pub(super) fn save(&self, package: &Package) -> Result<(), String> {
         let path = package.state_path();
+        std::fs::write(&path, self.render()?)
+            .map_err(|error| format!("failed to write {}: {error}", path.display()))
+    }
+
+    /// Renders the contents of the install-state file.
+    pub(super) fn render(&self) -> Result<String, String> {
         let body = toml::to_string_pretty(self)
             .map_err(|error| format!("failed to serialize install state: {error}"))?;
-        let contents = format!("# Topcoat UI install state. Managed by `topcoat ui`.\n{body}");
-        std::fs::write(&path, contents)
-            .map_err(|error| format!("failed to write {}: {error}", path.display()))
+        Ok(format!(
+            "# Topcoat UI install state. Managed by `topcoat ui`.\n{body}"
+        ))
     }
 
     /// Returns the registry's tracked state, creating an entry if needed. The caller

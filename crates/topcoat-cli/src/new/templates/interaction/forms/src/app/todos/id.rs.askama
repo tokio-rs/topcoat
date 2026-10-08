@@ -1,0 +1,24 @@
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{
+        error::{SeeOther, see_other},
+        href,{% if paths.is_module() %} module_param,{% endif %} path_param, route,
+    },
+};
+
+use crate::features::todo::Todo;
+
+{{ paths.param() }}!(pub id: u64, error = bad_request);
+
+#[route{{ paths.route_at("POST", "./toggle", "/todos/{id}/toggle") }}]
+pub async fn toggle(cx: &Cx) -> Result<SeeOther> {
+    Todo::toggle(cx, *path_param::<Id>(cx)?).await?;
+    Ok(see_other(href!(super::page).resolve(cx)))
+}
+
+#[route{{ paths.route_at("POST", "./delete", "/todos/{id}/delete") }}]
+pub async fn delete(cx: &Cx) -> Result<SeeOther> {
+    Todo::remove(cx, *path_param::<Id>(cx)?).await?;
+    Ok(see_other(href!(super::page).resolve(cx)))
+}

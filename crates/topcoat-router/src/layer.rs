@@ -186,7 +186,6 @@ impl<'a> Next<'a> {
 
     /// Runs the next layer in the chain, or the terminal handler once no layers
     /// remain.
-    #[must_use]
     pub fn run(self, cx: &'a Cx, body: Body) -> LayerFuture<'a> {
         match self.layers.split_first() {
             Some((layer, rest)) => layer.handle(

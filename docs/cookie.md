@@ -174,6 +174,8 @@ let jar = cookies(cx).map(|cookie| cookie.set_partitioned(true));
 
 [RFC 6265bis] cookie name prefixes ask the browser to enforce extra constraints based on the cookie's name. Topcoat applies the prefix *and* its required attributes for you, and strips the prefix back off on read so your code keeps using the bare name.
 
+Prefix adapters accept both bare names and names that already carry their prefix when reading, writing, or removing cookies. Returned cookies use the bare name.
+
 - `prefix_host` (`__Host-`): the cookie must be `Secure`, have `Path=/`, and carry no `Domain`. The tightest scoping: bound to the exact host, unavailable to subdomains.
 - `prefix_secure` (`__Secure-`): the cookie must be `Secure`.
 

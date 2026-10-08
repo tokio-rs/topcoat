@@ -62,7 +62,7 @@ Runtime types expose a subset of their Rust APIs:
 - `Option<T>`: `is_some`, `is_none`, `unwrap`, and `expect`.
 - `Result<T, E>`: `is_ok`, `is_err`, `ok`, `err`, `unwrap`, `expect`, `unwrap_err`, and `expect_err`.
 - `Vec<T>`, `[T; N]`, and slices: `len`, `is_empty`, `get`, `index`, `first`, `last`, `to_vec`, and `to_owned`. Vectors and arrays also support `as_slice` and `clone`. Lengths and indexes are `usize`. `get` returns `None` for an out-of-bounds index; `index` panics. Both borrow the element. Elements must belong to the shared vocabulary.
-- Tuples of vocabulary types: field access such as `pair.0`, and `clone`. A field of a borrowed tuple, such as `values.index(0).0`, borrows the element. A tuple renders its elements one after another with no separator. Tuples do not support comparisons.
+- Tuples of vocabulary types: literals such as `(count.get(), "items")`, field access such as `pair.0`, and `clone`. Empty tuples `()` and single-element tuples `(value,)` are supported. A field of a borrowed tuple, such as `values.index(0).0`, borrows the element. A tuple renders its elements one after another with no separator. Tuples do not support comparisons.
 - Structs with [`#[record]`](attr.record.html): create values with struct literals and access fields by name, such as `order.id`. Access through a borrowed record borrows the field. Records that implement `Clone` also support `clone`. Expressions cannot compare records or render them directly.
 - [`Signal`]: `get` and `set`, plus a shorter spelling for common writes: `toggle` on a `bool` signal, `increment` and `decrement` on a numeric signal, and `push_str` on a `String` signal.
 
@@ -75,7 +75,7 @@ Expressions use a subset of Rust's syntax:
 - String, integer, `f64`, and `bool` literals.
 - The unary and binary operators listed above.
 - Method calls, field access, and indexing.
-- Construction of options with `Some` and `None`, results with `Ok` and `Err`, and records with struct literals.
+- Construction of options with `Some` and `None`, results with `Ok` and `Err`, tuples with tuple literals, and records with struct literals.
 - Blocks, with `let` bindings of plain identifiers; the trailing expression is the block's value.
 - `if`/`else` as an expression.
 - Closures, optionally `async`, and `.await`.

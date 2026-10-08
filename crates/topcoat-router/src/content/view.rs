@@ -296,6 +296,7 @@ window.topcoat ??= {
         script.remove();
     },
 };
+document.currentScript.remove();
 </script>";
 
 /// Builds the script a mid-stream redirect is sent as: a navigation to the

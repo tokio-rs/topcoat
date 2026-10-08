@@ -57,26 +57,32 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                 :value=$(order.read().item.to_owned())
                 @input=$(|e: Event| {
                     let current = order.get();
-                    order.set(Order {
-                        item: e.target.value,
-                        quantity: current.quantity,
-                        address: current.address,
-                    });
+                    order.set(
+                        Order {
+                            item: e.target.value,
+                            quantity: current.quantity,
+                            address: current.address,
+                        },
+                    );
                 })
             >
         </label>
 
         <p>
-            "quantity: " $(order.get().quantity) " "
+            "quantity: "
+            $(order.get().quantity)
+            " "
             <button
                 @click=$(|_e| {
                     let current = order.get();
                     if current.quantity > 1u32 {
-                        order.set(Order {
-                            quantity: current.quantity - 1u32,
-                            item: current.item,
-                            address: current.address,
-                        });
+                        order.set(
+                            Order {
+                                quantity: current.quantity - 1u32,
+                                item: current.item,
+                                address: current.address,
+                            },
+                        );
                     }
                 })
             >
@@ -85,11 +91,13 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
             <button
                 @click=$(|_e| {
                     let current = order.get();
-                    order.set(Order {
-                        quantity: current.quantity + 1u32,
-                        item: current.item,
-                        address: current.address,
-                    });
+                    order.set(
+                        Order {
+                            quantity: current.quantity + 1u32,
+                            item: current.item,
+                            address: current.address,
+                        },
+                    );
                 })
             >
                 "+"
@@ -102,11 +110,16 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                 :value=$(order.read().address.street.to_owned())
                 @input=$(|e: Event| {
                     let current = order.get();
-                    order.set(Order {
-                        address: Address { street: e.target.value, city: current.address.city },
-                        item: current.item,
-                        quantity: current.quantity,
-                    });
+                    order.set(
+                        Order {
+                            address: Address {
+                                street: e.target.value,
+                                city: current.address.city,
+                            },
+                            item: current.item,
+                            quantity: current.quantity,
+                        },
+                    );
                 })
             >
         </label>
@@ -117,11 +130,16 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                 :value=$(order.read().address.city.to_owned())
                 @input=$(|e: Event| {
                     let current = order.get();
-                    order.set(Order {
-                        address: Address { street: current.address.street, city: e.target.value },
-                        item: current.item,
-                        quantity: current.quantity,
-                    });
+                    order.set(
+                        Order {
+                            address: Address {
+                                street: current.address.street,
+                                city: e.target.value,
+                            },
+                            item: current.item,
+                            quantity: current.quantity,
+                        },
+                    );
                 })
             >
         </label>
@@ -140,10 +158,20 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
 
         match placed {
             Some(Ok(receipt)) => {
-                <p>"Order #" (receipt.number) ": " (receipt.summary)</p>
+                <p>
+                    "Order #"
+                    (receipt.number)
+                    ": "
+                    (receipt.summary)
+                </p>
             }
-            Some(Err(message)) => <p>"Could not place the order: " (message)</p>,
-            None => {}
+            Some(Err(message)) => <p>
+                "Could not place the order: "
+                (message)
+            </p>,
+            None => {
+
+            }
         }
     })
 }

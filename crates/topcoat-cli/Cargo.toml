@@ -23,15 +23,18 @@ path = "src/bin/cargo_topcoat.rs"
 topcoat-asset = { workspace = true, features = ["bundler"] }
 topcoat-core = { workspace = true, features = ["build"] }
 topcoat-core-grammar = { workspace = true, features = ["pretty"] }
+topcoat-font = { workspace = true, features = ["fontsource"] }
 topcoat-font-grammar = { workspace = true, features = ["fontsource", "pretty"] }
 topcoat-mail-grammar = { workspace = true, features = ["pretty"] }
 topcoat-router = { workspace = true, features = ["websocket"] }
 topcoat-ui.workspace = true
+topcoat-ui-registry = { workspace = true, features = ["embedded"] }
 topcoat-view-grammar = { workspace = true, features = ["pretty"] }
 
+askama.workspace = true
 clap = { workspace = true, features = ["derive"] }
+cliclack.workspace = true
 console.workspace = true
-dialoguer.workspace = true
 futures-util.workspace = true
 glob.workspace = true
 ignore.workspace = true
@@ -43,6 +46,7 @@ serde_json.workspace = true
 syn.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "process", "signal", "io-util", "time", "sync"] }
 toml.workspace = true
+toml_edit.workspace = true
 
 [dev-dependencies]
 topcoat.workspace = true

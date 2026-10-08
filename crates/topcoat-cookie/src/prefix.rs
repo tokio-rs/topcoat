@@ -84,6 +84,7 @@ pub(crate) enum Conform {
 /// attributes; on read it looks the cookie up under its prefixed name and
 /// strips the prefix from the result. Created by
 /// [`Cookies::override_prefix_host`] and the related combinators.
+/// Names may be bare or already carry this adapter's prefix.
 #[derive(Debug, Clone, Copy)]
 pub struct Prefixed<J> {
     inner: J,
@@ -111,8 +112,12 @@ impl<J> Prefixed<J> {
 
 impl<J: Cookies> Cookies for Prefixed<J> {
     fn get(&self, name: &str) -> Option<Cookie<'static>> {
-        let prefixed = format!("{}{}", self.prefix.as_str(), name);
-        let mut cookie = self.inner.get(&prefixed)?;
+        let mut cookie = if name.starts_with(self.prefix.as_str()) {
+            self.inner.get(name)?
+        } else {
+            self.inner
+                .get(&format!("{}{}", self.prefix.as_str(), name))?
+        };
         self.prefix.strip_name(&mut cookie);
         Some(cookie)
     }

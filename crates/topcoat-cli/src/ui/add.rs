@@ -3,6 +3,7 @@ use console::style;
 use topcoat_ui::manage::{self, AddAction, AddOptions, Package, Selection};
 
 use super::PackageArg;
+use crate::common::prompt;
 
 #[derive(Args)]
 pub(super) struct AddCommand {
@@ -26,7 +27,9 @@ pub(super) struct AddCommand {
 impl AddCommand {
     pub(super) fn run(self) {
         if let Err(error) = self.run_inner() {
-            eprintln!("{}", style(error).red());
+            if error != prompt::CANCELLED {
+                eprintln!("{}", style(error).red());
+            }
             std::process::exit(1);
         }
     }
@@ -84,24 +87,15 @@ impl AddCommand {
 
 /// Asks for confirmation, defaulting to no. Returns an error without an interactive
 /// terminal. Use an explicit `--registry` to avoid registry-selection prompts.
-fn confirm(prompt: &str) -> Result<bool, String> {
-    use std::io::{IsTerminal, Write};
-
-    if !std::io::stdin().is_terminal() {
+fn confirm(question: &str) -> Result<bool, String> {
+    if !prompt::is_interactive() {
         return Err(format!(
-            "{prompt} (no terminal to prompt on; pass --registry to choose)"
+            "{question} (no terminal to prompt on; pass --registry to choose)"
         ));
     }
 
-    eprint!("{} {} ", style(prompt).yellow(), style("[y/N]").dim());
-    std::io::stderr().flush().ok();
-
-    let mut input = String::new();
-    std::io::stdin()
-        .read_line(&mut input)
-        .map_err(|error| format!("failed to read input: {error}"))?;
-    Ok(matches!(
-        input.trim().to_ascii_lowercase().as_str(),
-        "y" | "yes"
-    ))
+    cliclack::confirm(question)
+        .initial_value(false)
+        .interact()
+        .map_err(|error| prompt::error(&error))
 }

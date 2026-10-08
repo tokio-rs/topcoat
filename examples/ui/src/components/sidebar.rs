@@ -114,12 +114,12 @@ pub async fn sidebar_provider(
 // Ordinary components nested in the panel inherit its palette too. The
 // scoped aliases keep buttons, inputs and captions independent of the page.
 const PANEL_THEME: StaticClass = class!(
-    "[--background:var(--sidebar)] [--foreground:var(--sidebar-foreground)] \
-     [--card:var(--sidebar)] [--card-foreground:var(--sidebar-foreground)] \
-     [--primary:var(--sidebar-primary)] \
-     [--primary-foreground:var(--sidebar-primary-foreground)] \
-     [--border:var(--sidebar-border)] [--ring:var(--sidebar-ring)] \
-     [--muted-foreground:color-mix(in_oklab,var(--sidebar-foreground)_70%,transparent)]",
+    "[--background:var(--sidebar)] [--foreground:var(--sidebar-foreground)]",
+    "[--card:var(--sidebar)] [--card-foreground:var(--sidebar-foreground)]",
+    "[--primary:var(--sidebar-primary)]",
+    "[--primary-foreground:var(--sidebar-primary-foreground)]",
+    "[--border:var(--sidebar-border)] [--ring:var(--sidebar-ring)]",
+    "[--muted-foreground:color-mix(in_oklab,var(--sidebar-foreground)_70%,transparent)]",
 );
 
 /// A desktop panel that becomes a sheet over the page below `md` (48rem).

@@ -101,67 +101,79 @@ pub fn init(
     })
 }
 
-/// A theme resolved and read but not yet written.
-struct ThemePlan {
-    name: String,
-    registry: String,
-    hash: String,
-    /// Package-relative destination of the stylesheet.
-    file: PathBuf,
-    /// The stylesheet's CSS, read from the registry.
-    contents: String,
-}
-
-/// Reads the selected theme and plans its destination without writing files. Uses the
-/// sole theme if none is named, or calls `choose` when several are available.
+/// Loads the default registry and plans the selected theme without writing files.
 #[track_caller]
 fn plan_theme(
     package: &Package,
     requested: Option<&str>,
     choose: &mut ChooseTheme<'_>,
 ) -> Result<ThemePlan, String> {
-    let registry_name = DEFAULT_REGISTRY;
     let workspace = Workspace::load(package)?;
     let dir = workspace
-        .registry_dir(registry_name)
+        .registry_dir(DEFAULT_REGISTRY)
         .map_err(|error| format!("cannot install a theme: {error}"))?;
     let registry = Registry::load(dir)
-        .map_err(|error| format!("failed to load registry `{registry_name}`: {error}"))?;
+        .map_err(|error| format!("failed to load registry `{DEFAULT_REGISTRY}`: {error}"))?;
+    ThemePlan::select(&registry, requested, choose)
+}
 
-    let names: Vec<String> = registry.theme_names().map(str::to_string).collect();
-    if names.is_empty() {
-        return Err(format!(
-            "registry `{registry_name}` offers no themes to install"
-        ));
-    }
+/// A theme resolved and read but not yet written.
+pub(super) struct ThemePlan {
+    pub name: String,
+    pub registry: String,
+    pub hash: String,
+    /// Package-relative destination of the stylesheet.
+    pub file: PathBuf,
+    /// The stylesheet's CSS, read from the registry.
+    pub contents: String,
+}
 
-    let chosen = match requested {
-        Some(name) if names.iter().any(|known| known == name) => name.to_string(),
-        Some(name) => {
+impl ThemePlan {
+    /// Reads the selected theme from the default registry and plans its destination.
+    /// Uses the sole theme if none is named, or calls `choose` when several are
+    /// available.
+    #[track_caller]
+    pub(super) fn select(
+        registry: &Registry,
+        requested: Option<&str>,
+        choose: &mut ChooseTheme<'_>,
+    ) -> Result<Self, String> {
+        let registry_name = DEFAULT_REGISTRY;
+        let names: Vec<String> = registry.theme_names().map(str::to_string).collect();
+        if names.is_empty() {
             return Err(format!(
-                "unknown theme `{name}`; available: {}",
-                names.join(", ")
+                "registry `{registry_name}` offers no themes to install"
             ));
         }
-        // With a single theme on offer there is nothing to choose, so install it
-        // without prompting; the picker only appears once the registry ships more.
-        None if names.len() == 1 => names[0].clone(),
-        None => choose(&names)?,
-    };
 
-    let theme = registry
-        .theme(&chosen)
-        .expect("chosen theme came from the registry");
-    let contents = theme
-        .read_source()
-        .map_err(|error| format!("failed to read theme `{chosen}`: {error}"))?;
+        let chosen = match requested {
+            Some(name) if names.iter().any(|known| known == name) => name.to_string(),
+            Some(name) => {
+                return Err(format!(
+                    "unknown theme `{name}`; available: {}",
+                    names.join(", ")
+                ));
+            }
+            // With a single theme on offer there is nothing to choose, so install it
+            // without prompting; the picker only appears once the registry ships more.
+            None if names.len() == 1 => names[0].clone(),
+            None => choose(&names)?,
+        };
 
-    Ok(ThemePlan {
-        name: chosen,
-        registry: registry_name.to_string(),
-        hash: content_hash(&contents),
-        // Installed at the package root by default, alongside `components.toml`.
-        file: PathBuf::from(theme.file_name()),
-        contents,
-    })
+        let theme = registry
+            .theme(&chosen)
+            .expect("chosen theme came from the registry");
+        let contents = theme
+            .read_source()
+            .map_err(|error| format!("failed to read theme `{chosen}`: {error}"))?;
+
+        Ok(Self {
+            name: chosen,
+            registry: registry_name.to_string(),
+            hash: content_hash(&contents),
+            // Installed at the package root by default, alongside `components.toml`.
+            file: PathBuf::from(theme.file_name()),
+            contents,
+        })
+    }
 }

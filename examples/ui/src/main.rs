@@ -28,6 +28,10 @@ use components::{
     hover_card::{hover_card, hover_card_content},
     input::input,
     kbd::{kbd, kbd_group},
+    navigation_menu::{
+        NavigationMenuLinkVariant, navigation_menu, navigation_menu_content, navigation_menu_item,
+        navigation_menu_link, navigation_menu_list, navigation_menu_trigger,
+    },
     pagination::{
         pagination, pagination_content, pagination_ellipsis, pagination_item, pagination_link,
         pagination_next, pagination_previous,
@@ -155,6 +159,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                             )
                             separator(orientation: SeparatorOrientation::Vertical)
                             <span class="text-sm font-medium">"Component library"</span>
+                            site_navigation()
 
                             let theme_label = expr!(
                                 if dark.get() {
@@ -263,6 +268,106 @@ async fn home(cx: &Cx) -> Result<impl View> {
                 )
             </body>
         </html>
+    })
+}
+
+/// Sections of the showcase, linked from the navigation menu.
+const SECTIONS: [(&str, &str, &str); 4] = [
+    (
+        "#components",
+        "All components",
+        "Every demo, from buttons to tables.",
+    ),
+    (
+        "#forms",
+        "Forms",
+        "Fields, checkboxes, switches, and radios.",
+    ),
+    (
+        "#overlays",
+        "Overlays",
+        "Dialogs, sheets, and other floating layers.",
+    ),
+    (
+        "#overview",
+        "Overview",
+        "What Topcoat UI is and how to start.",
+    ),
+];
+
+/// The header's site navigation: panels of links that open on hover, focus, or tap.
+#[component]
+async fn site_navigation() -> Result<impl View> {
+    Ok(view! {
+        navigation_menu(
+            attrs: attributes! { class="max-md:hidden" aria-label="Site" },
+            navigation_menu_list(
+                navigation_menu_item(
+                    navigation_menu_trigger("Getting started")
+                    navigation_menu_content(
+                        attrs: attributes! { class="grid w-md grid-cols-[10rem_1fr] gap-1.5" },
+                        // A feature tile spans the panel's height beside the links.
+                        <a
+                            href=(DOCS)
+                            class="row-span-3 flex flex-col justify-end gap-1 rounded-lg \
+                                bg-foreground/5 p-4 text-sm outline-none transition-colors \
+                                hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                            icon(
+                                data: iconify_icon!("lucide:book-open"),
+                                attrs: attributes! { class="mb-2 size-5" }
+                            )
+                            <span class="font-medium">"Topcoat"</span>
+                            <span class="text-muted-foreground">
+                                "Server-rendered web apps in Rust."
+                            </span>
+                        </a>
+                        navigation_menu_link(
+                            attrs: attributes! { href=(DOCS) },
+                            <span class="font-medium">"Introduction"</span>
+                            <span class="text-muted-foreground">
+                                "Set up a first app."
+                            </span>
+                        )
+                        navigation_menu_link(
+                            attrs: attributes! { href=(REGISTRY) },
+                            <span class="font-medium">"Registry"</span>
+                            <span class="text-muted-foreground">
+                                "Browse component sources."
+                            </span>
+                        )
+                        navigation_menu_link(
+                            attrs: attributes! { href=(REPOSITORY) },
+                            <span class="font-medium">"Repository"</span>
+                            <span class="text-muted-foreground">
+                                "Read the code on GitHub."
+                            </span>
+                        )
+                    )
+                )
+                navigation_menu_item(
+                    navigation_menu_trigger("Components")
+                    navigation_menu_content(
+                        attrs: attributes! { class="grid w-lg grid-cols-2 gap-1" },
+                        for (href, title, description) in SECTIONS {
+                            navigation_menu_link(
+                                active: href == "#components",
+                                attrs: attributes! { href=(href) },
+                                <span class="font-medium">(title)</span>
+                                <span class="text-muted-foreground">(description)</span>
+                            )
+                        }
+                    )
+                )
+                navigation_menu_item(
+                    navigation_menu_link(
+                        variant: NavigationMenuLinkVariant::Trigger,
+                        attrs: attributes! { href=(DOCS) },
+                        "Docs"
+                    )
+                )
+            )
+        )
     })
 }
 

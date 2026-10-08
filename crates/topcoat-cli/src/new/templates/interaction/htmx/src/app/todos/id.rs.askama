@@ -1,0 +1,23 @@
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{{ "{" }}{% if paths.is_module() %}module_param, {% endif %}path_param, route},
+    view::{ViewExt, ViewHandle, view},
+};
+
+use super::todo_list;
+use crate::features::todo::Todo;
+
+{{ paths.param() }}!(pub id: u64, error = bad_request);
+
+#[route{{ paths.route("PATCH", "/todos/{id}") }}]
+pub async fn toggle(cx: &Cx) -> Result<ViewHandle> {
+    Todo::toggle(cx, *path_param::<Id>(cx)?).await?;
+    Ok(view! { cx => todo_list() }.single().await?)
+}
+
+#[route{{ paths.route("DELETE", "/todos/{id}") }}]
+pub async fn delete(cx: &Cx) -> Result<ViewHandle> {
+    Todo::remove(cx, *path_param::<Id>(cx)?).await?;
+    Ok(view! { cx => todo_list() }.single().await?)
+}

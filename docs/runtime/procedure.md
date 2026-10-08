@@ -77,7 +77,7 @@ With the `discover` feature enabled, `.discover()` registers all procedures link
 
 # Path
 
-Topcoat generates an internal path for each procedure. This path can change between builds. To choose a stable endpoint, pass an absolute path to `#[procedure]`:
+Topcoat generates an internal path for each procedure from its name and source location. This path changes when the procedure is renamed or moved. To choose a stable endpoint, pass an absolute path to `#[procedure]`:
 
 ```rust
 use topcoat::{Result, runtime::procedure};

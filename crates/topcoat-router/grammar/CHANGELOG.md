@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0](https://github.com/tokio-rs/topcoat/compare/topcoat-router-grammar-v0.9.0...topcoat-router-grammar-v0.10.0) - 2026-10-03
+
+### Added
+
+- *(router)* module_param! macro ([#460](https://github.com/tokio-rs/topcoat/pull/460))
+
+### Fixed
+
+- non-deterministic macros ([#485](https://github.com/tokio-rs/topcoat/pull/485))
+
 ## [0.9.0](https://github.com/tokio-rs/topcoat/compare/topcoat-router-grammar-v0.8.1...topcoat-router-grammar-v0.9.0) - 2026-09-24
 
 ### Other

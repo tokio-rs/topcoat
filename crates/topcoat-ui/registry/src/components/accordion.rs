@@ -43,10 +43,10 @@ pub async fn accordion(
 /// content visible during animation. Browsers without `::details-content` support use
 /// the native disclosure behavior.
 const ANIMATION: StaticClass = class!(
-    "[interpolate-size:allow-keywords] [&::details-content]:h-0 \
-     [&::details-content]:overflow-hidden \
-     [&::details-content]:[transition:height_200ms_ease-out,content-visibility_200ms_allow-discrete] \
-     [&[open]::details-content]:h-auto",
+    "[interpolate-size:allow-keywords] [&::details-content]:h-0",
+    "[&::details-content]:overflow-hidden",
+    "[&::details-content]:[transition:height_200ms_ease-out,content-visibility_200ms_allow-discrete]",
+    "[&[open]::details-content]:h-auto",
 );
 
 /// A collapsible section with a trigger and content.
@@ -84,11 +84,11 @@ pub async fn accordion_trigger(
     Ok(view! {
         <summary
             class=(class!(
-                "flex w-full cursor-pointer list-none items-center justify-between gap-4 py-4 \
-                 text-left text-sm font-medium outline-none transition-colors \
-                 hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring \
-                 focus-visible:ring-offset-2 focus-visible:ring-offset-background \
-                 [&::-webkit-details-marker]:hidden",
+                "flex w-full cursor-pointer list-none items-center justify-between gap-4 py-4",
+                "text-left text-sm font-medium outline-none transition-colors",
+                "hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring",
+                "focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                "[&::-webkit-details-marker]:hidden",
                 attrs.remove("class"),
             ))
             (attrs)

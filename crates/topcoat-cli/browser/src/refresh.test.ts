@@ -1,6 +1,10 @@
 // @vitest-environment happy-dom
 // @vitest-environment-options {"settings":{"disableCSSFileLoading":true,"handleDisabledFileLoadingAsSuccess":true}}
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import {
+	FRAMES_MEDIA_TYPE,
+	type ServerMessage,
+} from "../../../topcoat-core/browser/frames";
 import { PageRefresh } from "./refresh";
 
 const reload = vi.fn();
@@ -28,8 +32,8 @@ afterEach(() => {
 function response(body: string, head = ""): Response {
 	const doctype = document.doctype ? "<!doctype html>" : "";
 	return new Response(
-		`${doctype}<html lang="en"><head>${head}</head><body>${body}</body></html>`,
-		{ headers: { "Content-Type": "text/html; charset=utf-8" } },
+		`${JSON.stringify({ t: "snapshot", html: `${doctype}<html lang="en"><head>${head}</head><body>${body}</body></html>` })}\n`,
+		{ headers: { "Content-Type": FRAMES_MEDIA_TYPE } },
 	);
 }
 
@@ -90,6 +94,133 @@ it("morphs a page without the runtime, preserving controls and updating its head
 	expect(document.querySelector("link")?.getAttribute("href")).toBe("/new.css");
 	expect(document.documentElement.lang).toBe("en");
 	expect(document.querySelector("p")?.textContent).toBe("new");
+});
+
+function streamed() {
+	let controller!: ReadableStreamDefaultController<Uint8Array>;
+	const body = new ReadableStream<Uint8Array>({
+		start(value) {
+			controller = value;
+		},
+	});
+	return {
+		response: new Response(body, {
+			headers: { "Content-Type": FRAMES_MEDIA_TYPE },
+		}),
+		push: (frame: ServerMessage) =>
+			controller.enqueue(
+				new TextEncoder().encode(`${JSON.stringify(frame)}\n`),
+			),
+		close: () => controller.close(),
+	};
+}
+
+const region = (html: string) =>
+	`<!--::topcoat::region::start(ab)-->${html}<!--::topcoat::region::end(ab)-->`;
+
+it("displays the page and live updates without waiting for the stream to close", async () => {
+	const stream = streamed();
+	const fetch = vi.fn().mockResolvedValue(stream.response);
+	vi.stubGlobal("fetch", fetch);
+	const { refresh, reportError } = fixture();
+	const task = refresh.refresh();
+	try {
+		const snapshot = await response(
+			`<table><tbody>${region("<tr><td>working...</td></tr>")}</tbody></table>`,
+		).text();
+		stream.push(JSON.parse(snapshot));
+		await vi.waitFor(() =>
+			expect(document.querySelector("td")?.textContent).toBe("working..."),
+		);
+		stream.push({ t: "swap", region: "ab", html: "<tr><td>done!</td></tr>" });
+		await vi.waitFor(() =>
+			expect(document.querySelector("td")?.textContent).toBe("done!"),
+		);
+		expect(fetch.mock.calls[0]?.[1].headers.Accept).toBe(FRAMES_MEDIA_TYPE);
+		expect(reportError).not.toHaveBeenCalled();
+		expect(reload).not.toHaveBeenCalled();
+	} finally {
+		stream.close();
+		await task;
+	}
+});
+
+it.each([
+	"rebuild",
+	"navigation",
+])("ignores late live updates after a %s", async (reason) => {
+	const stream = streamed();
+	vi.stubGlobal(
+		"fetch",
+		vi
+			.fn()
+			.mockResolvedValueOnce(stream.response)
+			.mockResolvedValueOnce(response(region("<p>new build</p>"))),
+	);
+	const { refresh, navigate, reportError } = fixture();
+	const task = refresh.refresh();
+	try {
+		stream.push(JSON.parse(await response(region("<p>working...</p>")).text()));
+		await vi.waitFor(() =>
+			expect(document.querySelector("p")?.textContent).toBe("working..."),
+		);
+		if (reason === "rebuild") await refresh.refresh();
+		else navigate();
+		// Deliberately deliver a frame even though the request was aborted.
+		stream.push({ t: "swap", region: "ab", html: "<p>stale</p>" });
+	} finally {
+		stream.close();
+		await task;
+	}
+	expect(document.querySelector("p")?.textContent).toBe(
+		reason === "rebuild" ? "new build" : "working...",
+	);
+	expect(reportError).not.toHaveBeenCalled();
+});
+
+it.each([
+	"redirect",
+	"error",
+] as const)("handles a streamed %s before the response ends", async (type) => {
+	const stream = streamed();
+	const fetch = vi.fn().mockResolvedValue(stream.response);
+	vi.stubGlobal("fetch", fetch);
+	const { refresh, reportError } = fixture();
+	const task = refresh.refresh();
+	stream.push(
+		type === "redirect"
+			? { t: "redirect", location: "/login" }
+			: { t: "error", status: 500 },
+	);
+	try {
+		await task;
+		if (type === "redirect") expect(assign).toHaveBeenCalledWith("/login");
+		else expect(reportError).toHaveBeenCalledOnce();
+		expect(fetch.mock.calls[0]?.[1].signal.aborted).toBe(true);
+	} finally {
+		stream.close();
+	}
+});
+
+it("uses a browser reload for an HTML response without buffering its body", async () => {
+	const fetch = vi.fn().mockResolvedValue(
+		new Response(new ReadableStream(), {
+			headers: { "Content-Type": "text/html" },
+		}),
+	);
+	vi.stubGlobal("fetch", fetch);
+	await fixture().refresh.refresh();
+	expect(reload).toHaveBeenCalledOnce();
+	expect(fetch.mock.calls[0]?.[1].signal.aborted).toBe(true);
+});
+
+it("reloads an initial document still streaming instead of waiting for DOMContentLoaded", async () => {
+	vi.spyOn(document, "readyState", "get").mockReturnValue("loading");
+	const fetch = vi.fn();
+	vi.stubGlobal("fetch", fetch);
+	await fixture().refresh.refresh();
+	expect(reload).toHaveBeenCalledOnce();
+	expect(fetch).not.toHaveBeenCalled();
 });
 
 it("keeps unchanged scripts and reloads when executable resources change", async () => {

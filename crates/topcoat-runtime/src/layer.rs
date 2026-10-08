@@ -26,7 +26,9 @@ pub const RUNTIME_PROTOCOL: &str = "topcoat-runtime";
 ///   connection describes an HTTP request: a method, a path, a body, and a few runtime headers,
 ///   such as [`RUNTIME_HEADER`] for a page rerun. The layer dispatches it with the handshake's
 ///   other headers as a connected render. Renders run side by side, and each message sent back
-///   names the render it belongs to.
+///   names the render it belongs to. A connection may have at most
+///   [`max_runs_per_connection`](crate::RouterBuilderRuntimeExt::max_runs_per_connection) renders
+///   at once.
 ///
 /// WebSocket connections are supported on native servers. HTTP page reruns
 /// are also available on WebAssembly.
@@ -57,3 +59,10 @@ impl Layer for RuntimeLayer {
         next.run(cx, body)
     }
 }
+
+/// The limit set with
+/// [`RouterBuilderRuntimeExt::max_runs_per_connection`](crate::RouterBuilderRuntimeExt::max_runs_per_connection).
+#[derive(Debug, Clone, Copy)]
+// Read only by the WebSocket handler, which native servers compile.
+#[cfg_attr(target_family = "wasm", allow(dead_code))]
+pub(crate) struct MaxRunsPerConnection(pub(crate) usize);

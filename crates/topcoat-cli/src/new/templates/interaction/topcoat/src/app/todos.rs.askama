@@ -1,0 +1,160 @@
+use topcoat::{
+    Result,
+    context::Cx,
+    router::page,
+    runtime::{Event, Signal, procedure, shard, signal},
+    view::{View,{% if ui %} attributes,{% endif %} view},
+};
+
+{% if ui -%}
+use crate::components::button::{ButtonSize, ButtonVariant, button};
+use crate::components::input::input;
+{% endif -%}
+use crate::features::todo::Todo;
+
+#[page{{ paths.page("/todos") }}]
+pub async fn page(cx: &Cx) -> Result<impl View> {
+    // The text in the input, kept in the browser.
+    let title = signal(cx, String::new);
+    // Increased after every change, so the list renders again with the new todos.
+    let revision = signal(cx, || 0u32);
+
+    Ok(view! {
+        <main{{ classes.main }}>
+            <h1{{ classes.heading }}>"Todos"</h1>
+            <form
+                {{- classes.form }}
+                @submit=$(async |e: Event| {
+                    e.prevent_default();
+                    add(title.get()).await;
+                    title.set("".to_owned());
+                    revision.increment();
+                })
+            >
+{%- if ui %}
+                input(
+                    attrs: attributes! {
+                        type="text"
+                        placeholder="What needs doing?"
+                        required=""
+                        :value=$(title.get())
+                        @input=$(|e: Event| title.set(e.target.value))
+                    },
+                )
+                button(attrs: attributes! { type="submit" }, "Add")
+{%- else %}
+                <input
+                    {{- classes.input }}
+                    type="text"
+                    placeholder="What needs doing?"
+                    required=""
+                    :value=$(title.get())
+                    @input=$(|e: Event| title.set(e.target.value))
+                >
+                " "
+                <button{{ classes.button }} type="submit">"Add"</button>
+{%- endif %}
+            </form>
+            todo_list(revision: revision)
+        </main>
+    })
+}
+
+/// The todo list, rendered on the server again whenever `revision` changes.
+#[shard]
+pub async fn todo_list(cx: &Cx, revision: Signal<u32>) -> Result<impl View> {
+    // Reading the revision on the server makes the list depend on it.
+    let _ = revision.get();
+    let todos = Todo::list(cx).await?;
+
+    Ok(view! {
+        if todos.is_empty() {
+            <p{{ classes.paragraph }}>"Nothing to do."</p>
+        } else {
+            <ul{{ classes.list }}>
+                for todo in todos {
+                    // Browser code can only capture plain values, such as the id.
+                    let id = todo.id;
+                    <li{{ classes.item }}>
+{%- if ui %}
+                        button(
+                            variant: ButtonVariant::Outline,
+                            size: ButtonSize::Sm,
+                            attrs: attributes! {
+                                @click=$(async |_e: Event| {
+                                    toggle(id).await;
+                                    revision.increment();
+                                })
+                            },
+                            if todo.done { "Undo" } else { "Done" }
+                        )
+{%- else %}
+                        <button
+                            {{- classes.button }}
+                            @click=$(async |_e: Event| {
+                                toggle(id).await;
+                                revision.increment();
+                            })
+                        >
+                            if todo.done { "Undo" } else { "Done" }
+                        </button>
+{%- endif %}
+                        if todo.done {
+                            <s>(&todo.title)</s>
+                        } else {
+                            <span>(&todo.title)</span>
+                        }
+{%- if ui %}
+                        button(
+                            variant: ButtonVariant::Ghost,
+                            size: ButtonSize::Sm,
+                            attrs: attributes! {
+                                @click=$(async |_e: Event| {
+                                    remove(id).await;
+                                    revision.increment();
+                                })
+                            },
+                            "Delete"
+                        )
+{%- else %}
+                        <button
+                            {{- classes.button }}
+                            @click=$(async |_e: Event| {
+                                remove(id).await;
+                                revision.increment();
+                            })
+                        >
+                            "Delete"
+                        </button>
+{%- endif %}
+                    </li>
+                }
+            </ul>
+        }
+    })
+}
+
+// Procedures run on the server when the browser calls them. Their arguments come from
+// the browser, so validate them like any other request data.
+
+/// Adds a todo unless its title is blank.
+#[procedure]
+pub async fn add(cx: &Cx, title: String) -> Result<()> {
+    let title = title.trim();
+    if !title.is_empty() {
+        Todo::add(cx, title).await?;
+    }
+    Ok(())
+}
+
+/// Marks a todo as done, or as not done if it already is.
+#[procedure]
+pub async fn toggle(cx: &Cx, id: u64) -> Result<()> {
+    Todo::toggle(cx, id).await
+}
+
+/// Removes a todo.
+#[procedure]
+pub async fn remove(cx: &Cx, id: u64) -> Result<()> {
+    Todo::remove(cx, id).await
+}

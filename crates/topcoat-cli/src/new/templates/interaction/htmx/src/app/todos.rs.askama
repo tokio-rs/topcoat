@@ -1,0 +1,125 @@
+pub mod id;
+
+use serde::Deserialize;
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{content::Form, href, page, route},
+    view::{View, ViewExt, ViewHandle,{% if ui %} attributes,{% endif %} component, view},
+};
+
+{% if ui -%}
+use crate::components::button::{ButtonSize, ButtonVariant, button};
+use crate::components::input::input;
+{% endif -%}
+use crate::features::todo::Todo;
+
+#[page{{ paths.page("/todos") }}]
+pub async fn page() -> Result<impl View> {
+    Ok(view! {
+        <main{{ classes.main }}>
+            <h1{{ classes.heading }}>"Todos"</h1>
+            // htmx posts the form and swaps the returned list into #todos.
+            <form
+                {{- classes.form }}
+                hx-post=(href!(create))
+                hx-target="#todos"
+                hx-swap="outerHTML"
+                hx-on:htmx:after-request="if (event.detail.successful) this.reset()"
+            >
+{%- if ui %}
+                input(attrs: attributes! { type="text" name="title" placeholder="What needs doing?" required="" })
+                button(attrs: attributes! { type="submit" }, "Add")
+{%- else %}
+                <input{{ classes.input }} type="text" name="title" placeholder="What needs doing?" required="">
+                " "
+                <button{{ classes.button }} type="submit">"Add"</button>
+{%- endif %}
+            </form>
+            todo_list()
+        </main>
+    })
+}
+
+/// The todo list. Each route returns it so htmx can replace the list on the page.
+#[component]
+pub async fn todo_list(cx: &Cx) -> Result<impl View> {
+    let todos = Todo::list(cx).await?;
+
+    Ok(view! {
+        <div id="todos">
+            if todos.is_empty() {
+                <p{{ classes.paragraph }}>"Nothing to do."</p>
+            } else {
+                <ul{{ classes.list }}>
+                    for todo in todos {
+                        <li{{ classes.item }}>
+{%- if ui %}
+                            button(
+                                variant: ButtonVariant::Outline,
+                                size: ButtonSize::Sm,
+                                attrs: attributes! {
+                                    hx-patch=(href!(id::toggle, id::Id(todo.id)))
+                                    hx-target="#todos"
+                                    hx-swap="outerHTML"
+                                },
+                                if todo.done { "Undo" } else { "Done" }
+                            )
+{%- else %}
+                            <button
+                                {{- classes.button }}
+                                hx-patch=(href!(id::toggle, id::Id(todo.id)))
+                                hx-target="#todos"
+                                hx-swap="outerHTML"
+                            >
+                                if todo.done { "Undo" } else { "Done" }
+                            </button>
+{%- endif %}
+                            if todo.done {
+                                <s>(&todo.title)</s>
+                            } else {
+                                <span>(&todo.title)</span>
+                            }
+{%- if ui %}
+                            button(
+                                variant: ButtonVariant::Ghost,
+                                size: ButtonSize::Sm,
+                                attrs: attributes! {
+                                    hx-delete=(href!(id::delete, id::Id(todo.id)))
+                                    hx-target="#todos"
+                                    hx-swap="outerHTML"
+                                },
+                                "Delete"
+                            )
+{%- else %}
+                            <button
+                                {{- classes.button }}
+                                hx-delete=(href!(id::delete, id::Id(todo.id)))
+                                hx-target="#todos"
+                                hx-swap="outerHTML"
+                            >
+                                "Delete"
+                            </button>
+{%- endif %}
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    })
+}
+
+/// The fields of the form that adds a todo.
+#[derive(Deserialize)]
+pub struct NewTodo {
+    title: String,
+}
+
+#[route{{ paths.route("POST", "/todos") }}]
+pub async fn create(cx: &Cx, Form(new_todo): Form<NewTodo>) -> Result<ViewHandle> {
+    let title = new_todo.title.trim();
+    if !title.is_empty() {
+        Todo::add(cx, title).await?;
+    }
+    Ok(view! { cx => todo_list() }.single().await?)
+}

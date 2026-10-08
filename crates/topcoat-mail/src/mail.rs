@@ -423,15 +423,15 @@ mod tests {
         let mail = Mail::builder().build();
 
         assert_eq!(mail.from(), None);
-        assert!(mail.to().is_empty());
-        assert!(mail.cc().is_empty());
-        assert!(mail.bcc().is_empty());
-        assert!(mail.reply_to().is_empty());
+        assert_eq!(mail.to(), []);
+        assert_eq!(mail.cc(), []);
+        assert_eq!(mail.bcc(), []);
+        assert_eq!(mail.reply_to(), []);
         assert_eq!(mail.subject(), "");
         assert!(mail.html().is_none());
         assert_eq!(mail.text(), &TextBody::FromHtml);
-        assert!(mail.attachments().is_empty());
-        assert!(mail.headers().is_empty());
+        assert_eq!(mail.attachments(), []);
+        assert_eq!(mail.headers(), []);
         assert_eq!(mail.date(), None);
     }
 

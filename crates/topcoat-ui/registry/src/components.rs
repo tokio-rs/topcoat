@@ -14,6 +14,7 @@ pub mod hover_card;
 pub mod input;
 pub mod kbd;
 pub mod label;
+pub mod navigation_menu;
 pub mod pagination;
 pub mod progress;
 pub mod radio_group;

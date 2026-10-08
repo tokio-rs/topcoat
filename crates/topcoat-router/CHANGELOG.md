@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0](https://github.com/tokio-rs/topcoat/compare/topcoat-router-v0.9.0...topcoat-router-v0.10.0) - 2026-10-03
+
+### Added
+
+- *(router)* module_param! macro ([#460](https://github.com/tokio-rs/topcoat/pull/460))
+
+### Fixed
+
+- non-deterministic macros ([#485](https://github.com/tokio-rs/topcoat/pull/485))
+- *(cli)* dev server `live!` reload ([#481](https://github.com/tokio-rs/topcoat/pull/481))
+- *(cli)* `cargo topcoat` not working ([#480](https://github.com/tokio-rs/topcoat/pull/480))
+
+### Other
+
+- restructure repository documentation ([#454](https://github.com/tokio-rs/topcoat/pull/454))
+- *(router)* use module router as the recommended example router ([#453](https://github.com/tokio-rs/topcoat/pull/453))
+
 ## [0.9.0](https://github.com/tokio-rs/topcoat/compare/topcoat-router-v0.8.1...topcoat-router-v0.9.0) - 2026-09-24
 
 ### Added

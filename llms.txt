@@ -6,7 +6,9 @@ Links point to authoritative guides in this checkout. Runnable patterns: `exampl
 
 ## Start
 
-`cargo new app`; `cargo add topcoat`; `cargo add tokio --features rt-multi-thread,macros`. Install `cargo install topcoat-cli`; run `topcoat dev` (build/bundle/reload). `start` defaults to `127.0.0.1:3000`; override `HOST`/`PORT`. [Setup](docs/getting_started.md).
+Install `cargo install topcoat-cli`; create an app with `topcoat new app --recommended`; `cd app`. The recommended preset includes a Toasty/SQLite todo example: run `cargo run -- toasty migration generate` and `cargo run -- toasty migration apply`, then `topcoat dev` (build/bundle/reload). Edit `src/app.rs`. Use `--minimal` for a small app without database models, or omit the preset for the interactive wizard. The destination must not exist. [Getting started](docs/getting_started.md), [command options](docs/cli/new.md).
+
+For [manual setup](docs/manual_setup.md): `cargo new app`; `cd app`; `cargo add topcoat`; `cargo add tokio --features rt-multi-thread,macros`. The minimal entry point below runs with `cargo run` or `topcoat dev`. `start` defaults to `127.0.0.1:3000`; override `HOST`/`PORT`.
 
 ```rust
 use topcoat::{Result, router::{module_router, page}, view::{View, view}};
@@ -54,7 +56,7 @@ Defaults include router/view/runtime/serve/discover, asset/compression/cookie/se
 
 ## Browser runtime and streaming
 
-Setup: `module_router!().discover().assets(AssetBundle::load()?).runtime().build()`; include `topcoat::runtime::script()` in `<head>`. Register application layers before `.runtime()`. Procedures/shards need discovery or `.route(name)`. [Runtime](docs/runtime.md).
+Setup: `module_router!().discover().assets(AssetBundle::load()?).runtime().build()`; include `topcoat::runtime::script()` in `<head>`. Register application layers before `.runtime()`. `.max_runs_per_connection(n)` caps connected renders per WebSocket (default 64; extra requests get 429). Procedures/shards need discovery or `.route(name)`. [Runtime](docs/runtime.md).
 
 - [Navigation](docs/runtime/link.md): `runtime::link(href: href!(page), "Page")` opens server-rendered pages without a full reload and preserves signals shared by both pages. Prefetch defaults to `PrefetchMode::Intent` (hover/focus/touch); `Viewport` loads visible links, `Never` waits for navigation. Override per link with `prefetch:`, per scope with `cx.with(mode)`, or per app with `.prefetch(mode)` (`RouterBuilderRuntimeExt`). `prefetch_mode(cx)` reads the context default; `link_attrs(cx, href!(page), prefetch_mode(cx))` adds the same behavior to custom anchors. Plain `<a>` links retain normal navigation.
 
@@ -67,7 +69,7 @@ Ok(view! {
 })
 ```
 
-- `$(...)` = `runtime::expr!(...)`: initial server value, reactive browser updates. `@event` accepts closure/JS string; `:attr` binds attribute. Captures clone browser-visible snapshots; never capture secrets. [Expressions](docs/runtime/expr.md) support selected operations on numbers/bool/strings/Option/Result/collections/tuples/signals; blocks/if/closures/async/loop/while, not arbitrary Rust. Unsuffixed integers are usize; overflow panics.
+- `$(...)` = `runtime::expr!(...)`: initial server value, reactive browser updates. `@event` accepts closure/JS string; `:attr` binds attribute. Captures clone browser-visible snapshots; never capture secrets. [Expressions](docs/runtime/expr.md) support selected operations on numbers/bool/strings/Option/Result/collections/tuples/signals; blocks/if/closures/async/loop/while, not arbitrary Rust. Tuple literals include `()`, `(value,)`, and `(a, b)`; fields use `.0`, `.1`, etc. Unsuffixed integers are usize; overflow panics.
 - [Records](docs/runtime/record.md): add `#[record]` to a struct with named fields and no generics to use it in expressions, signals, and procedure inputs/outputs. Fields use expression vocabulary types, including nested records. Construct with `Todo { title, done: false }`; borrow a signal's field with `todo.read().title`. Derive `Clone` for `get`/`clone`. Render fields individually; records cannot be compared or rendered directly. Capturing exposes all fields, including private ones. Validate records received from the browser.
 - `raw!("${binding}.jsMethod()", rust_fallback)` escapes to JS with equivalent server evaluation. No fallback means browser-only; a fallback must read the signals its JS depends on.
 - Server `.get()`/`.read()` tracks enclosing page/shard for server rerenders; inside `$(...)` tracks browser updates. `_untracked` avoids server rerenders. Signal handles alone create no dependency. Validate all restored values as client input.
@@ -83,7 +85,7 @@ Ok(view! {
 - [Fonts](docs/font.md): `font!("Family", @font-face { src: url(...); ... })`, `font_face!` for one face. `.discover()`/`.font(FONT)` registers; `font::link(font: FONT)` loads CSS. `font-fontsource`: `fontsource_font!(GEIST, weight: [400, 700], host: Asset)` bundles files; default host is CDN.
 - [Icons](docs/icon.md): `icon(data: ICON, label: "Meaning")` renders SVG; unlabeled = decorative. `icon-iconify` on runtime/build dependencies; build.rs: `topcoat::icon::iconify::BuildConfig::new().icon_set("feather").stage().unwrap()`. `iconify::include!("feather")` creates `feather::TRASH_2`; `iconify_icon!("feather:trash-2")` yields one icon.
 - [UI](docs/ui.md), `ui`: configure Tailwind; `topcoat ui init`; `topcoat ui add button`. Compile installed styles.css; load its font. Import/edit copied `src/components`; commit components.toml. Props: variant/size enums, attrs, children. `ui list` shows updates; `add --overwrite` replaces local edits; `remove` deletes. `.dark` ancestor selects dark theme.
-- [Cookies](docs/cookie.md): `.cookies()`, import `cookie::Cookies`, use `cookies(cx).get/add/remove`. `cookie!("name" = value; Path = "/"; Secure; HttpOnly; SameSite = Lax)`. Write before response seals; late writes panic, errors/redirects preserve pending writes. Removal needs matching name/path/domain. Signed = authenticated; private = encrypted+authenticated; shared helpers need persisted Key in app context. `cookie_store::<T, _>(jar, "name").parse_or_default().update(...).commit()?` writes JSON; no commit = discarded changes.
+- [Cookies](docs/cookie.md): `.cookies()`, import `cookie::Cookies`, use `cookies(cx).get/add/remove`. `cookie!("name" = value; Path = "/"; Secure; HttpOnly; SameSite = Lax)`. Write before response seals; late writes panic, errors/redirects preserve pending writes. Removal needs matching name/path/domain. Prefix adapters accept bare or already-prefixed names and return bare names. Signed = authenticated; private = encrypted+authenticated; shared helpers need persisted Key in app context. `cookie_store::<T, _>(jar, "name").parse_or_default().update(...).commit()?` writes JSON; no commit = discarded changes.
 - [Sessions](docs/session.md): `.cookies().sessions(SessionConfig::default())`. Authenticate, then `session::start(cx).await?`; store token_hash/user/expiry, never raw token. `token_hash(cx).await?` needs application lookup+expiry validation. `stop` returns hash to delete; `refresh` requires validation+persisted expiry; `rotate` requires revoking old hash+persisting replacement. Default cookie: __Host-/Secure/HttpOnly/SameSite=Lax/Path=/. Mutate before streaming. TokenStore changes transport, not database storage.
 - [Mail](docs/mail.md), `mail`/`mail-smtp`: `.mail(MailConfig::builder().transport(...).build())`; `mail! { from: "...", to: "...", html: { cx => ... } }?`, then `send(cx, mail).await?`. Plain text derived from HTML; attachments supported. FileTransport for .eml, MemoryTransport for tests, SmtpTransport for delivery.
 
@@ -99,6 +101,6 @@ Ok(view! {
 
 ## Working in this repository
 
-[`topcoat fmt`](docs/cli/fmt.md) formats macro bodies. Add `--rustfmt` to run rustfmt first; `--stdin --rustfmt` supports editor overrides. Rustfmt must be on PATH; set `edition` in `rustfmt.toml` because input is piped to rustfmt.
+[`topcoat fmt`](docs/cli/fmt.md) formats macro bodies. Add `--check` to report inputs needing formatting without writing files or emitting formatted source; exits nonzero for formatting differences or errors. Add `--rustfmt` to run rustfmt first; `--stdin --rustfmt` supports editor overrides. Rustfmt must be on PATH; set `edition` in `rustfmt.toml` because input is piped to rustfmt.
 
 For framework changes, also read [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).

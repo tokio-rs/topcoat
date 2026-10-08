@@ -7,11 +7,12 @@ export function setupTextExpression(
 	end: Comment,
 	js: string,
 	scope: Scope,
+	syncText: boolean,
 ): void {
 	const compute = compile(js, "text expression");
 	const { context } = scope.runtime;
 
-	let first = true;
+	let first = !syncText;
 	scope.effect(() => {
 		const value = compute(context);
 		if (first) {

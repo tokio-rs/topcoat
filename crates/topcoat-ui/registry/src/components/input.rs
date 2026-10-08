@@ -5,13 +5,13 @@ use topcoat::{
 
 /// Classes for the input's dimensions, border, and interaction states.
 const INPUT: StaticClass = class!(
-    "h-9 w-full min-w-0 rounded-lg border border-border bg-transparent px-3 \
-     text-sm transition-colors outline-none \
-     placeholder:text-muted-foreground \
-     file:mr-3 file:h-full file:border-0 file:bg-transparent file:text-sm file:font-medium \
-     focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 \
-     aria-invalid:border-destructive aria-invalid:focus-visible:ring-destructive \
-     focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
+    "h-9 w-full min-w-0 rounded-lg border border-border bg-transparent px-3",
+    "text-sm transition-colors outline-none",
+    "placeholder:text-muted-foreground",
+    "file:mr-3 file:h-full file:border-0 file:bg-transparent file:text-sm file:font-medium",
+    "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+    "aria-invalid:border-destructive aria-invalid:focus-visible:ring-destructive",
+    "focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
 );
 
 /// A styled input.

@@ -22,6 +22,9 @@ proc-macro2 = { workspace = true, features = ["span-locations"] }
 quote.workspace = true
 syn = { workspace = true, features = ["full", "extra-traits", "visit-mut"] }
 
+[dev-dependencies]
+topcoat-core-grammar = { workspace = true, features = ["testing"] }
+
 [[test]]
 name = "pretty"
 required-features = ["pretty"]

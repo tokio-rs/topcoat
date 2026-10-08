@@ -1,0 +1,121 @@
+pub mod id;
+
+use serde::Deserialize;
+use topcoat::{
+    Result,
+    context::Cx,
+    datastar::{PatchElements, Signals},
+    router::{href, page, route},
+    view::{View, ViewExt,{% if ui %} attributes,{% endif %} component, view},
+};
+
+{% if ui -%}
+use crate::components::button::{ButtonSize, ButtonVariant, button};
+use crate::components::input::input;
+{% endif -%}
+use crate::features::todo::Todo;
+
+#[page{{ paths.page("/todos") }}]
+pub async fn page() -> Result<impl View> {
+    Ok(view! {
+        <main{{ classes.main }} data-signals:title="''">
+            <h1{{ classes.heading }}>"Todos"</h1>
+            // Datastar sends the signals to `create`, then clears the input.
+            <form
+                {{- classes.form }}
+                data-on:submit__prevent=(("@post('", href!(create), "'); $title = ''"))
+            >
+{%- if ui %}
+                input(attrs: attributes! { type="text" data-bind:title="" placeholder="What needs doing?" required="" })
+                button(attrs: attributes! { type="submit" }, "Add")
+{%- else %}
+                <input{{ classes.input }} type="text" data-bind:title="" placeholder="What needs doing?" required="">
+                " "
+                <button{{ classes.button }} type="submit">"Add"</button>
+{%- endif %}
+            </form>
+            todo_list()
+        </main>
+    })
+}
+
+/// The todo list. Each route sends it back so Datastar can morph the list on the page.
+#[component]
+pub async fn todo_list(cx: &Cx) -> Result<impl View> {
+    let todos = Todo::list(cx).await?;
+
+    Ok(view! {
+        <div id="todos">
+            if todos.is_empty() {
+                <p{{ classes.paragraph }}>"Nothing to do."</p>
+            } else {
+                <ul{{ classes.list }}>
+                    for todo in todos {
+                        <li{{ classes.item }}>
+{%- if ui %}
+                            button(
+                                variant: ButtonVariant::Outline,
+                                size: ButtonSize::Sm,
+                                attrs: attributes! {
+                                    data-on:click=(("@patch('", href!(id::toggle, id::Id(todo.id)), "')"))
+                                },
+                                if todo.done { "Undo" } else { "Done" }
+                            )
+{%- else %}
+                            <button
+                                {{- classes.button }}
+                                data-on:click=(("@patch('", href!(id::toggle, id::Id(todo.id)), "')"))
+                            >
+                                if todo.done { "Undo" } else { "Done" }
+                            </button>
+{%- endif %}
+                            if todo.done {
+                                <s>(&todo.title)</s>
+                            } else {
+                                <span>(&todo.title)</span>
+                            }
+{%- if ui %}
+                            button(
+                                variant: ButtonVariant::Ghost,
+                                size: ButtonSize::Sm,
+                                attrs: attributes! {
+                                    data-on:click=(("@delete('", href!(id::delete, id::Id(todo.id)), "')"))
+                                },
+                                "Delete"
+                            )
+{%- else %}
+                            <button
+                                {{- classes.button }}
+                                data-on:click=(("@delete('", href!(id::delete, id::Id(todo.id)), "')"))
+                            >
+                                "Delete"
+                            </button>
+{%- endif %}
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    })
+}
+
+/// Renders the todo list as a Datastar patch for the element with its id.
+pub async fn patch_todo_list(cx: &Cx) -> Result<PatchElements> {
+    let list = view! { cx => todo_list() }.single().await?;
+    Ok(PatchElements::new(list.render(cx)))
+}
+
+/// The signals the page declares.
+#[derive(Deserialize)]
+pub struct NewTodo {
+    title: String,
+}
+
+#[route{{ paths.route("POST", "/todos") }}]
+pub async fn create(cx: &Cx, Signals(new_todo): Signals<NewTodo>) -> Result<PatchElements> {
+    let title = new_todo.title.trim();
+    if !title.is_empty() {
+        Todo::add(cx, title).await?;
+    }
+    patch_todo_list(cx).await
+}

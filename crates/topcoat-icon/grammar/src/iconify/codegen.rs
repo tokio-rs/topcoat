@@ -95,6 +95,8 @@ pub(crate) fn set_consts(selection: &Selection, set: &IconSet, vis: &Visibility)
 
 #[cfg(test)]
 mod tests {
+    use topcoat_core_grammar::testing::assert_deterministic;
+
     use super::*;
 
     fn demo_set() -> IconSet {
@@ -172,5 +174,17 @@ mod tests {
         assert!(consts.contains("const BIN"), "{consts}");
         assert!(!consts.contains("OLD_TRASH"), "{consts}");
         assert!(!consts.contains("TRASH_FLIPPED"), "{consts}");
+    }
+
+    #[test]
+    fn set_consts_are_deterministic() {
+        // Each expansion loads its own set, as separate builds would.
+        assert_deterministic(|| {
+            Ok(set_consts(
+                &selection("demo"),
+                &demo_set(),
+                &Visibility::Inherited,
+            ))
+        });
     }
 }

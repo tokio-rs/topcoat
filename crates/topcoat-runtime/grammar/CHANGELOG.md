@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-grammar-v0.9.0...topcoat-runtime-grammar-v0.10.0) - 2026-10-03
+
+### Added
+
+- *(runtime)* tuple expression support ([#490](https://github.com/tokio-rs/topcoat/pull/490))
+- *(runtime)* custom record types ([#466](https://github.com/tokio-rs/topcoat/pull/466))
+
+### Fixed
+
+- non-deterministic macros ([#485](https://github.com/tokio-rs/topcoat/pull/485))
+- *(view)* rust analyzer auto completions breaking when the current rust code macro input is invalid ([#457](https://github.com/tokio-rs/topcoat/pull/457))
+
 ## [0.9.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-grammar-v0.8.1...topcoat-runtime-grammar-v0.9.0) - 2026-09-24
 
 ### Added

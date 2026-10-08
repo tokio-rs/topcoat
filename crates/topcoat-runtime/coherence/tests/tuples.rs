@@ -1,4 +1,35 @@
-use topcoat_runtime_coherence::coherent;
+use topcoat_runtime_coherence::{Awaitable, coherent};
+
+#[test]
+fn tuple_literals_preserve_shape_and_element_types() {
+    coherent!(());
+    coherent!(((),));
+    coherent!((1usize,));
+    coherent!((true, 3u8, "coffee".to_owned()));
+    coherent!(((false, -0.0), Some((2u32,)), ()));
+    coherent!(direct => (1usize, "two"));
+    coherent!((1usize, "two").0);
+    coherent!((1usize, "two").1.len());
+
+    let name = String::from("tea");
+    let values = vec![(1usize, String::from("coffee"))];
+    coherent!((name.clone(), values.index(0).clone()));
+    coherent!({
+        let pair = (values.index(0).0, values.index(0).1);
+        (*pair.0, pair.1.to_owned())
+    });
+    coherent!({
+        let pair = (name, Some((3u32,)));
+        pair.clone()
+    });
+}
+
+#[test]
+fn tuple_elements_can_await() {
+    let first = Awaitable::ready(3u32).after_yield();
+    let second = Awaitable::ready(String::from("late")).after_yield();
+    coherent!(async => (first.await, (second.await,), ()));
+}
 
 #[test]
 fn captured_tuples() {

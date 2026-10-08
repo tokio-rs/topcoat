@@ -5,7 +5,10 @@ use std::{collections::HashMap, sync::Arc};
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::{sync::mpsc, task::JoinHandle};
-use topcoat_core::{context::Cx, error::Result};
+use topcoat_core::{
+    context::{Cx, try_app_context},
+    error::Result,
+};
 use topcoat_router::{
     Body, HeaderMap, HeaderName, HeaderValue, Method, RemoteAddr, Router, Uri,
     content::{
@@ -18,7 +21,12 @@ use topcoat_router::{
     router,
 };
 
+use super::MaxRunsPerConnection;
 use crate::{ConnectedRender, RUNTIME_HEADER, RUNTIME_PROTOCOL};
+
+/// How many runs one connection may have at once, unless the router sets
+/// a [`MaxRunsPerConnection`].
+const DEFAULT_MAX_RUNS_PER_CONNECTION: usize = 64;
 
 /// Checks for a `GET` that requests the runtime WebSocket subprotocol.
 pub(super) fn requested(cx: &Cx) -> bool {
@@ -39,9 +47,11 @@ fn requests_runtime_protocol(headers: &HeaderMap) -> bool {
 pub(super) async fn accept(cx: &Cx, body: Body) -> Result<Response> {
     let upgrade = WebSocketUpgrade::from_request(cx, body).await?;
     let connection = Arc::new(Connection::from_handshake(cx));
+    let max_runs = try_app_context::<MaxRunsPerConnection>(cx)
+        .map_or(DEFAULT_MAX_RUNS_PER_CONNECTION, |max| max.0);
     upgrade
         .protocols([RUNTIME_PROTOCOL])
-        .on_upgrade(move |socket| run(connection, socket))
+        .on_upgrade(move |socket| run(connection, socket, max_runs))
 }
 
 /// A message from the browser.
@@ -223,8 +233,10 @@ impl Connection {
 ///
 /// Runs proceed side by side until they finish, the browser stops them, or
 /// the connection closes. A stopped run can still send output until its
-/// task next yields; the browser drops that output by its run id.
-async fn run(connection: Arc<Connection>, socket: WebSocket) {
+/// task next yields; the browser drops that output by its run id. A request
+/// for a new run while `max_runs` are unfinished is refused with
+/// `429 Too Many Requests`.
+async fn run(connection: Arc<Connection>, socket: WebSocket, max_runs: usize) {
     let (mut sink, mut stream) = socket.split();
     let (out, mut queue) = mpsc::channel::<Message>(16);
 
@@ -260,6 +272,14 @@ async fn run(connection: Arc<Connection>, socket: WebSocket) {
             };
             runs.retain(|_, run| !run.is_finished());
             let id = request.run;
+            // A reused id replaces its run, so it does not add to the count.
+            if !runs.contains_key(&id) && runs.len() >= max_runs {
+                let error = ConnectionFrame::Error { status: 429 }.to_message(Some(id));
+                if out.send(error).await.is_err() {
+                    break;
+                }
+                continue;
+            }
             let connection = Arc::clone(&connection);
             let out = out.clone();
             let handle = tokio::spawn(async move {

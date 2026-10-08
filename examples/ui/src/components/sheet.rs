@@ -7,15 +7,15 @@ use topcoat::{
 /// Classes for a viewport overlay with no edge padding. Set `display` only for the open
 /// state so the native closed state remains hidden.
 const OVERLAY: StaticClass = class!(
-    "fixed inset-0 z-50 size-full max-h-none max-w-none overflow-hidden \
-     bg-background/80 text-foreground backdrop-blur-sm open:flex",
+    "fixed inset-0 z-50 size-full max-h-none max-w-none overflow-hidden",
+    "bg-background/80 text-foreground backdrop-blur-sm open:flex",
 );
 
 /// Classes that fade the overlay in and out. `allow-discrete` keeps it displayed
 /// through the exit transition, and `@starting-style` supplies the entry opacity.
 const FADE: StaticClass = class!(
-    "opacity-0 open:opacity-100 starting:open:opacity-0 \
-     [transition:opacity_200ms_ease-out,display_200ms_allow-discrete]",
+    "opacity-0 open:opacity-100 starting:open:opacity-0",
+    "[transition:opacity_200ms_ease-out,display_200ms_allow-discrete]",
 );
 
 /// A panel that slides in from an edge of the page.
@@ -97,20 +97,20 @@ impl SheetSide {
     fn motion(self) -> StaticClass {
         match self {
             Self::Left => class!(
-                "-translate-x-full in-[[open]]:translate-x-0 \
-                 starting:in-[[open]]:-translate-x-full",
+                "-translate-x-full in-[[open]]:translate-x-0",
+                "starting:in-[[open]]:-translate-x-full",
             ),
             Self::Right => class!(
-                "translate-x-full in-[[open]]:translate-x-0 \
-                 starting:in-[[open]]:translate-x-full",
+                "translate-x-full in-[[open]]:translate-x-0",
+                "starting:in-[[open]]:translate-x-full",
             ),
             Self::Top => class!(
-                "-translate-y-full in-[[open]]:translate-y-0 \
-                 starting:in-[[open]]:-translate-y-full",
+                "-translate-y-full in-[[open]]:translate-y-0",
+                "starting:in-[[open]]:-translate-y-full",
             ),
             Self::Bottom => class!(
-                "translate-y-full in-[[open]]:translate-y-0 \
-                 starting:in-[[open]]:translate-y-full",
+                "translate-y-full in-[[open]]:translate-y-0",
+                "starting:in-[[open]]:translate-y-full",
             ),
         }
     }
@@ -118,8 +118,8 @@ impl SheetSide {
 
 /// Classes for a sheet panel with vertically stacked content and internal scrolling.
 const CONTENT: StaticClass = class!(
-    "flex flex-col gap-4 overflow-y-auto border-border bg-card p-6 \
-     text-card-foreground shadow-sm [transition:translate_200ms_ease-out]",
+    "flex flex-col gap-4 overflow-y-auto border-border bg-card p-6",
+    "text-card-foreground shadow-sm [transition:translate_200ms_ease-out]",
 );
 
 /// The content panel inside a sheet.

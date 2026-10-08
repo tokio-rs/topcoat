@@ -543,3 +543,46 @@ it("starts the destination's connected render once its response has ended", asyn
 	expect(opened).toHaveLength(1);
 	expect(new URL(opened[0] as string).pathname).toBe("/live");
 });
+
+it("moves the connected render to the destination when both pages are live", async () => {
+	const sockets: { sent: Record<string, unknown>[]; open(): void }[] = [];
+	vi.stubGlobal(
+		"WebSocket",
+		class extends EventTarget {
+			readyState = 0;
+			readonly sent: Record<string, unknown>[] = [];
+			constructor() {
+				super();
+				sockets.push(this);
+			}
+			send(data: string) {
+				this.sent.push(JSON.parse(data));
+			}
+			close() {}
+			open() {
+				this.readyState = 1;
+				this.dispatchEvent(new Event("open"));
+			}
+		},
+	);
+	stubFetch(() =>
+		snapshot(page("Chat", "<!--::topcoat::connect--><p>chat</p>")),
+	);
+	mount(
+		`<!--::topcoat::connect--><a data-topcoat-link="never" href="/chat">x</a>`,
+	);
+	await settle();
+	sockets[0]?.open();
+
+	click(link());
+	await settle();
+
+	expect(document.body.textContent).toContain("chat");
+	expect(sockets).toHaveLength(1);
+	const [first, ...rest] = sockets[0]?.sent ?? [];
+	expect(first).toEqual(expect.objectContaining({ run: 1, path: "/" }));
+	expect(rest).toEqual([
+		{ stop: 1 },
+		expect.objectContaining({ run: 2, path: "/chat" }),
+	]);
+});

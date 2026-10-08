@@ -192,7 +192,7 @@ mod tests {
     #[test]
     fn parses_simple_for_loop() {
         let loop_ = parse(r"for x in xs { (x) }");
-        assert!(loop_.attributes.is_empty());
+        assert_eq!(loop_.attributes, Vec::<syn::Attribute>::new());
         assert_eq!(loop_.pat.to_token_stream().to_string(), "x");
         assert_eq!(loop_.expr.to_token_stream().to_string(), "xs");
         assert_eq!(loop_.body.children.len(), 1);

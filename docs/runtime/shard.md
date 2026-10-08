@@ -148,7 +148,7 @@ With the `discover` feature enabled, `.discover()` registers all shards linked i
 
 # Path
 
-Topcoat generates an internal path for each shard. This path can change between builds. To choose a stable endpoint, pass an absolute path to `#[shard]`:
+Topcoat generates an internal path for each shard from its name and source location. This path changes when the shard is renamed or moved. To choose a stable endpoint, pass an absolute path to `#[shard]`:
 
 ```rust
 use topcoat::{Result, runtime::shard, view::{View, view}};

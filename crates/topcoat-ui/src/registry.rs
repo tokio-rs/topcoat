@@ -55,9 +55,37 @@ pub enum Dependency {
     Other { registry: String, name: String },
 }
 
-/// A component registry loaded from a crate's registry directory.
+/// Where a registry's manifest and sources are read from.
+enum Source {
+    /// A registry directory on disk.
+    Dir(PathBuf),
+    /// `(path, contents)` pairs compiled into the binary.
+    Embedded(&'static [(&'static str, &'static str)]),
+}
+
+impl Source {
+    /// Reads the file at `path`, relative to the registry directory.
+    fn read(&self, path: &str) -> Result<String, Error> {
+        match self {
+            Self::Dir(dir) => {
+                let path = dir.join(path);
+                std::fs::read_to_string(&path).map_err(|source| Error::Read { path, source })
+            }
+            Self::Embedded(files) => files
+                .iter()
+                .find(|(embedded, _)| *embedded == path)
+                .map(|(_, contents)| (*contents).to_string())
+                .ok_or_else(|| Error::NotEmbedded {
+                    path: path.to_string(),
+                }),
+        }
+    }
+}
+
+/// A component registry loaded from a crate's registry directory or from
+/// embedded files.
 pub struct Registry {
-    dir: PathBuf,
+    source: Source,
     themes: BTreeMap<String, ThemeEntry>,
     components: BTreeMap<String, Entry>,
 }
@@ -70,11 +98,23 @@ impl Registry {
     /// Returns an error if the manifest cannot be read or parsed, or if it
     /// declares a format version newer than [`MANIFEST_VERSION`].
     pub fn load(dir: PathBuf) -> Result<Self, Error> {
-        let manifest_path = dir.join(MANIFEST_FILE);
-        let raw = std::fs::read_to_string(&manifest_path).map_err(|source| Error::Read {
-            path: manifest_path,
-            source,
-        })?;
+        Self::from_source(Source::Dir(dir))
+    }
+
+    /// Loads a registry from `(path, contents)` pairs, where each path is
+    /// relative to the registry directory and uses `/` as the separator. The
+    /// files must include `registry.toml` and every source it names.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the manifest is missing or cannot be parsed, or if
+    /// it declares a format version newer than [`MANIFEST_VERSION`].
+    pub fn embedded(files: &'static [(&'static str, &'static str)]) -> Result<Self, Error> {
+        Self::from_source(Source::Embedded(files))
+    }
+
+    fn from_source(source: Source) -> Result<Self, Error> {
+        let raw = source.read(MANIFEST_FILE)?;
         let manifest: Manifest = toml::from_str(&raw)?;
         if manifest.version > MANIFEST_VERSION {
             return Err(Error::UnsupportedVersion {
@@ -83,7 +123,7 @@ impl Registry {
             });
         }
         Ok(Self {
-            dir,
+            source,
             themes: manifest.themes,
             components: manifest.components,
         })
@@ -102,7 +142,7 @@ impl Registry {
             .map(|(name, entry)| Component {
                 name,
                 entry,
-                dir: &self.dir,
+                source: &self.source,
             })
     }
 
@@ -117,7 +157,7 @@ impl Registry {
         self.themes.get_key_value(name).map(|(name, entry)| Theme {
             name,
             entry,
-            dir: &self.dir,
+            source: &self.source,
         })
     }
 }
@@ -126,7 +166,7 @@ impl Registry {
 pub struct Component<'a> {
     name: &'a str,
     entry: &'a Entry,
-    dir: &'a Path,
+    source: &'a Source,
 }
 
 impl Component<'_> {
@@ -160,8 +200,7 @@ impl Component<'_> {
     ///
     /// Returns an error if the source file cannot be read.
     pub fn read_source(&self) -> Result<String, Error> {
-        let path = self.dir.join(&self.entry.source);
-        std::fs::read_to_string(&path).map_err(|source| Error::Read { path, source })
+        self.source.read(&self.entry.source)
     }
 
     /// The other components this component depends on.
@@ -175,7 +214,7 @@ impl Component<'_> {
 pub struct Theme<'a> {
     name: &'a str,
     entry: &'a ThemeEntry,
-    dir: &'a Path,
+    source: &'a Source,
 }
 
 impl Theme<'_> {
@@ -206,8 +245,7 @@ impl Theme<'_> {
     ///
     /// Returns an error if the source file cannot be read.
     pub fn read_source(&self) -> Result<String, Error> {
-        let path = self.dir.join(&self.entry.source);
-        std::fs::read_to_string(&path).map_err(|source| Error::Read { path, source })
+        self.source.read(&self.entry.source)
     }
 }
 
@@ -236,10 +274,37 @@ pub enum Error {
         #[source]
         source: std::io::Error,
     },
+    #[error("registry file {path:?} is not embedded")]
+    NotEmbedded { path: String },
     #[error("failed to parse registry manifest")]
     Parse(#[from] toml::de::Error),
     #[error(
         "registry manifest has format version {found}, but this build supports up to {supported}"
     )]
     UnsupportedVersion { found: u32, supported: u32 },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn embedded_default_registry_matches_its_directory() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("registry");
+        let on_disk = Registry::load(dir).unwrap();
+        let embedded = Registry::embedded(topcoat_ui_registry::FILES).unwrap();
+
+        assert!(on_disk.names().eq(embedded.names()));
+        assert!(on_disk.theme_names().eq(embedded.theme_names()));
+        for name in on_disk.names() {
+            let expected = on_disk.get(name).unwrap().read_source().unwrap();
+            let actual = embedded.get(name).unwrap().read_source().unwrap();
+            assert_eq!(expected, actual, "component `{name}` differs");
+        }
+        for name in on_disk.theme_names() {
+            let expected = on_disk.theme(name).unwrap().read_source().unwrap();
+            let actual = embedded.theme(name).unwrap().read_source().unwrap();
+            assert_eq!(expected, actual, "theme `{name}` differs");
+        }
+    }
 }

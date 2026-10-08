@@ -74,6 +74,18 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace --all-features
 
+  # Compiles a few starter applications created by `topcoat new` against this
+  # checkout. Every combination compiles the framework with different features, so
+  # only a small set is covered.
+  starters:
+    name: starters
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup update stable && rustup default stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test -p topcoat-cli --test starters -- --ignored
+
   clippy:
     name: clippy
     runs-on: ubuntu-latest
@@ -183,7 +195,7 @@ jobs:
   release-plz-release:
     name: release
     runs-on: ubuntu-latest
-    needs: [release-pr-merge, test, clippy, fmt, docs, features, wasm, runtime, dev, udeps]
+    needs: [release-pr-merge, test, starters, clippy, fmt, docs, features, wasm, runtime, dev, udeps]
     if: >-
       github.repository == 'tokio-rs/topcoat'
       && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
@@ -268,7 +280,7 @@ jobs:
   release-plz-pr:
     name: release PR
     runs-on: ubuntu-latest
-    needs: [test, clippy, fmt, docs, features, wasm, runtime, dev, udeps]
+    needs: [test, starters, clippy, fmt, docs, features, wasm, runtime, dev, udeps]
     if: >-
       github.repository == 'tokio-rs/topcoat'
       && github.event_name == 'push'

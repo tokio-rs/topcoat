@@ -155,6 +155,30 @@ it("a member joining an open connection runs right away", () => {
 	]);
 });
 
+it("a member whose run was stopped runs again when it joins", () => {
+	const { connection, socket, pageTarget } = fixture();
+	connection.join(pageTarget);
+	socket().open();
+
+	connection.stop(pageTarget);
+	connection.join(pageTarget);
+
+	expect(socket().sent.slice(1)).toEqual([
+		{ stop: 1 },
+		expect.objectContaining({ run: 2, path: "/room?q=1" }),
+	]);
+});
+
+it("a member with a current run does not run again when it joins", () => {
+	const { connection, socket, pageTarget } = fixture();
+	connection.join(pageTarget);
+	socket().open();
+
+	connection.join(pageTarget);
+
+	expect(socket().sent).toHaveLength(1);
+});
+
 it("frames of interleaved runs reach their own targets", () => {
 	const { connection, socket, page, pageTarget, shard, shardTarget } =
 		fixture();

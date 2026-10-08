@@ -8,6 +8,7 @@ import {
 import { flushEffects } from "../reactivity";
 import { Runtime } from "../runtime";
 import { F64 } from "../surrogate";
+import { FRAMES_MEDIA_TYPE, newRender, type ServerMessage } from "./frames";
 
 afterEach(() => {
 	vi.restoreAllMocks();
@@ -65,7 +66,11 @@ it("a dev refresh keeps page and shard signals while replacing bindings and head
 		});
 		// A change made while the server is rendering must survive too.
 		count.set(new F64(7));
-		resolve(new Response(html, { headers: { "Content-Type": "text/html" } }));
+		resolve(
+			new Response(`${JSON.stringify({ t: "snapshot", html })}\n`, {
+				headers: { "Content-Type": FRAMES_MEDIA_TYPE },
+			}),
+		);
 		await task;
 		flushEffects();
 
@@ -81,6 +86,92 @@ it("a dev refresh keeps page and shard signals while replacing bindings and head
 		button.click();
 		flushEffects();
 		expect(input?.value).toBe("9");
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
+it("hydrates live updates while streaming and waits until completion to connect", async () => {
+	vi.spyOn(document, "readyState", "get").mockReturnValue("complete");
+	vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+	vi.spyOn(location, "reload").mockImplementation(() => {});
+	document.body.innerHTML = declaration("a", 1);
+	const runtime = new Runtime();
+	const join = vi
+		.spyOn(runtime.connection, "join")
+		.mockImplementation(() => {});
+	runtime.start(document);
+	runtime.page.listenForDevRefresh();
+	let controller!: ReadableStreamDefaultController<Uint8Array>;
+	const body = new ReadableStream<Uint8Array>({
+		start(value) {
+			controller = value;
+		},
+	});
+	const push = (frame: ServerMessage) =>
+		controller.enqueue(new TextEncoder().encode(`${JSON.stringify(frame)}\n`));
+	const fetch = vi
+		.fn()
+		.mockResolvedValue(
+			new Response(body, { headers: { "Content-Type": FRAMES_MEDIA_TYPE } }),
+		);
+	vi.stubGlobal("fetch", fetch);
+	const reportError = vi.fn();
+	const refresh = new PageRefresh(
+		() => false,
+		() => {},
+		reportError,
+	);
+	const task = refresh.refresh();
+	try {
+		const doctype = document.doctype ? "<!doctype html>" : "";
+		push({
+			t: "snapshot",
+			html: `${doctype}<html><head></head><body><!--::topcoat::connect--><!--::topcoat::region::start(ab)-->${declaration("a", 0)}<p>working...</p><!--::topcoat::region::end(ab)--></body></html>`,
+		});
+		await vi.waitFor(() =>
+			expect(document.querySelector("p")?.textContent).toBe("working..."),
+		);
+		runtime.context.signal("a").set(new F64(7));
+		push({
+			t: "swap",
+			region: "ab",
+			html: `${declaration("a", 0)}<p>done!</p><button data-topcoat-on:click="() => cx.signal('a').increment()">add</button>`,
+		});
+		await vi.waitFor(() =>
+			expect(document.querySelector("p")?.textContent).toBe("done!"),
+		);
+		expect((runtime.registry.read("a") as F64).dehydrate()).toBe(7);
+		document.querySelector("button")?.click();
+		flushEffects();
+		expect((runtime.registry.read("a") as F64).dehydrate()).toBe(8);
+		expect(join).not.toHaveBeenCalled();
+		expect(fetch.mock.calls[0]?.[1].headers.Accept).toBe(FRAMES_MEDIA_TYPE);
+	} finally {
+		controller.close();
+		await task;
+		runtime.navigation.dispose();
+		runtime.page.dispose();
+	}
+	expect(join).toHaveBeenCalled();
+	expect(reportError).not.toHaveBeenCalled();
+	expect(location.reload).not.toHaveBeenCalled();
+});
+
+it("does not apply a dev stream's swaps to a newer runtime render", async () => {
+	const runtime = new Runtime();
+	runtime.page.listenForDevRefresh();
+	try {
+		const detail: DevRuntimeDetail = {};
+		window.dispatchEvent(new CustomEvent(DEV_RUNTIME_EVENT, { detail }));
+		const region = (text: string) =>
+			`<!--::topcoat::region::start(ab)--><p>${text}</p><!--::topcoat::region::end(ab)-->`;
+		detail.runtime?.replace(() => {
+			document.body.innerHTML = region("dev");
+		});
+		runtime.page.replaceContent(region("newer"), newRender());
+		detail.runtime?.swap("ab", "<p>stale</p>");
+		expect(document.querySelector("p")?.textContent).toBe("newer");
 	} finally {
 		runtime.page.dispose();
 	}

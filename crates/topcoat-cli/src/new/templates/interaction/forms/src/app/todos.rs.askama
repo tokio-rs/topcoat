@@ -1,0 +1,98 @@
+pub mod id;
+
+use serde::Deserialize;
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{
+        content::Form,
+        error::{SeeOther, see_other},
+        href, page, route,
+    },
+    view::{View,{% if ui %} attributes,{% endif %} view},
+};
+
+{% if ui -%}
+use crate::components::button::{ButtonSize, ButtonVariant, button};
+use crate::components::input::input;
+{% endif -%}
+use crate::features::todo::Todo;
+
+#[page{{ paths.page("/todos") }}]
+pub async fn page(cx: &Cx) -> Result<impl View> {
+    let todos = Todo::list(cx).await?;
+
+    Ok(view! {
+        <main{{ classes.main }}>
+            <h1{{ classes.heading }}>"Todos"</h1>
+            <form{{ classes.form }} method="post" action=(href!(create))>
+{%- if ui %}
+                input(attrs: attributes! { type="text" name="title" placeholder="What needs doing?" required="" })
+                button(attrs: attributes! { type="submit" }, "Add")
+{%- else %}
+                <input{{ classes.input }} type="text" name="title" placeholder="What needs doing?" required="">
+                " "
+                <button{{ classes.button }} type="submit">"Add"</button>
+{%- endif %}
+            </form>
+            if todos.is_empty() {
+                <p{{ classes.paragraph }}>"Nothing to do."</p>
+            } else {
+                <ul{{ classes.list }}>
+                    for todo in todos {
+                        <li{{ classes.item }}>
+                            <form method="post" action=(href!(id::toggle, id::Id(todo.id)))>
+{%- if ui %}
+                                button(
+                                    variant: ButtonVariant::Outline,
+                                    size: ButtonSize::Sm,
+                                    attrs: attributes! { type="submit" },
+                                    if todo.done { "Undo" } else { "Done" }
+                                )
+{%- else %}
+                                <button{{ classes.button }} type="submit">
+                                    if todo.done { "Undo" } else { "Done" }
+                                </button>
+{%- endif %}
+                            </form>
+                            if todo.done {
+                                <s>(&todo.title)</s>
+                            } else {
+                                <span>(&todo.title)</span>
+                            }
+                            <form method="post" action=(href!(id::delete, id::Id(todo.id)))>
+{%- if ui %}
+                                button(
+                                    variant: ButtonVariant::Ghost,
+                                    size: ButtonSize::Sm,
+                                    attrs: attributes! { type="submit" },
+                                    "Delete"
+                                )
+{%- else %}
+                                <button{{ classes.button }} type="submit">"Delete"</button>
+{%- endif %}
+                            </form>
+                        </li>
+                    }
+                </ul>
+            }
+        </main>
+    })
+}
+
+/// The fields of the form that adds a todo.
+#[derive(Deserialize)]
+pub struct NewTodo {
+    title: String,
+}
+
+#[route{{ paths.route("POST", "/todos") }}]
+pub async fn create(cx: &Cx, Form(new_todo): Form<NewTodo>) -> Result<SeeOther> {
+    let title = new_todo.title.trim();
+    if !title.is_empty() {
+        Todo::add(cx, title).await?;
+    }
+
+    // Redirect back to the list so a reload does not submit the form again.
+    Ok(see_other(href!(page).resolve(cx)))
+}
