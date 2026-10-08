@@ -123,14 +123,15 @@ impl Manifest {
         }
 
         let mut dev = Table::new();
-        dev.decor_mut()
-            .set_prefix("\n# Speed up compilation while keeping file and line numbers in error backtraces.\n");
+        dev.decor_mut().set_prefix(
+            "\n# Speed up compilation while keeping file and line numbers in error backtraces.\n",
+        );
         dev["debug"] = value("line-tables-only");
 
         let mut dependencies = Table::new();
-        dependencies
-            .decor_mut()
-            .set_prefix("\n# Speed up compilation by skipping debug information for dependencies.\n");
+        dependencies.decor_mut().set_prefix(
+            "\n# Speed up compilation by skipping debug information for dependencies.\n",
+        );
         dependencies["debug"] = value(false);
 
         let mut packages = Table::new();
