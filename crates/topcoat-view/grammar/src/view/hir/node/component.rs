@@ -1,6 +1,6 @@
-use proc_macro2::{Ident, Span, TokenStream};
+use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
-use syn::{Path, spanned::Spanned};
+use syn::Path;
 use topcoat_core_grammar::paths::{topcoat_context, topcoat_core, topcoat_view};
 
 use crate::view::{
@@ -20,22 +20,18 @@ pub(crate) struct Component {
     /// ordinal is what tells the sites apart.
     pub ordinal: u32,
     pub children: Option<Scope>,
+    /// The span of the invocation's opening parenthesis, which every
+    /// generated token carries apart from the path.
+    ///
+    /// Editors resolve each generated token mapped onto a source token, and
+    /// also each one whose span contains it. A single-character span keeps
+    /// errors such as a missing prop next to the component name while
+    /// leaving go-to-definition on the name, and on anything inside the
+    /// parentheses, with only that token's own definition.
     pub span: Span,
 }
 
 impl Component {
-    /// Returns `name` as an ident spanned onto the component path, so the
-    /// error for a missing prop or a path that is not a component points at
-    /// the invocation.
-    ///
-    /// These idents are the only generated tokens carrying the path's span.
-    /// Anything spanned onto the path shows up when the editor hovers the
-    /// component name, so the rest of the emission uses call-site spans to
-    /// keep the hover down to the component and its props methods.
-    fn diagnostic_ident(&self, name: &str) -> Ident {
-        Ident::new(name, self.path.span())
-    }
-
     /// Returns the site key expression naming this invocation site.
     ///
     /// `file!`, `line!`, and `column!` carry call-site spans, so they
@@ -63,9 +59,6 @@ impl Emit for Component {
 
         let site = self.site();
         let path = &self.path;
-        let props_builder = self.diagnostic_ident("props_builder");
-        let build = self.diagnostic_ident("build");
-        let render = self.diagnostic_ident("render");
         let setters = self.named_args.iter().map(|arg| {
             let ident = &arg.ident;
             let value = &arg.value;
@@ -81,7 +74,7 @@ impl Emit for Component {
         emitter.hoist(quote_spanned! {span=>
             let #ident = {
                 use #topcoat_view::Component;
-                let __props = #path::#props_builder()#(#setters)*;
+                let __props = #path::props_builder()#(#setters)*;
                 let __cx = #topcoat_context::with_identity(
                     __cx.clone(), #topcoat_context::identity_raw(__cx).child(#site),
                 );
@@ -90,9 +83,9 @@ impl Emit for Component {
                     #topcoat_view::internal::MoveView::new(async {
                         let (__cx, __props) = __captured.take();
                         let __cx = &__cx;
-                        let __props = __props #child.#build();
+                        let __props = __props #child.build();
                         #[allow(clippy::default_constructed_unit_structs)]
-                        let __view = Component::#render(#path::default(), __cx, __props).await?;
+                        let __view = Component::render(#path::default(), __cx, __props).await?;
                         #topcoat_view::internal::MoveView::drive(__view).await
                     }),
                 )
