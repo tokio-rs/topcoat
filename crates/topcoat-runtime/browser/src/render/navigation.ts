@@ -49,6 +49,8 @@ export class NavigationController {
 	private readonly prefetches = new PrefetchCache();
 	/** The request for the most recently opened page. */
 	private current: PageRequest | null = null;
+	/** The navigation still waiting to replace the displayed document. */
+	private uncommitted: PageRequest | null = null;
 	private generation = 0;
 	/** Resolves when the most recent navigation finishes receiving its response. */
 	private streaming: Promise<void> | null = null;
@@ -192,6 +194,7 @@ export class NavigationController {
 		const request =
 			this.prefetches.take(target, body) ?? new PageRequest(target, body);
 		this.current = request;
+		this.uncommitted = request;
 
 		let finish!: () => void;
 		const streaming = new Promise<void>((resolve) => {
@@ -203,6 +206,7 @@ export class NavigationController {
 		try {
 			await this.follow(request, url, mode, scroll, isCurrent);
 		} finally {
+			if (this.uncommitted === request) this.uncommitted = null;
 			if (this.streaming === streaming) this.streaming = null;
 			finish();
 		}
@@ -254,6 +258,7 @@ export class NavigationController {
 							return;
 						}
 						this.commit(next, destination, mode, scroll, render);
+						if (this.uncommitted === request) this.uncommitted = null;
 						committed = true;
 						break;
 					}
@@ -381,6 +386,13 @@ export class NavigationController {
 		if (documentUrl(url.href) !== this.documentUrl) {
 			void this.navigate(url, "traverse", scroll);
 			return;
+		}
+		// Returning to the displayed page cancels a pending navigation, but
+		// keeps any request already streaming updates into this document.
+		if (this.uncommitted !== null) {
+			this.generation += 1;
+			this.uncommitted.abort();
+			this.uncommitted = null;
 		}
 		// The URL points to another fragment on the same page.
 		if (!this.managesScroll) return;

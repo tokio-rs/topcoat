@@ -400,6 +400,79 @@ it("shows the previous page again on a traversal and restores its scroll positio
 	expect(scrollTo).toHaveBeenLastCalledWith(0, 300);
 });
 
+it.each([
+	"headers",
+	"snapshot",
+])("cancels a back navigation waiting for %s when forward returns to the displayed page", async (waitingFor) => {
+	const slow = streamed();
+	let respond!: (response: Response) => void;
+	const response = new Promise<Response>((resolve) => {
+		respond = resolve;
+	});
+	const calls = stubFetch((path) => {
+		if (path === "/next") return snapshot(page("Next", "<p>next page</p>"));
+		return waitingFor === "headers" ? response : slow.response;
+	});
+	const rt = mount(`<a data-topcoat-link="never" href="/next">next</a>`);
+
+	click(link());
+	await settle();
+	history.back();
+	await settle();
+	const pending = rt.navigation.pending;
+	expect(pending).not.toBeNull();
+	expect(location.pathname).toBe("/");
+	expect(document.body.textContent).toContain("next page");
+
+	history.forward();
+	await settle();
+	respond(slow.response);
+	slow.push({ t: "snapshot", html: page("Home", "<p>stale home page</p>") });
+	slow.close();
+	await pending;
+	await settle();
+
+	expect(calls).toHaveLength(2);
+	expect(location.pathname).toBe("/next");
+	expect(document.title).toBe("Next");
+	expect(document.body.textContent).toContain("next page");
+	expect(document.body.textContent).not.toContain("stale home page");
+	expect(calls[1]?.init.signal?.aborted).toBe(true);
+	expect(location.assign).not.toHaveBeenCalled();
+	expect(location.replace).not.toHaveBeenCalled();
+});
+
+it("keeps the displayed page's live updates during a fragment traversal", async () => {
+	const stream = streamed();
+	const calls = stubFetch(() => stream.response);
+	const rt = mount(`<a data-topcoat-link="never" href="/next">next</a>`);
+
+	click(link());
+	stream.push({
+		t: "snapshot",
+		html: page(
+			"Next",
+			"<!--::topcoat::region::start(1f)--><p>loading</p><!--::topcoat::region::end(1f)-->",
+		),
+	});
+	await settle();
+
+	history.pushState(history.state, "", "/next#section");
+	history.back();
+	await settle();
+	stream.push({ t: "swap", region: "1f", html: "<p>loaded</p>" });
+	stream.close();
+	await rt.navigation.pending;
+	await settle();
+
+	expect(calls).toHaveLength(1);
+	expect(calls[0]?.init.signal?.aborted).toBe(false);
+	expect(location.pathname).toBe("/next");
+	expect(location.hash).toBe("");
+	expect(document.body.textContent).toContain("loaded");
+	expect(document.body.textContent).not.toContain("loading");
+});
+
 it("prefetches a link on hover and uses the prefetch when it is followed", async () => {
 	const calls = stubFetch(() => snapshot(page("Next", "<p>next page</p>")));
 	mount(`<a data-topcoat-link="intent" href="/next">x</a>`);
