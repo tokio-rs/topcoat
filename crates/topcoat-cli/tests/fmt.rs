@@ -258,6 +258,46 @@ async fn default_file_discovery_runs_both_formatters() {
 }
 
 #[tokio::test]
+async fn file_discovery_skips_ignored_files_and_build_directories() {
+    let project = Project::new();
+    let input = "fn main(){view!{<div id = \"greeting\"/>}}\n";
+    std::fs::write(project.path.join(".gitignore"), "/generated\n").unwrap();
+    for dir in ["src", "generated", "build"] {
+        std::fs::create_dir(project.path.join(dir)).unwrap();
+        std::fs::write(project.path.join(dir).join("main.rs"), input).unwrap();
+    }
+    std::fs::write(project.path.join("build/CACHEDIR.TAG"), "").unwrap();
+
+    let cases: [&[&str]; 2] = [&[], &["."]];
+    for args in cases {
+        let output = run(project.command(&[&["--check"][..], args].concat()), "").await;
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains("src"), "{stderr}");
+        assert!(!stderr.contains("generated"), "{stderr}");
+        assert!(!stderr.contains("build"), "{stderr}");
+    }
+
+    formatted(run(project.command(&[]), "").await);
+    let read = |dir: &str| std::fs::read_to_string(project.path.join(dir).join("main.rs")).unwrap();
+    assert_ne!(read("src"), input);
+    assert_eq!(read("generated"), input);
+    assert_eq!(read("build"), input);
+}
+
+#[tokio::test]
+async fn explicit_files_are_formatted_even_when_ignored() {
+    let project = Project::new();
+    let input = "fn main(){view!{<div id = \"greeting\"/>}}\n";
+    std::fs::write(project.path.join(".gitignore"), "/generated\n").unwrap();
+    std::fs::create_dir(project.path.join("generated")).unwrap();
+    let path = project.path.join("generated/main.rs");
+    std::fs::write(&path, input).unwrap();
+
+    formatted(run(project.command(&["generated/main.rs"]), "").await);
+    assert_ne!(std::fs::read_to_string(path).unwrap(), input);
+}
+
+#[tokio::test]
 async fn formatter_errors_leave_files_unchanged_and_emit_no_source() {
     let project = Project::new();
     for input in ["fn main( {", "fn main(){view!{<div></span>}}"] {

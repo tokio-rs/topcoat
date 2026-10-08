@@ -2,10 +2,17 @@
 
 mod error;
 
-use std::{collections::BTreeSet, io::Read, path::Path, process::Stdio, time::Instant};
+use std::{
+    collections::BTreeSet,
+    io::Read,
+    path::{Path, PathBuf},
+    process::Stdio,
+    time::Instant,
+};
 
 use clap::Args;
 use console::style;
+use ignore::WalkBuilder;
 use tokio::{io::AsyncWriteExt, process::Command};
 use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
 
@@ -61,29 +68,7 @@ impl FmtCommand {
 
         let start = Instant::now();
         let result: Result<(), Error> = async {
-            let mut files = BTreeSet::new();
-
-            let patterns: Vec<&str> = if self.files.is_empty() && !self.stdin {
-                vec!["**/*.rs"]
-            } else {
-                self.files.iter().map(String::as_str).collect()
-            };
-
-            for pattern in patterns {
-                for entry in glob::glob(pattern)? {
-                    let entry = entry?;
-                    if entry.is_dir() {
-                        let dir = entry
-                            .to_str()
-                            .expect("directory does not have a UTF-8 compatible name");
-                        for entry in glob::glob(&format!("{dir}/**/*.rs"))? {
-                            files.insert(entry?);
-                        }
-                    } else {
-                        files.insert(entry);
-                    }
-                }
-            }
+            let files = self.files()?;
 
             let mut count = 0;
             let mut modified = 0;
@@ -166,6 +151,28 @@ impl FmtCommand {
         }
     }
 
+    /// Collects the Rust files to format.
+    fn files(&self) -> Result<BTreeSet<PathBuf>, Error> {
+        let mut files = BTreeSet::new();
+        if self.files.is_empty() {
+            if !self.stdin {
+                rust_files_in(Path::new("."), &mut files)?;
+            }
+            return Ok(files);
+        }
+        for pattern in &self.files {
+            for entry in glob::glob(pattern)? {
+                let entry = entry?;
+                if entry.is_dir() {
+                    rust_files_in(&entry, &mut files)?;
+                } else {
+                    files.insert(entry);
+                }
+            }
+        }
+        Ok(files)
+    }
+
     async fn format_file(&self, path: &Path, registry: &Registry) -> Result<bool, Error> {
         let input = std::fs::read_to_string(path)?;
         let output = self.format_source(&input, registry, path.parent()).await?;
@@ -216,4 +223,28 @@ impl FmtCommand {
         })?;
         Ok(pretty_print_str(registry, &source)?)
     }
+}
+
+/// Adds the Rust files under `dir` to `files`, skipping ignored files and
+/// Cargo build directories.
+fn rust_files_in(dir: &Path, files: &mut BTreeSet<PathBuf>) -> Result<(), Error> {
+    let walk = WalkBuilder::new(dir)
+        // Projects that are not in a Git repository yet still have a `.gitignore`.
+        .require_git(false)
+        // Cargo marks its build directories with a `CACHEDIR.TAG` file.
+        .filter_entry(|entry| {
+            !entry.file_type().is_some_and(|ty| ty.is_dir())
+                || !entry.path().join("CACHEDIR.TAG").is_file()
+        })
+        .build();
+    for entry in walk {
+        let entry = entry?;
+        let path = entry.path();
+        if entry.file_type().is_some_and(|ty| ty.is_file())
+            && path.extension().is_some_and(|extension| extension == "rs")
+        {
+            files.insert(path.strip_prefix(".").unwrap_or(path).to_owned());
+        }
+    }
+    Ok(())
 }

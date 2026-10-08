@@ -4,6 +4,7 @@ use topcoat_core_grammar::pretty::FormatError;
 pub enum Error {
     Glob(glob::GlobError),
     Pattern(glob::PatternError),
+    Walk(ignore::Error),
     Io(std::io::Error),
     RustfmtIo(std::io::Error),
     RustfmtFailed(std::process::ExitStatus),
@@ -15,6 +16,7 @@ impl std::fmt::Display for Error {
         match self {
             Self::Glob(inner) => write!(f, "{inner}")?,
             Self::Pattern(inner) => write!(f, "{inner}")?,
+            Self::Walk(inner) => write!(f, "{inner}")?,
             Self::Io(inner) => write!(f, "{inner}")?,
             Self::RustfmtIo(inner) => write!(f, "failed to run rustfmt: {inner}")?,
             Self::RustfmtFailed(status) => write!(f, "rustfmt failed with {status}")?,
@@ -43,6 +45,12 @@ impl From<glob::GlobError> for Error {
 impl From<glob::PatternError> for Error {
     fn from(value: glob::PatternError) -> Self {
         Self::Pattern(value)
+    }
+}
+
+impl From<ignore::Error> for Error {
+    fn from(value: ignore::Error) -> Self {
+        Self::Walk(value)
     }
 }
 

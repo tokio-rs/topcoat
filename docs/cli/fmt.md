@@ -10,7 +10,7 @@ topcoat fmt
 
 You can also run `cargo topcoat fmt`. Use `topcoat fmt` in editors to avoid starting Cargo for each format request.
 
-With no file arguments, the command scans Rust files under the current directory and writes changes in place.
+With no file arguments, the command scans Rust files under the current directory, skipping ignored files and `target`, and writes changes in place.
 
 ```sh
 topcoat fmt src/main.rs src/app
