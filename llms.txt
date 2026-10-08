@@ -6,7 +6,9 @@ Links point to authoritative guides in this checkout. Runnable patterns: `exampl
 
 ## Start
 
-`cargo new app`; `cargo add topcoat`; `cargo add tokio --features rt-multi-thread,macros`. Install `cargo install topcoat-cli`; run `topcoat dev` (build/bundle/reload). `start` defaults to `127.0.0.1:3000`; override `HOST`/`PORT`. [Setup](docs/getting_started.md).
+Install `cargo install topcoat-cli`; create an app with `topcoat new app --recommended`; `cd app`. The recommended preset includes a Toasty/SQLite todo example: run `cargo run -- toasty migration generate` and `cargo run -- toasty migration apply`, then `topcoat dev` (build/bundle/reload). Edit `src/app.rs`. Use `--minimal` for a small app without database models, or omit the preset for the interactive wizard. The destination must not exist. [Getting started](docs/getting_started.md), [command options](docs/cli/new.md).
+
+For [manual setup](docs/manual_setup.md): `cargo new app`; `cd app`; `cargo add topcoat`; `cargo add tokio --features rt-multi-thread,macros`. The minimal entry point below runs with `cargo run` or `topcoat dev`. `start` defaults to `127.0.0.1:3000`; override `HOST`/`PORT`.
 
 ```rust
 use topcoat::{Result, router::{module_router, page}, view::{View, view}};

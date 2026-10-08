@@ -205,7 +205,9 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 ## Learn Topcoat
 
 **Start here**
-- [Getting started](https://github.com/tokio-rs/topcoat/blob/main/docs/getting_started.md): create a new project, install the CLI, run the dev server.
+
+- [Getting started](https://github.com/tokio-rs/topcoat/blob/main/docs/getting_started.md): create an app with `topcoat new` and run the dev server.
+- [Manual setup](https://github.com/tokio-rs/topcoat/blob/main/docs/manual_setup.md): add dependencies and wire up a minimal app yourself.
 - [Source code formatting](https://github.com/tokio-rs/topcoat/blob/main/docs/cli/fmt.md): `topcoat fmt` for macro bodies.
 
 **Rendering**
@@ -255,7 +257,6 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 
 Planned features we'd like to bring to Topcoat. Have an idea? [Open an issue](https://github.com/tokio-rs/topcoat/issues).
 
-- [ ] `topcoat new` CLI command to bootstrap pre-configured projects
 - [ ] Static export
 - [ ] (More) reactivity (`topcoat-runtime`)
 - [ ] More Topcoat UI components, full "blocks" e.g. sign-in form
@@ -268,7 +269,7 @@ Planned features we'd like to bring to Topcoat. Have an idea? [Open an issue](ht
 - [ ] `WebTransport`
 - [ ] Image optimization / resizing
 - [ ] Markdown support
-- [ ] Easier-to-use middlewares like rate-limiting, compression, etc.
+- [ ] Easier-to-use middlewares like rate-limiting
 - [ ] Authentication
 - [ ] Background jobs
 - [ ] Islands
