@@ -42,7 +42,7 @@ use topcoat::{
 {%- if tailwind %}
     tailwind,
 {%- endif %}
-    view::{View, view},
+    view::{View,{% if tailwind && (iconify_example || custom_icons) %} attributes,{% endif %} view},
 };
 {%- if ui %}
 {%- if example %}
@@ -157,7 +157,6 @@ async fn root(slot: Slot<'_>) -> Result<impl View> {
             </head>
 {%- if let Some(font) = font %}
 {%- if ui %}
-            // The theme applies the font to the body through its `--font-sans` variable.
             <body>(slot)</body>
 {%- else %}
             <body style=(format!("font-family: {:?}, {{ font.generic }}", {{ font.ident }}.family()))>
@@ -186,7 +185,10 @@ async fn home() -> Result<impl View> {
                 card_header(
                     card_title(
 {%- if iconify_example %}
-                        icon(data: iconify_icon!("lucide:sparkles"))
+                        icon(
+                            data: iconify_icon!("lucide:sparkles"),
+                            attrs: attributes! { class="inline-block" },
+                        )
                         " "
 {%- endif %}
                         {{ title }}
@@ -212,10 +214,20 @@ async fn home() -> Result<impl View> {
 {%- else %}
             <h1{{ classes.heading }}>
 {%- if iconify_example %}
-                icon(data: iconify_icon!("lucide:sparkles"))
+                icon(
+                    data: iconify_icon!("lucide:sparkles"),
+{%- if tailwind %}
+                    attrs: attributes! { class="inline-block" },
+{%- endif %}
+                )
                 " "
 {%- else if custom_icons %}
-                icon(data: crate::icons::SPARKLE)
+                icon(
+                    data: crate::icons::SPARKLE,
+{%- if tailwind %}
+                    attrs: attributes! { class="inline-block" },
+{%- endif %}
+                )
                 " "
 {%- endif %}
                 {{ title }}
