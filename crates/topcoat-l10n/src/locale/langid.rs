@@ -68,9 +68,8 @@ impl LanguageIdentifier {
             if index == bytes.len() || bytes[index] == b'-' {
                 let (_, rest) = bytes.split_at(start);
                 let (piece, _) = rest.split_at(index - start);
-                let piece = match str::from_utf8(piece) {
-                    Ok(piece) => piece,
-                    Err(_) => return Err(LocaleParseError::InvalidSubtag),
+                let Ok(piece) = str::from_utf8(piece) else {
+                    return Err(LocaleParseError::InvalidSubtag);
                 };
 
                 identifier = match identifier {
@@ -464,10 +463,9 @@ mod tests {
 
     #[test]
     fn icu_identifiers_with_too_many_variants_are_rejected() {
-        let icu = icu_locale_core::LanguageIdentifier::try_from_str(
-            "en-aaaaa-bbbbb-ccccc-ddddd-eeeee",
-        )
-        .unwrap();
+        let icu =
+            icu_locale_core::LanguageIdentifier::try_from_str("en-aaaaa-bbbbb-ccccc-ddddd-eeeee")
+                .unwrap();
 
         assert_eq!(
             LanguageIdentifier::try_from_icu(&icu),
