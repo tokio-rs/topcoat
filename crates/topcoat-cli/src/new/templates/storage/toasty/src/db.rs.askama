@@ -20,6 +20,9 @@ pub async fn connect() -> toasty::Result<Db> {
 
 /// Returns the database handle from the router's app context. Cloning it is cheap
 /// because it refers to a shared connection pool.
+{%- if !example %}
+#[allow(dead_code, reason = "features call it once they store data")]
+{%- endif %}
 pub fn db(cx: &Cx) -> Db {
     app_context::<Db>(cx).clone()
 }

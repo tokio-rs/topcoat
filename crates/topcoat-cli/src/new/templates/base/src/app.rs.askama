@@ -1,5 +1,7 @@
+{% if example -%}
 mod todos;
 
+{% endif -%}
 {% if toasty -%}
 use toasty::Db;
 {% endif -%}
@@ -24,15 +26,15 @@ use topcoat::{
 {%- endif %}
 {%- match routing %}
 {%- when Routing::Module %}
-{%- if interaction == Interaction::Topcoat %}
-    router::{Router, RouterBuilderDiscoverExt, Slot, href, layout, module_router, page},
+{%- if discover %}
+    router::{Router, RouterBuilderDiscoverExt, Slot,{% if example %} href,{% endif %} layout, module_router, page},
 {%- else %}
-    router::{Router, Slot, href, layout, module_router, page},
+    router::{Router, Slot,{% if example %} href,{% endif %} layout, module_router, page},
 {%- endif %}
 {%- when Routing::Discover %}
-    router::{Router, RouterBuilderDiscoverExt, Slot, href, layout, page},
+    router::{Router, RouterBuilderDiscoverExt, Slot,{% if example %} href,{% endif %} layout, page},
 {%- when Routing::Manual %}
-    router::{Router, Slot, href, layout, page},
+    router::{Router, Slot,{% if example %} href,{% endif %} layout, page},
 {%- endmatch %}
 {%- if interaction == Interaction::Topcoat %}
     runtime::RouterBuilderRuntimeExt,
@@ -43,11 +45,16 @@ use topcoat::{
     view::{View, view},
 };
 {%- if ui %}
+{%- if example %}
 
 use crate::components::{
     button::{ButtonSize, ButtonVariant, button_variants},
     card::{card, card_content, card_description, card_header, card_title},
 };
+{%- else %}
+
+use crate::components::card::{card, card_description, card_header, card_title};
+{%- endif %}
 {%- endif %}
 {%- if let Some(font) = font %}
 
@@ -66,7 +73,7 @@ pub fn router() -> Router {
     // The pages and layouts of this module and its submodules, with paths derived
     // from the module tree.
     module_router!()
-{%- if interaction == Interaction::Topcoat %}
+{%- if discover %}
         // The runtime's procedures and shards, which have no place in the module tree.
         .discover()
 {%- endif %}
@@ -78,6 +85,7 @@ pub fn router() -> Router {
     Router::builder()
         .layout(root)
         .page(home)
+{%- if example %}
         .page(todos::page)
 {%- if interaction == Interaction::Topcoat %}
         .route(todos::todo_list)
@@ -89,6 +97,7 @@ pub fn router() -> Router {
         .route(todos::id::toggle)
         .route(todos::id::delete)
 {%- endif %}
+{%- endif %}
 {%- endmatch %}
 {%- if let Some(font) = font %}
 {%- if !discover %}
@@ -97,7 +106,7 @@ pub fn router() -> Router {
 {%- endif %}
 {%- if toasty %}
         .app_context(db)
-{%- else %}
+{%- else if example %}
         .app_context(crate::features::todo::Todos::default())
 {%- endif %}
         .assets(AssetBundle::load().unwrap())
@@ -188,6 +197,7 @@ async fn home() -> Result<impl View> {
                         " and save to see your changes."
                     )
                 )
+{%- if example %}
                 card_content(
                     // A link styled like a button, with the button component's classes.
                     <a
@@ -197,6 +207,7 @@ async fn home() -> Result<impl View> {
                         "Todo example"
                     </a>
                 )
+{%- endif %}
             )
 {%- else %}
             <h1{{ classes.heading }}>
@@ -214,9 +225,11 @@ async fn home() -> Result<impl View> {
                 <code>"src/app.rs"</code>
                 " and save to see your changes."
             </p>
+{%- if example %}
             <p{{ classes.paragraph }}>
                 <a{{ classes.link }} href=(href!(todos::page))>"Todo example"</a>
             </p>
+{%- endif %}
 {%- endif %}
         </main>
     })

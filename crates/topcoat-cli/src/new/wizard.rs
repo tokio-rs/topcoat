@@ -139,6 +139,13 @@ pub fn ask(input: &mut Input) -> Result<(), String> {
                 ],
                 recommended.font,
             )?),
+            Question::Example => Answer::Example(confirm(
+                &format!(
+                    "Include the todo example?\n{}",
+                    style("A small todo list that shows how pages, data, and interactions fit together").dim()
+                ),
+                recommended.example,
+            )?),
         };
         input.answer(answer);
     }

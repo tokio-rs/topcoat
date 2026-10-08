@@ -26,6 +26,25 @@ fn minimal_preset_compiles() {
     check("minimal", &["--minimal"], false);
 }
 
+/// The todo example with plain HTML forms, stored in memory.
+#[test]
+#[ignore = "slow; compiles a starter application"]
+fn minimal_preset_with_example_compiles() {
+    check("minimal-example", &["--minimal", "--example"], false);
+}
+
+/// Toasty and Topcoat UI without the todo example, which has the only model and uses
+/// most of the UI components.
+#[test]
+#[ignore = "slow; compiles a starter application"]
+fn recommended_preset_without_example_compiles() {
+    check(
+        "recommended-no-example",
+        &["--recommended", "--no-example"],
+        true,
+    );
+}
+
 /// The choices neither preset covers: manual routing, htmx, Tailwind without Topcoat
 /// UI, custom icons, and a font other than the UI theme's.
 #[test]
@@ -48,6 +67,7 @@ fn mixed_choices_compile() {
             "--font-family",
             "inter",
             "--no-ui",
+            "--example",
         ],
         true,
     );

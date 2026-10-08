@@ -113,7 +113,10 @@ impl NewCommand {
 
         let quoted = shell_quote(&path);
         let mut steps = vec![format!("cd {quoted}")];
-        if let DatabaseSetup::Toasty { .. } = resolution.options.database {
+        // Without the example there are no models, so there is nothing to migrate yet.
+        if let DatabaseSetup::Toasty { .. } = resolution.options.database
+            && resolution.options.example
+        {
             steps.push("cargo run -- toasty migration generate".to_string());
             steps.push("cargo run -- toasty migration apply".to_string());
         }

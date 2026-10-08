@@ -63,6 +63,12 @@ pub struct ChoiceArgs {
     /// Do not install Topcoat UI components
     #[arg(long)]
     no_ui: bool,
+    /// Include the todo example
+    #[arg(long, conflicts_with = "no_example")]
+    example: bool,
+    /// Do not include the todo example
+    #[arg(long)]
+    no_example: bool,
 }
 
 impl ChoiceArgs {
@@ -97,6 +103,7 @@ impl Preset {
                 icons: Icons::Iconify,
                 font: Font::Fontsource,
                 ui: true,
+                example: true,
             },
             Self::Minimal => PresetChoices {
                 routing: Routing::Module,
@@ -106,6 +113,7 @@ impl Preset {
                 icons: Icons::None,
                 font: Font::None,
                 ui: false,
+                example: false,
             },
         }
     }
@@ -120,6 +128,7 @@ pub struct PresetChoices {
     pub icons: Icons,
     pub font: Font,
     pub ui: bool,
+    pub example: bool,
 }
 
 /// Where a choice's value came from.
@@ -160,6 +169,7 @@ pub struct Input {
     pub font: Option<Sourced<Font>>,
     pub font_family: Option<String>,
     pub ui: Option<Sourced<bool>>,
+    pub example: Option<Sourced<bool>>,
 }
 
 impl Input {
@@ -182,6 +192,7 @@ impl Input {
             font: args.font.map(flag),
             font_family: args.font_family,
             ui: switch(args.ui, args.no_ui).map(flag),
+            example: switch(args.example, args.no_example).map(flag),
         };
         if let Some(preset) = preset {
             input.fill(preset);
@@ -206,6 +217,8 @@ impl Input {
             .get_or_insert(Sourced::new(choices.icons, origin));
         self.font.get_or_insert(Sourced::new(choices.font, origin));
         self.ui.get_or_insert(Sourced::new(choices.ui, origin));
+        self.example
+            .get_or_insert(Sourced::new(choices.example, origin));
     }
 
     /// Fills open choices that follow from the choices already made. Topcoat UI
@@ -245,6 +258,7 @@ impl Input {
             Answer::Icons(value) => self.icons = Some(prompt(value)),
             Answer::Font(value) => self.font = Some(prompt(value)),
             Answer::Ui(value) => self.ui = Some(prompt(value)),
+            Answer::Example(value) => self.example = Some(prompt(value)),
         }
         self.infer();
     }
@@ -270,6 +284,7 @@ impl Input {
             (self.tailwind.is_none(), Question::Tailwind),
             (self.icons.is_none(), Question::Icons),
             (self.font.is_none(), Question::Font),
+            (self.example.is_none(), Question::Example),
         ]
         .into_iter()
         .filter_map(|(open, question)| open.then_some(question))
@@ -289,6 +304,7 @@ impl Input {
             Some(icons),
             Some(font),
             Some(ui),
+            Some(example),
         ) = (
             self.routing,
             self.database,
@@ -297,6 +313,7 @@ impl Input {
             self.icons,
             self.font,
             self.ui,
+            self.example,
         )
         else {
             let flags: Vec<&str> = self.questions().into_iter().map(Question::flag).collect();
@@ -361,6 +378,7 @@ impl Input {
             icons: icon_setup,
             font: font_setup,
             ui: ui.value,
+            example: example.value,
         };
 
         let mut notes = Vec::new();
@@ -404,6 +422,7 @@ pub enum Question {
     Tailwind,
     Icons,
     Font,
+    Example,
 }
 
 impl Question {
@@ -417,6 +436,7 @@ impl Question {
             Self::Icons => "--icons",
             Self::Font => "--font",
             Self::Ui => "--ui or --no-ui",
+            Self::Example => "--example or --no-example",
         }
     }
 }
@@ -431,6 +451,7 @@ pub enum Answer {
     Icons(Icons),
     Font(Font),
     Ui(bool),
+    Example(bool),
 }
 
 /// Validated options and notes about choices made on the user's behalf.
@@ -587,7 +608,10 @@ mod tests {
         }
 
         input.answer(Answer::Ui(true));
-        assert_eq!(input.questions(), []);
+        let questions = input.questions();
+        for prerequisite in [Question::Tailwind, Question::Icons, Question::Font] {
+            assert!(!questions.contains(&prerequisite), "{prerequisite:?}");
+        }
     }
 
     #[test]
@@ -600,6 +624,7 @@ mod tests {
             "--interaction",
             "none",
             "--ui",
+            "--no-example",
         ])
         .unwrap();
         assert_eq!(
@@ -625,6 +650,7 @@ mod tests {
             "--ui",
             "--font",
             "none",
+            "--no-example",
         ])
         .unwrap();
         assert_eq!(options.font, FontSetup::None);
@@ -655,6 +681,7 @@ mod tests {
             Answer::Tailwind(true),
             Answer::Icons(Icons::Custom),
             Answer::Font(Font::Fontsource),
+            Answer::Example(false),
         ] {
             answered.answer(answer);
         }
@@ -674,6 +701,7 @@ mod tests {
             "--font",
             "fontsource",
             "--no-ui",
+            "--no-example",
         ])
         .unwrap();
         assert_eq!(answered.resolve().unwrap().options, flags);

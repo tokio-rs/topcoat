@@ -13,6 +13,7 @@ pub struct ProjectOptions {
     pub icons: IconSetup,
     pub font: FontSetup,
     pub ui: bool,
+    pub example: bool,
 }
 
 impl ProjectOptions {

@@ -10,15 +10,25 @@ Install the Topcoat CLI:
 cargo install topcoat-cli
 ```
 {%- if toasty %}
+{%- if example %}
 
 Create the database tables by generating a migration from the models and applying it:
+{%- else %}
+
+After adding or changing a Toasty model, generate a migration and apply it:
+{%- endif %}
 
 ```sh
 cargo run -- toasty migration generate
 cargo run -- toasty migration apply
 ```
+{%- if example %}
 
 Run both commands again after changing a model. The database is stored in `data.db`.
+{%- else %}
+
+The database is stored in `data.db`.
+{%- endif %}
 {%- endif %}
 
 Start the development server, which rebuilds the application when you edit its source:
@@ -34,8 +44,10 @@ Then open <http://127.0.0.1:3000>.
 | Path | Contents |
 | --- | --- |
 | `src/app.rs`, `src/app/` | The route tree: the router, layouts, pages, and routes. |
-| `src/features/` | Everything one feature owns, such as its data and business rules. |
-| `src/components/` | Shared UI components that belong to no single feature. |
+| `src/features.rs`, `src/features/` | Everything one feature owns, such as its data and business rules. |
+{%- if ui %}
+| `src/components.rs`, `src/components/` | Shared UI components that belong to no single feature. |
+{%- endif %}
 {%- if toasty %}
 | `src/db.rs` | The database connection. |
 | `toasty/` | The database migrations. Commit them with your code. |

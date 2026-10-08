@@ -30,8 +30,10 @@ const TOASTY_VERSION: &str = "0.11";
 const EXAMPLE_ICON_SET: &str = "lucide";
 /// The stylesheet at the package root: plain CSS, the Tailwind input, or the UI theme.
 const STYLESHEET: &str = "styles.css";
-/// The Topcoat UI components the starter pages use.
-const UI_COMPONENTS: &[&str] = &["button", "card", "input"];
+/// The Topcoat UI components the home page uses.
+const UI_COMPONENTS: &[&str] = &["card"];
+/// The Topcoat UI components the todo example uses in addition.
+const EXAMPLE_UI_COMPONENTS: &[&str] = &["button", "input"];
 /// The UI theme's declaration of its sans-serif font, naming the family it expects.
 const THEME_FONT: &str = r#"--font-sans: "Geist", sans-serif;"#;
 
@@ -53,6 +55,23 @@ struct MainRs {
 struct Gitignore {
     /// Whether the application stores its data with Toasty.
     toasty: bool,
+}
+
+/// `src/features.rs`: the feature modules.
+#[derive(Template)]
+#[template(path = "base/src/features.rs.askama", escape = "none")]
+struct FeaturesRs {
+    /// Whether the application includes the todo example.
+    example: bool,
+}
+
+/// `src/db.rs`: the Toasty database connection.
+#[derive(Template)]
+#[template(path = "storage/toasty/src/db.rs.askama", escape = "none")]
+struct DbRs {
+    /// Whether the application includes the todo example, whose feature reads the
+    /// database.
+    example: bool,
 }
 
 /// `src/app.rs`: the router, root layout, and home page.
@@ -83,6 +102,8 @@ struct AppRs<'a> {
     /// Whether the application has a module of hand-written icons.
     custom_icons: bool,
     font: Option<FontInfo>,
+    /// Whether the application includes the todo example.
+    example: bool,
 }
 
 /// The Fontsource family a generated application loads.
@@ -337,6 +358,10 @@ struct Readme<'a> {
     name: &'a str,
     /// Whether the application stores its data with Toasty.
     toasty: bool,
+    /// Whether the application has Topcoat UI components.
+    ui: bool,
+    /// Whether the application includes the todo example.
+    example: bool,
 }
 
 /// Renders the files of a new application named `name` with the given options.
@@ -383,7 +408,7 @@ pub fn generate(name: &PackageName, options: &ProjectOptions) -> Result<ProjectP
         }
     }
     // Every todo page except the runtime's reads form or signal data with serde.
-    if options.interaction != Interaction::Topcoat {
+    if options.example && options.interaction != Interaction::Topcoat {
         manifest.dependency("serde", Dependency::new(SERDE_VERSION).features(["derive"]))?;
     }
 
@@ -440,11 +465,15 @@ pub fn generate(name: &PackageName, options: &ProjectOptions) -> Result<ProjectP
         manifest.dependency("topcoat", topcoat().features(["ui"]))?;
         let registry = Registry::embedded(topcoat_ui_registry::FILES)
             .map_err(|error| format!("failed to load the UI registry: {error}"))?;
+        let mut components = UI_COMPONENTS.to_vec();
+        if options.example {
+            components.extend(EXAMPLE_UI_COMPONENTS);
+        }
         let scaffold = manage::scaffold(
             &registry,
             &ScaffoldOptions {
                 theme: None,
-                components: UI_COMPONENTS,
+                components: &components,
             },
         )?;
         for file in scaffold {
@@ -457,53 +486,22 @@ pub fn generate(name: &PackageName, options: &ProjectOptions) -> Result<ProjectP
         }
     }
 
-    // The todo feature, stored with the selected database integration or in memory.
     plan.add(
         "src/features.rs",
-        include_str!("templates/base/src/features.rs"),
+        render(&FeaturesRs {
+            example: options.example,
+        })?,
     )?;
     if toasty {
         plan.add(
             "src/db.rs",
-            include_str!("templates/storage/toasty/src/db.rs"),
-        )?;
-        plan.add(
-            "src/features/todo.rs",
-            include_str!("templates/storage/toasty/src/features/todo.rs"),
-        )?;
-    } else {
-        plan.add(
-            "src/features/todo.rs",
-            include_str!("templates/storage/memory/src/features/todo.rs"),
+            render(&DbRs {
+                example: options.example,
+            })?,
         )?;
     }
-
-    // The todo pages, built with the selected interaction approach.
-    let (todos, todo_id) = match options.interaction {
-        Interaction::None => (
-            render(&FormsTodos { paths, classes, ui })?,
-            Some(render(&FormsTodoId { paths })?),
-        ),
-        Interaction::AlpineAjax => (
-            render(&AlpineAjaxTodos { paths, classes, ui })?,
-            Some(render(&FormsTodoId { paths })?),
-        ),
-        Interaction::Htmx => (
-            render(&HtmxTodos { paths, classes, ui })?,
-            Some(render(&HtmxTodoId { paths })?),
-        ),
-        Interaction::Datastar => (
-            render(&DatastarTodos { paths, classes, ui })?,
-            Some(render(&DatastarTodoId { paths })?),
-        ),
-        Interaction::Topcoat => (render(&TopcoatTodos { paths, classes, ui })?, None),
-    };
-    plan.add("src/app/todos.rs", format_rust("src/app/todos.rs", &todos)?)?;
-    if let Some(todo_id) = todo_id {
-        plan.add(
-            "src/app/todos/id.rs",
-            format_rust("src/app/todos/id.rs", &todo_id)?,
-        )?;
+    if options.example {
+        add_example(&mut plan, options, toasty, paths, classes)?;
     }
 
     let app = render(&AppRs {
@@ -511,7 +509,9 @@ pub fn generate(name: &PackageName, options: &ProjectOptions) -> Result<ProjectP
         ui,
         routing: options.routing,
         discover: options.routing == Routing::Discover
-            || (options.routing == Routing::Module && options.interaction == Interaction::Topcoat),
+            || (options.routing == Routing::Module
+                && options.interaction == Interaction::Topcoat
+                && options.example),
         paths,
         classes,
         interaction: options.interaction,
@@ -521,6 +521,7 @@ pub fn generate(name: &PackageName, options: &ProjectOptions) -> Result<ProjectP
         icon_set_hint: iconify_set.filter(|_| !iconify_example),
         custom_icons,
         font,
+        example: options.example,
     })?;
     plan.add("src/app.rs", format_rust("src/app.rs", &app)?)?;
     let main = render(&MainRs {
@@ -556,9 +557,57 @@ pub fn generate(name: &PackageName, options: &ProjectOptions) -> Result<ProjectP
         render(&Readme {
             name: name.as_str(),
             toasty,
+            ui,
+            example: options.example,
         })?,
     )?;
     Ok(plan)
+}
+
+/// Adds the todo example: the todo feature, stored with Toasty or in memory, and its
+/// pages, built with the selected interaction approach.
+fn add_example(
+    plan: &mut ProjectPlan,
+    options: &ProjectOptions,
+    toasty: bool,
+    paths: Paths,
+    classes: Classes,
+) -> Result<(), String> {
+    let feature = if toasty {
+        include_str!("templates/storage/toasty/src/features/todo.rs")
+    } else {
+        include_str!("templates/storage/memory/src/features/todo.rs")
+    };
+    plan.add("src/features/todo.rs", feature)?;
+
+    let ui = options.ui;
+    let (todos, todo_id) = match options.interaction {
+        Interaction::None => (
+            render(&FormsTodos { paths, classes, ui })?,
+            Some(render(&FormsTodoId { paths })?),
+        ),
+        Interaction::AlpineAjax => (
+            render(&AlpineAjaxTodos { paths, classes, ui })?,
+            Some(render(&FormsTodoId { paths })?),
+        ),
+        Interaction::Htmx => (
+            render(&HtmxTodos { paths, classes, ui })?,
+            Some(render(&HtmxTodoId { paths })?),
+        ),
+        Interaction::Datastar => (
+            render(&DatastarTodos { paths, classes, ui })?,
+            Some(render(&DatastarTodoId { paths })?),
+        ),
+        Interaction::Topcoat => (render(&TopcoatTodos { paths, classes, ui })?, None),
+    };
+    plan.add("src/app/todos.rs", format_rust("src/app/todos.rs", &todos)?)?;
+    if let Some(todo_id) = todo_id {
+        plan.add(
+            "src/app/todos/id.rs",
+            format_rust("src/app/todos/id.rs", &todo_id)?,
+        )?;
+    }
+    Ok(())
 }
 
 /// Points the UI theme's sans-serif font at the application's Fontsource family. The
@@ -613,6 +662,7 @@ mod tests {
             icons: IconSetup::None,
             font: FontSetup::None,
             ui: false,
+            example: false,
         }
     }
 
@@ -729,6 +779,7 @@ mod tests {
             let options = ProjectOptions {
                 routing: Routing::Manual,
                 interaction,
+                example: true,
                 ..minimal()
             };
             let plan = generate(&name, &options).unwrap();
@@ -768,8 +819,12 @@ mod tests {
     #[test]
     fn todos_are_stored_with_toasty_or_in_memory() {
         let name = PackageName::new("my-app").unwrap();
+        let example = ProjectOptions {
+            example: true,
+            ..minimal()
+        };
 
-        let plan = generate(&name, &minimal()).unwrap();
+        let plan = generate(&name, &example).unwrap();
         let manifest: toml::Table = file(&plan, "Cargo.toml").unwrap().parse().unwrap();
         assert!(manifest["dependencies"].get("toasty").is_none());
         assert!(file(&plan, "src/db.rs").is_none());
@@ -783,7 +838,7 @@ mod tests {
             database: DatabaseSetup::Toasty {
                 backend: DatabaseBackend::Sqlite,
             },
-            ..minimal()
+            ..example
         };
         let plan = generate(&name, &options).unwrap();
         let manifest: toml::Table = file(&plan, "Cargo.toml").unwrap().parse().unwrap();
@@ -887,7 +942,11 @@ mod tests {
     #[test]
     fn ui_installs_its_theme_and_the_components_the_pages_use() {
         let name = PackageName::new("my-app").unwrap();
-        let plan = generate(&name, &ui("geist")).unwrap();
+        let options = ProjectOptions {
+            example: true,
+            ..ui("geist")
+        };
+        let plan = generate(&name, &options).unwrap();
 
         let manifest: toml::Table = file(&plan, "Cargo.toml").unwrap().parse().unwrap();
         assert!(features(&manifest["dependencies"]["topcoat"]).contains(&"ui"));
@@ -896,7 +955,7 @@ mod tests {
         assert!(theme.contains(THEME_FONT));
         assert!(file(&plan, "components.toml").is_some());
         let modules = file(&plan, "src/components.rs").unwrap();
-        for component in UI_COMPONENTS {
+        for component in UI_COMPONENTS.iter().chain(EXAMPLE_UI_COMPONENTS) {
             assert!(
                 modules.contains(&format!("pub mod {component};")),
                 "{component}"
@@ -911,6 +970,46 @@ mod tests {
         );
         assert!(file(&plan, "src/app.rs").unwrap().contains("card("));
         assert!(file(&plan, "src/app/todos.rs").unwrap().contains("button("));
+    }
+
+    #[test]
+    fn without_the_example_no_todo_code_is_generated() {
+        let name = PackageName::new("my-app").unwrap();
+        for interaction in [
+            Interaction::None,
+            Interaction::Topcoat,
+            Interaction::Htmx,
+            Interaction::Datastar,
+            Interaction::AlpineAjax,
+        ] {
+            let options = ProjectOptions {
+                interaction,
+                database: DatabaseSetup::Toasty {
+                    backend: DatabaseBackend::Sqlite,
+                },
+                ..ui("geist")
+            };
+            let plan = generate(&name, &options).unwrap();
+            let label = format!("{interaction:?}");
+
+            for (path, _) in plan.files() {
+                assert!(
+                    !path.starts_with("src/app") && !path.starts_with("src/features"),
+                    "{label}: {}",
+                    path.display()
+                );
+            }
+            let manifest: toml::Table = file(&plan, "Cargo.toml").unwrap().parse().unwrap();
+            assert!(manifest["dependencies"].get("serde").is_none(), "{label}");
+            let components = file(&plan, "src/components.rs").unwrap();
+            for component in EXAMPLE_UI_COMPONENTS {
+                assert!(!components.contains(component), "{label}: {component}");
+            }
+            let app = file(&plan, "src/app.rs").unwrap();
+            assert!(!app.contains("todo"), "{label}");
+            // Module routing only discovers handlers for the example's runtime code.
+            assert!(!app.contains("discover"), "{label}");
+        }
     }
 
     #[test]
