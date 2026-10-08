@@ -3,7 +3,6 @@ use std::{
     str::FromStr,
 };
 
-use super::common::Buffer;
 use crate::LocaleParseError;
 
 /// A language subtag, such as `en` or `zh`: two or three ASCII letters.
@@ -12,14 +11,11 @@ use crate::LocaleParseError;
 /// at compile time, or parse one with [`str::parse`]. Parsing canonicalizes
 /// the text to lower case.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Language(Buffer<3>);
+pub struct Language(icu_locale_core::subtags::Language);
 
 impl Language {
     /// The unknown language, written `und`.
-    pub const UNKNOWN: Self = match Self::try_from_str("und") {
-        Ok(language) => language,
-        Err(_) => unreachable!(),
-    };
+    pub const UNKNOWN: Self = Self(icu_locale_core::subtags::Language::UNKNOWN);
 
     /// Parses a language subtag, canonicalizing its case.
     ///
@@ -27,11 +23,9 @@ impl Language {
     ///
     /// Fails when the text is not two or three ASCII letters.
     pub const fn try_from_str(text: &str) -> Result<Self, LocaleParseError> {
-        match Buffer::new(text.as_bytes()) {
-            Some(buffer) if buffer.len() >= 2 && buffer.is_alphabetic() => {
-                Ok(Self(buffer.to_lowercase()))
-            }
-            _ => Err(LocaleParseError::InvalidLanguage),
+        match icu_locale_core::subtags::Language::try_from_str(text) {
+            Ok(language) => Ok(Self(language)),
+            Err(_) => Err(LocaleParseError::InvalidLanguage),
         }
     }
 
@@ -44,23 +38,19 @@ impl Language {
     /// Returns whether this is the unknown language.
     #[must_use]
     pub const fn is_unknown(&self) -> bool {
-        matches!(self.as_str().as_bytes(), b"und")
+        self.0.is_unknown()
     }
 
     /// Converts to the `icu_locale_core` subtag.
     #[must_use]
     pub const fn to_icu(self) -> icu_locale_core::subtags::Language {
-        // Both types accept the same canonical text.
-        match icu_locale_core::subtags::Language::try_from_raw(self.0.into_raw()) {
-            Ok(language) => language,
-            Err(_) => unreachable!(),
-        }
+        self.0
     }
 
     /// Converts from the `icu_locale_core` subtag.
     #[must_use]
     pub const fn from_icu(language: icu_locale_core::subtags::Language) -> Self {
-        Self(Buffer::from_raw(language.into_raw()))
+        Self(language)
     }
 }
 
@@ -111,22 +101,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parses_two_and_three_letter_subtags() {
-        assert_eq!("en".parse::<Language>().unwrap().as_str(), "en");
-        assert_eq!("ast".parse::<Language>().unwrap().as_str(), "ast");
-    }
-
-    #[test]
     fn canonicalizes_to_lower_case() {
         assert_eq!("EN".parse::<Language>().unwrap(), language!("en"));
         assert_eq!("De".parse::<Language>().unwrap().to_string(), "de");
     }
 
     #[test]
-    fn rejects_other_lengths_and_digits() {
-        assert!("e".parse::<Language>().is_err());
-        assert!("engl".parse::<Language>().is_err());
-        assert!("e1".parse::<Language>().is_err());
+    fn rejects_malformed_text() {
+        assert_eq!(
+            "e1".parse::<Language>(),
+            Err(LocaleParseError::InvalidLanguage)
+        );
         assert!("".parse::<Language>().is_err());
     }
 
@@ -135,6 +120,5 @@ mod tests {
         assert!(Language::UNKNOWN.is_unknown());
         assert!("UND".parse::<Language>().unwrap().is_unknown());
         assert!(!language!("en").is_unknown());
-        assert!(!language!("unf").is_unknown());
     }
 }

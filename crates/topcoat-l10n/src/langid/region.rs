@@ -3,7 +3,6 @@ use std::{
     str::FromStr,
 };
 
-use super::common::Buffer;
 use crate::LocaleParseError;
 
 /// A region subtag, such as `AT` or `419`: two ASCII letters or three ASCII
@@ -13,7 +12,7 @@ use crate::LocaleParseError;
 /// compile time, or parse one with [`str::parse`]. Parsing canonicalizes the
 /// text to upper case.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Region(Buffer<3>);
+pub struct Region(icu_locale_core::subtags::Region);
 
 impl Region {
     /// Parses a region subtag, canonicalizing its case.
@@ -23,12 +22,9 @@ impl Region {
     /// Fails when the text is neither two ASCII letters nor three ASCII
     /// digits.
     pub const fn try_from_str(text: &str) -> Result<Self, LocaleParseError> {
-        match Buffer::new(text.as_bytes()) {
-            Some(buffer) if buffer.len() == 2 && buffer.is_alphabetic() => {
-                Ok(Self(buffer.to_uppercase()))
-            }
-            Some(buffer) if buffer.len() == 3 && buffer.is_numeric() => Ok(Self(buffer)),
-            _ => Err(LocaleParseError::InvalidRegion),
+        match icu_locale_core::subtags::Region::try_from_str(text) {
+            Ok(region) => Ok(Self(region)),
+            Err(_) => Err(LocaleParseError::InvalidRegion),
         }
     }
 
@@ -41,17 +37,13 @@ impl Region {
     /// Converts to the `icu_locale_core` subtag.
     #[must_use]
     pub const fn to_icu(self) -> icu_locale_core::subtags::Region {
-        // Both types accept the same canonical text.
-        match icu_locale_core::subtags::Region::try_from_raw(self.0.into_raw()) {
-            Ok(region) => region,
-            Err(_) => unreachable!(),
-        }
+        self.0
     }
 
     /// Converts from the `icu_locale_core` subtag.
     #[must_use]
     pub const fn from_icu(region: icu_locale_core::subtags::Region) -> Self {
-        Self(Buffer::from_raw(region.into_raw()))
+        Self(region)
     }
 }
 
@@ -102,21 +94,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn accepts_letters_and_digits() {
-        assert_eq!("at".parse::<Region>().unwrap(), region!("AT"));
-        assert_eq!("419".parse::<Region>().unwrap().as_str(), "419");
-    }
-
-    #[test]
     fn canonicalizes_letters_to_upper_case() {
-        assert_eq!("us".parse::<Region>().unwrap().to_string(), "US");
+        assert_eq!("at".parse::<Region>().unwrap(), region!("AT"));
+        assert_eq!("419".parse::<Region>().unwrap().to_string(), "419");
     }
 
     #[test]
-    fn rejects_mixed_and_wrong_length_text() {
-        assert!("A".parse::<Region>().is_err());
-        assert!("USA".parse::<Region>().is_err());
-        assert!("41".parse::<Region>().is_err());
+    fn rejects_malformed_text() {
+        assert_eq!(
+            "USA".parse::<Region>(),
+            Err(LocaleParseError::InvalidRegion)
+        );
         assert!("4A9".parse::<Region>().is_err());
     }
 }

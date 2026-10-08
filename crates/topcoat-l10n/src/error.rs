@@ -12,15 +12,25 @@ pub enum LocaleParseError {
     InvalidRegion,
     /// A variant subtag is malformed.
     InvalidVariant,
-    /// The same variant appears twice.
-    DuplicateVariant,
-    /// More variants than a language identifier can hold. See
-    /// [`MAX_VARIANTS`](crate::MAX_VARIANTS).
-    TooManyVariants,
     /// A subtag fits none of the positions in a language identifier.
     InvalidSubtag,
-    /// The extensions after the language identifier are malformed.
+    /// An extension is malformed.
     InvalidExtension,
+    /// The same extension appears twice.
+    DuplicateExtension,
+}
+
+impl LocaleParseError {
+    pub(crate) const fn from_icu(error: icu_locale_core::ParseError) -> Self {
+        use icu_locale_core::ParseError;
+
+        match error {
+            ParseError::InvalidLanguage => Self::InvalidLanguage,
+            ParseError::InvalidExtension => Self::InvalidExtension,
+            ParseError::DuplicatedExtension => Self::DuplicateExtension,
+            _ => Self::InvalidSubtag,
+        }
+    }
 }
 
 impl Display for LocaleParseError {
@@ -30,10 +40,9 @@ impl Display for LocaleParseError {
             Self::InvalidScript => "invalid script subtag",
             Self::InvalidRegion => "invalid region subtag",
             Self::InvalidVariant => "invalid variant subtag",
-            Self::DuplicateVariant => "duplicate variant subtag",
-            Self::TooManyVariants => "too many variant subtags",
             Self::InvalidSubtag => "subtag fits no position in the language identifier",
             Self::InvalidExtension => "invalid locale extension",
+            Self::DuplicateExtension => "duplicate locale extension",
         })
     }
 }

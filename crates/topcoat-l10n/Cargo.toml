@@ -21,6 +21,7 @@ topcoat-core.workspace = true
 topcoat-router = { workspace = true, optional = true }
 
 http = { workspace = true, optional = true }
+icu_locale.workspace = true
 icu_locale_core = { workspace = true, features = ["alloc"] }
 
 [dev-dependencies]

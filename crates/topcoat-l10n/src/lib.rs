@@ -2,6 +2,12 @@
 
 //! Localization for Topcoat.
 
+mod error;
+mod extensions;
+mod langid;
 mod locale;
 
+pub use error::*;
+pub use extensions::*;
+pub use langid::*;
 pub use locale::*;

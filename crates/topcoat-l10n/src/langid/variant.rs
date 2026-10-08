@@ -3,7 +3,6 @@ use std::{
     str::FromStr,
 };
 
-use super::common::Buffer;
 use crate::LocaleParseError;
 
 /// A variant subtag, such as `posix` or `1996`: five to eight ASCII
@@ -13,7 +12,7 @@ use crate::LocaleParseError;
 /// compile time, or parse one with [`str::parse`]. Parsing canonicalizes the
 /// text to lower case.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Variant(Buffer<8>);
+pub struct Variant(icu_locale_core::subtags::Variant);
 
 impl Variant {
     /// Parses a variant subtag, canonicalizing its case.
@@ -23,12 +22,9 @@ impl Variant {
     /// Fails when the text is neither five to eight ASCII alphanumerics nor
     /// a digit followed by three alphanumerics.
     pub const fn try_from_str(text: &str) -> Result<Self, LocaleParseError> {
-        match Buffer::new(text.as_bytes()) {
-            Some(buffer) if buffer.len() >= 5 => Ok(Self(buffer.to_lowercase())),
-            Some(buffer) if buffer.len() == 4 && buffer.starts_with_digit() => {
-                Ok(Self(buffer.to_lowercase()))
-            }
-            _ => Err(LocaleParseError::InvalidVariant),
+        match icu_locale_core::subtags::Variant::try_from_str(text) {
+            Ok(variant) => Ok(Self(variant)),
+            Err(_) => Err(LocaleParseError::InvalidVariant),
         }
     }
 
@@ -41,22 +37,13 @@ impl Variant {
     /// Converts to the `icu_locale_core` subtag.
     #[must_use]
     pub const fn to_icu(self) -> icu_locale_core::subtags::Variant {
-        // Both types accept the same canonical text.
-        match icu_locale_core::subtags::Variant::try_from_raw(self.0.into_raw()) {
-            Ok(variant) => variant,
-            Err(_) => unreachable!(),
-        }
+        self.0
     }
 
     /// Converts from the `icu_locale_core` subtag.
     #[must_use]
     pub const fn from_icu(variant: icu_locale_core::subtags::Variant) -> Self {
-        Self(Buffer::from_raw(variant.into_raw()))
-    }
-
-    /// Compares two variants like `Ord`, for use in const context.
-    pub(crate) const fn compare(&self, other: &Self) -> std::cmp::Ordering {
-        self.0.compare(&other.0)
+        Self(variant)
     }
 }
 
@@ -107,23 +94,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn accepts_both_forms() {
-        assert_eq!("posix".parse::<Variant>().unwrap(), variant!("posix"));
-        assert_eq!("1996".parse::<Variant>().unwrap().as_str(), "1996");
-        assert_eq!("1aaa".parse::<Variant>().unwrap().as_str(), "1aaa");
-        assert_eq!("valencia".parse::<Variant>().unwrap().as_str(), "valencia");
-    }
-
-    #[test]
     fn canonicalizes_to_lower_case() {
-        assert_eq!("POSIX".parse::<Variant>().unwrap().to_string(), "posix");
+        assert_eq!("POSIX".parse::<Variant>().unwrap(), variant!("posix"));
+        assert_eq!("1996".parse::<Variant>().unwrap().to_string(), "1996");
     }
 
     #[test]
-    fn rejects_short_letter_only_text_and_overlong_text() {
-        assert!("abcd".parse::<Variant>().is_err());
-        assert!("abc".parse::<Variant>().is_err());
-        assert!("123".parse::<Variant>().is_err());
+    fn rejects_malformed_text() {
+        assert_eq!(
+            "abcd".parse::<Variant>(),
+            Err(LocaleParseError::InvalidVariant)
+        );
         assert!("valencian".parse::<Variant>().is_err());
     }
 }

@@ -3,7 +3,6 @@ use std::{
     str::FromStr,
 };
 
-use super::common::Buffer;
 use crate::LocaleParseError;
 
 /// A script subtag, such as `Latn` or `Hant`: four ASCII letters.
@@ -12,7 +11,7 @@ use crate::LocaleParseError;
 /// compile time, or parse one with [`str::parse`]. Parsing canonicalizes the
 /// text to title case.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Script(Buffer<4>);
+pub struct Script(icu_locale_core::subtags::Script);
 
 impl Script {
     /// Parses a script subtag, canonicalizing its case.
@@ -21,11 +20,9 @@ impl Script {
     ///
     /// Fails when the text is not four ASCII letters.
     pub const fn try_from_str(text: &str) -> Result<Self, LocaleParseError> {
-        match Buffer::new(text.as_bytes()) {
-            Some(buffer) if buffer.len() == 4 && buffer.is_alphabetic() => {
-                Ok(Self(buffer.to_titlecase()))
-            }
-            _ => Err(LocaleParseError::InvalidScript),
+        match icu_locale_core::subtags::Script::try_from_str(text) {
+            Ok(script) => Ok(Self(script)),
+            Err(_) => Err(LocaleParseError::InvalidScript),
         }
     }
 
@@ -38,17 +35,13 @@ impl Script {
     /// Converts to the `icu_locale_core` subtag.
     #[must_use]
     pub const fn to_icu(self) -> icu_locale_core::subtags::Script {
-        // Both types accept the same canonical text.
-        match icu_locale_core::subtags::Script::try_from_raw(self.0.into_raw()) {
-            Ok(script) => script,
-            Err(_) => unreachable!(),
-        }
+        self.0
     }
 
     /// Converts from the `icu_locale_core` subtag.
     #[must_use]
     pub const fn from_icu(script: icu_locale_core::subtags::Script) -> Self {
-        Self(Buffer::from_raw(script.into_raw()))
+        Self(script)
     }
 }
 
@@ -105,9 +98,11 @@ mod tests {
     }
 
     #[test]
-    fn rejects_other_lengths_and_digits() {
-        assert!("Lat".parse::<Script>().is_err());
-        assert!("Latin".parse::<Script>().is_err());
+    fn rejects_malformed_text() {
+        assert_eq!(
+            "Lat".parse::<Script>(),
+            Err(LocaleParseError::InvalidScript)
+        );
         assert!("La1n".parse::<Script>().is_err());
     }
 }
