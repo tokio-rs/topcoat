@@ -43,7 +43,6 @@ pub struct NewCommand {
 
 impl NewCommand {
     pub fn run(self) {
-        cliclack::intro(style(" Create a new Topcoat project ").black().on_cyan()).ok();
         if let Err(error) = self.run_inner() {
             if error != prompt::CANCELLED {
                 cliclack::outro_cancel(error).ok();

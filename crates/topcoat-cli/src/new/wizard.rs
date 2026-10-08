@@ -33,7 +33,7 @@ const BRING_YOUR_OWN: &str = "set it up yourself";
 /// Asks for the directory to create the application in. Unless `named` is set, the
 /// directory name must also be a valid package name.
 pub fn destination(named: bool) -> Result<PathBuf, String> {
-    let path: String = cliclack::input("Where should the application be created?")
+    let path: String = cliclack::input("Directory")
         .default_input("my-app")
         .validate(move |path: &String| check_destination(Path::new(path), named))
         .interact()
@@ -48,7 +48,7 @@ pub fn ask(input: &mut Input) -> Result<(), String> {
     while let Some(&question) = input.questions().first() {
         let answer = match question {
             Question::Routing => Answer::Routing(select(
-                "Which routing style do you want to use?",
+                "Routing style",
                 &[
                     (
                         Routing::Module,
@@ -70,7 +70,7 @@ pub fn ask(input: &mut Input) -> Result<(), String> {
                 recommended.routing,
             )?),
             Question::Database => Answer::Database(select(
-                "Which database integration?",
+                "Database integration",
                 &[
                     (Database::Toasty, "Toasty", "async ORM"),
                     (Database::None, "None", BRING_YOUR_OWN),
@@ -78,7 +78,7 @@ pub fn ask(input: &mut Input) -> Result<(), String> {
                 recommended.database,
             )?),
             Question::Interaction => Answer::Interaction(select(
-                "Which browser interaction library?",
+                "Browser interaction",
                 &[
                     (
                         Interaction::Topcoat,
@@ -106,16 +106,16 @@ pub fn ask(input: &mut Input) -> Result<(), String> {
             )?),
             Question::Ui => Answer::Ui(confirm(
                 &format!(
-                    "Use Topcoat UI components?\n{}",
+                    "Topcoat UI components\n{}",
                     style("Includes Tailwind CSS, Lucide icons, and the Geist font").dim()
                 ),
                 recommended.ui,
             )?),
             Question::Tailwind => {
-                Answer::Tailwind(confirm("Use Tailwind CSS?", recommended.tailwind)?)
+                Answer::Tailwind(confirm("Tailwind CSS", recommended.tailwind)?)
             }
             Question::Icons => Answer::Icons(select(
-                "Which icon integration?",
+                "Icon integration",
                 &[
                     (
                         Icons::Iconify,
@@ -128,7 +128,7 @@ pub fn ask(input: &mut Input) -> Result<(), String> {
                 recommended.icons,
             )?),
             Question::Font => Answer::Font(select(
-                "Which font integration?",
+                "Font integration",
                 &[
                     (
                         Font::Fontsource,
@@ -141,7 +141,7 @@ pub fn ask(input: &mut Input) -> Result<(), String> {
             )?),
             Question::Example => Answer::Example(confirm(
                 &format!(
-                    "Include the todo example?\n{}",
+                    "Todo example\n{}",
                     style("A small todo list that shows how pages, data, and interactions fit together").dim()
                 ),
                 recommended.example,
@@ -158,7 +158,7 @@ pub fn ask(input: &mut Input) -> Result<(), String> {
     {
         let suggestions = POPULAR_ICON_SETS.iter().map(ToString::to_string).collect();
         input.icon_set = Some(text(
-            "Which Iconify set?",
+            "Iconify set",
             DEFAULT_ICON_SET,
             suggestions,
             icon_set_id,
@@ -175,7 +175,7 @@ pub fn ask(input: &mut Input) -> Result<(), String> {
             .map(|family| family.id.to_string())
             .collect();
         input.font_family = Some(text(
-            "Which Fontsource family?",
+            "Fontsource family",
             input.default_font_family(),
             suggestions,
             font_family_id,
