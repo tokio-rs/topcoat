@@ -6,8 +6,8 @@ use crate::IconData;
 
 /// Renders an [`IconData`] as an inline `<svg>` element.
 ///
-/// The icon is `1em` square by default, so it scales with the surrounding
-/// text, and carries `aria-hidden` unless a `label` is passed.
+/// The icon is a `1em` inline-block square by default, so it scales with the
+/// surrounding text, and carries `aria-hidden` unless a `label` is passed.
 #[component]
 pub async fn icon(
     /// The icon to render.
@@ -30,7 +30,7 @@ pub async fn icon(
             viewBox=(data.view_box())
             width=(size)
             height=(size)
-            style="vertical-align: -0.125em"
+            style="display: inline-block; vertical-align: -0.125em"
             aria-hidden=(label.is_empty().then_some("true"))
             role=((!label.is_empty()).then_some("img"))
             aria-label=((!label.is_empty()).then_some(label))
