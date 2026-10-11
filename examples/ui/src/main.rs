@@ -1051,9 +1051,7 @@ async fn branches_card(cx: &Cx) -> Result<impl View> {
                             // Picking an item closes the menu.
                             dropdown_menu_item(
                                 close: Some(&menu),
-                                attrs: attributes! {
-                                    @click=$(|_e: Event| selected.set(branch.to_owned()))
-                                },
+                                attrs: attributes! { @click=$(|_e: Event| selected.set(branch.to_owned())) },
                                 (branch)
                             )
                         }
@@ -1067,9 +1065,7 @@ async fn branches_card(cx: &Cx) -> Result<impl View> {
                                     // Closing the menu closes the submenu with it.
                                     dropdown_menu_item(
                                         close: Some(&menu),
-                                        attrs: attributes! {
-                                            @click=$(|_e: Event| selected.set(tag.to_owned()))
-                                        },
+                                        attrs: attributes! { @click=$(|_e: Event| selected.set(tag.to_owned())) },
                                         (tag)
                                     )
                                 }
@@ -1123,22 +1119,14 @@ async fn popover_card(cx: &Cx) -> Result<impl View> {
                                     orientation: FieldOrientation::Horizontal,
                                     field_label(attrs: attributes! { for=(&width) }, "Width")
                                     input(
-                                        attrs: attributes! {
-                                            id=(&width)
-                                            value="1280px"
-                                            class="h-8"
-                                        }
+                                        attrs: attributes! { id=(&width) value="1280px" class="h-8" }
                                     )
                                 )
                                 field(
                                     orientation: FieldOrientation::Horizontal,
                                     field_label(attrs: attributes! { for=(&height) }, "Height")
                                     input(
-                                        attrs: attributes! {
-                                            id=(&height)
-                                            value="720px"
-                                            class="h-8"
-                                        }
+                                        attrs: attributes! { id=(&height) value="720px" class="h-8" }
                                     )
                                 )
                             </div>
