@@ -95,7 +95,10 @@ mod tests {
     #[should_panic(expected = "unkeyed-test-loop")]
     fn an_ambiguous_identity_panics() {
         let site = SiteKey::new(file!(), line!(), column!(), 0);
-        let cx = with_identity(Cx::default(), Identity::ROOT.ambiguous_child(site, "unkeyed-test-loop"));
+        let cx = with_identity(
+            Cx::default(),
+            Identity::ROOT.ambiguous_child(site, "unkeyed-test-loop"),
+        );
         let _ = element_id(&cx);
     }
 }

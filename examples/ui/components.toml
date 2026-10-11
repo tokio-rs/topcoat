@@ -49,15 +49,19 @@ hash = "sha256:4191478a84b3e35b927927624cc12e89f8ee6ca69ac1a710950d4653bbbd9c67"
 file = "src/components/dialog.rs"
 
 [registries.topcoat.components.dropdown_menu]
-hash = "sha256:ead032c170b64120f8ecbfccef0adcd2f66e8152129deae326c85206d33cf33a"
+hash = "sha256:09d1aba4b23b6f3c3fc1191ea63ab5a069047f06d92ad8b8d9240afb05ccf5b9"
 file = "src/components/dropdown_menu.rs"
 
 [registries.topcoat.components.field]
 hash = "sha256:068bd99ee2bc265d4d1afeae789153b3273ec3d5a8a380af7e2cde9b28d4c66c"
 file = "src/components/field.rs"
 
+[registries.topcoat.components.floating]
+hash = "sha256:888edd54ba6641a7a45c32e26c1a32eb2838c36be8971cf2bcf9c0b4c1eb5cd3"
+file = "src/components/floating.rs"
+
 [registries.topcoat.components.hover_card]
-hash = "sha256:d3df0f6ad362c41663e227e19da51d961c3536e37647c031afac0e34ce47c075"
+hash = "sha256:4ef6990dbc65eeed057ab3078d3c411ed721f651ad19e21fa4bb75ab9cb35392"
 file = "src/components/hover_card.rs"
 
 [registries.topcoat.components.input]
@@ -79,6 +83,10 @@ file = "src/components/navigation_menu.rs"
 [registries.topcoat.components.pagination]
 hash = "sha256:e3a01c26e38ad5b5c93c32f56cbd148f1e102d8691a107a837d1b80a15670cfb"
 file = "src/components/pagination.rs"
+
+[registries.topcoat.components.popover]
+hash = "sha256:a3c582aab23db96da7a23e295239fed9226fbca4062194f46cf1aa6ac40e1e35"
+file = "src/components/popover.rs"
 
 [registries.topcoat.components.progress]
 hash = "sha256:c4ade4c149bc414dff7af49a3892fc41d185da9f4bfb3d48dc73e0d48913e0fb"
@@ -133,5 +141,5 @@ hash = "sha256:9e3db7d5944dd9307e01bba2d53e795e1aa6bf851c499379e2f18a19e37e8bb2"
 file = "src/components/toggle.rs"
 
 [registries.topcoat.components.tooltip]
-hash = "sha256:f8c7b8e1f943e515d71ea8c54a2e080a8454862d00fce868658a9662b9742c0a"
+hash = "sha256:a79d143ff5b902009a3cd18dbb742c9111d17389f716a06cb067dbb92a39c526"
 file = "src/components/tooltip.rs"

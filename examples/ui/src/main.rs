@@ -25,6 +25,7 @@ use components::{
         FieldLegendVariant, FieldOrientation, field, field_content, field_description, field_error,
         field_group, field_label, field_legend, field_separator, field_set,
     },
+    floating::{FloatingAlign, FloatingSide},
     hover_card::{hover_card, hover_card_content},
     input::input,
     kbd::{kbd, kbd_group},
@@ -36,6 +37,7 @@ use components::{
         pagination, pagination_content, pagination_ellipsis, pagination_item, pagination_link,
         pagination_next, pagination_previous,
     },
+    popover::{popover, popover_content, popover_trigger},
     progress::progress,
     radio_group::{radio_group, radio_group_item},
     select::select,
@@ -69,7 +71,7 @@ use topcoat::{
     router::{RouterBuilderDiscoverExt, module_router, page},
     runtime::{Event, RouterBuilderRuntimeExt, Signal, expr, shard, signal},
     tailwind,
-    view::{Child, View, attributes, component, view},
+    view::{Child, View, attributes, component, element_id, view},
 };
 
 /// A stand-in portrait for the workspace's owner, served from the example's
@@ -252,6 +254,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                                 demo(overview_card())
                                 demo(faq_card())
                                 demo(branches_card())
+                                demo(popover_card())
                                 demo(toolbar_card())
                                 demo(tooltip_card())
                                 demo(hover_card_demo())
@@ -1001,7 +1004,7 @@ async fn faq_card() -> Result<impl View> {
     })
 }
 
-/// A branch switcher that updates its label and closes the menu locally.
+/// A branch switcher that updates its label and closes the menu on selection.
 #[component]
 async fn branches_card(cx: &Cx) -> Result<impl View> {
     // The first branch is selected until another branch or tag is picked.
@@ -1009,8 +1012,9 @@ async fn branches_card(cx: &Cx) -> Result<impl View> {
     const TAGS: [&str; 3] = ["v1.2.0", "v1.1.0", "v1.0.0"];
 
     let selected = signal(cx, || BRANCHES[0].to_owned());
-    let open = signal(cx, || false);
-    let tags_open = signal(cx, || false);
+    // The trigger and each panel refer to each other by these ids.
+    let menu = element_id(cx);
+    let tags = element_id(cx);
 
     Ok(view! {
         card(
@@ -1020,38 +1024,35 @@ async fn branches_card(cx: &Cx) -> Result<impl View> {
             )
             card_content(
                 dropdown_menu(
-                    attrs: attributes! { :open=$(open.get()) },
                     // The trigger takes any content; this one borrows the
                     // outline button's looks and adds a flipping chevron.
                     dropdown_menu_trigger(
+                        target: &menu,
                         attrs: attributes! {
                             class=(button_variants(
                                 ButtonVariant::Outline,
                                 ButtonSize::Sm,
                             ))
-                            @click=$(|e: Event| {
-                                e.prevent_default();
-                                open.toggle();
-                                tags_open.set(false);
-                            })
                         },
                         $(selected.get())
                         icon(
                             data: iconify_icon!("lucide:chevron-down"),
-                            attrs: attributes! { class="transition-transform group-open:rotate-180" }
+                            attrs: attributes! {
+                                class="transition-transform \
+                                    group-has-[:popover-open]/dropdown-menu:rotate-180"
+                            }
                         )
                     )
                     dropdown_menu_content(
+                        id: &menu,
+                        align: FloatingAlign::Start,
                         dropdown_menu_label("Switch branch")
                         for branch in BRANCHES {
+                            // Picking an item closes the menu.
                             dropdown_menu_item(
+                                close: Some(&menu),
                                 attrs: attributes! {
-                                    type="button"
-                                    @click=$(|_e: Event| {
-                                        selected.set(branch.to_owned());
-                                        open.set(false);
-                                        tags_open.set(false);
-                                    })
+                                    @click=$(|_e: Event| selected.set(branch.to_owned()))
                                 },
                                 (branch)
                             )
@@ -1059,26 +1060,15 @@ async fn branches_card(cx: &Cx) -> Result<impl View> {
                         dropdown_menu_separator()
                         // A submenu opens its own panel beside this row.
                         dropdown_menu_sub(
-                            attrs: attributes! { :open=$(tags_open.get()) },
-                            dropdown_menu_sub_trigger(
-                                attrs: attributes! {
-                                    @click=$(|e: Event| {
-                                        e.prevent_default();
-                                        tags_open.toggle();
-                                    })
-                                },
-                                "Checkout tag"
-                            )
+                            dropdown_menu_sub_trigger(target: &tags, "Checkout tag")
                             dropdown_menu_sub_content(
+                                id: &tags,
                                 for tag in TAGS {
+                                    // Closing the menu closes the submenu with it.
                                     dropdown_menu_item(
+                                        close: Some(&menu),
                                         attrs: attributes! {
-                                            type="button"
-                                            @click=$(|_e: Event| {
-                                                selected.set(tag.to_owned());
-                                                open.set(false);
-                                                tags_open.set(false);
-                                            })
+                                            @click=$(|_e: Event| selected.set(tag.to_owned()))
                                         },
                                         (tag)
                                     )
@@ -1087,6 +1077,74 @@ async fn branches_card(cx: &Cx) -> Result<impl View> {
                         )
                     )
                 )
+            )
+        )
+    })
+}
+
+/// A panel with a small form, opened from a button.
+#[component]
+async fn popover_card(cx: &Cx) -> Result<impl View> {
+    let panel = element_id(cx);
+    let width = element_id(cx);
+    let height = element_id(cx);
+
+    Ok(view! {
+        card(
+            card_header(
+                card_title("Popover")
+                card_description("A panel of rich content next to its trigger.")
+            )
+            card_content(
+                <div class="flex items-center justify-between gap-4">
+                    <p class="text-sm text-muted-foreground">"Set the canvas size"</p>
+                    popover(
+                        popover_trigger(
+                            target: &panel,
+                            attrs: attributes! {
+                                class=(button_variants(
+                                    ButtonVariant::Outline,
+                                    ButtonSize::Sm,
+                                ))
+                            },
+                            "Dimensions"
+                        )
+                        popover_content(
+                            id: &panel,
+                            side: FloatingSide::Left,
+                            <div class="flex flex-col gap-3">
+                                <div class="flex flex-col gap-1">
+                                    <p class="text-sm font-medium">"Dimensions"</p>
+                                    <p class="text-sm text-muted-foreground">
+                                        "Set the size of the canvas."
+                                    </p>
+                                </div>
+                                field(
+                                    orientation: FieldOrientation::Horizontal,
+                                    field_label(attrs: attributes! { for=(&width) }, "Width")
+                                    input(
+                                        attrs: attributes! {
+                                            id=(&width)
+                                            value="1280px"
+                                            class="h-8"
+                                        }
+                                    )
+                                )
+                                field(
+                                    orientation: FieldOrientation::Horizontal,
+                                    field_label(attrs: attributes! { for=(&height) }, "Height")
+                                    input(
+                                        attrs: attributes! {
+                                            id=(&height)
+                                            value="720px"
+                                            class="h-8"
+                                        }
+                                    )
+                                )
+                            </div>
+                        )
+                    )
+                </div>
             )
         )
     })

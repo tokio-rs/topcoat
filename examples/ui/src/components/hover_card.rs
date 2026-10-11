@@ -3,6 +3,10 @@ use topcoat::{
     view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
+use super::floating::{
+    FLOATING_SCOPE, FloatingAlign, FloatingAnchor, FloatingSide, floating_variants,
+};
+
 /// Extra information shown when its trigger is hovered or focused.
 ///
 /// Pass the trigger and a `hover_card_content` panel as children. The panel appears and
@@ -27,7 +31,7 @@ pub async fn hover_card(
 ) -> Result<impl View> {
     Ok(view! {
         <span
-            class=(class!("group relative inline-flex", attrs.remove("class")))
+            class=(class!("group inline-flex", FLOATING_SCOPE, attrs.remove("class")))
             (attrs)
         >
             (child)
@@ -35,25 +39,44 @@ pub async fn hover_card(
     })
 }
 
-/// Classes for the panel below the trigger. Delayed opacity and visibility transitions
-/// let the pointer reach the panel before it closes.
+/// Classes for the panel. Delayed opacity and visibility transitions let the pointer
+/// reach the panel before it closes.
 const PANEL: StaticClass = class!(
-    "invisible absolute top-full left-0 z-50 mt-2 w-64 rounded-lg border",
+    "invisible z-50 w-64 rounded-lg border",
     "border-border bg-popover p-4 text-popover-foreground opacity-0 shadow-sm",
     "[transition:opacity_150ms_ease-out_300ms,visibility_150ms_allow-discrete_300ms]",
     "group-hover:visible group-hover:opacity-100",
     "group-focus-within:visible group-focus-within:opacity-100",
 );
 
-/// The view a [`hover_card`] shows, in a panel below its trigger.
+/// The view a [`hover_card`] shows, in a panel next to its trigger.
+///
+/// `side` chooses the side of the trigger it opens on and defaults to `Bottom`. `align`
+/// lines it up with the trigger and defaults to `Center`. When the panel would overflow
+/// the viewport, it moves to another position.
 #[component]
 pub async fn hover_card_content(
-    #[default] mut attrs: Attributes,
-    #[default] child: Child<'_>,
+    /// The side of the trigger the panel opens on.
+    #[default]
+    side: FloatingSide,
+    /// How the panel lines up with the trigger.
+    #[default]
+    align: FloatingAlign,
+    /// Extra attributes for the `<span>` element.
+    #[default]
+    mut attrs: Attributes,
+    /// The panel's content.
+    #[default]
+    child: Child<'_>,
 ) -> Result<impl View> {
     Ok(view! {
         <span
-            class=(class!("flex flex-col gap-2", PANEL, attrs.remove("class")))
+            class=(class!(
+                "flex flex-col gap-2",
+                floating_variants(FloatingAnchor::Scope, side, align),
+                PANEL,
+                attrs.remove("class"),
+            ))
             (attrs)
         >
             (child)

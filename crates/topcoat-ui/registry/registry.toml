@@ -42,13 +42,18 @@ source = "src/components/dialog.rs"
 
 [components.dropdown_menu]
 source = "src/components/dropdown_menu.rs"
+dependencies = ["floating"]
 
 [components.field]
 source = "src/components/field.rs"
 dependencies = ["label"]
 
+[components.floating]
+source = "src/components/floating.rs"
+
 [components.hover_card]
 source = "src/components/hover_card.rs"
+dependencies = ["floating"]
 
 [components.input]
 source = "src/components/input.rs"
@@ -65,6 +70,10 @@ source = "src/components/navigation_menu.rs"
 [components.pagination]
 source = "src/components/pagination.rs"
 dependencies = ["button"]
+
+[components.popover]
+source = "src/components/popover.rs"
+dependencies = ["floating"]
 
 [components.progress]
 source = "src/components/progress.rs"
@@ -109,3 +118,4 @@ source = "src/components/toggle.rs"
 
 [components.tooltip]
 source = "src/components/tooltip.rs"
+dependencies = ["floating"]
