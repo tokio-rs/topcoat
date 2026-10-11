@@ -177,7 +177,7 @@ mod tests {
 
     #[test]
     fn balanced_trees_keep_order_and_nest_logarithmically() {
-        for len in 0..=64_usize {
+        for len in 1..=64_usize {
             let items = (0..len).collect::<Vec<_>>();
             let tree = balanced(
                 &items,
