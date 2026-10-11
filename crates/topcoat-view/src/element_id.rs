@@ -5,11 +5,11 @@ use topcoat_core::{
     identity::SiteKey,
 };
 
-/// Returns an HTML `id` that is unique to this call and stable across renders.
+/// Creates an HTML ID that stays the same when the component renders again.
 ///
-/// The id comes from the identity of `cx` and the location of this call, so each
-/// component instance gets its own ids. Use it to connect elements that refer to each
-/// other by id, such as a label and its input or a button and the popover it opens:
+/// The ID depends on the identity in `cx` and where you call this function. Each
+/// component instance gets its own IDs. Use them to connect a label to an input or a
+/// button to a popover:
 ///
 /// ```rust
 /// use topcoat::{
@@ -20,24 +20,25 @@ use topcoat_core::{
 ///
 /// #[component]
 /// async fn email_field(cx: &Cx) -> Result<impl View> {
-///     let id = element_id(cx);
 ///     Ok(view! {
+///         let id = element_id(cx);
 ///         <label for=(&id)>"Email"</label>
 ///         <input id=(&id) type="email" name="email">
 ///     })
 /// }
 /// ```
 ///
-/// Calls at different locations return different ids. A call that runs repeatedly,
-/// such as one in a helper invoked from a loop, returns the same id each time. Pass a
-/// context derived with [`Cx::keyed`] to tell those calls apart. The id starts with a
-/// letter and contains only ASCII letters, digits, `-` and `_`, so it also works
-/// unescaped in CSS selectors.
+/// Calls on different lines or columns produce different IDs. Repeating a call at the
+/// same location with the same context produces the same ID. If a loop calls a helper
+/// that creates IDs, pass a different [`Cx::keyed`] context for each item.
+///
+/// IDs start with a letter and contain only ASCII letters, digits, `-`, and `_`. You
+/// can use them in CSS selectors without escaping them.
 ///
 /// # Panics
 ///
-/// Panics if `cx` belongs to a memoized call or carries an ambiguous identity, such as
-/// one inside a `view!` loop without a `#[key]`.
+/// Panics inside a memoized call or when `cx` cannot identify a single instance. This
+/// happens, for example, when a `view!` loop renders the component without a `#[key]`.
 #[must_use]
 #[track_caller]
 pub fn element_id(cx: &Cx) -> String {
@@ -51,7 +52,7 @@ mod tests {
 
     use super::*;
 
-    /// Returns the id of a single call site, however often it runs.
+    /// Calls `element_id` from the same source location each time.
     fn id_at_one_site(cx: &Cx) -> String {
         element_id(cx)
     }

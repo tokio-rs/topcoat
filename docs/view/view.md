@@ -374,21 +374,21 @@ Ordinary Rust expressions use the context explicitly passed to them. The macro d
 
 ## Element IDs
 
-Use [`element_id`] to get an HTML `id` for elements that refer to each other, such as a label and its input. The id comes from the component's identity and the location of the call, so it is stable across renders and unique to each component instance:
+Use [`element_id`] when one HTML element needs another element's ID. For example, a label's `for` attribute must match its input's `id`. Each component instance gets its own IDs, and those IDs stay the same when it renders again. The ID depends on the component's identity and where you call `element_id`:
 
 ```rust
 # use topcoat::{Result, context::Cx, view::*};
 # #[component]
 # async fn example(cx: &Cx) -> Result<impl View> {
-let id = element_id(cx);
 Ok(view! {
+    let id = element_id(cx);
     <label for=(&id)>"Email"</label>
     <input id=(&id) type="email" name="email">
 })
 # }
 ```
 
-Like other identity reads, it needs `#[key]` on any loop that encloses the component.
+When rendering the component in a `view!` loop, add `#[key(...)]` to the loop so each instance has its own identity. To create one ID per item inside a loop body, pass a keyed context, such as `element_id(&cx.keyed(item.id))`.
 
 # Views Are Lazy
 

@@ -119,8 +119,8 @@ pub const FLOATING_SCOPE: StaticClass =
 /// panel does not fit in the window. For a panel opened by a button:
 ///
 /// ```ignore
-/// let filters = element_id(cx);
 /// view! {
+///     let filters = element_id(cx);
 ///     <button type="button" popovertarget=(&filters)>"Filters"</button>
 ///     <div
 ///         id=(&filters)
@@ -149,7 +149,7 @@ pub const FLOATING_SCOPE: StaticClass =
 ///                     FloatingSide::Top,
 ///                     FloatingAlign::Center,
 ///                 ),
-///                 "invisible group-hover:visible",
+///                 "hidden group-hover:block",
 ///             ))
 ///         >
 ///             (hint)

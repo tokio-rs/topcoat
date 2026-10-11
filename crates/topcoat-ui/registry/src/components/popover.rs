@@ -18,8 +18,8 @@ use super::floating::{FloatingAlign, FloatingAnchor, FloatingSide, floating_vari
 /// children look while the panel is open.
 ///
 /// ```ignore
-/// let share = element_id(cx);
 /// view! {
+///     let share = element_id(cx);
 ///     popover(
 ///         popover_trigger(
 ///             target: &share,

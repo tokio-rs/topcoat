@@ -39,9 +39,9 @@ pub async fn hover_card(
     })
 }
 
-/// Classes for the panel. The closed panel generates no box, so it is placed again each
-/// time it opens. Delayed opacity and display transitions let the pointer reach the
-/// panel before it closes, and `@starting-style` supplies the entry opacity.
+/// Styles for a panel that fades in and out. The closing delay gives the pointer time
+/// to reach the panel. Using `display: none` while closed makes the browser recalculate
+/// its position when it opens. `@starting-style` starts the fade from transparent.
 const PANEL: StaticClass = class!(
     "hidden z-50 w-64 flex-col gap-2 rounded-lg border",
     "border-border bg-popover p-4 text-popover-foreground opacity-0 shadow-sm",
@@ -51,23 +51,23 @@ const PANEL: StaticClass = class!(
     "starting:group-focus-within:opacity-0",
 );
 
-/// The view a [`hover_card`] shows, in a panel next to its trigger.
+/// The content shown beside a [`hover_card`]'s trigger.
 ///
-/// `side` chooses the side of the trigger it opens on and defaults to `Bottom`. `align`
-/// lines it up with the trigger and defaults to `Center`. When the panel would overflow
-/// the viewport, it moves to another position.
+/// Use `side` to choose where the card opens and `align` to line it up with the trigger.
+/// By default, it opens below the trigger and is centered on it. The browser tries
+/// other positions if there is not enough room in the window.
 #[component]
 pub async fn hover_card_content(
-    /// The side of the trigger the panel opens on.
+    /// Where the card opens relative to the trigger.
     #[default]
     side: FloatingSide,
-    /// How the panel lines up with the trigger.
+    /// Which edge or center of the trigger the card lines up with.
     #[default]
     align: FloatingAlign,
-    /// Extra attributes for the `<span>` element.
+    /// Attributes to add to the card's `<span>`.
     #[default]
     mut attrs: Attributes,
-    /// The panel's content.
+    /// Content shown inside the card.
     #[default]
     child: Child<'_>,
 ) -> Result<impl View> {

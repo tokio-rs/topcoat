@@ -8,20 +8,19 @@ use super::floating::{FloatingAlign, FloatingAnchor, FloatingSide, floating_vari
 
 /// A floating action menu controlled by a trigger.
 ///
-/// Pass a [`dropdown_menu_trigger`] and a [`dropdown_menu_content`] as children, and
-/// connect them by passing the content's `id` to the trigger's `target`. Create the id
-/// with [`element_id`](topcoat::view::element_id). The browser opens and closes the menu
-/// without JavaScript. Clicking outside the menu or pressing Escape closes it. The menu
-/// shows above the rest of the page, so containers that clip their overflow do not cut
-/// it off.
+/// Add a [`dropdown_menu_trigger`] and a [`dropdown_menu_content`] as children. Create
+/// an ID with [`element_id`](topcoat::view::element_id) and use it for the trigger's
+/// `target` and the content's `id`. The button opens and closes the menu without
+/// JavaScript. Clicking outside or pressing Escape also closes it. The menu appears
+/// above the page and is not cut off by a parent's overflow settings.
 ///
-/// `attrs` are forwarded to the wrapper `<div>`, with extra classes added to its classes.
-/// The wrapper does not generate a box of its own. Items use normal Tab navigation. The
-/// component does not implement the ARIA menu pattern's arrow-key navigation.
+/// `attrs` adds attributes and classes to the wrapper `<div>`, which takes up no space
+/// in the layout. Use Tab to move between items. Arrow-key menu navigation is not
+/// provided.
 ///
 /// ```ignore
-/// let menu = element_id(cx);
 /// view! {
+///     let menu = element_id(cx);
 ///     dropdown_menu(
 ///         dropdown_menu_trigger(target: &menu, "Options")
 ///         dropdown_menu_content(
@@ -51,13 +50,13 @@ pub async fn dropdown_menu(
     })
 }
 
-/// A button that opens or closes the dropdown menu.
+/// A button for opening and closing the dropdown menu.
 ///
-/// Set `target` to the `id` of the [`dropdown_menu_content`]. Pass its label as
-/// children. To style it as a button, pass classes from
-/// [`button_variants`](super::button::button_variants) through `attrs`. The attributes
-/// go on the `<button>`. Use `group-has-[:popover-open]/dropdown-menu:` classes to style
-/// children while the menu is open.
+/// Set `target` to the [`dropdown_menu_content`]'s `id` and put the button's label in
+/// its children. Add [`button_variants`](super::button::button_variants) classes through
+/// `attrs` to give it the standard button style. All attributes go on the `<button>`.
+/// Use `group-has-[:popover-open]/dropdown-menu:` classes to change how children look
+/// while the menu is open.
 ///
 /// ```ignore
 /// view! {
@@ -78,12 +77,12 @@ pub async fn dropdown_menu(
 /// ```
 #[component]
 pub async fn dropdown_menu_trigger(
-    /// The `id` of the menu to open.
+    /// The menu ID this button controls.
     target: &str,
-    /// Extra attributes for the `<button>` element.
+    /// Attributes to add to the button.
     #[default]
     mut attrs: Attributes,
-    /// The trigger's label.
+    /// Content shown inside the button.
     #[default]
     child: Child<'_>,
 ) -> Result<impl View> {
@@ -107,23 +106,23 @@ const PANEL: StaticClass = class!(
 
 /// The floating panel of a [`dropdown_menu`], holding the menu's items.
 ///
-/// `side` chooses the side of the trigger it opens on and defaults to `Bottom`. `align`
-/// lines it up with the trigger and defaults to `Center`. When the panel would overflow
-/// the viewport, it moves to another position.
+/// Use `side` to choose where the menu opens and `align` to line it up with the button.
+/// By default, it opens below the button and is centered on it. The browser tries other
+/// positions if there is not enough room in the window.
 #[component]
 pub async fn dropdown_menu_content(
-    /// The panel's `id`, referenced by its trigger's `target`.
+    /// The menu ID to pass to the trigger's `target`.
     id: &str,
-    /// The side of the trigger the panel opens on.
+    /// Where the menu opens relative to the button.
     #[default]
     side: FloatingSide,
-    /// How the panel lines up with the trigger.
+    /// Which edge or center of the button the menu lines up with.
     #[default]
     align: FloatingAlign,
-    /// Extra attributes for the `<div>` element.
+    /// Attributes to add to the menu's `<div>`.
     #[default]
     mut attrs: Attributes,
-    /// The menu's items.
+    /// Items shown inside the menu.
     #[default]
     child: Child<'_>,
 ) -> Result<impl View> {
@@ -151,20 +150,20 @@ const ITEM: StaticClass = class!(
     "[&_svg]:size-4 [&_svg]:shrink-0",
 );
 
-/// One action in a [`dropdown_menu_content`], rendered as a `<button type="button">`.
+/// A button for an action inside [`dropdown_menu_content`].
 ///
-/// Set `close` to the menu's `id` to close the menu when the item is clicked. Closing a
-/// menu also closes its submenus. Leave it unset for items that keep the menu open.
-/// Submit buttons ignore `close`, which suits items that leave the page.
+/// The button defaults to `type="button"`. Pass the menu's ID to `close` to close the
+/// menu and its submenus when clicked. Omit `close` to leave them open. If you set
+/// `type="submit"` through `attrs`, the button submits its form and ignores `close`.
 #[component]
 pub async fn dropdown_menu_item(
-    /// The `id` of the menu to close when the item is clicked.
+    /// The menu ID to close when this button is clicked.
     #[default]
     close: Option<&str>,
-    /// Extra attributes for the `<button>` element.
+    /// Attributes to add to the button.
     #[default]
     mut attrs: Attributes,
-    /// The item's label.
+    /// Content shown inside the item.
     #[default]
     child: Child<'_>,
 ) -> Result<impl View> {
@@ -183,17 +182,17 @@ pub async fn dropdown_menu_item(
 
 /// A nested menu that opens from a row in the parent menu.
 ///
-/// Pass a [`dropdown_menu_sub_trigger`] and a [`dropdown_menu_sub_content`] as children,
-/// and connect them by passing the content's `id` to the trigger's `target`. Opening the
-/// submenu keeps the parent menu open, and closing the parent also closes the submenu.
+/// Add a [`dropdown_menu_sub_trigger`] and a [`dropdown_menu_sub_content`] as children.
+/// Give the trigger's `target` and the content's `id` the same value. The parent menu
+/// stays open when the submenu opens. Closing the parent closes the submenu too.
 ///
-/// `attrs` are forwarded to the wrapper `<div>`, with extra classes added to its classes.
-/// The wrapper does not generate a box of its own.
+/// `attrs` adds attributes and classes to the wrapper `<div>`. The wrapper takes up no
+/// space in the layout.
 ///
 /// ```ignore
-/// let menu = element_id(cx);
-/// let move_to = element_id(cx);
 /// view! {
+///     let menu = element_id(cx);
+///     let move_to = element_id(cx);
 ///     dropdown_menu_content(
 ///         id: &menu,
 ///         dropdown_menu_item(close: Some(&menu), "Back")
@@ -222,18 +221,17 @@ pub async fn dropdown_menu_sub(
 
 /// The row that opens or closes a submenu.
 ///
-/// Set `target` to the `id` of the [`dropdown_menu_sub_content`]. Pass its label as
-/// children. A chevron points toward the submenu, and the row stays highlighted while it
-/// is open. `attrs` are forwarded to the `<button>`, with extra classes added to its
-/// classes.
+/// Set `target` to the [`dropdown_menu_sub_content`]'s `id` and put the label in the
+/// children. The row includes a chevron and stays highlighted while the submenu is
+/// open. `attrs` adds attributes and classes to the row's `<button>`.
 #[component]
 pub async fn dropdown_menu_sub_trigger(
-    /// The `id` of the submenu to open.
+    /// The submenu ID this button controls.
     target: &str,
-    /// Extra attributes for the `<button>` element.
+    /// Attributes to add to the button.
     #[default]
     mut attrs: Attributes,
-    /// The row's label.
+    /// Content shown inside the row.
     #[default]
     child: Child<'_>,
 ) -> Result<impl View> {
@@ -257,17 +255,17 @@ pub async fn dropdown_menu_sub_trigger(
     })
 }
 
-/// The submenu panel, opening to the right of its trigger row.
+/// A submenu that opens to the right of its button.
 ///
-/// When the panel would overflow the viewport, it moves to another position.
+/// The browser tries other positions if the submenu does not fit in the window.
 #[component]
 pub async fn dropdown_menu_sub_content(
-    /// The panel's `id`, referenced by its trigger's `target`.
+    /// The submenu ID to pass to the trigger's `target`.
     id: &str,
-    /// Extra attributes for the `<div>` element.
+    /// Attributes to add to the submenu's `<div>`.
     #[default]
     mut attrs: Attributes,
-    /// The submenu's items.
+    /// Items shown inside the submenu.
     #[default]
     child: Child<'_>,
 ) -> Result<impl View> {

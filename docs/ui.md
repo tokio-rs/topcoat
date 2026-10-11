@@ -114,32 +114,41 @@ use components::card::{
 };
 use components::field::{field, field_description, field_group, field_label};
 use components::input::input;
-use topcoat::{Result, view::{View, attributes, component, view}};
+use topcoat::{
+    Result,
+    context::Cx,
+    view::{View, attributes, component, element_id, view},
+};
 
 #[component]
-async fn sign_in() -> Result<impl View> {
+async fn sign_in(cx: &Cx) -> Result<impl View> {
     Ok(view! {
+        // Elements that refer to each other share these IDs.
+        let form = element_id(cx);
+        let email = element_id(cx);
+        let email_description = element_id(cx);
+
         card(
             card_header(
                 card_title("Sign in")
                 card_description("Use your work email to continue.")
             )
             card_content(
-                <form id="sign-in" method="post" action="/login">
+                <form id=(&form) method="post" action="/login">
                     field_group(
                         field(
-                            field_label(attrs: attributes! { for="email" }, "Email")
+                            field_label(attrs: attributes! { for=(&email) }, "Email")
                             input(
                                 attrs: attributes! {
-                                    id="email"
+                                    id=(&email)
                                     name="email"
                                     type="email"
                                     placeholder="you@example.com"
-                                    aria-describedby="email-description"
+                                    aria-describedby=(&email_description)
                                 }
                             )
                             field_description(
-                                attrs: attributes! { id="email-description" },
+                                attrs: attributes! { id=(&email_description) },
                                 "Use the email address associated with your account."
                             )
                         )
@@ -148,7 +157,7 @@ async fn sign_in() -> Result<impl View> {
             )
             card_footer(
                 button(
-                    attrs: attributes! { class="w-full" type="submit" form="sign-in" },
+                    attrs: attributes! { class="w-full" type="submit" form=(&form) },
                     "Sign in"
                 )
             )

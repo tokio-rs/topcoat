@@ -9,11 +9,12 @@ use super::floating::{
 
 /// A short hint shown when its trigger is hovered or focused.
 ///
-/// Pass the trigger and `tooltip_content` as children.
+/// Add the trigger and a [`tooltip_content`] as children.
 ///
 /// Give the trigger its own text or accessible label. The tooltip must not be the only
 /// way to learn what the trigger does. To associate the hint with the trigger, give
-/// `tooltip_content` an `id` and reference it with the trigger's `aria-describedby`.
+/// `tooltip_content` an `id` from [`element_id`](topcoat::view::element_id) and
+/// reference it with the trigger's `aria-describedby`.
 ///
 /// ```ignore
 /// view! {
@@ -42,9 +43,9 @@ pub async fn tooltip(
     })
 }
 
-/// Classes for a tooltip bubble. The bubble ignores pointer events. The hidden bubble
-/// generates no box, so it is placed again each time it shows. Opacity and display
-/// transitions let it fade in and out, and `@starting-style` supplies the entry opacity.
+/// Styles for a hint that fades in and out and lets pointer events pass through.
+/// Using `display: none` while hidden makes the browser recalculate its position when
+/// it appears. `@starting-style` starts the fade from transparent.
 const BUBBLE: StaticClass = class!(
     "pointer-events-none hidden z-50 rounded-md bg-foreground px-2.5 py-1",
     "text-xs font-medium text-background",
@@ -55,23 +56,23 @@ const BUBBLE: StaticClass = class!(
     "starting:group-focus-within:opacity-0",
 );
 
-/// The hint a [`tooltip`] shows, in a bubble next to its trigger.
+/// The hint shown beside a [`tooltip`]'s trigger.
 ///
-/// `side` chooses the side of the trigger it shows on and defaults to `Top`. `align`
-/// lines it up with the trigger and defaults to `Center`. When the bubble would overflow
-/// the viewport, it moves to another position.
+/// Use `side` to choose where the hint appears and `align` to line it up with the
+/// trigger. By default, it appears above the trigger and is centered on it. The browser
+/// tries other positions if there is not enough room in the window.
 #[component]
 pub async fn tooltip_content(
-    /// The side of the trigger the bubble shows on.
+    /// Where the hint appears relative to the trigger.
     #[default(FloatingSide::Top)]
     side: FloatingSide,
-    /// How the bubble lines up with the trigger.
+    /// Which edge or center of the trigger the hint lines up with.
     #[default]
     align: FloatingAlign,
-    /// Extra attributes for the `<span>` element.
+    /// Attributes to add to the hint's `<span>`.
     #[default]
     mut attrs: Attributes,
-    /// The hint.
+    /// Content shown in the hint.
     #[default]
     child: Child<'_>,
 ) -> Result<impl View> {
