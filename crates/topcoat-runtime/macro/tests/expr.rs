@@ -390,6 +390,26 @@ async fn constants_and_captured_values_render_without_bindings() {
 }
 
 #[tokio::test]
+async fn dynamic_constants_render_bindings() {
+    let cx = &Cx::default();
+    let open = Expr::from(true).dynamic();
+    let state = expr!(if open { "open" } else { "closed" });
+    assert!(!state.is_static());
+    let html = view! {
+        cx =>
+        <dialog :open=(open) :data-state=(state)></dialog>
+    }
+    .single()
+    .await
+    .unwrap()
+    .render(cx);
+
+    assert!(html.contains("data-topcoat-bind:open="), "{html}");
+    assert!(html.contains("data-topcoat-bind:data-state="), "{html}");
+    assert!(html.contains("data-state=\"open\""), "{html}");
+}
+
+#[tokio::test]
 async fn forwarded_value_conversions_replace_dynamic_bindings() {
     let cx = &Cx::default();
     let html = view! { cx => replaced_dynamic_bindings() }

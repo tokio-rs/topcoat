@@ -160,6 +160,21 @@ Ok(view! {
 # }
 ```
 
+A plain `value` attribute is only an input's default. When a page or shard re-renders, a control the user has edited keeps its value, while an untouched one takes the new default. A bind attribute whose expression reads no signals renders as a plain attribute too. Call [`Expr::dynamic`] on the expression to bind it anyway, so every render sets the live value:
+
+```rust
+# use topcoat::{Result, context::Cx, runtime::Expr, view::*};
+# #[component]
+# async fn example(cx: &Cx) -> Result<impl View> {
+// Every render clears what the user typed.
+let draft = Expr::from(String::new()).dynamic();
+
+Ok(view! {
+    <input :value=(draft)>
+})
+# }
+```
+
 # Procedures
 
 A **procedure** is an async server function called from a runtime expression. Use one when an event handler needs a server resource, such as a database:
@@ -280,6 +295,7 @@ A shard can also take a signal from its caller, through a parameter typed `Signa
 Use `.get_untracked()` or `.read_untracked()` to read a value on the server without making changes to it trigger another render.
 
 [`Event`]: struct.Event.html
+[`Expr::dynamic`]: struct.Expr.html#method.dynamic
 [`expr!`]: macro.expr.html
 [`signal`]: fn.signal.html
 [`view!`]: ../view/macro.view.html
