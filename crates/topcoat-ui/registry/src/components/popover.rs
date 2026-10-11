@@ -5,18 +5,17 @@ use topcoat::{
 
 use super::floating::{FloatingAlign, FloatingAnchor, FloatingSide, floating_variants};
 
-/// A panel of rich content that opens next to a trigger.
+/// A panel that opens beside a button.
 ///
-/// Pass a [`popover_trigger`] and a [`popover_content`] as children, and connect them by
-/// passing the content's `id` to the trigger's `target`. Create the id with
-/// [`element_id`](topcoat::view::element_id). The browser opens and closes the panel
-/// without JavaScript. Clicking outside the panel or pressing Escape closes it. The panel
-/// shows above the rest of the page, so containers that clip their overflow do not cut
-/// it off.
+/// Add a [`popover_trigger`] and a [`popover_content`] as children. Use
+/// [`element_id`](topcoat::view::element_id) to create an ID, then pass it to the
+/// trigger's `target` and the content's `id`. The button opens and closes the panel
+/// without JavaScript. Clicking outside or pressing Escape also closes it. The panel
+/// appears above the page and is not cut off by a parent's overflow settings.
 ///
-/// `attrs` are forwarded to the wrapper `<div>`, with extra classes added to its classes.
-/// The wrapper does not generate a box of its own. Use `group-has-[:popover-open]/popover:`
-/// classes to style children while the panel is open.
+/// `attrs` adds attributes and classes to the wrapper `<div>`. The wrapper takes up no
+/// space in the layout. Use `group-has-[:popover-open]/popover:` classes to change how
+/// children look while the panel is open.
 ///
 /// ```ignore
 /// let share = element_id(cx);
@@ -45,20 +44,20 @@ pub async fn popover(
     })
 }
 
-/// The button that opens or closes a [`popover_content`].
+/// A button for opening and closing [`popover_content`].
 ///
-/// Set `target` to the content's `id`. Pass the label as children. The trigger has no
-/// styling of its own. To style it as a button, pass classes from
-/// [`button_variants`](super::button::button_variants) through `attrs`. The attributes
-/// go on the `<button>`.
+/// Set `target` to the panel's `id` and put the button's label in its children.
+/// The button has no visual style by default. To give it the standard button style,
+/// add [`button_variants`](super::button::button_variants) classes through `attrs`.
+/// All attributes in `attrs` go on the `<button>`.
 #[component]
 pub async fn popover_trigger(
-    /// The `id` of the panel to open.
+    /// The panel ID this button controls.
     target: &str,
-    /// Extra attributes for the `<button>` element.
+    /// Attributes to add to the button.
     #[default]
     mut attrs: Attributes,
-    /// The trigger's label.
+    /// Content shown inside the button.
     #[default]
     child: Child<'_>,
 ) -> Result<impl View> {
@@ -74,34 +73,34 @@ pub async fn popover_trigger(
     })
 }
 
-/// Classes for a popover panel with its own background, border, and text color.
+/// The panel's size, colors, border, spacing, and shadow.
 const PANEL: StaticClass = class!(
     "w-72 rounded-lg border border-border bg-popover p-4 text-popover-foreground",
     "shadow-sm outline-none",
 );
 
-/// The floating panel of a [`popover`].
+/// The content shown when a [`popover`] opens.
 ///
-/// `side` chooses the side of the trigger it opens on and defaults to `Bottom`. `align`
-/// lines it up with the trigger and defaults to `Center`. When the panel would overflow
-/// the viewport, it moves to another position.
+/// Use `side` to choose where the panel opens and `align` to line it up with the
+/// button. By default, it opens below the button and is centered on it. The browser
+/// tries other positions if there is not enough room in the window.
 ///
-/// `attrs` are forwarded to the `<div>`, with extra classes added to its classes. Use
-/// them to change the panel's width.
+/// `attrs` adds attributes and classes to the panel's `<div>`. Add width classes here
+/// to change the panel's size.
 #[component]
 pub async fn popover_content(
-    /// The panel's `id`, referenced by its trigger's `target`.
+    /// The panel ID to pass to the trigger's `target`.
     id: &str,
-    /// The side of the trigger the panel opens on.
+    /// Where the panel opens relative to the button.
     #[default]
     side: FloatingSide,
-    /// How the panel lines up with the trigger.
+    /// Which edge or center of the button the panel lines up with.
     #[default]
     align: FloatingAlign,
-    /// Extra attributes for the `<div>` element.
+    /// Attributes to add to the panel's `<div>`.
     #[default]
     mut attrs: Attributes,
-    /// The panel's content.
+    /// Content shown inside the panel.
     #[default]
     child: Child<'_>,
 ) -> Result<impl View> {

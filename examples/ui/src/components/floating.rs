@@ -1,26 +1,26 @@
 use topcoat::view::{Class, StaticClass, class};
 
-/// The side of its anchor that a floating panel opens on.
+/// Where a floating panel appears relative to the element it follows.
 ///
-/// [`Default`] is `FloatingSide::Bottom`, used when no side is given.
+/// The default is [`Bottom`](Self::Bottom).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum FloatingSide {
-    /// Above the anchor.
+    /// Place the panel above the anchor.
     Top,
-    /// To the right of the anchor.
+    /// Place the panel to the anchor's right.
     Right,
-    /// Below the anchor.
+    /// Place the panel below the anchor.
     #[default]
     Bottom,
-    /// To the left of the anchor.
+    /// Place the panel to the anchor's left.
     Left,
 }
 
 impl FloatingSide {
-    /// Classes for the gap to the anchor and the positions to try when the panel would
-    /// overflow the viewport. The panel first moves to the opposite side, then to the
-    /// other alignment. Panels beside the anchor finally try above and below it.
+    /// Sets the gap from the anchor and the fallback positions. If the panel does not
+    /// fit, the browser tries flipping its side, its alignment, then both. Panels on
+    /// the left or right can also move above or below the anchor.
     fn classes(self) -> StaticClass {
         match self {
             Self::Top => class!(
@@ -41,23 +41,23 @@ impl FloatingSide {
     }
 }
 
-/// How a floating panel lines up with its anchor along the side it opens on.
+/// Which edge or center of the anchor a floating panel lines up with.
 ///
-/// [`Default`] is `FloatingAlign::Center`, used when no alignment is given.
+/// The default is [`Center`](Self::Center).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum FloatingAlign {
-    /// Lines up with the anchor's left or top edge.
+    /// Align the panel with the anchor's left or top edge.
     Start,
-    /// Centers on the anchor.
+    /// Center the panel on the anchor.
     #[default]
     Center,
-    /// Lines up with the anchor's right or bottom edge.
+    /// Align the panel with the anchor's right or bottom edge.
     End,
 }
 
 impl FloatingAlign {
-    /// The `position-area` class that places the panel on `side` with this alignment.
+    /// Chooses the CSS `position-area` for this side and alignment.
     fn area(self, side: FloatingSide) -> StaticClass {
         match (side, self) {
             (FloatingSide::Top, Self::Start) => class!("[position-area:top_span-right]"),
@@ -76,22 +76,24 @@ impl FloatingAlign {
     }
 }
 
-/// What a floating panel is anchored to.
+/// The element a floating panel follows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum FloatingAnchor {
-    /// The button whose `popovertarget` opened the panel. The panel must be a `popover`
-    /// element. It shows above the rest of the page, so no container clips it.
+    /// Follow the button that opened the panel through `popovertarget`. The panel
+    /// needs a `popover` attribute. It appears above the page, where parent containers
+    /// cannot cut it off.
     Invoker,
-    /// The nearest ancestor with [`FLOATING_SCOPE`]. Use it for panels that open
-    /// without the popover API, such as on hover. Containers that clip their overflow do
-    /// not cut the panel off, unless they also have a transform, filter, or containment.
+    /// Follow the nearest parent or ancestor with [`FLOATING_SCOPE`] classes. Use this
+    /// for panels shown without the popover API, such as hints shown on hover. Parent
+    /// overflow settings do not cut off the panel unless a parent also uses a CSS
+    /// transform, filter, or containment.
     Scope,
 }
 
 impl FloatingAnchor {
-    /// Classes that anchor the panel. A popover also undoes the browser's centering of
-    /// popovers and fades in when it opens.
+    /// Positions the panel relative to its anchor. For popovers, also removes the
+    /// browser's default centering and adds a fade when the panel opens.
     fn classes(self) -> StaticClass {
         match self {
             Self::Invoker => class!(
@@ -103,18 +105,18 @@ impl FloatingAnchor {
     }
 }
 
-/// Classes that make an element the anchor of the [`FloatingAnchor::Scope`] panels
-/// inside it.
+/// Add these classes to the element that [`FloatingAnchor::Scope`] panels should follow.
 ///
-/// The anchor is scoped to the element, so every instance anchors its own panels.
+/// Place the panels inside this element. Each copy of the element positions its own
+/// panels independently.
 pub const FLOATING_SCOPE: StaticClass =
     class!("[anchor-name:--floating-anchor] [anchor-scope:--floating-anchor]");
 
-/// Builds the full class list for a panel floating on `side` of its `anchor`, lined up
-/// by `align`.
+/// Returns CSS classes that position a panel next to its anchor.
 ///
-/// The panel moves to another position when it would overflow the viewport. Use it to
-/// float your own panel next to a button:
+/// `anchor` chooses the element to follow, `side` chooses where the panel appears,
+/// and `align` chooses how they line up. The browser tries other positions if the
+/// panel does not fit in the window. For a panel opened by a button:
 ///
 /// ```ignore
 /// let filters = element_id(cx);
@@ -134,7 +136,7 @@ pub const FLOATING_SCOPE: StaticClass =
 /// }
 /// ```
 ///
-/// Or next to an ancestor, for example to show a hint on hover:
+/// To show a hint when its parent is hovered, make that parent the anchor:
 ///
 /// ```ignore
 /// view! {
