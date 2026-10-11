@@ -372,6 +372,24 @@ The attribute is optional. An unkeyed loop still renders, but its iteration iden
 
 Ordinary Rust expressions use the context explicitly passed to them. The macro does not rebind context variables inside loops. If a helper needs a distinct identity for each call, pass a context derived with [`Cx::keyed`](../context/struct.Cx.html#method.keyed), such as `helper(&cx.keyed(item.id))`.
 
+## Element IDs
+
+Use [`element_id`] to get an HTML `id` for elements that refer to each other, such as a label and its input. The id comes from the component's identity and the location of the call, so it is stable across renders and unique to each component instance:
+
+```rust
+# use topcoat::{Result, context::Cx, view::*};
+# #[component]
+# async fn example(cx: &Cx) -> Result<impl View> {
+let id = element_id(cx);
+Ok(view! {
+    <label for=(&id)>"Email"</label>
+    <input id=(&id) type="email" name="email">
+})
+# }
+```
+
+Like other identity reads, it needs `#[key]` on any loop that encloses the component.
+
 # Views Are Lazy
 
 A [`view!`] expression creates a value implementing [`View`]. Expressions inside it run only when the view renders, such as when it becomes a response. They do not run if the view is never rendered.
@@ -615,6 +633,7 @@ Ok(view! {
 [`NodeViewParts`]: trait.NodeViewParts.html
 [`PartsWriter`]: struct.PartsWriter.html
 [`component`]: attr.component.html
+[`element_id`]: fn.element_id.html
 [`memoize`]: https://docs.rs/topcoat/latest/topcoat/context/attr.memoize.html
 [`attributes!`]: macro.attributes.html
 [`class!`]: macro.class.html
