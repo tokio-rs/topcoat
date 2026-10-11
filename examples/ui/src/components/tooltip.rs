@@ -42,15 +42,17 @@ pub async fn tooltip(
     })
 }
 
-/// Classes for a tooltip bubble. The bubble ignores pointer events. Opacity and
-/// visibility transitions let it fade in and out.
+/// Classes for a tooltip bubble. The bubble ignores pointer events. The hidden bubble
+/// generates no box, so it is placed again each time it shows. Opacity and display
+/// transitions let it fade in and out, and `@starting-style` supplies the entry opacity.
 const BUBBLE: StaticClass = class!(
-    "pointer-events-none invisible z-50 rounded-md bg-foreground px-2.5 py-1",
+    "pointer-events-none hidden z-50 rounded-md bg-foreground px-2.5 py-1",
     "text-xs font-medium text-background",
     "opacity-0 shadow-sm whitespace-nowrap",
-    "[transition:opacity_150ms_ease-out,visibility_150ms_allow-discrete]",
-    "group-hover:visible group-hover:opacity-100",
-    "group-focus-within:visible group-focus-within:opacity-100",
+    "[transition:opacity_150ms_ease-out,display_150ms_allow-discrete]",
+    "group-hover:block group-hover:opacity-100 starting:group-hover:opacity-0",
+    "group-focus-within:block group-focus-within:opacity-100",
+    "starting:group-focus-within:opacity-0",
 );
 
 /// The hint a [`tooltip`] shows, in a bubble next to its trigger.

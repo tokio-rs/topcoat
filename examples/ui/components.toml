@@ -61,7 +61,7 @@ hash = "sha256:888edd54ba6641a7a45c32e26c1a32eb2838c36be8971cf2bcf9c0b4c1eb5cd3"
 file = "src/components/floating.rs"
 
 [registries.topcoat.components.hover_card]
-hash = "sha256:4ef6990dbc65eeed057ab3078d3c411ed721f651ad19e21fa4bb75ab9cb35392"
+hash = "sha256:d00b0f67db4e1cccd6b5fb22f38ab71df9e8b3e2f67972800d3bfd91d0bff2ed"
 file = "src/components/hover_card.rs"
 
 [registries.topcoat.components.input]
@@ -141,5 +141,5 @@ hash = "sha256:9e3db7d5944dd9307e01bba2d53e795e1aa6bf851c499379e2f18a19e37e8bb2"
 file = "src/components/toggle.rs"
 
 [registries.topcoat.components.tooltip]
-hash = "sha256:a79d143ff5b902009a3cd18dbb742c9111d17389f716a06cb067dbb92a39c526"
+hash = "sha256:fd294adf5413cf8edb5254201a8d2bdfd4d3a18846d1362e74e720c02ef1d6b6"
 file = "src/components/tooltip.rs"

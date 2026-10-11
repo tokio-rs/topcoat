@@ -39,14 +39,16 @@ pub async fn hover_card(
     })
 }
 
-/// Classes for the panel. Delayed opacity and visibility transitions let the pointer
-/// reach the panel before it closes.
+/// Classes for the panel. The closed panel generates no box, so it is placed again each
+/// time it opens. Delayed opacity and display transitions let the pointer reach the
+/// panel before it closes, and `@starting-style` supplies the entry opacity.
 const PANEL: StaticClass = class!(
-    "invisible z-50 w-64 rounded-lg border",
+    "hidden z-50 w-64 flex-col gap-2 rounded-lg border",
     "border-border bg-popover p-4 text-popover-foreground opacity-0 shadow-sm",
-    "[transition:opacity_150ms_ease-out_300ms,visibility_150ms_allow-discrete_300ms]",
-    "group-hover:visible group-hover:opacity-100",
-    "group-focus-within:visible group-focus-within:opacity-100",
+    "[transition:opacity_150ms_ease-out_300ms,display_150ms_allow-discrete_300ms]",
+    "group-hover:flex group-hover:opacity-100 starting:group-hover:opacity-0",
+    "group-focus-within:flex group-focus-within:opacity-100",
+    "starting:group-focus-within:opacity-0",
 );
 
 /// The view a [`hover_card`] shows, in a panel next to its trigger.
@@ -72,7 +74,6 @@ pub async fn hover_card_content(
     Ok(view! {
         <span
             class=(class!(
-                "flex flex-col gap-2",
                 floating_variants(FloatingAnchor::Scope, side, align),
                 PANEL,
                 attrs.remove("class"),
