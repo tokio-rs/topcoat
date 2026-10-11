@@ -13,8 +13,8 @@ pin_project! {
     /// position: the branches build different types, but only the taken one
     /// is driven.
     ///
-    /// `match` arms nest `Right`s to give every arm a distinct position in
-    /// one type.
+    /// `match` arms nest `EitherView`s in a balanced tree to give every arm
+    /// a distinct position in one type.
     #[project = EitherViewProj]
     pub enum EitherView<A, B> {
         Left { #[pin] view: A },
