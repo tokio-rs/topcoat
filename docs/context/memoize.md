@@ -215,7 +215,7 @@ async fn lookup(cx: &Cx, name: &str) -> Result<Record> {
     db::find(name).await
 }
 
-# async fn example(cx: &Cx) -> Result {
+# async fn example(cx: &Cx) -> Result<()> {
 let record = lookup(cx, "alice").await?; // computes; caches under the hash of "alice"
 let record = lookup(cx, "alice").await?; // cache hit, no allocation
 # let _ = record;
