@@ -87,6 +87,7 @@ async fn hundreds_of_dynamic_positions_in_one_template_compile_and_render_in_ord
         <p>(next())</p> item(n: next()) <p>(next())</p> item(n: next())
         <p>(next())</p> item(n: next()) <p>(next())</p> item(n: next())
     }
+    .boxed()
     .single()
     .await
     .unwrap()
