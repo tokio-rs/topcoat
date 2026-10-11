@@ -160,7 +160,9 @@ Ok(view! {
 # }
 ```
 
-A plain `value` attribute is only an input's default. When a page or shard re-renders, a control the user has edited keeps its value, while an untouched one takes the new default. A bind attribute whose expression reads no signals renders as a plain attribute too. Call [`Expr::dynamic`] on the expression to bind it anyway, so every render sets the live value:
+A plain `value` attribute sets an input's default value. If the user types into the input, their text stays in place when the page or shard renders again. If they have not edited the input, it takes the new default value.
+
+Using `:value` has the same effect if its expression does not read any signals. To set the input's current value every time it renders, call [`Expr::dynamic`] on the expression. This works even without a signal. For example, this input is cleared each time it renders:
 
 ```rust
 # use topcoat::{Result, context::Cx, runtime::Expr, view::*};
