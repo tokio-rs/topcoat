@@ -289,6 +289,13 @@ where
     }
 }
 
+/// Clones a borrowed error, so `?` works on a `Result<T, &Error>`.
+impl From<&Error> for Error {
+    fn from(error: &Error) -> Self {
+        error.clone()
+    }
+}
+
 impl From<Error> for Box<dyn std::error::Error + Send + Sync + 'static> {
     fn from(error: Error) -> Self {
         Box::new(BoxedError(error))
