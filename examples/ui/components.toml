@@ -61,7 +61,7 @@ hash = "sha256:66636f7861a3eb370ee736de1a40aff889ec15e491d7aae57b64ad05e25d5cdd"
 file = "src/components/floating.rs"
 
 [registries.topcoat.components.hover_card]
-hash = "sha256:d00b0f67db4e1cccd6b5fb22f38ab71df9e8b3e2f67972800d3bfd91d0bff2ed"
+hash = "sha256:b3a2f8d1122ff25fd350d951f35792928222a165730394faa926a72924c50b53"
 file = "src/components/hover_card.rs"
 
 [registries.topcoat.components.input]
