@@ -4,3 +4,8 @@ compatibility_date = "2026-10-01"
 
 [build]
 command = "cargo install -q \"worker-build@^0.8\" && worker-build --release"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "topcoat-todos"
+database_id = "<database id>"

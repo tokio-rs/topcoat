@@ -621,6 +621,8 @@ version = "0.10.0"
 dependencies = [
  "http-body-util",
  "serde",
+ "toasty",
+ "toasty-driver-d1",
  "topcoat",
  "worker",
 ]
@@ -3401,8 +3403,7 @@ dependencies = [
 [[package]]
 name = "toasty"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82c0ad66cbf23d9aeff0d85404e3799788dcea052d835997ed7e85bb3773725c"
+source = "git+https://github.com/otavio/toasty?branch=feat%2Fd1-driver#eb2d35ef0687338d33a04198f30ee47e47de6e46"
 dependencies = [
  "async-trait",
  "bit-set",
@@ -3420,13 +3421,13 @@ dependencies = [
  "tokio-stream",
  "tracing",
  "uuid",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]
 name = "toasty-core"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06ce722358481c0ad55b7b5edaaf9d0669ee5de6e9c737a73ca4c27621003732"
+source = "git+https://github.com/otavio/toasty?branch=feat%2Fd1-driver#eb2d35ef0687338d33a04198f30ee47e47de6e46"
 dependencies = [
  "async-trait",
  "bit-set",
@@ -3444,10 +3445,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "toasty-driver-d1"
+version = "0.11.0"
+source = "git+https://github.com/otavio/toasty?branch=feat%2Fd1-driver#eb2d35ef0687338d33a04198f30ee47e47de6e46"
+dependencies = [
+ "async-trait",
+ "toasty-core",
+ "toasty-sql",
+ "tracing",
+ "worker",
+]
+
+[[package]]
 name = "toasty-driver-mysql"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfa5622479dff74a1db2178c8475e014f32ab434ffb06c8cb69142b0abebd876"
+source = "git+https://github.com/otavio/toasty?branch=feat%2Fd1-driver#eb2d35ef0687338d33a04198f30ee47e47de6e46"
 dependencies = [
  "async-trait",
  "sqlx-core",
@@ -3463,10 +3475,10 @@ dependencies = [
 [[package]]
 name = "toasty-driver-sqlite"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffaebb64e79526666cb2628a7de5979da5ef282bb3f36a7e3b6a5acc55936794"
+source = "git+https://github.com/otavio/toasty?branch=feat%2Fd1-driver#eb2d35ef0687338d33a04198f30ee47e47de6e46"
 dependencies = [
  "async-trait",
+ "indexmap",
  "rusqlite",
  "serde",
  "toasty-core",
@@ -3478,8 +3490,7 @@ dependencies = [
 [[package]]
 name = "toasty-macros"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f5b5a87266b1cccdd184244733b26fdac9ed3997446c5aca88c2c71f5b03f61"
+source = "git+https://github.com/otavio/toasty?branch=feat%2Fd1-driver#eb2d35ef0687338d33a04198f30ee47e47de6e46"
 dependencies = [
  "heck",
  "indexmap",
@@ -3493,8 +3504,7 @@ dependencies = [
 [[package]]
 name = "toasty-sql"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29b50cee2799bc54257ba202a9497f07b59df7e446b6df27fbf801cffe4b1b8a"
+source = "git+https://github.com/otavio/toasty?branch=feat%2Fd1-driver#eb2d35ef0687338d33a04198f30ee47e47de6e46"
 dependencies = [
  "serde",
  "serde_json",

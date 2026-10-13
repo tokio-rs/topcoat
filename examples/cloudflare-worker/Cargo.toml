@@ -10,10 +10,12 @@ crate-type = ["cdylib"]
 [dependencies]
 http-body-util.workspace = true
 serde = { workspace = true, features = ["derive"] }
+toasty.workspace = true
+toasty-driver-d1.workspace = true
 # We cannot use `workspace = true` with `default-features = false`. The `serve`
 # feature needs a native server, so this app leaves it out.
 topcoat = { path = "../../crates/topcoat", default-features = false, features = ["router", "view"] }
-worker = { workspace = true, features = ["http"] }
+worker = { workspace = true, features = ["d1", "http"] }
 
 [lints]
 workspace = true

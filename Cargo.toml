@@ -201,6 +201,7 @@ syn = "3.0.6"
 thiserror = "2.0.18"
 time = "0.3"
 toasty = "0.11"
+toasty-driver-d1 = "0.11"
 tokio = "1.51.1"
 tokio-util = "0.7"
 toml = "1.1.2"
@@ -213,3 +214,13 @@ uuid = "1.23"
 v8 = "152.0.0"
 web-time = "1.1"
 worker = "0.8"
+
+# The Cloudflare D1 driver is not released yet. Remove this once
+# https://github.com/tokio-rs/toasty/pull/1292 is in a release.
+[patch.crates-io]
+toasty = { git = "https://github.com/otavio/toasty", branch = "feat/d1-driver" }
+toasty-core = { git = "https://github.com/otavio/toasty", branch = "feat/d1-driver" }
+toasty-driver-d1 = { git = "https://github.com/otavio/toasty", branch = "feat/d1-driver" }
+toasty-driver-sqlite = { git = "https://github.com/otavio/toasty", branch = "feat/d1-driver" }
+toasty-macros = { git = "https://github.com/otavio/toasty", branch = "feat/d1-driver" }
+toasty-sql = { git = "https://github.com/otavio/toasty", branch = "feat/d1-driver" }
