@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0](https://github.com/tokio-rs/topcoat/compare/topcoat-core-v0.10.0...topcoat-core-v0.11.0) - 2026-10-14
+
+### Added
+
+- *(core)* support `?` operator on Result<T, &topcoat::Error>, e.g. from #[memoize(as_ref)] ([#514](https://github.com/tokio-rs/topcoat/pull/514))
+
+### Fixed
+
+- *(runtime)* preserve edited form controls on rerender ([#513](https://github.com/tokio-rs/topcoat/pull/513))
+
 ## [0.10.0](https://github.com/tokio-rs/topcoat/compare/topcoat-core-v0.9.0...topcoat-core-v0.10.0) - 2026-10-03
 
 ### Fixed

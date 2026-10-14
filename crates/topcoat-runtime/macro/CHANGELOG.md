@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-macro-v0.10.0...topcoat-runtime-macro-v0.11.0) - 2026-10-14
+
+### Fixed
+
+- *(runtime)* preserve edited form controls on rerender ([#513](https://github.com/tokio-rs/topcoat/pull/513))
+
+### Other
+
+- format
+- format
+
 ## [0.10.0](https://github.com/tokio-rs/topcoat/compare/topcoat-runtime-macro-v0.9.0...topcoat-runtime-macro-v0.10.0) - 2026-10-03
 
 ### Added

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cli-v0.10.0...topcoat-cli-v0.11.0) - 2026-10-14
+
+### Added
+
+- *(cli)* [**breaking**] add `topcoat new` command ([#501](https://github.com/tokio-rs/topcoat/pull/501))
+
+### Fixed
+
+- *(cli)* restart dev server when bundled assets change ([#524](https://github.com/tokio-rs/topcoat/pull/524))
+- *(cli)* [**breaking**] fix gitignore handling for fmt and dev
+- *(runtime)* preserve edited form controls on rerender ([#513](https://github.com/tokio-rs/topcoat/pull/513))
+
+### Other
+
+- fix the failing test job on main ([#522](https://github.com/tokio-rs/topcoat/pull/522))
+
 ## [0.10.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cli-v0.9.0...topcoat-cli-v0.10.0) - 2026-10-03
 
 ### Added

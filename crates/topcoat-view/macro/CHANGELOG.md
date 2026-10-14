@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0](https://github.com/tokio-rs/topcoat/compare/topcoat-view-macro-v0.10.0...topcoat-view-macro-v0.11.0) - 2026-10-14
+
+### Fixed
+
+- *(view)* recursion limit checking Send bound on big views ([#515](https://github.com/tokio-rs/topcoat/pull/515))
+
+### Other
+
+- format
+
 ## [0.9.0](https://github.com/tokio-rs/topcoat/compare/topcoat-view-macro-v0.8.1...topcoat-view-macro-v0.9.0) - 2026-09-24
 
 ### Added

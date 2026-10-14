@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0](https://github.com/tokio-rs/topcoat/compare/v0.10.0...v0.11.0) - 2026-10-14
+
+### Added
+
+- *(cli)* [**breaking**] add `topcoat new` command ([#501](https://github.com/tokio-rs/topcoat/pull/501))
+- *(core)* support `?` operator on Result<T, &topcoat::Error>, e.g. from #[memoize(as_ref)] ([#514](https://github.com/tokio-rs/topcoat/pull/514))
+- new admin panel demo ([#526](https://github.com/tokio-rs/topcoat/pull/526))
+- *(ui)* [**breaking**] add popover component and reusable floating utilities, add `element_id(cx)` ([#516](https://github.com/tokio-rs/topcoat/pull/516))
+- *(ui)* add navigation menu ([#499](https://github.com/tokio-rs/topcoat/pull/499))
+
+### Fixed
+
+- *(asset)* percent-encode bundled filenames in urls ([#495](https://github.com/tokio-rs/topcoat/pull/495))
+- *(cli)* restart dev server when bundled assets change ([#524](https://github.com/tokio-rs/topcoat/pull/524))
+- *(cli)* [**breaking**] fix gitignore handling for fmt and dev
+- *(runtime)* preserve edited form controls on rerender ([#513](https://github.com/tokio-rs/topcoat/pull/513))
+- *(cookie)* read cookies with already-prefixed names ([#500](https://github.com/tokio-rs/topcoat/pull/500))
+- *(router)* scope module discovery to the router's root ([#518](https://github.com/tokio-rs/topcoat/pull/518))
+- *(router)* decode last-event-id headers as utf-8 ([#493](https://github.com/tokio-rs/topcoat/pull/493))
+- *(router)* create Hyper with a default tokio timer ([#497](https://github.com/tokio-rs/topcoat/pull/497))
+- *(runtime)* cancel stale history navigations ([#503](https://github.com/tokio-rs/topcoat/pull/503))
+- *(runtime)* reconcile text after content replacement ([#494](https://github.com/tokio-rs/topcoat/pull/494))
+- *(view)* recursion limit checking Send bound on big views ([#515](https://github.com/tokio-rs/topcoat/pull/515))
+- *(view)* improve component go-to-definition ([#502](https://github.com/tokio-rs/topcoat/pull/502))
+
+### Other
+
+- fix the failing test job on main ([#522](https://github.com/tokio-rs/topcoat/pull/522))
+- update Cargo.lock dependencies
+- format
+- format
+
 ## [0.10.0](https://github.com/tokio-rs/topcoat/compare/v0.9.0...v0.10.0) - 2026-10-03
 
 ### Added

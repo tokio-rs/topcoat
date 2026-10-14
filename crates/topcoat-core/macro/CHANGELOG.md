@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0](https://github.com/tokio-rs/topcoat/compare/topcoat-core-macro-v0.10.0...topcoat-core-macro-v0.11.0) - 2026-10-14
+
+### Added
+
+- *(core)* support `?` operator on Result<T, &topcoat::Error>, e.g. from #[memoize(as_ref)] ([#514](https://github.com/tokio-rs/topcoat/pull/514))
+
 ## [0.9.0](https://github.com/tokio-rs/topcoat/compare/topcoat-core-macro-v0.8.1...topcoat-core-macro-v0.9.0) - 2026-09-24
 
 ### Other
