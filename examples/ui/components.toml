@@ -49,7 +49,7 @@ hash = "sha256:97494bc086959953eff0e1a28ba72be8268cd4c38d83b50259c13788a3931e3c"
 file = "src/components/dialog.rs"
 
 [registries.topcoat.components.dropdown_menu]
-hash = "sha256:432ae62e74beff85f2589a81dc6c06c49573a23d9359fe9720dd9a573cbf51dd"
+hash = "sha256:f4144823926ae64c0e5f4f89cce141ea2ecca0e423d8640cf8114e84dccb52c9"
 file = "src/components/dropdown_menu.rs"
 
 [registries.topcoat.components.field]

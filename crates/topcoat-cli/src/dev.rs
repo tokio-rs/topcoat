@@ -1,8 +1,8 @@
 //! Runs an application and rebuilds it when source files change.
 //!
 //! The running application keeps serving while a rebuild is pending or has
-//! failed. A successful build replaces it only if the executable changed or
-//! the user requested a manual rebuild.
+//! failed. A successful build replaces it only if the executable or asset bundle
+//! changed, or the user requested a manual rebuild.
 
 mod app_server;
 mod broadcast_server;
@@ -16,14 +16,14 @@ use std::path::Path;
 
 use app_server::AppServer;
 use broadcast_server::{Event, EventBus};
-use build::{BuildKind, BuildTask};
+use build::{BuildKind, BuildStamp, BuildTask};
 use clap::Args;
 use console::style;
 use keyboard::Keyboard;
 use spinner::Spinner;
 use watch::{Change, SourceWatcher};
 
-use crate::common::cargo::{BuildFlags, BuildOpts, BuildStamp, Metadata};
+use crate::common::cargo::{BuildFlags, BuildOpts, Metadata};
 
 #[derive(Args)]
 pub struct DevCommand {
@@ -80,7 +80,7 @@ impl DevCommand {
 
         let mut build: Option<BuildTask> = Some(BuildTask::spawn(BuildKind::Initial, opts.clone()));
         let mut server: Option<AppServer> = None;
-        // The stamp of the executable the running server was started from,
+        // The stamp of the executable and assets the running server loaded,
         // used to skip the restart when a rebuild changed nothing.
         let mut last_build: Option<BuildStamp> = None;
         // Set when the pending rebuild was requested with the `r` key: a
@@ -108,18 +108,18 @@ impl DevCommand {
                     break;
                 }
 
-                exe = async { build.as_mut().unwrap().finished().await }, if build.is_some() => {
+                output = async { build.as_mut().unwrap().finished().await }, if build.is_some() => {
                     build = None;
-                    if let Some(exe) = exe {
-                        let stamp = BuildStamp::of(&exe);
+                    if let Some(output) = output {
+                        let stamp = output.stamp;
                         if !std::mem::take(&mut force_restart)
                             && server.is_some()
                             && stamp.is_some()
                             && stamp == last_build
                         {
-                            // Cargo found nothing to relink: the binary that
-                            // is already running. Leave the process and its
-                            // browsers undisturbed.
+                            // Both the executable and asset manifest match
+                            // what the running process loaded. Leave it and
+                            // its browsers undisturbed.
                             events.publish(Event::UpToDate);
                             eprintln!("  {}", style("no changes; application up to date").dim());
                             eprintln!();
@@ -130,7 +130,7 @@ impl DevCommand {
                             if let Some(old) = server.take() {
                                 old.shutdown().await;
                             }
-                            server = start_app(&exe, &dev_url, &events);
+                            server = start_app(&output.exe, &dev_url, &events);
                         }
                     } else {
                         // The failure is already on the terminal; keep the

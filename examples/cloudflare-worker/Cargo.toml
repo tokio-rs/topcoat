@@ -1,0 +1,19 @@
+[package]
+name = "cloudflare-worker"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+http-body-util.workspace = true
+serde = { workspace = true, features = ["derive"] }
+# We cannot use `workspace = true` with `default-features = false`. The `serve`
+# feature needs a native server, so this app leaves it out.
+topcoat = { path = "../../crates/topcoat", default-features = false, features = ["router", "view"] }
+worker = { workspace = true, features = ["http"] }
+
+[lints]
+workspace = true

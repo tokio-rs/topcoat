@@ -38,6 +38,7 @@ members = [
     "examples/alpine-ajax",
     "examples/app-context",
     "examples/asset",
+    "examples/cloudflare-worker",
     "examples/context",
     "examples/cookie",
     "examples/datastar",
@@ -81,7 +82,7 @@ repository = "https://github.com/tokio-rs/topcoat"
 homepage = "https://github.com/tokio-rs/topcoat"
 keywords = ["web", "framework", "ssr", "html", "server"]
 categories = ["web-programming", "web-programming::http-server"]
-rust-version = "1.98"
+rust-version = "1.99"
 
 [workspace.lints.rust]
 unsafe_code = "deny"
@@ -214,3 +215,4 @@ ureq = "3.3"
 uuid = "1.23"
 v8 = "152.0.0"
 web-time = "1.1"
+worker = "0.8"

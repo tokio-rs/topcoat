@@ -261,6 +261,8 @@ async fn default_file_discovery_runs_both_formatters() {
 async fn file_discovery_skips_ignored_files_and_build_directories() {
     let project = Project::new();
     let input = "fn main(){view!{<div id = \"greeting\"/>}}\n";
+    // `.gitignore` files only apply inside a Git repository.
+    std::fs::create_dir(project.path.join(".git")).unwrap();
     std::fs::write(project.path.join(".gitignore"), "/generated\n").unwrap();
     for dir in ["src", "generated", "build"] {
         std::fs::create_dir(project.path.join(dir)).unwrap();
