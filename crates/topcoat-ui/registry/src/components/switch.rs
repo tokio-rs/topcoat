@@ -27,8 +27,9 @@ const THUMB: StaticClass = class!(
 /// ```ignore
 /// view! {
 ///     <div class="flex items-center gap-2">
-///         switch(attrs: attributes! { id="airplane-mode" checked="" })
-///         label(attrs: attributes! { for="airplane-mode" }, "Airplane mode")
+///         let airplane_mode = element_id(cx);
+///         switch(attrs: attributes! { id=(&airplane_mode) checked="" })
+///         label(attrs: attributes! { for=(&airplane_mode) }, "Airplane mode")
 ///     </div>
 /// }
 /// ```

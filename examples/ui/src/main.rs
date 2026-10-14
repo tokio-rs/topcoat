@@ -25,6 +25,7 @@ use components::{
         FieldLegendVariant, FieldOrientation, field, field_content, field_description, field_error,
         field_group, field_label, field_legend, field_separator, field_set,
     },
+    floating::{FloatingAlign, FloatingSide},
     hover_card::{hover_card, hover_card_content},
     input::input,
     kbd::{kbd, kbd_group},
@@ -36,6 +37,7 @@ use components::{
         pagination, pagination_content, pagination_ellipsis, pagination_item, pagination_link,
         pagination_next, pagination_previous,
     },
+    popover::{popover, popover_content, popover_trigger},
     progress::progress,
     radio_group::{radio_group, radio_group_item},
     select::select,
@@ -69,7 +71,7 @@ use topcoat::{
     router::{RouterBuilderDiscoverExt, module_router, page},
     runtime::{Event, RouterBuilderRuntimeExt, Signal, expr, shard, signal},
     tailwind,
-    view::{Child, View, attributes, component, view},
+    view::{Child, View, attributes, component, element_id, view},
 };
 
 /// A stand-in portrait for the workspace's owner, served from the example's
@@ -252,6 +254,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                                 demo(overview_card())
                                 demo(faq_card())
                                 demo(branches_card())
+                                demo(popover_card())
                                 demo(toolbar_card())
                                 demo(tooltip_card())
                                 demo(hover_card_demo())
@@ -634,6 +637,16 @@ async fn form_card(cx: &Cx) -> Result<impl View> {
     });
 
     Ok(view! {
+        // Labels and descriptions refer to their controls by these IDs.
+        let name_id = element_id(cx);
+        let name_description = element_id(cx);
+        let name_error = element_id(cx);
+        let region_id = element_id(cx);
+        let region_description = element_id(cx);
+        let summary_id = element_id(cx);
+        let owner_id = element_id(cx);
+        let owner_description = element_id(cx);
+
         card(
             card_header(
                 card_title("Form controls")
@@ -663,38 +676,38 @@ async fn form_card(cx: &Cx) -> Result<impl View> {
                         )
                         field_group(
                             field(
-                                field_label(
-                                    attrs: attributes! { for="project-name" },
-                                    "Name"
-                                )
+                                field_label(attrs: attributes! { for=(&name_id) }, "Name")
                                 input(
                                     attrs: attributes! {
-                                        id="project-name"
+                                        id=(&name_id)
                                         name="name"
                                         placeholder="my-app"
                                         aria-required="true"
-                                        aria-describedby="project-name-description project-name-error"
+                                        aria-describedby=(format!("{name_description} {name_error}"))
                                         :aria-invalid=$(if invalid { "true" } else { "false" })
                                         :value=$(name.get())
                                         @input=$(|e: Event| name.set(e.target.value))
                                     }
                                 )
                                 field_description(
-                                    attrs: attributes! { id="project-name-description" },
+                                    attrs: attributes! { id=(&name_description) },
                                     "A name to identify this project."
                                 )
                                 field_error(
-                                    attrs: attributes! { id="project-name-error" :hidden=$(!invalid) },
+                                    attrs: attributes! { id=(&name_error) :hidden=$(!invalid) },
                                     $(if invalid { "Enter a project name." } else { "" })
                                 )
                             )
                             field(
-                                field_label(attrs: attributes! { for="region" }, "Region")
+                                field_label(
+                                    attrs: attributes! { for=(&region_id) },
+                                    "Region"
+                                )
                                 select(
                                     attrs: attributes! {
-                                        id="region"
+                                        id=(&region_id)
                                         name="region"
-                                        aria-describedby="region-description"
+                                        aria-describedby=(&region_description)
                                         :value=$(region.get())
                                         @change=$(|e: Event| region.set(e.target.value))
                                     },
@@ -710,18 +723,18 @@ async fn form_card(cx: &Cx) -> Result<impl View> {
                                     </optgroup>
                                 )
                                 field_description(
-                                    attrs: attributes! { id="region-description" },
+                                    attrs: attributes! { id=(&region_description) },
                                     "Choose the region closest to your users."
                                 )
                             )
                             field(
                                 field_label(
-                                    attrs: attributes! { for="summary" },
+                                    attrs: attributes! { for=(&summary_id) },
                                     "Summary"
                                 )
                                 textarea(
                                     attrs: attributes! {
-                                        id="summary"
+                                        id=(&summary_id)
                                         name="summary"
                                         placeholder="What this project is for."
                                         :value=$(summary.get())
@@ -732,20 +745,23 @@ async fn form_card(cx: &Cx) -> Result<impl View> {
                             field_separator()
                             field(
                                 orientation: FieldOrientation::Responsive,
-                                field_label(attrs: attributes! { for="owner" }, "Owner")
+                                field_label(
+                                    attrs: attributes! { for=(&owner_id) },
+                                    "Owner"
+                                )
                                 // A disabled field shows a value that is not the
                                 // form's to change.
                                 field_content(
                                     input(
                                         attrs: attributes! {
-                                            id="owner"
+                                            id=(&owner_id)
                                             value="ada@example.com"
-                                            aria-describedby="owner-description"
+                                            aria-describedby=(&owner_description)
                                             disabled=""
                                         }
                                     )
                                     field_description(
-                                        attrs: attributes! { id="owner-description" },
+                                        attrs: attributes! { id=(&owner_description) },
                                         "The workspace owner manages this project."
                                     )
                                 )
@@ -771,7 +787,7 @@ async fn form_card(cx: &Cx) -> Result<impl View> {
 /// Each control keeps its own signal, starting in the state its row names.
 #[component]
 async fn checks_card(cx: &Cx) -> Result<impl View> {
-    // The id, label, checked state, and disabled state of each checkbox.
+    // The key, label, checked state, and disabled state of each checkbox.
     const CHECKS: [(&str, &str, bool, bool); 4] = [
         ("check-on", "Checked", true, false),
         ("check-off", "Unchecked", false, false),
@@ -781,8 +797,8 @@ async fn checks_card(cx: &Cx) -> Result<impl View> {
 
     let checks: Vec<_> = CHECKS
         .into_iter()
-        .map(|(id, text, checked, disabled)| {
-            (id, text, signal(&cx.keyed(id), || checked), disabled)
+        .map(|(key, text, checked, disabled)| {
+            (key, text, signal(&cx.keyed(key), || checked), disabled)
         })
         .collect();
 
@@ -795,18 +811,20 @@ async fn checks_card(cx: &Cx) -> Result<impl View> {
             card_content(
                 field_group(
                     attrs: attributes! { class="gap-3" },
-                    for (id, text, checked, disabled) in checks {
+                    for (key, text, checked, disabled) in checks {
+                        let id = element_id(&cx.keyed(key));
+
                         field(
                             orientation: FieldOrientation::Horizontal,
                             checkbox(
                                 attrs: attributes! {
-                                    id=(id)
+                                    id=(&id)
                                     :checked=$(checked.get())
                                     @change=$(|e: Event| checked.set(e.target.checked))
                                     disabled=(disabled)
                                 }
                             )
-                            field_label(attrs: attributes! { for=(id) }, (text))
+                            field_label(attrs: attributes! { for=(&id) }, (text))
                         )
                     }
                 )
@@ -818,7 +836,7 @@ async fn checks_card(cx: &Cx) -> Result<impl View> {
 /// Switches with an independent signal for each control.
 #[component]
 async fn switches_card(cx: &Cx) -> Result<impl View> {
-    // The id, label, checked state, and disabled state of each switch.
+    // The key, label, checked state, and disabled state of each switch.
     const SWITCHES: [(&str, &str, bool, bool); 3] = [
         ("switch-on", "On", true, false),
         ("switch-off", "Off", false, false),
@@ -827,8 +845,8 @@ async fn switches_card(cx: &Cx) -> Result<impl View> {
 
     let switches: Vec<_> = SWITCHES
         .into_iter()
-        .map(|(id, text, checked, disabled)| {
-            (id, text, signal(&cx.keyed(id), || checked), disabled)
+        .map(|(key, text, checked, disabled)| {
+            (key, text, signal(&cx.keyed(key), || checked), disabled)
         })
         .collect();
 
@@ -841,13 +859,15 @@ async fn switches_card(cx: &Cx) -> Result<impl View> {
             card_content(
                 field_group(
                     attrs: attributes! { class="gap-3" },
-                    for (id, text, checked, disabled) in switches {
+                    for (key, text, checked, disabled) in switches {
+                        let id = element_id(&cx.keyed(key));
+
                         field(
                             orientation: FieldOrientation::Horizontal,
-                            field_label(attrs: attributes! { for=(id) }, (text))
+                            field_label(attrs: attributes! { for=(&id) }, (text))
                             switch(
                                 attrs: attributes! {
-                                    id=(id)
+                                    id=(&id)
                                     :checked=$(checked.get())
                                     @change=$(|e: Event| checked.set(e.target.checked))
                                     disabled=(disabled)
@@ -863,7 +883,7 @@ async fn switches_card(cx: &Cx) -> Result<impl View> {
 
 /// A standalone radio group whose selection is managed by the browser.
 #[component]
-async fn radios_card() -> Result<impl View> {
+async fn radios_card(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         card(
             card_header(
@@ -878,23 +898,20 @@ async fn radios_card() -> Result<impl View> {
                         ("two", "Option two", false, false),
                         ("three", "Option three (disabled)", false, true),
                     ] {
-                        let id = format!("radio-demo-{value}");
+                        let id = element_id(&cx.keyed(value));
 
                         field(
                             orientation: FieldOrientation::Horizontal,
                             radio_group_item(
                                 attrs: attributes! {
-                                    id=(id.as_str())
+                                    id=(&id)
                                     name="radio-demo"
                                     value=(value)
                                     checked=(checked)
                                     disabled=(disabled)
                                 }
                             )
-                            field_label(
-                                attrs: attributes! { for=(id.as_str()) },
-                                (text)
-                            )
+                            field_label(attrs: attributes! { for=(&id) }, (text))
                         )
                     }
                 )
@@ -1001,7 +1018,7 @@ async fn faq_card() -> Result<impl View> {
     })
 }
 
-/// A branch switcher that updates its label and closes the menu locally.
+/// A branch picker that shows the chosen name and closes after a choice.
 #[component]
 async fn branches_card(cx: &Cx) -> Result<impl View> {
     // The first branch is selected until another branch or tag is picked.
@@ -1009,10 +1026,12 @@ async fn branches_card(cx: &Cx) -> Result<impl View> {
     const TAGS: [&str; 3] = ["v1.2.0", "v1.1.0", "v1.0.0"];
 
     let selected = signal(cx, || BRANCHES[0].to_owned());
-    let open = signal(cx, || false);
-    let tags_open = signal(cx, || false);
 
     Ok(view! {
+        // Each button uses its panel's ID to open and close it.
+        let menu = element_id(cx);
+        let tags = element_id(cx);
+
         card(
             card_header(
                 card_title("Dropdown menu")
@@ -1020,66 +1039,48 @@ async fn branches_card(cx: &Cx) -> Result<impl View> {
             )
             card_content(
                 dropdown_menu(
-                    attrs: attributes! { :open=$(open.get()) },
                     // The trigger takes any content; this one borrows the
                     // outline button's looks and adds a flipping chevron.
                     dropdown_menu_trigger(
+                        target: &menu,
                         attrs: attributes! {
                             class=(button_variants(
                                 ButtonVariant::Outline,
                                 ButtonSize::Sm,
                             ))
-                            @click=$(|e: Event| {
-                                e.prevent_default();
-                                open.toggle();
-                                tags_open.set(false);
-                            })
                         },
                         $(selected.get())
                         icon(
                             data: iconify_icon!("lucide:chevron-down"),
-                            attrs: attributes! { class="transition-transform group-open:rotate-180" }
+                            attrs: attributes! {
+                                class="transition-transform \
+                                    group-has-[:popover-open]/dropdown-menu:rotate-180"
+                            }
                         )
                     )
                     dropdown_menu_content(
+                        id: &menu,
+                        align: FloatingAlign::Start,
                         dropdown_menu_label("Switch branch")
                         for branch in BRANCHES {
+                            // Close the menu after choosing a branch.
                             dropdown_menu_item(
-                                attrs: attributes! {
-                                    type="button"
-                                    @click=$(|_e: Event| {
-                                        selected.set(branch.to_owned());
-                                        open.set(false);
-                                        tags_open.set(false);
-                                    })
-                                },
+                                close: Some(&menu),
+                                attrs: attributes! { @click=$(|_e: Event| selected.set(branch.to_owned())) },
                                 (branch)
                             )
                         }
                         dropdown_menu_separator()
                         // A submenu opens its own panel beside this row.
                         dropdown_menu_sub(
-                            attrs: attributes! { :open=$(tags_open.get()) },
-                            dropdown_menu_sub_trigger(
-                                attrs: attributes! {
-                                    @click=$(|e: Event| {
-                                        e.prevent_default();
-                                        tags_open.toggle();
-                                    })
-                                },
-                                "Checkout tag"
-                            )
+                            dropdown_menu_sub_trigger(target: &tags, "Checkout tag")
                             dropdown_menu_sub_content(
+                                id: &tags,
                                 for tag in TAGS {
+                                    // Use the parent menu's ID to close both menus.
                                     dropdown_menu_item(
-                                        attrs: attributes! {
-                                            type="button"
-                                            @click=$(|_e: Event| {
-                                                selected.set(tag.to_owned());
-                                                open.set(false);
-                                                tags_open.set(false);
-                                            })
-                                        },
+                                        close: Some(&menu),
+                                        attrs: attributes! { @click=$(|_e: Event| selected.set(tag.to_owned())) },
                                         (tag)
                                     )
                                 }
@@ -1087,6 +1088,66 @@ async fn branches_card(cx: &Cx) -> Result<impl View> {
                         )
                     )
                 )
+            )
+        )
+    })
+}
+
+/// A button that opens a form for setting the canvas size.
+#[component]
+async fn popover_card(cx: &Cx) -> Result<impl View> {
+    Ok(view! {
+        let panel = element_id(cx);
+        let width = element_id(cx);
+        let height = element_id(cx);
+
+        card(
+            card_header(
+                card_title("Popover")
+                card_description("A panel of rich content next to its trigger.")
+            )
+            card_content(
+                <div class="flex items-center justify-between gap-4">
+                    <p class="text-sm text-muted-foreground">"Set the canvas size"</p>
+                    popover(
+                        popover_trigger(
+                            target: &panel,
+                            attrs: attributes! {
+                                class=(button_variants(
+                                    ButtonVariant::Outline,
+                                    ButtonSize::Sm,
+                                ))
+                            },
+                            "Dimensions"
+                        )
+                        popover_content(
+                            id: &panel,
+                            side: FloatingSide::Left,
+                            <div class="flex flex-col gap-3">
+                                <div class="flex flex-col gap-1">
+                                    <p class="text-sm font-medium">"Dimensions"</p>
+                                    <p class="text-sm text-muted-foreground">
+                                        "Set the size of the canvas."
+                                    </p>
+                                </div>
+                                field(
+                                    orientation: FieldOrientation::Horizontal,
+                                    field_label(attrs: attributes! { for=(&width) }, "Width")
+                                    input(
+                                        attrs: attributes! { id=(&width) value="1280px" class="h-8" }
+                                    )
+                                )
+                                field(
+                                    orientation: FieldOrientation::Horizontal,
+                                    field_label(attrs: attributes! { for=(&height) }, "Height")
+                                    input(
+                                        attrs: attributes! { id=(&height) value="720px" class="h-8" }
+                                    )
+                                )
+                            </div>
+                        )
+                    )
+                </div>
             )
         )
     })
@@ -1420,10 +1481,8 @@ async fn deployments_card(cx: &Cx) -> Result<impl View> {
                 card_description("Deployment rows with badges and pagination.")
             )
             // The card pads its sections rather than itself, so the table can
-            // span its full width; the table's own padding lines the cells up
-            // with the sections above and below it.
+            // span its full width.
             table(
-                attrs: attributes! { class="px-3" },
                 table_caption("Deployments")
                 table_header(
                     table_row(
@@ -1680,6 +1739,9 @@ async fn app_sidebar(cx: &Cx, open: Signal<bool>, mobile_open: Signal<bool>) -> 
     };
 
     Ok(view! {
+        // The section toggle refers to the links it shows and hides by this ID.
+        let section_links = element_id(cx);
+
         sidebar(
             open: $(open.get()),
             mobile_open: $(mobile_open.get()),
@@ -1743,7 +1805,7 @@ async fn app_sidebar(cx: &Cx, open: Signal<bool>, mobile_open: Signal<bool>) -> 
                     sidebar_group_action(
                         attrs: attributes! {
                             aria-label="Toggle section links"
-                            aria-controls="sidebar-section-links"
+                            aria-controls=(&section_links)
                             :aria-expanded=$(if sections.get() {
                                 "true"
                             } else {
@@ -1786,7 +1848,7 @@ async fn app_sidebar(cx: &Cx, open: Signal<bool>, mobile_open: Signal<bool>) -> 
                                 )
                                 sidebar_menu_badge("22")
                                 sidebar_menu_sub(
-                                    attrs: attributes! { id="sidebar-section-links" :hidden=$(!sections.get()) },
+                                    attrs: attributes! { id=(&section_links) :hidden=$(!sections.get()) },
                                     for (href, text) in [
                                         ("#forms", "Forms"),
                                         ("#overlays", "Overlays"),
@@ -1836,10 +1898,7 @@ async fn app_sidebar(cx: &Cx, open: Signal<bool>, mobile_open: Signal<bool>) -> 
             sidebar_footer(
                 <div class="md:group-data-[collapsible=icon]/sidebar:hidden">
                     toggle_group(
-                        attrs: attributes! {
-                            role="radiogroup"
-                            aria-labelledby="sidebar-variant-label"
-                        },
+                        attrs: attributes! { role="radiogroup" aria-label="Sidebar variant" },
                         for (value, text) in [
                             ("sidebar", "Sidebar"),
                             ("floating", "Floating"),

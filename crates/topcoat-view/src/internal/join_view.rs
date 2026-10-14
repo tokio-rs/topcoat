@@ -92,16 +92,20 @@ where
     }
 }
 
-/// A list of views polled concurrently by [`JoinView`].
+/// A set of views polled concurrently by [`JoinView`].
 ///
-/// Each [`JoinUnit`] holds one view and the rest of the list, ending in
-/// `()`. Resolved contents use the same nested structure.
+/// A [`JoinUnit`] holds one view, and a [`JoinPair`] joins two sets in
+/// position order. `()` is the empty set. Resolved contents mirror the
+/// structure: a `ViewHandle` for each unit, a pair for each [`JoinPair`].
+///
+/// Pairing sets into a balanced tree keeps the type's nesting depth
+/// logarithmic in the number of views, so trait checks on large templates
+/// stay within the compiler's recursion limit.
 pub trait JoinUnits {
-    /// The number of units in the list.
+    /// The number of units in the set.
     const LEN: usize;
 
-    /// The units' contents, in position order: nested
-    /// `(ViewHandle, ...)` pairs terminated by `()`.
+    /// The units' contents, in the same structure as the set.
     type Contents;
 
     /// Polls pending units until all have initial content or one fails.
@@ -149,83 +153,60 @@ impl JoinUnits for () {
 }
 
 pin_project! {
-    /// One dynamic position of a [`JoinView`], linked to the rest.
-    pub struct JoinUnit<V, Rest> {
+    /// One dynamic position of a [`JoinView`].
+    pub struct JoinUnit<V> {
         #[pin]
         view: V,
         // The unit's content, held until the burst takes it.
         content: Option<ViewHandle>,
         // Whether the view reported it has no further updates.
         done: bool,
-        #[pin]
-        rest: Rest,
     }
 }
 
-impl<V, Rest> JoinUnit<V, Rest>
+impl<V> JoinUnit<V>
 where
     V: View,
-    Rest: JoinUnits,
 {
     #[must_use]
-    pub fn new(view: V, rest: Rest) -> Self {
+    pub fn new(view: V) -> Self {
         Self {
             view,
             content: None,
             done: false,
-            rest,
         }
     }
 }
 
-impl<V, Rest> JoinUnits for JoinUnit<V, Rest>
+impl<V> JoinUnits for JoinUnit<V>
 where
     V: View,
-    Rest: JoinUnits,
 {
-    const LEN: usize = 1 + Rest::LEN;
+    const LEN: usize = 1;
 
-    type Contents = (ViewHandle, Rest::Contents);
+    type Contents = ViewHandle;
 
     fn poll_contents(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
         let this = self.project();
-        let mut ready = true;
-
-        if this.content.is_none() {
-            match this.view.poll_first(cx) {
-                Poll::Ready(Ok(ViewFirst { content, live })) => {
-                    *this.content = Some(content);
-                    *this.done = !live;
-                }
-                Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
-                Poll::Pending => ready = false,
-            }
+        if this.content.is_some() {
+            return Poll::Ready(Ok(()));
         }
 
-        match this.rest.poll_contents(cx) {
-            Poll::Ready(Ok(())) => {}
-            Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
-            Poll::Pending => ready = false,
-        }
-
-        if ready {
-            Poll::Ready(Ok(()))
-        } else {
-            Poll::Pending
-        }
+        let ViewFirst { content, live } = ready!(this.view.poll_first(cx))?;
+        *this.content = Some(content);
+        *this.done = !live;
+        Poll::Ready(Ok(()))
     }
 
     fn take_contents(self: Pin<&mut Self>) -> Self::Contents {
-        let this = self.project();
-        let content = this
+        self.project()
             .content
             .take()
-            .expect("every unit resolved its content");
-        (content, this.rest.take_contents())
+            .expect("every unit resolved its content")
     }
 
     fn is_live(&self) -> bool {
-        !self.done || self.rest.is_live()
+        !self.done
     }
 
     fn poll_swap_range(
@@ -234,30 +215,104 @@ where
         from: usize,
         to: usize,
     ) -> Poll<Result<Option<(usize, ViewSwap)>>> {
-        if to == 0 {
+        let this = self.project();
+        if from > 0 || to == 0 || *this.done {
             return Poll::Ready(Ok(None));
         }
 
+        let swap = ready!(this.view.poll_swap(cx))?;
+        if swap.is_none() {
+            *this.done = true;
+        }
+        Poll::Ready(Ok(swap.map(|swap| (0, swap))))
+    }
+}
+
+pin_project! {
+    /// Two sets of [`JoinView`] units, the `left` positions before the
+    /// `right` ones.
+    pub struct JoinPair<L, R> {
+        #[pin]
+        left: L,
+        #[pin]
+        right: R,
+    }
+}
+
+impl<L, R> JoinPair<L, R>
+where
+    L: JoinUnits,
+    R: JoinUnits,
+{
+    #[must_use]
+    pub fn new(left: L, right: R) -> Self {
+        Self { left, right }
+    }
+}
+
+impl<L, R> JoinUnits for JoinPair<L, R>
+where
+    L: JoinUnits,
+    R: JoinUnits,
+{
+    const LEN: usize = L::LEN + R::LEN;
+
+    type Contents = (L::Contents, R::Contents);
+
+    fn poll_contents(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
         let this = self.project();
+        // Both sides are polled even if one is pending, so every unit makes
+        // progress on each poll.
+        let left = this.left.poll_contents(cx)?;
+        let right = this.right.poll_contents(cx)?;
+        ready!(left);
+        right.map(Ok)
+    }
+
+    fn take_contents(self: Pin<&mut Self>) -> Self::Contents {
+        let this = self.project();
+        (this.left.take_contents(), this.right.take_contents())
+    }
+
+    fn is_live(&self) -> bool {
+        self.left.is_live() || self.right.is_live()
+    }
+
+    fn poll_swap_range(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        from: usize,
+        to: usize,
+    ) -> Poll<Result<Option<(usize, ViewSwap)>>> {
+        let this = self.project();
+        let split = L::LEN;
         let mut pending = false;
 
-        if from == 0 && !*this.done {
-            match this.view.poll_swap(cx) {
-                Poll::Ready(Ok(Some(swap))) => return Poll::Ready(Ok(Some((0, swap)))),
-                Poll::Ready(Ok(None)) => *this.done = true,
-                Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
+        if from < split {
+            match this.left.poll_swap_range(cx, from, to.min(split))? {
+                Poll::Ready(Some(swap)) => return Poll::Ready(Ok(Some(swap))),
+                Poll::Ready(None) => {}
                 Poll::Pending => pending = true,
             }
         }
 
-        match this
-            .rest
-            .poll_swap_range(cx, from.saturating_sub(1), to - 1)
-        {
-            Poll::Ready(Ok(Some((position, swap)))) => Poll::Ready(Ok(Some((position + 1, swap)))),
-            // The rest of the range is done, but this unit still owes a swap.
-            Poll::Ready(Ok(None)) if pending => Poll::Pending,
-            other => other,
+        if to > split {
+            match this
+                .right
+                .poll_swap_range(cx, from.saturating_sub(split), to - split)?
+            {
+                Poll::Ready(Some((position, swap))) => {
+                    return Poll::Ready(Ok(Some((position + split, swap))));
+                }
+                Poll::Ready(None) => {}
+                Poll::Pending => pending = true,
+            }
+        }
+
+        if pending {
+            Poll::Pending
+        } else {
+            Poll::Ready(Ok(None))
         }
     }
 }
@@ -312,9 +367,9 @@ mod tests {
         });
 
         let ticker = |region, remaining| Ticker { region, remaining };
-        let units = JoinUnit::new(
-            ticker(a, 3),
-            JoinUnit::new(ticker(b, 1), JoinUnit::new(ticker(c, 2), ())),
+        let units = JoinPair::new(
+            JoinUnit::new(ticker(a, 3)),
+            JoinPair::new(JoinUnit::new(ticker(b, 1)), JoinUnit::new(ticker(c, 2))),
         );
         let cx = Cx::default();
         let mut view = std::pin::pin!(JoinView::new(&cx, units, |_, _| ()));

@@ -197,24 +197,25 @@ let user: Option<&User> = find_user(cx, 42).await;
 
 With `as_ref`, the macro rewrites the return type through the `MemoizeAsRef` trait: `Option<T>` comes back as `Option<&T>` and `Result<T, E>` as `Result<&T, &E>`. Implement the trait for your own return types to use them with `as_ref`.
 
+A borrowed `&topcoat::Error` converts into `topcoat::Error` with `?`, so memoized functions returning `topcoat::Result` can propagate errors directly. Other borrowed error types need an explicit conversion, such as `.map_err(Clone::clone)`.
+
 # Borrowed and owned arguments
 
 Arguments can be passed by value or by reference. The cache never stores a copy of the arguments: an entry is identified by a hash of them, so borrowed arguments are only hashed, never cloned.
 
 ```rust
 # fn main() {}
-# use topcoat::context::{Cx, memoize};
+# use topcoat::{context::{Cx, memoize}, Result};
 # struct Record;
-# struct Error;
 # mod db {
-#     pub async fn find(_name: &str) -> Result<super::Record, super::Error> { Ok(super::Record) }
+#     pub async fn find(_name: &str) -> topcoat::Result<super::Record> { Ok(super::Record) }
 # }
 #[memoize(as_ref)]
-async fn lookup(cx: &Cx, name: &str) -> Result<Record, Error> {
+async fn lookup(cx: &Cx, name: &str) -> Result<Record> {
     db::find(name).await
 }
 
-# async fn example(cx: &Cx) -> Result<(), &Error> {
+# async fn example(cx: &Cx) -> Result<()> {
 let record = lookup(cx, "alice").await?; // computes; caches under the hash of "alice"
 let record = lookup(cx, "alice").await?; // cache hit, no allocation
 # let _ = record;

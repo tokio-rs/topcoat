@@ -78,20 +78,26 @@ impl Emitter {
     /// `JoinView` against the ambient `__cx` context, and ends with `tail`
     /// applied to the join expression.
     ///
-    /// Units form a nested list ending in `()`. Their contents use the same
-    /// structure and bind to the `__view` identifiers read by the burst.
+    /// Units form a balanced tree of `JoinPair`s, so the join's type nests
+    /// only logarithmically deep in the number of units. Their contents use
+    /// the same structure and bind to the `__view` identifiers read by the
+    /// burst.
     /// The burst owns its captured bindings. `tail` can consume the view
     /// before anything borrowed by those bindings leaves scope.
     pub(super) fn finish(self, tail: impl FnOnce(TokenStream) -> TokenStream) -> TokenStream {
-        let units = self.units.iter().rev().fold(quote! { () }, |rest, ident| {
-            quote! { #topcoat_view::internal::JoinUnit::new(#ident, #rest) }
-        });
-        let contents = (0..self.units.len())
-            .rev()
-            .fold(quote! { () }, |rest, index| {
-                let view = format_ident!("__view{index}");
-                quote! { (#view, #rest) }
-            });
+        let units = balanced(
+            &self.units,
+            &|ident| quote! { #topcoat_view::internal::JoinUnit::new(#ident) },
+            &|left, right| quote! { #topcoat_view::internal::JoinPair::new(#left, #right) },
+        );
+        let views = (0..self.units.len())
+            .map(|index| format_ident!("__view{index}"))
+            .collect::<Vec<_>>();
+        let contents = balanced(
+            &views,
+            &|view| quote! { #view },
+            &|left, right| quote! { (#left, #right) },
+        );
         let hoist = &self.hoist;
         let burst = &self.burst;
         let tail = tail(quote! {
@@ -126,5 +132,70 @@ impl Emitter {
                 #burst
             })
         }}
+    }
+}
+
+/// Builds a balanced binary tree over `items`, in order: `leaf` wraps each
+/// item and `pair` joins a left subtree to a right one. An empty slice is
+/// `()`.
+fn balanced<T>(
+    items: &[T],
+    leaf: &impl Fn(&T) -> TokenStream,
+    pair: &impl Fn(TokenStream, TokenStream) -> TokenStream,
+) -> TokenStream {
+    match items {
+        [] => quote! { () },
+        [item] => leaf(item),
+        items => {
+            let (left, right) = items.split_at(items.len() / 2);
+            pair(balanced(left, leaf, pair), balanced(right, leaf, pair))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use proc_macro2::{Literal, TokenTree};
+
+    use super::*;
+
+    /// Collects the leaf literals of a tree in order and returns the
+    /// deepest group nesting seen.
+    fn walk(tokens: TokenStream, depth: usize, leaves: &mut Vec<usize>) -> usize {
+        let mut deepest = depth;
+        for token in tokens {
+            match token {
+                TokenTree::Group(group) => {
+                    deepest = deepest.max(walk(group.stream(), depth + 1, leaves));
+                }
+                TokenTree::Literal(literal) => leaves.push(literal.to_string().parse().unwrap()),
+                TokenTree::Ident(_) | TokenTree::Punct(_) => {}
+            }
+        }
+        deepest
+    }
+
+    #[test]
+    fn balanced_trees_keep_order_and_nest_logarithmically() {
+        for len in 1..=64_usize {
+            let items = (0..len).collect::<Vec<_>>();
+            let tree = balanced(
+                &items,
+                &|item| {
+                    let literal = Literal::usize_unsuffixed(*item);
+                    quote! { #literal }
+                },
+                &|left, right| quote! { (#left, #right) },
+            );
+
+            let mut leaves = Vec::new();
+            let depth = walk(tree, 0, &mut leaves);
+            assert_eq!(leaves, items, "a tree of {len} keeps its items in order");
+            let bound = len.next_power_of_two().trailing_zeros() as usize;
+            assert!(
+                depth <= bound,
+                "a tree of {len} nests {depth} deep, more than {bound}",
+            );
+        }
     }
 }

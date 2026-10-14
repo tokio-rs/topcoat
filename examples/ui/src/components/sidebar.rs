@@ -184,7 +184,7 @@ pub async fn sidebar(
                     role="navigation"
                     aria-label="Sidebar"
                     class=(class!(
-                        "md:relative md:inset-auto md:flex md:overflow-visible md:bg-transparent md:opacity-100 md:backdrop-blur-none md:starting:open:opacity-100 md:transition-none md:group-data-[collapsible=offcanvas]/sidebar:invisible motion-reduce:transition-none",
+                        "md:relative md:inset-auto md:flex md:overflow-visible md:bg-transparent md:opacity-100 md:starting:open:opacity-100 md:transition-none md:group-data-[collapsible=offcanvas]/sidebar:invisible motion-reduce:transition-none",
                         sheet_attrs.remove("class"),
                     ))
                     (sheet_attrs)

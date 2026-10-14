@@ -9,7 +9,7 @@ use topcoat::{
 /// Set `display` only for the open state so the native closed state remains hidden.
 const OVERLAY: StaticClass = class!(
     "fixed inset-0 z-50 size-full max-h-none max-w-none items-start",
-    "justify-center overflow-y-auto bg-background/80 p-4 text-foreground backdrop-blur-sm",
+    "justify-center overflow-y-auto bg-black/50 p-4 text-foreground",
     "open:flex",
 );
 

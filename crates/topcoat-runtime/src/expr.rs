@@ -42,6 +42,31 @@ impl<T> Expr<T> {
         self.is_static
     }
 
+    /// Makes this expression dynamic even if it reads no signals.
+    ///
+    /// A static expression only renders its value. A dynamic one is also
+    /// evaluated in the browser whenever its content renders. As a bind
+    /// attribute, this sets the element's live state on every render, such as
+    /// the value of an input the user has edited, instead of only its default.
+    ///
+    /// ```rust
+    /// use topcoat::{Result, context::Cx, runtime::Expr, view::*};
+    ///
+    /// #[component]
+    /// async fn search(cx: &Cx) -> Result<impl View> {
+    ///     // Every render clears what the user typed.
+    ///     let query = Expr::from(String::new()).dynamic();
+    ///
+    ///     Ok(view! { <input :value=(query)> })
+    /// }
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn dynamic(mut self) -> Self {
+        self.is_static = false;
+        self
+    }
+
     /// Returns the value and its JavaScript, including for static expressions.
     #[inline]
     pub fn into_evaluated_and_js(self) -> (T, Js) {

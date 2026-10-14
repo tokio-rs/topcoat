@@ -57,6 +57,17 @@ impl ModuleRouterBuilder {
             .expect("module path must be under module router's root")
     }
 
+    /// Whether `module_path` is `root_module_path` or a module below it.
+    /// Discovery skips everything else, so routers rooted in different crates
+    /// or modules can live in one binary.
+    #[cfg(any(feature = "discover", test))]
+    fn owns(root_module_path: &str, module_path: &str) -> bool {
+        module_path == root_module_path
+            || module_path
+                .strip_prefix(root_module_path)
+                .is_some_and(|rest| rest.starts_with("::"))
+    }
+
     /// Registers a [`Segment`] override for a module path.
     ///
     /// # Panics
@@ -208,7 +219,12 @@ impl ModuleRouterBuilder {
     #[cfg(feature = "discover")]
     #[must_use]
     pub fn discover_segments(mut self) -> Self {
-        for segment in inventory::iter::<Segment>().cloned() {
+        let root = self.root_module_path;
+
+        for segment in inventory::iter::<Segment>()
+            .filter(|s| Self::owns(root, s.module_path()))
+            .cloned()
+        {
             self = self.segment(segment);
         }
         self
@@ -219,7 +235,11 @@ impl ModuleRouterBuilder {
     #[cfg(feature = "discover")]
     #[must_use]
     pub fn discover_pages(mut self) -> Self {
-        for &page in inventory::iter::<&'static dyn ModulePage>() {
+        let root = self.root_module_path;
+
+        for &page in inventory::iter::<&'static dyn ModulePage>()
+            .filter(|p| Self::owns(root, p.module_path()))
+        {
             self = self.page(page);
         }
         self
@@ -241,7 +261,11 @@ impl ModuleRouterBuilder {
     #[track_caller]
     pub fn discover_layouts(mut self) -> Self {
         let mut seen = std::collections::HashSet::new();
-        for &layout in inventory::iter::<&'static dyn ModuleLayout>() {
+        let root = self.root_module_path;
+
+        for &layout in inventory::iter::<&'static dyn ModuleLayout>()
+            .filter(|l| Self::owns(root, l.module_path()))
+        {
             let path = self.resolve_path(layout.module_path(), layout.relative_path());
             assert!(
                 seen.insert(path.clone()),
@@ -257,7 +281,11 @@ impl ModuleRouterBuilder {
     #[cfg(feature = "discover")]
     #[must_use]
     pub fn discover_routes(mut self) -> Self {
-        for &route in inventory::iter::<&'static dyn ModuleRoute>() {
+        let root = self.root_module_path;
+
+        for &route in inventory::iter::<&'static dyn ModuleRoute>()
+            .filter(|r| Self::owns(root, r.module_path()))
+        {
             self = self.route(route);
         }
         self
@@ -278,7 +306,11 @@ impl ModuleRouterBuilder {
     #[track_caller]
     pub fn discover_layers(mut self) -> Self {
         let mut seen = std::collections::HashSet::new();
-        for &layer in inventory::iter::<&'static dyn ModuleLayer>() {
+        let root = self.root_module_path;
+
+        for &layer in inventory::iter::<&'static dyn ModuleLayer>()
+            .filter(|l| Self::owns(root, l.module_path()))
+        {
             let path = self.resolve_path(layer.module_path(), layer.relative_path());
             assert!(
                 seen.insert(path.clone()),
@@ -372,6 +404,21 @@ mod tests {
 
     fn builder() -> ModuleRouterBuilder {
         ModuleRouterBuilder::new("app")
+    }
+
+    // -- owns --
+
+    #[test]
+    fn owns_root_and_descendants() {
+        assert!(ModuleRouterBuilder::owns("app", "app"));
+        assert!(ModuleRouterBuilder::owns("app", "app::users"));
+    }
+
+    #[test]
+    fn does_not_own_other_trees_or_shared_prefixes() {
+        assert!(!ModuleRouterBuilder::owns("app", "admin::users"));
+        assert!(!ModuleRouterBuilder::owns("app", "application::users"));
+        assert!(!ModuleRouterBuilder::owns("portal::routes", "crm::routes"));
     }
 
     // -- relative_module_path --

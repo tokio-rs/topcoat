@@ -146,21 +146,48 @@ it("keeps a focused input and what the user typed while its siblings change", ()
 	expect(document.activeElement).toBe(input);
 	expect(input.value).toBe("shoes");
 	expect(document.body.innerHTML).toBe(
-		`<input value="sho"><ul><li>shoes</li></ul><p>1 result</p>`,
+		`<input value="shoes"><ul><li>shoes</li></ul><p>1 result</p>`,
 	);
 });
 
-it("syncs the value of an input that is not focused", () => {
-	document.body.innerHTML = `<input value="a"><input type="checkbox">`;
-	const [text, box] = Array.from(
-		document.querySelectorAll("input"),
-	) as HTMLInputElement[];
-	(text as HTMLInputElement).value = "typed";
+it("keeps what the user entered in controls that are not focused", () => {
+	document.body.innerHTML = `<input value="a"><textarea>a</textarea><input type="checkbox"><select><option value="a">A</option><option value="b">B</option></select><button>sort</button>`;
+	const input = document.querySelector("input") as HTMLInputElement;
+	const area = document.querySelector("textarea") as HTMLTextAreaElement;
+	const box = document.querySelector('[type="checkbox"]') as HTMLInputElement;
+	const select = document.querySelector("select") as HTMLSelectElement;
+	input.value = "typed";
+	area.value = "written";
+	box.checked = true;
+	select.value = "b";
+	(document.querySelector("button") as HTMLButtonElement).focus();
 
-	morphBody(`<input value="b"><input type="checkbox" checked>`);
+	morphBody(
+		`<input value="b"><textarea>b</textarea><input type="checkbox"><select><option value="a">A!</option><option value="b">B!</option></select><button>sort</button>`,
+	);
 
-	expect((text as HTMLInputElement).value).toBe("b");
-	expect((box as HTMLInputElement).checked).toBe(true);
+	expect(document.querySelector("input")).toBe(input);
+	expect(input.value).toBe("typed");
+	expect(input.defaultValue).toBe("b");
+	expect(area.value).toBe("written");
+	expect(area.defaultValue).toBe("b");
+	expect(box.checked).toBe(true);
+	expect(select.value).toBe("b");
+});
+
+it("updates untouched controls to their new defaults", () => {
+	document.body.innerHTML = `<input value="a"><textarea>a</textarea><input type="checkbox"><select><option value="a">A</option><option value="b">B</option></select>`;
+
+	morphBody(
+		`<input value="b"><textarea>b</textarea><input type="checkbox" checked><select><option value="a">A</option><option value="b" selected>B</option></select>`,
+	);
+
+	expect(document.querySelector("input")?.value).toBe("b");
+	expect(document.querySelector("textarea")?.value).toBe("b");
+	expect(
+		(document.querySelector('[type="checkbox"]') as HTMLInputElement).checked,
+	).toBe(true);
+	expect(document.querySelector("select")?.value).toBe("b");
 });
 
 it("matches elements by id across a reorder", () => {

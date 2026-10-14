@@ -313,8 +313,7 @@ fn gitignore_matchers(roots: &[PathBuf], target_dir: Option<&Path>) -> Vec<Gitig
         // gitignore rules, so ignored subtrees are not descended into.
         let target = target_dir.map(Path::to_path_buf);
         let mut walk = WalkBuilder::new(root);
-        walk.require_git(false)
-            .filter_entry(move |entry| Some(entry.path()) != target.as_deref());
+        walk.filter_entry(move |entry| Some(entry.path()) != target.as_deref());
         for entry in walk.build().flatten() {
             if entry.file_type().is_some_and(|kind| kind.is_dir()) {
                 let gitignore = entry.path().join(".gitignore");

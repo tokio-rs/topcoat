@@ -5,7 +5,10 @@
  * IDs present in both versions identify elements across moves and help match
  * their containing elements. Those elements keep their IDs when matched.
  *
- * Attributes and text update in place. The focused element keeps its value.
+ * Attributes and text update in place. Live form state is left to the
+ * browser: a control's attributes and text are its defaults, so a control
+ * the user has edited keeps its value while one they have not follows the
+ * new defaults.
  */
 
 export interface MorphOptions {
@@ -292,8 +295,7 @@ function removeNodesBetween(from: ChildNode, to: ChildNode): void {
 function morphNode(ctx: Ctx, oldNode: ChildNode, newNode: Node): ChildNode {
 	if (oldNode instanceof Element && newNode instanceof Element) {
 		if (oldNode.tagName === newNode.tagName) {
-			const preserve = preservedProperties(ctx, oldNode);
-			syncAttributes(oldNode, newNode, preserve);
+			syncAttributes(oldNode, newNode, preservedAttributes(ctx, oldNode));
 			// A textarea's children are its default value. Leave them alone
 			// when preserving its value, including its caret and selection.
 			if (
@@ -310,8 +312,6 @@ function morphNode(ctx: Ctx, oldNode: ChildNode, newNode: Node): ChildNode {
 					Array.from(newNode.childNodes),
 				);
 			}
-			// After the children, so a select sees its morphed options.
-			syncProperties(oldNode, newNode, preserve);
 			return oldNode;
 		}
 	} else if (oldNode.nodeType === newNode.nodeType) {
@@ -370,10 +370,12 @@ function moveBefore(
 	parent.insertBefore(node, before);
 }
 
-/** Decides what to leave alone before attributes can change live state. */
-function preservedProperties(ctx: Ctx, el: Element): Set<string> {
+/**
+ * The attributes to leave alone because syncing them would change the live
+ * state of a control the caller wants to keep as is, even if untouched.
+ */
+function preservedAttributes(ctx: Ctx, el: Element): Set<string> {
 	const preserve = new Set<string>();
-	if (el === ctx.active) preserve.add("value");
 	if (!ctx.options.preserveFormState) return preserve;
 	if (el instanceof HTMLInputElement) {
 		preserve.add("value");
@@ -418,41 +420,5 @@ function syncAttributes(
 		} else if (!newEl.hasAttributeNS(attr.namespaceURI, attr.localName)) {
 			oldEl.removeAttributeNS(attr.namespaceURI, attr.localName);
 		}
-	}
-}
-
-/**
- * Brings the live form state of `oldEl` in line with `newEl`, because the
- * attribute is only the initial state once the user has touched a control.
- * The value of the focused element stays what the user typed.
- */
-function syncProperties(
-	oldEl: Element,
-	newEl: Element,
-	preserve: Set<string>,
-): void {
-	if (oldEl instanceof HTMLInputElement && newEl instanceof HTMLInputElement) {
-		if (!preserve.has("checked") && oldEl.checked !== newEl.checked)
-			oldEl.checked = newEl.checked;
-		if (!preserve.has("value") && oldEl.value !== newEl.value)
-			oldEl.value = newEl.value;
-	} else if (
-		oldEl instanceof HTMLTextAreaElement &&
-		newEl instanceof HTMLTextAreaElement
-	) {
-		if (!preserve.has("value") && oldEl.value !== newEl.value)
-			oldEl.value = newEl.value;
-	} else if (
-		oldEl instanceof HTMLOptionElement &&
-		newEl instanceof HTMLOptionElement
-	) {
-		if (!preserve.has("selected") && oldEl.selected !== newEl.selected)
-			oldEl.selected = newEl.selected;
-	} else if (
-		oldEl instanceof HTMLSelectElement &&
-		newEl instanceof HTMLSelectElement
-	) {
-		if (!preserve.has("value") && oldEl.value !== newEl.value)
-			oldEl.value = newEl.value;
 	}
 }

@@ -240,9 +240,9 @@ mod tests {
             ),
             "{out}"
         );
-        assert!(out.contains("JoinUnit :: new (__expr0 , ())"), "{out}");
+        assert!(out.contains("JoinUnit :: new (__expr0)"), "{out}");
         assert!(out.contains("JoinView :: new"), "{out}");
-        assert!(out.contains("move | __b , (__view0 , ()) |"), "{out}");
+        assert!(out.contains("move | __b , __view0 |"), "{out}");
         assert!(out.contains("__b . markup (& \"<p>\")"), "{out}");
         assert!(
             out.contains("__b . node (__expr0_parts) ; __b . view (__view0)"),
@@ -285,7 +285,7 @@ mod tests {
         assert!(out.contains("EitherView :: left"), "{out}");
         assert!(out.contains("EitherView :: right"), "{out}");
         assert!(out.contains("\"no\""), "{out}");
-        assert!(out.contains("JoinUnit :: new (__expr0 , ())"), "{out}");
+        assert!(out.contains("JoinUnit :: new (__expr0)"), "{out}");
     }
 
     #[test]
@@ -411,7 +411,7 @@ mod tests {
             out.contains("HoistView :: new (:: topcoat_view :: internal :: MoveView :: new (async")
         );
         assert!(out.contains("Component :: render"));
-        assert!(out.contains("JoinUnit :: new (__expr0 , ())"));
+        assert!(out.contains("JoinUnit :: new (__expr0)"));
     }
 
     #[test]
@@ -433,8 +433,8 @@ mod tests {
         add_component(&mut builder, "first");
         add_component(&mut builder, "second");
         let out = rendered(builder);
-        assert!(out.contains("JoinUnit :: new (__expr0 , :: topcoat_view :: internal :: JoinUnit :: new (__expr1 , ()))"));
-        assert!(out.contains("move | __b , (__view0 , (__view1 , ())) |"));
+        assert!(out.contains("JoinPair :: new (:: topcoat_view :: internal :: JoinUnit :: new (__expr0) , :: topcoat_view :: internal :: JoinUnit :: new (__expr1))"));
+        assert!(out.contains("move | __b , (__view0 , __view1) |"));
         assert!(out.contains("__b . view (__view0)"));
         assert!(out.contains("__b . view (__view1)"));
     }
@@ -561,7 +561,7 @@ mod tests {
         );
         assert!(out.contains("LoopView :: new (__iterations)"), "{out}");
         assert!(out.contains("MoveView :: new"), "{out}");
-        assert!(out.contains("JoinUnit :: new (__expr0 , ())"), "{out}");
+        assert!(out.contains("JoinUnit :: new (__expr0)"), "{out}");
     }
 
     #[test]

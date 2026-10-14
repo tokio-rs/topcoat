@@ -23,8 +23,9 @@ const CHECKBOX: StaticClass = class!(
 /// ```ignore
 /// view! {
 ///     <div class="flex items-center gap-2">
-///         checkbox(attrs: attributes! { id="terms" name="terms" checked="" })
-///         label(attrs: attributes! { for="terms" }, "Accept terms")
+///         let terms = element_id(cx);
+///         checkbox(attrs: attributes! { id=(&terms) name="terms" checked="" })
+///         label(attrs: attributes! { for=(&terms) }, "Accept terms")
 ///     </div>
 /// }
 /// ```

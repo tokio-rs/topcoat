@@ -8,7 +8,7 @@ use topcoat::{
 /// state so the native closed state remains hidden.
 const OVERLAY: StaticClass = class!(
     "fixed inset-0 z-50 size-full max-h-none max-w-none overflow-hidden",
-    "bg-background/80 text-foreground backdrop-blur-sm open:flex",
+    "bg-black/50 text-foreground open:flex",
 );
 
 /// Classes that fade the overlay in and out. `allow-discrete` keeps it displayed

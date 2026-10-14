@@ -159,6 +159,52 @@ async fn memoized_result_return_is_borrowed_ergonomically_with_as_ref() {
     assert_eq!(err_value, Err(&"nope".to_owned()));
 }
 
+#[deny(unused_imports)]
+mod cx_import_used_only_by_memoized_signature {
+    use topcoat::context::{Cx, memoize};
+
+    #[memoize]
+    pub fn value(cx: &Cx) -> i32 {
+        let _ = cx;
+        42
+    }
+}
+
+#[tokio::test]
+async fn memoized_signature_uses_the_written_cx_type() {
+    let cx = Cx::default();
+
+    assert_eq!(*cx_import_used_only_by_memoized_signature::value(&cx), 42);
+}
+
+#[tokio::test]
+async fn memoized_topcoat_error_propagates_with_question_mark_under_as_ref() {
+    #[derive(Debug)]
+    struct Failure;
+
+    impl std::fmt::Display for Failure {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("failure")
+        }
+    }
+
+    impl std::error::Error for Failure {}
+
+    #[memoize(as_ref)]
+    fn fallible(cx: &Cx) -> topcoat::Result<i32> {
+        let _ = cx;
+        Err(Failure.into())
+    }
+
+    fn caller(cx: &Cx) -> topcoat::Result<i32> {
+        Ok(*fallible(cx)?)
+    }
+
+    let cx = Cx::default();
+
+    assert!(caller(&cx).unwrap_err().is::<Failure>());
+}
+
 #[tokio::test]
 async fn memoized_option_return_is_a_plain_reference_by_default() {
     #[memoize]

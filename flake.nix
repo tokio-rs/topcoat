@@ -23,7 +23,15 @@
       devShells = forAllSystems (system:
         let
           pkgs = import nixpkgs { inherit system; };
-          rustToolchain = fenix.packages.${system}.stable.withComponents [
+          rustVersion = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.rust-version;
+          msrv =
+            if builtins.length (pkgs.lib.splitString "." rustVersion) == 2
+            then "${rustVersion}.0"
+            else rustVersion;
+          rustToolchain = (fenix.packages.${system}.toolchainOf {
+            channel = msrv;
+            sha256 = "sha256-zm3dyIY2T414ZRR3EhLOvptzG6gta4WZUcawzMUWtqI=";
+          }).withComponents [
             "cargo"
             "clippy"
             "rust-analyzer"

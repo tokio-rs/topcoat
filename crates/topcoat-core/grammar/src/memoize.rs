@@ -121,7 +121,14 @@ impl ToTokens for Memoize {
                 && pi.ident == "cx"
             {
                 let span = pi.span();
-                new_inputs.push(quote_spanned! {span=> cx: &'__cx #topcoat_context::Cx });
+                // Keep the written type so its import counts as used.
+                let cx_type = match &*pat_type.ty {
+                    syn::Type::Reference(reference) if reference.lifetime.is_none() => {
+                        reference.elem.to_token_stream()
+                    }
+                    _ => quote! { #topcoat_context::Cx },
+                };
+                new_inputs.push(quote_spanned! {span=> cx: &'__cx #cx_type });
                 continue;
             }
             let ty = &pat_type.ty;

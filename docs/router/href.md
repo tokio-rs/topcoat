@@ -122,3 +122,39 @@ async fn posts_link(cx: &Cx) -> Result<impl View> {
     })
 }
 ```
+
+# Storing different link targets together
+
+`href!` returns a different type for each handler, so you cannot put links to different handlers directly in the same collection. You can store references to the handlers as `&dyn HrefTarget` and call `href!` when you need each link.
+
+For example, a navigation list can store labels alongside handler references. Use `&(dyn HrefTarget + Sync)` so the view can be sent between threads, then call `href!(*target)` inside a loop:
+
+```rust
+use topcoat::{
+    Result,
+    context::Cx,
+    router::{HrefTarget, href},
+    view::{View, component, view},
+};
+# #[topcoat::router::page("/")]
+# async fn home() -> Result<impl View> { Ok(topcoat::view::view! { "Home" }) }
+# #[topcoat::router::page("/posts")]
+# async fn posts() -> Result<impl View> { Ok(topcoat::view::view! { "Posts" }) }
+
+const NAV: &[(&str, &(dyn HrefTarget + Sync))] = &[("Home", &home), ("Posts", &posts)];
+
+#[component]
+async fn nav(cx: &Cx) -> Result<impl View> {
+    Ok(view! {
+        <nav>
+            for (label, target) in NAV {
+                let link = href!(*target);
+                let current = link.is_current(cx);
+                <a href=(link) aria-current=(current.then_some("page"))>(*label)</a>
+            }
+        </nav>
+    })
+}
+```
+
+This only works when all targets require the same path parameters. In this example, neither handler takes any.

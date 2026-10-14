@@ -250,6 +250,31 @@ it("a page re-run morphs the body, keeping a focused input", async () => {
 	expect(document.body.innerHTML).toBe(`<input><p>2 results</p>`);
 });
 
+it("a page re-run keeps an edited input unless a binding sets its value", async () => {
+	const body = `<input><input data-topcoat-bind:value="cx.hydrate('')"><button>sort</button>`;
+	stubFetch(
+		200,
+		"OK",
+		snapshot(
+			`<!doctype html><html><head><title>t</title></head><body>${body}</body></html>`,
+		),
+	);
+	globalThis.location = new URL("https://app.example/") as unknown as Location;
+	document.body.innerHTML = body;
+	const runtime = new Runtime();
+	runtime.start(document);
+	const [free, bound] = Array.from(document.querySelectorAll("input"));
+	if (!free || !bound) throw new Error("Missing inputs");
+	free.value = "typed";
+	bound.value = "typed";
+	(document.querySelector("button") as HTMLButtonElement).focus();
+
+	await refetch(runtime.page)();
+
+	expect(free.value).toBe("typed");
+	expect(bound.value).toBe("");
+});
+
 /**
  * A unit whose content is described by a script rather than a document:
  * each replacement declares the given signals and dependencies into the new

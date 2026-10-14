@@ -15,15 +15,16 @@ const LABEL: StaticClass = class!(
 
 /// A label for a form control.
 ///
-/// Wrap the control or pass a `for` attribute matching its `id`. Pass the label text as
-/// children. `attrs` are forwarded to the `<label>`, with extra classes added to its
-/// classes.
+/// Wrap the control or pass a `for` attribute matching its `id`. Create the id with
+/// [`element_id`](topcoat::view::element_id). Pass the label text as children. `attrs`
+/// are forwarded to the `<label>`, with extra classes added to its classes.
 ///
 /// ```ignore
 /// view! {
 ///     <div class="flex flex-col gap-2">
-///         label(attrs: attributes! { for="email" }, "Email")
-///         input(attrs: attributes! { id="email" type="email" })
+///         let email = element_id(cx);
+///         label(attrs: attributes! { for=(&email) }, "Email")
+///         input(attrs: attributes! { id=(&email) type="email" })
 ///     </div>
 /// }
 /// ```

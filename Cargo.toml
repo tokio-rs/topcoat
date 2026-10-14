@@ -39,6 +39,7 @@ members = [
     "examples/alpine-ajax",
     "examples/app-context",
     "examples/asset",
+    "examples/cloudflare-worker",
     "examples/context",
     "examples/cookie",
     "examples/datastar",
@@ -63,7 +64,7 @@ members = [
     "examples/ui",
     "examples/websocket",
 
-    "demos/coffee-shop",
+    "demos/admin",
 
     "benchmarks/topcoat",
 ]
@@ -82,7 +83,7 @@ repository = "https://github.com/tokio-rs/topcoat"
 homepage = "https://github.com/tokio-rs/topcoat"
 keywords = ["web", "framework", "ssr", "html", "server"]
 categories = ["web-programming", "web-programming::http-server"]
-rust-version = "1.98"
+rust-version = "1.99"
 
 [workspace.lints.rust]
 unsafe_code = "deny"
@@ -150,6 +151,7 @@ topcoat-view-macro = { version = "0.10.0", path = "crates/topcoat-view/macro" }
 
 anyhow = "1.0"
 anymap3 = "1.0"
+argon2 = "0.6"
 askama = "0.16.1"
 base64 = "0.22"
 boxcar = "0.2"
@@ -181,6 +183,7 @@ ignore = "0.4"
 indicatif = "0.18"
 inventory = "0.3.24"
 ipnet = "2"
+jiff = "0.2"
 lettre = { version = "0.11", default-features = false }
 matchit = "0.9"
 memchr = "2.8"
@@ -203,7 +206,8 @@ smallvec = "1"
 syn = "3.0.6"
 thiserror = "2.0.18"
 time = "0.3"
-toasty = "0.7"
+toasty = "0.11"
+toasty-cli = "0.11"
 tokio = "1.51.1"
 tokio-util = "0.7"
 toml = "1.1.2"
@@ -215,3 +219,4 @@ ureq = "3.3"
 uuid = "1.23"
 v8 = "152.0.0"
 web-time = "1.1"
+worker = "0.8"

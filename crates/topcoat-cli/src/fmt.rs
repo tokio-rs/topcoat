@@ -229,8 +229,6 @@ impl FmtCommand {
 /// Cargo build directories.
 fn rust_files_in(dir: &Path, files: &mut BTreeSet<PathBuf>) -> Result<(), Error> {
     let walk = WalkBuilder::new(dir)
-        // Projects that are not in a Git repository yet still have a `.gitignore`.
-        .require_git(false)
         // Cargo marks its build directories with a `CACHEDIR.TAG` file.
         .filter_entry(|entry| {
             !entry.file_type().is_some_and(|ty| ty.is_dir())

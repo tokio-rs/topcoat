@@ -1,0 +1,24 @@
+[package]
+name = "admin"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+argon2.workspace = true
+jiff.workspace = true
+serde = { workspace = true, features = ["derive"] }
+toasty = { workspace = true, features = ["jiff", "migration", "sqlite"] }
+toasty-cli.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
+topcoat = { workspace = true, features = ["font-fontsource", "icon-iconify", "tailwind", "ui"] }
+
+[build-dependencies]
+# We cannot use `workspace = true` with `default-features = false`.
+topcoat = { path = "../../crates/topcoat/", default-features = false, features = ["icon-iconify", "tailwind"] }
+
+[dev-dependencies]
+topcoat-ui.workspace = true
+
+[lints]
+workspace = true

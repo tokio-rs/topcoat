@@ -9,7 +9,14 @@ These pages show how to build interactive views with Topcoat's browser runtime:
 - `shard` asks the server for new search results as the query changes.
 - `record` stores an order as a `#[record]` value in a signal and submits it to a server procedure.
 
-Start the example with:
+Clone the Topcoat repository:
+
+```sh
+git clone https://github.com/tokio-rs/topcoat.git
+cd topcoat
+```
+
+Then start the example with:
 
 ```sh
 cargo topcoat dev -p runtime
