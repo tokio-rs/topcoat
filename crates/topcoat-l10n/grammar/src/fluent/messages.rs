@@ -1,7 +1,9 @@
 use syn::{
-    LitStr, Visibility,
+    Visibility,
     parse::{Parse, ParseStream},
 };
+
+use crate::fluent::PathPattern;
 
 /// The input of a `messages!` invocation: an optional visibility followed by
 /// the path of the Fluent files to load.
@@ -12,9 +14,8 @@ use syn::{
 pub struct Messages {
     /// The visibility of the generated module.
     pub vis: Visibility,
-    /// The path of the Fluent files, with a `{locale}` placeholder for the
-    /// locale.
-    pub path: LitStr,
+    /// The path of the Fluent files.
+    pub path: PathPattern,
 }
 
 impl Parse for Messages {
