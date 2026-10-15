@@ -42,7 +42,13 @@ export class DevConnection {
 			this.handlers.navigating();
 		};
 		// Firefox closes the socket at navigation start, Chrome at commit.
-		window.navigation?.addEventListener("navigate", navigating, options);
+		window.navigation?.addEventListener(
+			"navigate",
+			(event) => {
+				if (!event.destination.sameDocument) navigating();
+			},
+			options,
+		);
 		window.addEventListener("pagehide", navigating, options);
 		window.navigation?.addEventListener(
 			"navigateerror",

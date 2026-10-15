@@ -25,6 +25,7 @@ let connection: DevConnection;
 beforeEach(() => {
 	vi.useFakeTimers();
 	vi.stubGlobal("WebSocket", Socket);
+	vi.stubGlobal("navigation", new EventTarget());
 	Socket.all = [];
 });
 
@@ -74,6 +75,7 @@ it("keeps the reconnected socket for subsequent builds", () => {
 });
 
 it("defers reconnecting during navigation and resumes after a page is restored", () => {
+	vi.stubGlobal("navigation", undefined);
 	const handlers = start();
 	window.dispatchEvent(new Event("pagehide"));
 	Socket.at(0).close();
@@ -84,6 +86,44 @@ it("defers reconnecting during navigation and resumes after a page is restored",
 	window.dispatchEvent(new Event("pageshow"));
 	vi.advanceTimersByTime(500);
 	Socket.at(1).onopen?.();
+	expect(handlers.reconnected).toHaveBeenCalledOnce();
+});
+
+it("keeps reloads and reconnects active after same-document navigation", () => {
+	const handlers = start();
+	window.navigation.dispatchEvent(
+		Object.assign(new Event("navigate"), {
+			destination: { sameDocument: true },
+		}),
+	);
+
+	expect(connection.isNavigating).toBe(false);
+	expect(handlers.navigating).not.toHaveBeenCalled();
+	Socket.at(0).onmessage?.({ data: "reload" });
+	expect(handlers.event).toHaveBeenCalledWith("reload");
+	Socket.at(0).close();
+	vi.advanceTimersByTime(500);
+	Socket.at(1).onopen?.();
+	expect(handlers.reconnected).toHaveBeenCalledOnce();
+});
+
+it("defers reconnecting for a new document and resumes if navigation fails", () => {
+	const handlers = start();
+	window.navigation.dispatchEvent(
+		Object.assign(new Event("navigate"), {
+			destination: { sameDocument: false },
+		}),
+	);
+	Socket.at(0).close();
+	vi.advanceTimersByTime(1000);
+
+	expect(connection.isNavigating).toBe(true);
+	expect(handlers.navigating).toHaveBeenCalledOnce();
+	expect(Socket.all).toHaveLength(1);
+	window.navigation.dispatchEvent(new Event("navigateerror"));
+	vi.advanceTimersByTime(500);
+	Socket.at(1).onopen?.();
+	expect(connection.isNavigating).toBe(false);
 	expect(handlers.reconnected).toHaveBeenCalledOnce();
 });
 
