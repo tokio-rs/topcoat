@@ -403,6 +403,8 @@ See the [`view!`](crate::view::view!) macro docs for the full placement and prec
 
 The router applies an [`OriginPolicy`] to every request before any layer or handler runs: by default, state-changing cross-origin browser requests and cross-origin WebSocket handshakes are rejected with `403 Forbidden`. Register a policy with [`origin_policy`](RouterBuilder::origin_policy) to trust cross-origin peers, to exempt individual routes, or to opt out; see [`OriginPolicy`] for the exact rules.
 
+When a browser sends `Origin` without `Sec-Fetch-Site`, the router compares its scheme, host, and port with the configured public [`base_url`](RouterBuilder::base_url), or with the absolute request URI if no base URL is configured. Without a base URL, a path-only URI cannot establish the scheme, so the fallback rejects the request unless its origin is explicitly trusted. Set `.base_url("https://example.com")` to support these requests behind a reverse proxy. The base URL takes precedence over the backend request URI, and its path prefix does not affect the comparison. Forwarding headers are not used for this check.
+
 # Manual registration
 
 For routes with explicit paths, register each handler with `.page()`, `.layout()`, `.layer()`, or `.route()`, then call [`build`](RouterBuilder::build):

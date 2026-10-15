@@ -1413,6 +1413,55 @@ mod tests {
     }
 
     #[test]
+    fn cross_scheme_origin_is_rejected_before_the_handler() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::POST, path("/x"), panic_route))
+            .build();
+        let request = http::Request::builder()
+            .method(Method::POST)
+            .uri("https://example.com/x")
+            .header("host", "example.com")
+            .header("origin", "http://example.com")
+            .body(Body::empty())
+            .unwrap();
+        let response = block_on(router.handle(request));
+        // Reaching the handler would produce 500 instead of 403.
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn origin_fallback_uses_the_public_base_url_behind_a_proxy() {
+        let router = RouterBuilder::new()
+            .base_url("https://example.com/app")
+            .route(RouteFn::new(Method::POST, path("/x"), say_posted))
+            .build();
+        for target in ["/x", "http://internal:3000/x"] {
+            for (origin, expected) in [
+                ("https://example.com", StatusCode::OK),
+                ("http://example.com", StatusCode::FORBIDDEN),
+            ] {
+                let request = http::Request::builder()
+                    .method(Method::POST)
+                    .uri(target)
+                    .header("host", "internal:3000")
+                    .header("origin", origin)
+                    .body(Body::empty())
+                    .unwrap();
+                let response = block_on(router.handle(request));
+                assert_eq!(
+                    response.status(),
+                    expected,
+                    "target: {target}, origin: {origin}"
+                );
+                if expected == StatusCode::OK {
+                    let body = block_on(to_bytes(response.into_body(), usize::MAX)).unwrap();
+                    assert_eq!(&body[..], b"posted");
+                }
+            }
+        }
+    }
+
+    #[test]
     fn origin_verification_wraps_unmatched_requests() {
         // The origin layer runs before the 404 resolves, so an untrusted
         // cross-origin request learns nothing about which paths exist.

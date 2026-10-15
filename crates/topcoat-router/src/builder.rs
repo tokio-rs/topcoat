@@ -288,7 +288,8 @@ impl RouterBuilder {
     /// Registers the base URL the application is publicly reachable at, like
     /// `https://example.com`.
     ///
-    /// This base is used when rendering absolute URLs. Read it with
+    /// This base is used when rendering absolute URLs and as the public
+    /// origin for [`OriginPolicy`] checks without fetch metadata. Read it with
     /// [`base_url`](topcoat_core::base_url::base_url) and resolve application
     /// paths against it with [`BaseUrl::join`](topcoat_core::base_url::BaseUrl::join).
     ///

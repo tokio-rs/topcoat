@@ -1,4 +1,5 @@
-use topcoat_core::context::Cx;
+use http::Uri;
+use topcoat_core::{base_url::try_base_url, context::Cx};
 
 use crate::{
     Body, IntoPath, Layer, LayerFuture, Method, Next, Path, PathBuf,
@@ -17,6 +18,14 @@ use crate::{
 /// without origin or fetch metadata headers also pass. Register a policy with
 /// [`RouterBuilder::origin_policy`](crate::RouterBuilder::origin_policy) to
 /// trust origins, exempt paths, or disable verification.
+///
+/// Without fetch metadata, an `Origin` header must match the scheme, host,
+/// and port of the configured [`base_url`](crate::RouterBuilder::base_url),
+/// or the absolute request URI when no base URL is configured. Without a
+/// base URL, a path-only request URI cannot establish the scheme, so these
+/// requests are rejected unless the origin is explicitly trusted. Configure
+/// the public base URL behind a reverse proxy; forwarding headers are not
+/// used for this check.
 ///
 /// # Examples
 ///
@@ -169,17 +178,14 @@ impl OriginPolicy {
                     };
                 }
 
-                // Fallback check for older browsers: Compare the "origin" and "host" header
-                // manually. If they are the same, this is a safe same-origin
-                // request.
+                // Without fetch metadata, compare the complete public origin.
+                // A Host header alone cannot establish the request's scheme.
                 if let Some(origin) = origin {
-                    let origin = origin.split_once("://").map(|(_, host)| host);
-                    let host = header(header::HOST.as_str())
-                        .or_else(|| uri(cx).authority().map(http::uri::Authority::as_str));
-                    return if let Some(host) = host
-                        && let Some(origin) = origin
-                        && origin.eq_ignore_ascii_case(host)
-                    {
+                    let target = match try_base_url(cx) {
+                        Some(base) => base.as_str().parse().expect("base URL is a valid URI"),
+                        None => uri(cx).clone(),
+                    };
+                    return if same_origin(origin, &target) {
                         OriginVerdict::Allow
                     } else {
                         OriginVerdict::Deny
@@ -241,6 +247,54 @@ impl Layer for OriginLayer {
             OriginVerdict::Deny => Box::pin(async { Err(forbidden().into()) }),
         }
     }
+}
+
+/// Compares a serialized Origin header with a request or public base URL.
+fn same_origin(origin: &str, target: &Uri) -> bool {
+    let Some((_, authority)) = origin.split_once("://") else {
+        return false;
+    };
+    // An Origin header contains no user information, path, query, or fragment.
+    if authority.contains(['@', '/', '?', '#']) {
+        return false;
+    }
+    let Ok(origin) = origin.parse::<Uri>() else {
+        return false;
+    };
+    let (Some((scheme, host, port)), Some((target_scheme, target_host, target_port))) =
+        (origin_parts(&origin), origin_parts(target))
+    else {
+        return false;
+    };
+    scheme.eq_ignore_ascii_case(target_scheme)
+        && host.eq_ignore_ascii_case(target_host)
+        && port == target_port
+}
+
+/// Returns an HTTP origin's scheme, host, and effective port.
+fn origin_parts(uri: &Uri) -> Option<(&str, &str, u16)> {
+    let scheme = uri.scheme_str()?;
+    let default_port = if scheme.eq_ignore_ascii_case("http") {
+        80
+    } else if scheme.eq_ignore_ascii_case("https") {
+        443
+    } else {
+        return None;
+    };
+    let authority = uri.authority()?;
+    let host = authority.host();
+    // Reject invalid explicit ports rather than treating them as absent.
+    let port = match authority.as_str().strip_prefix(host)? {
+        "" => default_port,
+        suffix => {
+            let port = suffix.strip_prefix(':')?;
+            if !port.bytes().all(|byte| byte.is_ascii_digit()) {
+                return None;
+            }
+            port.parse().ok()?
+        }
+    };
+    Some((scheme, host, port))
 }
 
 #[cfg(test)]
@@ -333,27 +387,119 @@ mod tests {
         );
     }
 
-    // -- the origin/host fallback for older browsers --
+    // -- the Origin fallback for older browsers --
 
     #[test]
-    fn matching_origin_and_host_pass() {
+    fn cross_scheme_origins_are_denied_without_fetch_metadata() {
         let policy = OriginPolicy::new();
-        assert_eq!(
-            check(
-                &policy,
-                Method::POST,
-                &[("origin", "https://example.com"), ("host", "EXAMPLE.com")]
-            ),
-            OriginVerdict::Allow
-        );
+        for (target, origin) in [
+            ("https://example.com/x", "http://example.com"),
+            ("http://example.com/x", "https://example.com"),
+            ("https://example.com:8443/x", "http://example.com:8443"),
+            ("http://example.com:8443/x", "https://example.com:8443"),
+        ] {
+            for method in [Method::POST, Method::PUT, Method::DELETE, Method::PATCH] {
+                let cx = cx_with(
+                    method,
+                    target,
+                    &[("origin", origin), ("host", "example.com")],
+                );
+                assert_eq!(policy.check(&cx), OriginVerdict::Deny);
+            }
+            let cx = cx_with(
+                Method::GET,
+                target,
+                &[
+                    ("origin", origin),
+                    ("host", "example.com"),
+                    ("upgrade", "websocket"),
+                ],
+            );
+            assert_eq!(policy.check(&cx), OriginVerdict::Deny);
+        }
     }
 
     #[test]
-    fn mismatched_origin_and_host_are_denied_for_unsafe_methods() {
+    fn matching_origins_pass() {
         let policy = OriginPolicy::new();
-        let headers = [("origin", "https://evil.example"), ("host", "example.com")];
-        assert_eq!(check(&policy, Method::POST, &headers), OriginVerdict::Deny);
-        assert_eq!(check(&policy, Method::GET, &headers), OriginVerdict::Allow);
+        for (target, origin) in [
+            ("https://example.com/x", "https://EXAMPLE.com"),
+            ("http://example.com/x", "http://example.com"),
+            ("https://example.com:443/x", "https://example.com"),
+            ("http://example.com/x", "http://example.com:80"),
+            ("https://example.com:8443/x", "https://example.com:8443"),
+            ("https://[::1]:443/x", "https://[::1]"),
+        ] {
+            let cx = cx_with(Method::POST, target, &[("origin", origin)]);
+            assert_eq!(policy.check(&cx), OriginVerdict::Allow, "{origin}");
+        }
+    }
+
+    #[test]
+    fn mismatched_hosts_and_ports_are_denied_for_unsafe_methods() {
+        let policy = OriginPolicy::new();
+        for origin in ["https://evil.example", "https://example.com:8443"] {
+            let headers = [("origin", origin), ("host", "example.com")];
+            let cx = cx_with(Method::POST, "https://example.com/x", &headers);
+            assert_eq!(policy.check(&cx), OriginVerdict::Deny);
+            let cx = cx_with(Method::GET, "https://example.com/x", &headers);
+            assert_eq!(policy.check(&cx), OriginVerdict::Allow);
+        }
+    }
+
+    #[test]
+    fn absolute_request_schemes_are_case_insensitive() {
+        // Parsing a complete URI normalizes HTTP schemes, but the builder
+        // preserves their case.
+        for (scheme, origin) in [
+            ("HTTP", "http://example.com"),
+            ("HTTPS", "https://example.com"),
+        ] {
+            let target = Uri::builder()
+                .scheme(scheme)
+                .authority("example.com")
+                .path_and_query("/x")
+                .build()
+                .unwrap();
+            assert!(same_origin(origin, &target));
+        }
+    }
+
+    #[test]
+    fn a_host_or_forwarded_header_cannot_establish_the_scheme() {
+        let policy = OriginPolicy::new();
+        for origin in ["http://example.com", "https://example.com"] {
+            let headers = [("origin", origin), ("host", "example.com")];
+            assert_eq!(check(&policy, Method::POST, &headers), OriginVerdict::Deny);
+            let headers = [
+                ("origin", origin),
+                ("host", "example.com"),
+                ("x-forwarded-proto", "https"),
+                ("forwarded", "proto=https;host=example.com"),
+            ];
+            assert_eq!(check(&policy, Method::POST, &headers), OriginVerdict::Deny);
+        }
+    }
+
+    #[test]
+    fn malformed_and_non_http_origins_are_denied() {
+        let policy = OriginPolicy::new();
+        for origin in [
+            "null",
+            "example.com",
+            "ftp://example.com",
+            "https://example.com/",
+            "https://example.com?query",
+            "https://example.com#fragment",
+            "https://user@example.com",
+            "https://example.com:invalid",
+            "https://example.com:+443",
+            "https://example.com:65536",
+            "https://example.com:",
+        ] {
+            let cx = cx_with(Method::POST, "https://example.com/x", &[("origin", origin)]);
+            assert_eq!(policy.check(&cx), OriginVerdict::Deny, "{origin}");
+        }
     }
 
     // -- trusted origins --
