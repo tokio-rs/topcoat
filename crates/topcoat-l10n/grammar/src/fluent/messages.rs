@@ -1,3 +1,5 @@
+use proc_macro2::TokenStream;
+use quote::{ToTokens, quote};
 use syn::{
     Visibility,
     parse::{Parse, ParseStream},
@@ -34,6 +36,16 @@ impl Parse for Messages {
             vis: input.parse()?,
             path: input.call(PathPattern::parse_option)?,
         })
+    }
+}
+
+impl ToTokens for Messages {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let vis = &self.vis;
+        quote! {
+            #vis mod msg {}
+        }
+        .to_tokens(tokens);
     }
 }
 

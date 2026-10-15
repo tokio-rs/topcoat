@@ -21,9 +21,18 @@ fluent = [
 [dependencies]
 topcoat-l10n-grammar.workspace = true
 
+quote.workspace = true
+syn.workspace = true
+
+[dev-dependencies]
+topcoat = { workspace = true, features = ["l10n-fluent"] }
+
 [lints]
 workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+
+[package.metadata.cargo-udeps.ignore]
+development = ["topcoat"]
