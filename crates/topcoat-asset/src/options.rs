@@ -31,6 +31,10 @@ pub struct AssetOptions {
     /// Override the `Content-Type` the asset is served with. When unset, the
     /// bundler guesses it from the bundled file's extension.
     pub content_type: Option<Cow<'static, str>>,
+    /// Whether the file should be embedded into the compiled binary, as opposed
+    /// to being separately bundled into a directory.
+    /// This is only supported for asset paths starting with "./", "../", and "/"
+    pub embed: Option<Cow<'static, bool>>,
 }
 
 impl AssetOptions {
@@ -40,6 +44,7 @@ impl AssetOptions {
         extension: None,
         checksum: None,
         content_type: None,
+        embed: None,
     };
 
     /// Returns the configured [`rename`](Self::rename) value, if any.
@@ -66,11 +71,22 @@ impl AssetOptions {
         self.content_type.as_deref()
     }
 
+    /// Returns the configured [`embed`](Self::embed) value.
+    #[must_use]
+    pub fn embed(&self) -> bool {
+        self.embed.as_ref().is_some_and(|embed| **embed)
+    }
+
     pub(crate) const fn encode_into(&self, w: &mut ConstWriter<'_>) {
         w.write_str_opt(cow_as_str(self.rename.as_ref()));
         w.write_str_opt(cow_as_str(self.extension.as_ref()));
         w.write_str_opt(cow_as_str(self.checksum.as_ref()));
         w.write_str_opt(cow_as_str(self.content_type.as_ref()));
+        w.write_bool(match self.embed {
+            Some(Cow::Borrowed(bool)) => *bool,
+            Some(Cow::Owned(bool)) => bool,
+            None => false,
+        });
     }
 
     pub(crate) const fn hash_into(&self, mut h: Fnv1a<u64>) -> Fnv1a<u64> {
@@ -78,6 +94,17 @@ impl AssetOptions {
         h = hash_opt_str(h, cow_as_str(self.extension.as_ref()));
         h = hash_opt_str(h, cow_as_str(self.checksum.as_ref()));
         h = hash_opt_str(h, cow_as_str(self.content_type.as_ref()));
+        h = h.write(&[
+            if match self.embed {
+                Some(Cow::Borrowed(bool)) => *bool,
+                Some(Cow::Owned(bool)) => bool,
+                None => false,
+            } {
+                1u8
+            } else {
+                0u8
+            },
+        ]);
         h
     }
 
@@ -87,6 +114,7 @@ impl AssetOptions {
             extension: r.read_str_opt()?.map(|s| Cow::Owned(s.to_owned())),
             checksum: r.read_str_opt()?.map(|s| Cow::Owned(s.to_owned())),
             content_type: r.read_str_opt()?.map(|s| Cow::Owned(s.to_owned())),
+            embed: Some(Cow::Owned(r.read_bool()?)),
         })
     }
 }
@@ -122,7 +150,7 @@ macro_rules! asset_options {
     ($($field:ident $(: $expr:expr)?),* $(,)?) => {{
         #[allow(clippy::needless_update)]
         $crate::AssetOptions {
-            $($field: ::core::option::Option::Some(::std::borrow::Cow::Borrowed($($expr)?)),)*
+            $($field: ::core::option::Option::Some(::std::borrow::Cow::Borrowed(& $($expr)?)),)*
             ..$crate::AssetOptions::NONE
         }
     }};

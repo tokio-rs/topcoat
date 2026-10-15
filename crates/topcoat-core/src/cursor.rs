@@ -18,6 +18,10 @@ impl<'a> ConstWriter<'a> {
         }
     }
 
+    pub const fn write_bool(&mut self, v: bool) {
+        self.write_bytes(&[if v { 1u8 } else { 0u8 }]);
+    }
+
     pub const fn write_u16_le(&mut self, v: u16) {
         self.write_bytes(&v.to_le_bytes());
     }
@@ -68,6 +72,14 @@ impl<'a> ConstReader<'a> {
         };
         self.pos += n;
         Some(head)
+    }
+
+    pub const fn read_bool(&mut self) -> Option<bool> {
+        match self.read_bytes(1) {
+            Some([0]) => Some(false),
+            Some([1]) => Some(true),
+            _ => None,
+        }
     }
 
     pub const fn read_u16_le(&mut self) -> Option<u16> {

@@ -282,6 +282,10 @@ fn normalize(path: &Path) -> PathBuf {
 /// Named arguments configure [`AssetOptions`]. For example, `rename: "logo"`
 /// changes the output stem, and `checksum: "sha256:<hex>"` verifies the source.
 ///
+/// `embed: true` embeds the asset into the compiled executable instead of bundling
+/// it into a separate directory. This is only supported for asset paths starting with
+/// "./", "../", and "/".
+///
 /// Output filenames include a content hash, such as
 /// `logo-1a2b3c4d5e6f7a8b.png`. Declarations that produce the same filename must
 /// agree on its content type. To serve one file with different content types,
