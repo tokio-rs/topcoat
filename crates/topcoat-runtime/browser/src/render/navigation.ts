@@ -1,4 +1,8 @@
+import { dehydrate } from "../expression/dehydrate";
+import type { DehydratedSurrogate } from "../expression/serialized";
 import type { Runtime } from "../runtime";
+import type { Scope } from "../scope";
+import type { SignalId } from "../signal-registry";
 import { newRender, type RenderToken } from "./frames";
 import { PageRequest, type PageResponseHead, PrefetchCache } from "./prefetch";
 
@@ -238,6 +242,10 @@ export class NavigationController {
 
 		const { page } = this.runtime;
 		const render = newRender();
+		const { signals } = JSON.parse(request.body) as {
+			signals: Record<SignalId, DehydratedSurrogate>;
+		};
+		const corrected = new WeakSet<Scope>();
 		let committed = false;
 		try {
 			for await (const frame of request.frames()) {
@@ -279,6 +287,7 @@ export class NavigationController {
 					case "error":
 						throw new Error(`Navigation render failed: ${frame.status}`);
 				}
+				if (committed) this.correctChangedSignals(signals, render, corrected);
 			}
 			// A response without a snapshot leaves nothing to show, so the
 			// browser loads the destination instead.
@@ -291,6 +300,41 @@ export class NavigationController {
 			}
 			this.runtime.reportError(error);
 		}
+	}
+
+	/**
+	 * Preserved signals may have changed while this response was loading.
+	 * Recheck each frame because a later swap can introduce a dependency.
+	 * Correct each affected unit once, letting an enclosing correction cover
+	 * its children and leaving content from newer renders alone.
+	 */
+	private correctChangedSignals(
+		signals: Record<SignalId, DehydratedSurrogate>,
+		render: RenderToken,
+		corrected: WeakSet<Scope>,
+	): void {
+		const { registry, page } = this.runtime;
+		const changed = new Set<SignalId>();
+		for (const [id, value] of Object.entries(signals)) {
+			if (
+				registry.has(id) &&
+				JSON.stringify(dehydrate(registry.read(id))) !== JSON.stringify(value)
+			) {
+				changed.add(id);
+			}
+		}
+		if (changed.size === 0) return;
+
+		const visit = (scope: Scope) => {
+			if (scope.render !== render || corrected.has(scope)) return;
+			const unit = scope.unit;
+			if (unit?.contentScope === scope && unit.refreshIfChanged(changed)) {
+				corrected.add(scope);
+				return;
+			}
+			for (const child of scope.children) visit(child);
+		};
+		visit(page.contentScope);
 	}
 
 	/**

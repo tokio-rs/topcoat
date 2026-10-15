@@ -13,6 +13,9 @@ const FRAMES = "application/x-ndjson";
 let runtime: Runtime | null = null;
 
 beforeEach(() => {
+	for (const node of Array.from(document.childNodes)) {
+		if (node !== document.documentElement) document.removeChild(node);
+	}
 	history.replaceState(null, "", "/");
 	history.scrollRestoration = "auto";
 	vi.spyOn(location, "assign").mockImplementation(() => undefined);
@@ -67,14 +70,16 @@ type Call = { url: string; init: RequestInit };
  * Records each fetch request and calls `respond` with its URL path to
  * get the response.
  */
-function stubFetch(respond: (path: string) => Response | Promise<Response>) {
+function stubFetch(
+	respond: (path: string, init: RequestInit) => Response | Promise<Response>,
+) {
 	const calls: Call[] = [];
 	vi.stubGlobal(
 		"fetch",
 		async (input: RequestInfo | URL, init: RequestInit) => {
 			const url = String(input);
 			calls.push({ url, init });
-			return respond(new URL(url).pathname);
+			return respond(new URL(url, location.href).pathname, init);
 		},
 	);
 	return calls;
@@ -83,6 +88,15 @@ function stubFetch(respond: (path: string) => Response | Promise<Response>) {
 /** Sets up a document with `body` and starts the runtime. */
 function mount(body: string): Runtime {
 	document.documentElement.innerHTML = `<head><title>Home</title></head><body>${body}</body>`;
+	runtime = new Runtime();
+	runtime.start(document);
+	return runtime;
+}
+
+/** Mounts a complete response, including markers outside the html element. */
+function mountDocument(html: string): Runtime {
+	const next = new DOMParser().parseFromString(html, "text/html");
+	document.replaceChildren(...Array.from(next.childNodes));
 	runtime = new Runtime();
 	runtime.start(document);
 	return runtime;
@@ -155,6 +169,280 @@ it("follows a link in place, keeping the signals the destination declares again"
 	// Keep the browser's signal value instead of the new page's initial value.
 	expect(rt.registry.read("a")).toEqual(new F64(5));
 	expect(rt.registry.has("b")).toBe(false);
+});
+
+it.each([
+	"navigation",
+	"prefetch",
+])("corrects server content when a signal changes during a pending %s", async (loading) => {
+	const stream = streamed();
+	let requests = 0;
+	const content = (value: number) =>
+		page(
+			"Next",
+			`${declaration("a", value)}<!--::topcoat::dep("a")--><p>count ${value}</p>`,
+		);
+	const calls = stubFetch((_, init) => {
+		requests += 1;
+		if (requests === 1) return stream.response;
+		return snapshot(content(JSON.parse(init.body as string).signals.a));
+	});
+	const rt = mount(
+		`${declaration("a", 1)}<a data-topcoat-link="intent" href="/next">next</a>`,
+	);
+	if (loading === "prefetch") {
+		link().dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+		await settle();
+	}
+	click(link());
+	rt.context.signal("a").set(new F64(2));
+	await settle();
+	stream.push({ t: "snapshot", html: content(1) });
+	stream.close();
+	await settle();
+
+	expect(calls).toHaveLength(2);
+	expect(JSON.parse(calls[1]?.init.body as string)).toEqual({
+		signals: { a: 2 },
+	});
+	expect(rt.registry.read("a")).toEqual(new F64(2));
+	expect(document.body.textContent).toBe("count 2");
+	expect(location.pathname).toBe("/next");
+});
+
+it("corrects a layout dependency emitted before the document element", async () => {
+	const stream = streamed();
+	let requests = 0;
+	const content = (value: number) =>
+		`${declaration("a", value)}<!--::topcoat::dep("a")--><!DOCTYPE html>${page("Next", `<p>count ${value}</p>`)}`;
+	const calls = stubFetch((_, init) => {
+		requests += 1;
+		return requests === 1
+			? stream.response
+			: snapshot(content(JSON.parse(init.body as string).signals.a));
+	});
+	const rt = mountDocument(
+		`${declaration("a", 1)}<!DOCTYPE html>${page("Home", '<a data-topcoat-link="never" href="/next">next</a>')}`,
+	);
+	click(link());
+	rt.context.signal("a").set(new F64(2));
+	await settle();
+	stream.push({ t: "snapshot", html: content(1) });
+	stream.close();
+	await settle();
+
+	expect(calls).toHaveLength(2);
+	expect(JSON.parse(calls[1]?.init.body as string)).toEqual({
+		signals: { a: 2 },
+	});
+	expect(rt.registry.read("a")).toEqual(new F64(2));
+	expect(document.body.textContent).toBe("count 2");
+});
+
+it("replaces document-level markers while preserving the html element and doctype", async () => {
+	const calls = stubFetch(() =>
+		snapshot(
+			`${declaration("b", 3)}<!--::topcoat::dep("b")--><!DOCTYPE html>${page("Next", "<input data-topcoat-bind:value=\"cx.signal('b').get()\">")}<!--after next-->`,
+		),
+	);
+	const rt = mountDocument(
+		`${declaration("a", 1)}<!--::topcoat::dep("a")--><!DOCTYPE html>${page("Home", '<a data-topcoat-link="never" href="/next">next</a>')}<!--after home-->`,
+	);
+	const root = document.documentElement;
+	const doctype = document.doctype;
+	const previous = rt.context.signal("a");
+	click(link());
+	await settle();
+
+	expect(calls).toHaveLength(1);
+	expect(document.documentElement).toBe(root);
+	expect(document.doctype).toBe(doctype);
+	expect(rt.registry.has("a")).toBe(false);
+	expect(rt.registry.read("b")).toEqual(new F64(3));
+	expect([...rt.page.contentScope.collectDependencies()]).toEqual(["b"]);
+	expect(document.querySelector("input")?.value).toBe("3");
+	expect(Array.from(document.childNodes, (node) => node.nodeName)).toEqual([
+		"#comment",
+		"#comment",
+		"html",
+		"HTML",
+		"#comment",
+	]);
+	expect(document.lastChild?.nodeValue).toBe("after next");
+	previous.set(new F64(5));
+	await settle();
+	expect(calls).toHaveLength(1);
+});
+
+it.each([
+	"unchanged",
+	"unrelated",
+	"restored",
+])("does not rerender navigation content for %s signal values", async (change) => {
+	const stream = streamed();
+	const calls = stubFetch(() => stream.response);
+	const rt = mount(
+		`${declaration("a", 1)}${declaration("b", 1)}<a data-topcoat-link="never" href="/next">next</a>`,
+	);
+	click(link());
+	if (change === "unrelated") rt.context.signal("b").set(new F64(2));
+	if (change === "restored") {
+		rt.context.signal("a").set(new F64(2));
+		rt.context.signal("a").set(new F64(1));
+	}
+	await settle();
+	stream.push({
+		t: "snapshot",
+		html: page(
+			"Next",
+			`${declaration("a", 1)}${declaration("b", 1)}<!--::topcoat::dep("a")--><p>count 1</p><input data-topcoat-bind:value="cx.signal('b').get()">`,
+		),
+	});
+	stream.close();
+	await settle();
+
+	expect(calls).toHaveLength(1);
+	expect(document.body.textContent).toBe("count 1");
+	expect(document.querySelector("input")?.value).toBe(
+		change === "unrelated" ? "2" : "1",
+	);
+});
+
+it.each([
+	"argument",
+	"dependency",
+])("corrects only the nested shard whose %s changed while navigation loaded", async (input) => {
+	const stream = streamed();
+	const calls = stubFetch((path, init) => {
+		if (path === "/next") return stream.response;
+		const body = JSON.parse(init.body as string);
+		const value = input === "argument" ? body.args[0] : body.signals.a;
+		return snapshot(
+			`${input === "dependency" ? declaration("a", value) : ""}<p>count ${value}</p>`,
+		);
+	});
+	const rt = mount(
+		`${declaration("a", 1)}<a data-topcoat-link="never" href="/next">next</a>`,
+	);
+	click(link());
+	rt.context.signal("a").set(new F64(2));
+	await settle();
+	const exprs = input === "argument" ? `["cx.signal('a').get()"]` : "[]";
+	const inner = `${input === "dependency" ? `${declaration("a", 1)}<!--::topcoat::dep("a")-->` : ""}<p>count 1</p>`;
+	stream.push({
+		t: "snapshot",
+		html: page(
+			"Next",
+			`${input === "argument" ? declaration("a", 1) : ""}<!--::topcoat::shard::start("/outer", "outer", [])--><!--::topcoat::shard::start("/inner", "inner", ${exprs})-->${inner}<!--::topcoat::shard::end("inner")--><!--::topcoat::shard::end("outer")--><!--::topcoat::region::start(bb)--><!--::topcoat::region::end(bb)-->`,
+		),
+	});
+	await settle();
+	// A later frame must leave the independently corrected shard alone.
+	stream.push({ t: "swap", region: "bb", html: "<span></span>" });
+	stream.close();
+	await settle();
+
+	expect(
+		calls.map((call) => new URL(call.url, location.href).pathname),
+	).toEqual(["/next", "/inner"]);
+	expect(JSON.parse(calls[1]?.init.body as string)).toEqual(
+		input === "argument"
+			? { args: [2], signals: {} }
+			: { args: [], signals: { a: 2 } },
+	);
+	expect(rt.registry.read("a")).toEqual(new F64(2));
+	expect(document.body.textContent).toBe("count 2");
+});
+
+it("corrects a dependency introduced by a later navigation frame", async () => {
+	const stream = streamed();
+	let requests = 0;
+	const region = (body: string) =>
+		`<!--::topcoat::region::start(aa)-->${body}<!--::topcoat::region::end(aa)-->`;
+	const calls = stubFetch((_, init) => {
+		requests += 1;
+		if (requests === 1) return stream.response;
+		const value = JSON.parse(init.body as string).signals.a;
+		return snapshot(
+			page(
+				"Next",
+				`${declaration("a", value)}${region(`<!--::topcoat::dep("a")--><p>count ${value}</p>`)}`,
+			),
+		);
+	});
+	const rt = mount(
+		`${declaration("a", 1)}<a data-topcoat-link="never" href="/next">next</a>`,
+	);
+	click(link());
+	rt.context.signal("a").set(new F64(2));
+	await settle();
+	stream.push({
+		t: "snapshot",
+		html: page("Next", `${declaration("a", 1)}${region("loading")}`),
+	});
+	await settle();
+	expect(calls).toHaveLength(1);
+
+	stream.push({
+		t: "swap",
+		region: "aa",
+		html: '<!--::topcoat::dep("a")--><p>count 1</p>',
+	});
+	await settle();
+	expect(calls).toHaveLength(2);
+	expect(document.body.textContent).toBe("count 2");
+
+	stream.push({ t: "swap", region: "aa", html: "stale original response" });
+	stream.close();
+	await settle();
+	expect(calls).toHaveLength(2);
+	expect(document.body.textContent).toBe("count 2");
+});
+
+it("lets a pending page correction cover nested shards and later frames", async () => {
+	const stream = streamed();
+	let complete!: (response: Response) => void;
+	const correction = new Promise<Response>((resolve) => {
+		complete = resolve;
+	});
+	let requests = 0;
+	const calls = stubFetch(() => {
+		requests += 1;
+		return requests === 1 ? stream.response : correction;
+	});
+	const rt = mount(
+		`${declaration("a", 1)}<a data-topcoat-link="never" href="/next">next</a>`,
+	);
+	click(link());
+	rt.context.signal("a").set(new F64(2));
+	await settle();
+	stream.push({
+		t: "snapshot",
+		html: page(
+			"Next",
+			`${declaration("a", 1)}<!--::topcoat::dep("a")--><!--::topcoat::shard::start("/inner", "inner", [])--><!--::topcoat::region::start(aa)--><!--::topcoat::dep("a")--><p>count 1</p><!--::topcoat::region::end(aa)--><!--::topcoat::shard::end("inner")-->`,
+		),
+	});
+	await settle();
+	stream.push({
+		t: "swap",
+		region: "aa",
+		html: '<!--::topcoat::dep("a")--><p>still count 1</p>',
+	});
+	await settle();
+
+	expect(
+		calls.map((call) => new URL(call.url, location.href).pathname),
+	).toEqual(["/next", "/next"]);
+	expect(calls[1]?.init.signal?.aborted).toBe(false);
+	expect(JSON.parse(calls[1]?.init.body as string)).toEqual({
+		signals: { a: 2 },
+	});
+	complete(snapshot(page("Next", `${declaration("a", 2)}<p>count 2</p>`)));
+	stream.close();
+	await settle();
+	expect(calls).toHaveLength(2);
+	expect(document.body.textContent).toBe("count 2");
 });
 
 it.each([
