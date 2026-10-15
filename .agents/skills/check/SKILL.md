@@ -38,6 +38,8 @@ yarn build
 yarn test
 ```
 
+The runtime also has native browser tests. From `crates/topcoat-runtime/browser`, install Playwright's browsers with `yarn playwright install --with-deps chromium firefox webkit`, then run `yarn test:browser`. These tests run in Chromium, Firefox, and WebKit. `yarn test` excludes `*.browser.test.ts` files.
+
 The runtime and CLI embed their prebuilt `dist/index.js`; the runtime's coherence crate also embeds `dist/coherence.js`. CI rebuilds these files and rejects drift. Include regenerated bundles alongside source changes.
 
 ## New crates

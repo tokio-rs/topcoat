@@ -156,6 +156,8 @@ jobs:
       - run: yarn build
       - run: git diff --exit-code -- dist/index.js dist/coherence.js
       - run: yarn test
+      - run: yarn playwright install --with-deps chromium firefox webkit
+      - run: yarn test:browser
 
   dev:
     name: dev
