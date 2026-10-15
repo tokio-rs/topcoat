@@ -1,0 +1,10 @@
+{
+	"dialog": "() => (cx.hydrate({\"t\":\"ElementRef\",\"id\":\"tc-dialog\",\"kind\":\"dialog\"})).resolve()",
+	"html": "() => (cx.hydrate({\"t\":\"ElementRef\",\"id\":\"tc-container\",\"kind\":\"html\"})).resolve()",
+	"id": "(cx.hydrate({\"t\":\"ElementRef\",\"id\":\"tc-field\",\"kind\":\"input\"})).id().to_owned()",
+	"input": "() => (cx.hydrate({\"t\":\"ElementRef\",\"id\":\"tc-field\",\"kind\":\"input\"})).resolve()",
+	"keyed": "<input id=\"tc-o8KjPjrceZrqzxYkQwNo3g\" data-key=\"1\"><button data-key=\"1\" data-topcoat-on:click=\"(__local0) => { (cx.hydrate({&quot;t&quot;:&quot;ElementRef&quot;,&quot;id&quot;:&quot;tc-o8KjPjrceZrqzxYkQwNo3g&quot;,&quot;kind&quot;:&quot;input&quot;})).resolve().unwrap();  }\">Resolve</button><input id=\"tc-QdkljS6K1AE7LOPerN9JZw\" data-key=\"2\"><button data-key=\"2\" data-topcoat-on:click=\"(__local0) => { (cx.hydrate({&quot;t&quot;:&quot;ElementRef&quot;,&quot;id&quot;:&quot;tc-QdkljS6K1AE7LOPerN9JZw&quot;,&quot;kind&quot;:&quot;input&quot;})).resolve().unwrap();  }\">Resolve</button>",
+	"missing": "() => (cx.hydrate({\"t\":\"ElementRef\",\"id\":\"tc-field\",\"kind\":\"input\"})).resolve().unwrap_err().is_missing()",
+	"reordered": "<input id=\"tc-QdkljS6K1AE7LOPerN9JZw\" data-key=\"2\"><button data-key=\"2\" data-topcoat-on:click=\"(__local0) => { (cx.hydrate({&quot;t&quot;:&quot;ElementRef&quot;,&quot;id&quot;:&quot;tc-QdkljS6K1AE7LOPerN9JZw&quot;,&quot;kind&quot;:&quot;input&quot;})).resolve().unwrap();  }\">Resolve</button><input id=\"tc-o8KjPjrceZrqzxYkQwNo3g\" data-key=\"1\"><button data-key=\"1\" data-topcoat-on:click=\"(__local0) => { (cx.hydrate({&quot;t&quot;:&quot;ElementRef&quot;,&quot;id&quot;:&quot;tc-o8KjPjrceZrqzxYkQwNo3g&quot;,&quot;kind&quot;:&quot;input&quot;})).resolve().unwrap();  }\">Resolve</button>",
+	"wrong_type": "() => (cx.hydrate({\"t\":\"ElementRef\",\"id\":\"tc-field\",\"kind\":\"input\"})).resolve().unwrap_err().is_wrong_type()"
+}

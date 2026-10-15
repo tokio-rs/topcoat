@@ -6,11 +6,14 @@
 	"scripts": {
 		"lint": "biome ci --config-path . . ../../topcoat-core/browser",
 		"build": "tsup && tsup --config tsup.coherence.config.ts && tsc",
-		"test": "vitest run"
+		"test": "vitest run",
+		"test:browser": "vitest run --config vitest.browser.config.ts"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.15",
+		"@vitest/browser-playwright": "4.1.10",
 		"happy-dom": "^20.14.0",
+		"playwright": "1.62.1",
 		"tsup": "^8.5.1",
 		"typescript": "^6.0.3",
 		"vite": "^8.1.5",

@@ -65,6 +65,7 @@ Runtime types expose a subset of their Rust APIs:
 - Tuples of vocabulary types: literals such as `(count.get(), "items")`, field access such as `pair.0`, and `clone`. Empty tuples `()` and single-element tuples `(value,)` are supported. A field of a borrowed tuple, such as `values.index(0).0`, borrows the element. A tuple renders its elements one after another with no separator. Tuples do not support comparisons.
 - Structs with [`#[record]`](attr.record.html): create values with struct literals and access fields by name, such as `order.id`. Access through a borrowed record borrows the field. Records that implement `Clone` also support `clone`. Expressions cannot compare records or render them directly.
 - [`Signal`]: `get` and `set`, plus a shorter spelling for common writes: `toggle` on a `bool` signal, `increment` and `decrement` on a numeric signal, and `push_str` on a `String` signal.
+- [`ElementRef`](struct.ElementRef.html): `id`, `clone`, and browser-only `resolve`. Capture a reference built from `view::element_id(cx)` and resolve it inside a handler closure. Each call finds the current element or returns a missing/wrong-type error. Resolved handles cannot be serialized. See [element references](index.html#element-references).
 
 Operations follow Rust semantics in both languages. For strings, `len` counts UTF-8 bytes, comparisons use code point order, and trimming uses Unicode `White_Space`. This means trimming keeps U+FEFF and removes U+0085.
 
