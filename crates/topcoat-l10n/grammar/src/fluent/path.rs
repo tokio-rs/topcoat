@@ -1,9 +1,13 @@
+use proc_macro2::Span;
 use syn::{
     LitStr,
     parse::{Parse, ParseStream},
 };
+use topcoat_core_grammar::ParseOption;
 
 const PLACEHOLDER: &str = "{locale}";
+const MODULE: &str = "{mod}";
+const DEFAULT: &str = "{mod}/l10n/{locale}.ftl";
 
 /// A path to Fluent files with a `{locale}` placeholder, such as
 /// `"./l10n/{locale}.ftl"` or `"./**/l10n/{locale}/**/*.ftl"`.
@@ -15,8 +19,13 @@ const PLACEHOLDER: &str = "{locale}";
 /// - `*` matches any characters within a single path component.
 /// - `**` matches zero or more directories and must be a whole path component.
 ///
+/// The path may start with a `{mod}` component, which stands for the directory
+/// of the invoking module. That is the directory where its child modules live,
+/// such as `src/about/` for both `src/about.rs` and `src/about/mod.rs`.
+///
 /// `*` cannot appear in the same path component as `{locale}`. Other braces,
 /// `?`, `[` and `]` are reserved and rejected.
+#[derive(Clone)]
 pub struct PathPattern {
     /// The path as written.
     pub lit: LitStr,
@@ -40,7 +49,31 @@ impl PathPattern {
             1 => {}
             _ => return Err("expected exactly one `{locale}` placeholder in the path"),
         }
-        path.split('/').map(PathComponent::parse).collect()
+        path.split('/')
+            .enumerate()
+            .map(|(index, component)| match component {
+                MODULE if index == 0 => Ok(PathComponent::Module),
+                _ if component.contains(MODULE) => {
+                    Err("`{mod}` must be the whole first path component")
+                }
+                _ => PathComponent::parse(component),
+            })
+            .collect()
+    }
+}
+
+/// The default path, `"{mod}/l10n/{locale}.ftl"`.
+impl Default for PathPattern {
+    fn default() -> Self {
+        Self {
+            lit: LitStr::new(DEFAULT, Span::call_site()),
+        }
+    }
+}
+
+impl ParseOption for PathPattern {
+    fn peek(input: ParseStream) -> bool {
+        input.peek(LitStr)
     }
 }
 
@@ -56,6 +89,8 @@ impl Parse for PathPattern {
 /// One `/`-separated component of a [`PathPattern`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PathComponent {
+    /// `{mod}`, the directory of the invoking module.
+    Module,
     /// A name without wildcards or placeholders.
     Literal(String),
     /// A name containing `*` wildcards, as written.
@@ -151,6 +186,43 @@ mod tests {
                 PathComponent::Wildcard("*.ftl".to_owned()),
             ]
         );
+    }
+
+    #[test]
+    fn default_is_a_valid_pattern() {
+        // `components` panics on an invalid pattern.
+        assert_eq!(
+            PathPattern::default().components().first(),
+            Some(&PathComponent::Module)
+        );
+    }
+
+    #[test]
+    fn accepts_a_leading_module_directory() {
+        let pattern = parse("{mod}/l10n/{locale}.ftl").unwrap();
+        assert_eq!(
+            pattern.components(),
+            [
+                PathComponent::Module,
+                literal("l10n"),
+                PathComponent::Locale {
+                    prefix: String::new(),
+                    suffix: ".ftl".to_owned(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn rejects_a_module_directory_after_the_start() {
+        assert!(parse("./{mod}/{locale}.ftl").is_err());
+        assert!(parse("l10n/{mod}/{locale}.ftl").is_err());
+    }
+
+    #[test]
+    fn rejects_a_module_directory_within_a_component() {
+        assert!(parse("{mod}-x/{locale}.ftl").is_err());
+        assert!(parse("{mod}{locale}.ftl").is_err());
     }
 
     #[test]

@@ -5292,7 +5292,9 @@ dependencies = [
 name = "topcoat-l10n-grammar"
 version = "0.10.0"
 dependencies = [
+ "proc-macro2",
  "syn 3.0.6",
+ "topcoat-core-grammar",
 ]
 
 [[package]]
