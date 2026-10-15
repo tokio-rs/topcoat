@@ -34,6 +34,10 @@ export class Slice<T> {
 		return new Bool(this.start === this.end);
 	}
 
+	iter(): SliceIter<T> {
+		return new SliceIter(this.items, this.usizeType, this.start, this.end);
+	}
+
 	get(index: Integer): Option<Ref<T> & T> {
 		const offset = index.toIndex(this.end - this.start, this.usizeType.bits);
 		return offset === undefined
@@ -66,6 +70,28 @@ export class Slice<T> {
 
 	to_owned(): Vec<T> {
 		return this.to_vec();
+	}
+}
+
+/** A borrowed cursor. Each position call consumes the visited elements. */
+class SliceIter<T> {
+	constructor(
+		private readonly items: readonly T[],
+		private readonly usizeType: IntegerType,
+		private cursor: number,
+		private readonly end: number,
+	) {}
+
+	position(predicate: (item: Ref<T> & T) => Bool): Option<Integer> {
+		const start = this.cursor;
+		while (this.cursor < this.end) {
+			const index = this.cursor++;
+			const item = Ref.shared(() => this.items[index] as T);
+			if (predicate(item).dehydrate()) {
+				return Option.some(new Integer(BigInt(index - start), this.usizeType));
+			}
+		}
+		return Option.none();
 	}
 }
 
