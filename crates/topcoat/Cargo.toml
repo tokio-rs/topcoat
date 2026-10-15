@@ -40,6 +40,7 @@ full = [
 	"icon",
 	"icon-iconify",
 	"l10n",
+	"l10n-fluent",
 	"mail",
 	"mail-smtp",
 	"multipart",
@@ -114,6 +115,11 @@ icon-iconify = [
 ]
 l10n = [
 	"dep:topcoat-l10n",
+]
+l10n-fluent = [
+	"l10n",
+	"dep:topcoat-l10n-macro",
+	"topcoat-l10n-macro/fluent",
 ]
 mail = [
 	"dep:topcoat-mail",
@@ -198,6 +204,7 @@ topcoat-htmx = { workspace = true, optional = true }
 topcoat-icon = { workspace = true, optional = true }
 topcoat-icon-macro = { workspace = true, optional = true }
 topcoat-l10n = { workspace = true, optional = true }
+topcoat-l10n-macro = { workspace = true, optional = true }
 topcoat-mail = { workspace = true, optional = true }
 topcoat-mail-macro = { workspace = true, optional = true }
 topcoat-router = { workspace = true, optional = true }

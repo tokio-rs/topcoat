@@ -5038,6 +5038,7 @@ dependencies = [
  "topcoat-icon",
  "topcoat-icon-macro",
  "topcoat-l10n",
+ "topcoat-l10n-macro",
  "topcoat-mail",
  "topcoat-mail-macro",
  "topcoat-router",
@@ -5285,6 +5286,20 @@ dependencies = [
  "topcoat-core",
  "topcoat-router",
  "topcoat-view",
+]
+
+[[package]]
+name = "topcoat-l10n-grammar"
+version = "0.10.0"
+dependencies = [
+ "syn 3.0.6",
+]
+
+[[package]]
+name = "topcoat-l10n-macro"
+version = "0.10.0"
+dependencies = [
+ "topcoat-l10n-grammar",
 ]
 
 [[package]]
