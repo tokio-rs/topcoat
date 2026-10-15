@@ -4,8 +4,8 @@ use ref_cast::RefCast;
 use serde::{Deserialize, Serialize, de};
 
 use crate::{
-    Signal, SignalId, StrSurrogate, Surrogate, Surrogated, impl_surrogate, impl_surrogate_mut,
-    impl_surrogate_ref,
+    Signal, SignalId, StrSurrogate, Surrogate, Surrogated, U64Surrogate, impl_surrogate,
+    impl_surrogate_mut, impl_surrogate_ref,
 };
 
 #[derive(Debug, RefCast)]
@@ -16,6 +16,32 @@ impl<T> SignalSurrogate<T> {
     #[inline]
     pub(crate) const fn new(v: Signal<T>) -> Self {
         Self(v)
+    }
+
+    /// Returns the browser handle's successful-write count as a `u64`.
+    ///
+    /// Starts at zero and advances once per committed write, including equal
+    /// values. Reading it in a browser effect subscribes to writes separately
+    /// from value changes. Effects remain batched and may skip intermediate
+    /// revisions. A read does not flush effects or call user code.
+    ///
+    /// Aliases and adopted declarations share the handle's count. Removing
+    /// and recreating a signal starts a new lifetime. Compare checkpoints only
+    /// within the same handle's lifetime. The counter is not serialized as
+    /// signal metadata. The returned `u64` can be stored or sent as an ordinary
+    /// value, but cannot seed or restore a handle's counter.
+    /// A failed updater does not commit, but its side effects, including nested
+    /// successful writes, are not rolled back. At `u64::MAX`, further commits
+    /// fail without changing the value or revision.
+    ///
+    /// # Panics
+    ///
+    /// Always panics on the server. Call this only in browser expressions,
+    /// such as event-handler bodies.
+    #[must_use]
+    #[track_caller]
+    pub fn write_revision(&self) -> U64Surrogate {
+        panic!("signal write revisions can only be read in browser expressions");
     }
 }
 
@@ -280,6 +306,17 @@ mod tests {
             "v": "shoes",
         }))
         .unwrap_err();
+    }
+
+    #[test]
+    fn write_revision_panics_server_side_without_value_bounds() {
+        struct NoVocabulary;
+        assert!(
+            std::panic::catch_unwind(|| {
+                let _: U64Surrogate = surrogate(NoVocabulary).write_revision();
+            })
+            .is_err()
+        );
     }
 
     #[test]

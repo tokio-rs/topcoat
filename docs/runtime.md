@@ -87,6 +87,36 @@ A signal is cheap to clone. Runtime expressions can share it, and components can
 
 In the browser, an expression runs again whenever a signal it reads changes. `.get()` reads the current value and `.set(...)` replaces it. Use an event handler to change `count` when the user clicks a button.
 
+## Browser write checkpoints
+
+Inside a browser expression, `signal.write_revision()` returns a `u64` counting committed writes to that signal's handle. Use it to check whether a write happened after a saved checkpoint, even if the value is equal or changed from A to B and back to A. The count starts at zero and advances for every successful write, including writes through mutation helpers and references.
+
+```rust
+# use topcoat::{Result, context::Cx, runtime::signal, view::*};
+# #[component]
+# async fn example(cx: &Cx) -> Result<impl View> {
+let open = signal(cx, || false);
+let written = signal(cx, || false);
+
+Ok(view! {
+    <button @click=$(|_e| {
+        let checkpoint = open.write_revision();
+        open.set(false);
+        written.set(open.write_revision() != checkpoint);
+    })>"Check a write"</button>
+    <p>"Written: " $(written.get())</p>
+})
+# }
+```
+
+Reading the revision in a browser effect subscribes that effect to writes, separately from ordinary value changes. Existing untracked execution stays untracked. Effects remain batched, so they may observe only the latest revision. Reading a revision does not run effects or user callbacks. Writes during an effect still notify other subscribers without scheduling that effect again.
+
+Revisions belong to the browser handle. Aliases share them, and declaration adoption preserves them when content is replaced. Hydration, reads, and serialization do not advance them. Removing a signal and later recreating its declaration starts a fresh lifetime at zero. Compare checkpoints only within the same handle's lifetime; equal numbers from different handles do not imply shared history.
+
+A failed updater does not commit a write. Its side effects are not rolled back, including successful nested writes. Commits are counted after their updater returns. Once the count reaches `u64::MAX`, the next commit fails without changing the value or revision. Updater side effects can still occur before this check.
+
+`write_revision()` is browser-only and panics during server evaluation. Use it in browser-executed code, such as an event-handler body, rather than an expression that the server evaluates for initial HTML. The runtime does not include the counter as metadata in signal declarations, captures, or server requests. The returned `u64` is an ordinary value that you can deliberately store in a signal or submit to the server. Such a value cannot seed or restore a browser handle's counter. See [`SignalSurrogate::write_revision`](struct.SignalSurrogate.html#method.write_revision).
+
 # Event handlers
 
 An attribute starting with `@` attaches a DOM event handler, such as `@click`. Its value is a runtime expression returning a closure. The browser calls that closure when the event fires:

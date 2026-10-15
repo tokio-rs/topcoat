@@ -4,15 +4,21 @@ import type { WriteSignal as SignalHandle } from "../reactivity";
 import type { SignalId } from "../signal-registry";
 import type { Bool } from "./bool";
 import { F64 } from "./f64";
-import { Integer } from "./integer";
+import { Integer, integerType } from "./integer";
 import { cloneValue, Ref } from "./ref";
 import { String as RuntimeString, type Str } from "./string";
+
+const revisionType = integerType("u64", 64);
 
 export class WriteSignal<T> {
 	constructor(
 		private readonly id: SignalId,
 		private readonly inner: SignalHandle<T>,
 	) {}
+
+	write_revision(): Integer {
+		return new Integer(this.inner.write_revision(), revisionType);
+	}
 
 	read(): Ref<T> {
 		return new Ref(

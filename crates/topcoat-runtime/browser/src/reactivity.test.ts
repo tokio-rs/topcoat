@@ -237,3 +237,172 @@ it("does not duplicate a manual flush when its microtask arrives", async () => {
 	await Promise.resolve();
 	expect(callback).toHaveBeenCalledTimes(3);
 });
+
+it("counts equal writes separately from ordinary value notifications", () => {
+	const initial = {};
+	const value = signal<unknown>(initial);
+	const values = vi.fn(() => value());
+	const revisions: bigint[] = [];
+	watch(values);
+	watch(() => revisions.push(value.write_revision()));
+	for (const next of [initial, {}, 0, -0, Number.NaN, Number.NaN]) {
+		value.set(next);
+		flushEffects();
+	}
+	expect(revisions).toEqual([0n, 1n, 2n, 3n, 4n, 5n, 6n]);
+	expect(values).toHaveBeenCalledTimes(5);
+});
+
+it("preserves the setter's signed-zero return and stored value", () => {
+	const value = signal(0);
+	expect(Object.is(value.set(-0), 0)).toBe(true);
+	expect(Object.is(value(), 0)).toBe(true);
+	expect(value.write_revision()).toBe(1n);
+});
+
+it("counts nested commits in commit order and keeps them after updater failure", () => {
+	const value = signal("A");
+	const seen: [string, bigint][] = [];
+	watch(() => seen.push([value(), value.write_revision()]));
+	expect(
+		value.set((previous) => {
+			expect(previous).toBe("A");
+			value.set("B");
+			expect(value.write_revision()).toBe(1n);
+			return "A";
+		}),
+	).toBe("A");
+	expect(value.write_revision()).toBe(2n);
+	const error = new Error("updater failed");
+	expect(() =>
+		value.set(() => {
+			throw error;
+		}),
+	).toThrow(error);
+	expect(value.write_revision()).toBe(2n);
+	expect(() =>
+		value.set(() => {
+			value.set("C");
+			throw error;
+		}),
+	).toThrow(error);
+	expect(value.write_revision()).toBe(3n);
+	flushEffects();
+	expect(seen).toEqual([
+		["A", 0n],
+		["C", 3n],
+	]);
+});
+
+it("batches dual subscriptions and reads coherent state without flushing", async () => {
+	const value = signal("A");
+	const seen: [bigint, string][] = [];
+	watch(() => seen.push([value.write_revision(), value()]));
+	value.set("B");
+	value.set("A");
+	value.set("A");
+	expect(value.write_revision()).toBe(3n);
+	expect(value()).toBe("A");
+	expect(seen).toEqual([[0n, "A"]]);
+	await Promise.resolve();
+	expect(seen).toEqual([
+		[0n, "A"],
+		[3n, "A"],
+	]);
+});
+
+it("replaces revision dependencies with value dependencies on the same handle", () => {
+	const revisions = signal(true);
+	const value = signal(0);
+	const callback = vi.fn(() =>
+		revisions() ? value.write_revision() : value(),
+	);
+	watch(callback);
+	value.set(0);
+	flushEffects();
+	expect(callback).toHaveBeenCalledTimes(2);
+	revisions.set(false);
+	flushEffects();
+	value.set(0);
+	flushEffects();
+	expect(callback).toHaveBeenCalledTimes(3);
+	value.set(1);
+	flushEffects();
+	expect(callback).toHaveBeenCalledTimes(4);
+	revisions.set(true);
+	flushEffects();
+	value.set(1);
+	flushEffects();
+	expect(callback).toHaveBeenCalledTimes(6);
+});
+
+it("untracks revision reads and restores tracking after an error", () => {
+	const ignored = signal(0);
+	const tracked = signal(0);
+	const error = new Error("read failed");
+	const callback = vi.fn(() => {
+		expect(() =>
+			untrack(() => {
+				untrack(() => ignored.write_revision());
+				throw error;
+			}),
+		).toThrow(error);
+		tracked.write_revision();
+	});
+	watch(callback);
+	ignored.set(0);
+	flushEffects();
+	expect(callback).toHaveBeenCalledTimes(1);
+	tracked.set(0);
+	flushEffects();
+	expect(callback).toHaveBeenCalledTimes(2);
+});
+
+it("revision self-writes notify other effects without scheduling the running effect", () => {
+	const value = signal(0);
+	const seen: bigint[] = [];
+	watch(() => seen.push(value.write_revision()));
+	const callback = vi.fn(() => {
+		value.write_revision();
+		value.set(0);
+	});
+	watch(callback);
+	flushEffects();
+	expect(callback).toHaveBeenCalledTimes(1);
+	expect(seen).toEqual([0n, 1n]);
+	value.set(0);
+	flushEffects();
+	expect(callback).toHaveBeenCalledTimes(2);
+	expect(seen.at(-1)).toBe(3n);
+});
+
+it("disposes pending and future revision subscriptions", async () => {
+	const value = signal(0);
+	const callback = vi.fn(() => value.write_revision());
+	const effect = watch(callback);
+	value.set(0);
+	effect.dispose();
+	await Promise.resolve();
+	value.set(0);
+	flushEffects();
+	effect.run();
+	expect(callback).toHaveBeenCalledTimes(1);
+});
+
+it("drains revision subscribers after errors and recovers for later writes", () => {
+	const value = signal(0);
+	const errors = [new Error("first"), new Error("second")];
+	for (const error of errors) {
+		watch(() => {
+			if (value.write_revision() === 1n) throw error;
+		});
+	}
+	const seen: bigint[] = [];
+	watch(() => seen.push(value.write_revision()));
+	value.set(0);
+	expect(flushEffects).toThrow(AggregateError);
+	expect(seen).toEqual([0n, 1n]);
+	value.set(0);
+	flushEffects();
+	expect(seen).toEqual([0n, 1n, 2n]);
+});

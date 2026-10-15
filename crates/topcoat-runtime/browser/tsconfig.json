@@ -10,7 +10,7 @@
 		"module": "esnext",
 		"target": "esnext",
 		"moduleResolution": "bundler",
-		"types": [],
+		"types": ["vitest/importMeta"],
 		// For nodejs:
 		// "lib": ["esnext"],
 		// "types": ["node"],
