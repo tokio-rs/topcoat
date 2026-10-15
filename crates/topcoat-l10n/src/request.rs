@@ -3,12 +3,12 @@ use topcoat_core::context::{Cx, app_context, memoize_cache, request_context};
 
 use crate::{Locale, SupportedLocales};
 
-/// Returns the locales the request accepts, most preferred first.
+/// Returns the locales listed in the request's `Accept-Language` header, most
+/// preferred first.
 ///
-/// They are read from the `Accept-Language` header and
-/// [canonicalized](Locale::canonicalize). Entries that fail to parse, the `*`
-/// wildcard, and entries with a weight of zero are skipped. The result is
-/// computed once per request.
+/// The locales are [canonicalized](Locale::canonicalize). Entries that fail to
+/// parse, the `*` wildcard, and entries with a weight of zero are skipped. The
+/// result is computed once per request.
 ///
 /// # Panics
 ///
@@ -16,7 +16,7 @@ use crate::{Locale, SupportedLocales};
 /// context).
 #[must_use]
 #[track_caller]
-pub fn request_locales(cx: &Cx) -> &[Locale] {
+pub fn accept_language(cx: &Cx) -> &[Locale] {
     memoize_cache(cx).memoize(cx, (), (), |cx, ()| {
         let headers = request_context::<Parts>(&cx)
             .headers
@@ -26,7 +26,7 @@ pub fn request_locales(cx: &Cx) -> &[Locale] {
 }
 
 /// Returns the locale for the request: the supported locale that best matches
-/// [`request_locales`], or the fallback.
+/// [`accept_language`], or the fallback.
 ///
 /// See [`SupportedLocales::negotiate`] for how locales are matched. The
 /// result is computed once per request.
@@ -40,7 +40,7 @@ pub fn request_locales(cx: &Cx) -> &[Locale] {
 pub fn locale(cx: &Cx) -> &Locale {
     memoize_cache(cx).memoize(cx, (), (), |cx, ()| {
         app_context::<SupportedLocales>(&cx)
-            .negotiate(request_locales(&cx))
+            .negotiate(accept_language(&cx))
             .clone()
     })
 }
@@ -184,13 +184,13 @@ mod tests {
         }
     }
 
-    async fn locale_for(accept_language: Option<&str>) -> String {
+    async fn locale_for(header: Option<&str>) -> String {
         let router = Router::builder()
             .route(CurrentLocale)
             .supported_locales([locale!("en"), locale!("de")])
             .build();
         let mut request = Request::builder().uri("/");
-        if let Some(value) = accept_language {
+        if let Some(value) = header {
             request = request.header(ACCEPT_LANGUAGE, value);
         }
         let request = request.body(Body::empty()).expect("request should build");
