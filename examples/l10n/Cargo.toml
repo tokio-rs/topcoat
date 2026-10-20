@@ -1,0 +1,12 @@
+[package]
+name = "l10n"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+topcoat = { workspace = true, features = ["l10n-fluent"] }
+
+[lints]
+workspace = true

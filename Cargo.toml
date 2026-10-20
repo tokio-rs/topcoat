@@ -50,6 +50,7 @@ members = [
     "examples/hello-world",
     "examples/htmx",
     "examples/icon",
+    "examples/l10n",
     "examples/live",
     "examples/mail",
     "examples/manual-router",

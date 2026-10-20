@@ -2657,6 +2657,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "l10n"
+version = "0.10.0"
+dependencies = [
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
