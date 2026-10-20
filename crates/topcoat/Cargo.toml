@@ -119,6 +119,7 @@ l10n = [
 l10n-fluent = [
 	"l10n",
 	"dep:topcoat-l10n-macro",
+	"topcoat-l10n/fluent",
 	"topcoat-l10n-macro/fluent",
 ]
 mail = [

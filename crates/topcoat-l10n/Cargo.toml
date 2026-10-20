@@ -11,6 +11,14 @@ categories.workspace = true
 rust-version.workspace = true
 
 [features]
+fluent = [
+	"dep:fixed_decimal",
+	"dep:fluent-bundle",
+	"dep:icu_decimal",
+	"dep:icu_provider",
+	"dep:intl-memoizer",
+	"dep:unic-langid",
+]
 router = [
 	"dep:topcoat-router",
 	"dep:http",
@@ -24,9 +32,15 @@ topcoat-core.workspace = true
 topcoat-router = { workspace = true, optional = true }
 topcoat-view = { workspace = true, optional = true }
 
+fixed_decimal = { workspace = true, optional = true, features = ["ryu"] }
+fluent-bundle = { workspace = true, optional = true }
 http = { workspace = true, optional = true }
+icu_decimal = { workspace = true, optional = true, features = ["alloc"] }
 icu_locale.workspace = true
 icu_locale_core = { workspace = true, features = ["alloc"] }
+icu_provider = { workspace = true, optional = true, features = ["sync"] }
+intl-memoizer = { workspace = true, optional = true }
+unic-langid = { workspace = true, optional = true }
 
 [dev-dependencies]
 http.workspace = true

@@ -5,6 +5,8 @@
 mod direction;
 mod error;
 mod extensions;
+#[cfg(feature = "fluent")]
+mod fluent;
 mod langid;
 mod locale;
 #[cfg(feature = "router")]
@@ -18,6 +20,8 @@ mod view;
 pub use direction::*;
 pub use error::*;
 pub use extensions::*;
+#[cfg(feature = "fluent")]
+pub use fluent::*;
 pub use langid::*;
 pub use locale::*;
 #[cfg(feature = "router")]
