@@ -1498,6 +1498,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "fluent-syntax"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54f0d287c53ffd184d04d8677f590f4ac5379785529e5e08b1c8083acdd5c198"
+dependencies = [
+ "memchr",
+ "thiserror",
+]
+
+[[package]]
 name = "fluent-uri"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5292,6 +5302,7 @@ dependencies = [
 name = "topcoat-l10n-grammar"
 version = "0.10.0"
 dependencies = [
+ "fluent-syntax",
  "icu_locale_core",
  "proc-macro2",
  "quote",

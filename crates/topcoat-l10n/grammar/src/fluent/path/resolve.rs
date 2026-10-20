@@ -204,14 +204,14 @@ fn walk(
         }
         PathComponent::Locale { prefix, suffix } => {
             for (name, _) in entries(dir)? {
-                let matched = name
+                let found = name
                     .strip_prefix(prefix.as_str())
                     .and_then(|name| name.strip_suffix(suffix.as_str()));
-                if let Some(matched) = matched
-                    && !matched.is_empty()
+                if let Some(found) = found
+                    && !found.is_empty()
                     && is_visible(&name, prefix)
                 {
-                    walk(&dir.join(&name), rest, Some(matched), matches)?;
+                    walk(&dir.join(&name), rest, Some(found), matches)?;
                 }
             }
             Ok(())

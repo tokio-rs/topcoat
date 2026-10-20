@@ -6,7 +6,7 @@ use syn::{
 };
 use topcoat_core_grammar::ParseOption;
 
-use crate::fluent::{CallSite, PathPattern};
+use crate::fluent::{CallSite, LocaleResources, PathPattern};
 
 /// The input of a `messages!` invocation: an optional visibility followed by
 /// an optional path of the Fluent files to load.
@@ -30,17 +30,42 @@ impl Messages {
     }
 
     /// Generates the `msg` module for the files matched by the path from
-    /// `call_site`, or a compile error if they cannot be found.
+    /// `call_site`, or compile errors if they cannot be found or parsed.
     #[must_use]
     pub fn expand(&self, call_site: &CallSite) -> TokenStream {
-        let _locales = match self.path().resolve(call_site) {
+        let path = self.path();
+        let locales = match path.resolve(call_site) {
             Ok(locales) => locales,
             Err(err) => return err.to_compile_error(),
         };
+
+        // Including the files makes the compiler rebuild the crate when one of
+        // them changes, including after a syntax error.
+        let files = locales
+            .iter()
+            .flat_map(|locale| &locale.files)
+            .map(|file| file.to_string_lossy());
+        let tracked = quote! {
+            #(const _: &str = ::core::include_str!(#files);)*
+        };
+
+        let span = path.lit.span();
+        let mut resources = Vec::with_capacity(locales.len());
+        let mut errors = Vec::new();
+        for files in locales {
+            match LocaleResources::read(files, span) {
+                Ok(locale) => resources.push(locale),
+                Err(err) => errors.push(err.to_compile_error()),
+            }
+        }
+
         let vis = &self.vis;
-        // TODO: generate items from the locales' files.
+        // TODO: generate items from `resources`.
         quote! {
-            #vis mod msg {}
+            #vis mod msg {
+                #tracked
+            }
+            #(#errors)*
         }
     }
 }
