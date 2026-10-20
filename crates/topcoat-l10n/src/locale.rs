@@ -11,7 +11,7 @@ use crate::{Extensions, LanguageIdentifier, LocaleParseError};
 /// A Unicode locale identifier, such as `en-US` or `th-TH-u-ca-buddhist`.
 ///
 /// It is a [`LanguageIdentifier`] followed by optional [`Extensions`]. Create
-/// one with the [`locale!`](crate::locale) macro for text known at compile
+/// one with the [`locale!`](macro@crate::locale) macro for text known at compile
 /// time, or parse one with [`str::parse`]. Parsing canonicalizes letter case
 /// and the order of variants and extensions, but keeps deprecated subtags;
 /// replace those with [`canonicalize`](Self::canonicalize).

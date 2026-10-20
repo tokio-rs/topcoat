@@ -25,7 +25,7 @@ quote.workspace = true
 syn.workspace = true
 
 [dev-dependencies]
-topcoat = { workspace = true, features = ["l10n-fluent"] }
+topcoat = { workspace = true, features = ["l10n-fluent", "view"] }
 
 [lints]
 workspace = true

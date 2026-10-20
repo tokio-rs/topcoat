@@ -24,3 +24,11 @@ pub fn messages(tokens: TokenStream) -> TokenStream {
             .into(),
     }
 }
+
+#[cfg(feature = "fluent")]
+#[doc = include_str!("../docs/fluent/t.md")]
+#[proc_macro]
+pub fn t(tokens: TokenStream) -> TokenStream {
+    let translate = syn::parse_macro_input!(tokens as topcoat_l10n_grammar::fluent::Translate);
+    quote::quote! { #translate }.into()
+}

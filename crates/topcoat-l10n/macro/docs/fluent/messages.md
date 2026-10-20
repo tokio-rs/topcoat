@@ -6,13 +6,13 @@ topcoat::l10n::fluent::messages!(pub(crate) "l10n/{locale}.ftl", fallback = "en"
 
 All arguments are optional. A visibility before the path applies to the generated module.
 
-The module contains a `CATALOG` static, a [`Catalog`](topcoat::l10n::Catalog) of the messages in every locale. Its [supported locales](topcoat::l10n::Catalog::supported_locales) are the locales that have files.
+The module contains a `CATALOG` static, a [`Catalog`] of the messages in every locale. Its [supported locales] are the locales that have files.
 
 # Messages
 
 Each message has a module named after its ID, with hyphens replaced by underscores, such as `msg::login_input` for `login-input`. An ID that is a Rust keyword becomes a raw identifier, such as `msg::r#type`.
 
-The module holds an `Args` struct with a field for each variable the message uses in any locale, including the variables of the messages it references. Its `format` function returns a [`Translation`](topcoat::l10n::Translation), which renders in a view as the message in the locale of the scope, or turns into text with [`resolve`](topcoat::l10n::Translation::resolve):
+The module holds an `Args` struct with a field for each variable the message uses in any locale, including the variables of the messages it references. Its `format` function returns a [`Translation`], which renders in a view as the message in the locale of the scope, or turns into text with [`resolve`]:
 
 ```rust
 # use topcoat::context::Cx;
@@ -23,6 +23,8 @@ assert_eq!(hello.resolve(&Cx::default()), "Hello, world!");
 ```
 
 Each attribute of a message has a module within the message's module, such as `msg::login_input::placeholder`, with its own `Args` and `format`.
+
+[`t!`] is a shorthand for calling `format`, such as `t!(msg::login_input.placeholder)`.
 
 # Fallback
 
@@ -55,3 +57,8 @@ pub mod strings {
 ```
 
 [Fluent]: https://projectfluent.org/
+[`Catalog`]: ../struct.Catalog.html
+[supported locales]: ../struct.Catalog.html#method.supported_locales
+[`Translation`]: ../struct.Translation.html
+[`resolve`]: ../struct.Translation.html#method.resolve
+[`t!`]: macro.t.html

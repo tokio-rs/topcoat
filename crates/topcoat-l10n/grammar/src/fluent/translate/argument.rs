@@ -1,4 +1,5 @@
 use proc_macro2::{Delimiter, Spacing, TokenStream, TokenTree};
+use quote::ToTokens;
 use syn::{
     Ident, Token,
     parse::{Parse, ParseStream},
@@ -67,6 +68,24 @@ impl TranslateArgument {
         self.value
             .as_ref()
             .is_none_or(|value| !value.tokens.is_empty())
+    }
+
+    /// Returns the expression of the argument: the written value, or the name
+    /// for a shorthand.
+    ///
+    /// A value that is still being typed becomes a compile error at its `=`,
+    /// so that the argument keeps its place in the expansion.
+    #[must_use]
+    pub fn value(&self) -> TokenStream {
+        match &self.value {
+            None => self.name.to_token_stream(),
+            Some(value) if value.tokens.is_empty() => syn::Error::new(
+                value.eq_token.span,
+                format!("expected a value for `{}` after `=`", self.name),
+            )
+            .to_compile_error(),
+            Some(value) => value.tokens.clone(),
+        }
     }
 }
 
@@ -341,6 +360,36 @@ mod tests {
                 ("name".to_owned(), Some(tokens("user"))),
             ]
         );
+    }
+
+    /// The expression of each argument.
+    fn values(input: &str) -> Vec<String> {
+        parse(input)
+            .unwrap()
+            .arguments
+            .iter()
+            .map(|argument| argument.value().to_string())
+            .collect()
+    }
+
+    #[test]
+    fn a_shorthand_is_its_own_value() {
+        assert_eq!(
+            values(", count = n + 1, name"),
+            [tokens("n + 1"), tokens("name")]
+        );
+    }
+
+    #[test]
+    fn a_value_being_typed_is_a_compile_error() {
+        let values = values(", count =, name");
+        assert!(values[0].contains("compile_error"), "{}", values[0]);
+        assert!(
+            values[0].contains("expected a value for `count`"),
+            "{}",
+            values[0]
+        );
+        assert_eq!(values[1], tokens("name"));
     }
 
     #[test]
