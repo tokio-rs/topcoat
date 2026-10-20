@@ -1,4 +1,5 @@
 mod counter;
+mod mount;
 mod procedure;
 mod record;
 mod shard;
@@ -58,6 +59,8 @@ async fn layout(slot: Slot<'_>) -> Result<impl View> {
                     link(href: href!(shard::page), "shard")
                     " | "
                     link(href: href!(record::page), "record")
+                    " | "
+                    link(href: href!(mount::page), "mount")
                 </nav>
 
                 <hr>
