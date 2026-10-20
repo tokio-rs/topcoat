@@ -181,6 +181,9 @@ fn walk(
         PathComponent::Literal(name) if name.is_empty() || name == "." => {
             walk(dir, rest, locale, matches)
         }
+        PathComponent::Literal(name) if name == ".." => {
+            walk(dir.parent().unwrap_or(dir), rest, locale, matches)
+        }
         PathComponent::Literal(name) => walk(&dir.join(name), rest, locale, matches),
         PathComponent::Wildcard(pattern) => {
             for (name, _) in entries(dir)? {
