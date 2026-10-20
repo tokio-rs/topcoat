@@ -9,7 +9,7 @@ use syn::{
     Token, Visibility,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::{ParseOption, paths::topcoat_l10n};
 
 use crate::fluent::{CallSite, LocaleFiles, LocaleResources, PathPattern};
 
@@ -94,24 +94,24 @@ impl Messages {
             Err(err) => return err.to_compile_error(),
         };
 
+        let mut errors = Vec::new();
+        let catalog = match self.fallback(&locales) {
+            Ok(fallback) => Some(Self::catalog(fallback, &locales)),
+            Err(err) => {
+                errors.push(err.to_compile_error());
+                None
+            }
+        };
+
         // Including the files makes the compiler rebuild the crate when one of
-        // them changes, including after a syntax error.
+        // them changes. The catalog includes them, so they are only included
+        // on their own when there is no catalog because of an error.
         let files = locales
             .iter()
             .flat_map(|locale| &locale.files)
             .map(|file| file.to_string_lossy());
         let tracked = quote! {
             #(const _: &str = ::core::include_str!(#files);)*
-        };
-
-        let mut errors = Vec::new();
-        // TODO: generate the catalog with the fallback.
-        let _fallback = match self.fallback(&locales) {
-            Ok(fallback) => Some(fallback.clone()),
-            Err(err) => {
-                errors.push(err.to_compile_error());
-                None
-            }
         };
 
         let span = path.lit.span();
@@ -123,13 +123,44 @@ impl Messages {
             }
         }
 
+        let body = match catalog {
+            Some(catalog) if errors.is_empty() => catalog,
+            _ => tracked,
+        };
         let vis = &self.vis;
         // TODO: generate items from `resources`.
         quote! {
             #vis mod msg {
-                #tracked
+                #body
             }
             #(#errors)*
+        }
+    }
+
+    /// Generates the `CATALOG` static, which loads the files of `locales` and
+    /// takes missing messages from `fallback`.
+    fn catalog(fallback: &LanguageIdentifier, locales: &[LocaleFiles]) -> TokenStream {
+        let new_locale = |locale: &LanguageIdentifier| {
+            let locale = locale.to_string();
+            quote! {
+                #topcoat_l10n::Locale::try_from_str(#locale)
+                    .expect("the locale is validated by `messages!`")
+            }
+        };
+        let fallback = new_locale(fallback);
+        let entries = locales.iter().map(|files| {
+            let locale = new_locale(&files.locale);
+            let sources = files.files.iter().map(|file| file.to_string_lossy());
+            quote! {
+                (#locale, &[#(::core::include_str!(#sources)),*][..])
+            }
+        });
+        quote! {
+            /// The translations of the messages in this module.
+            pub static CATALOG: ::std::sync::LazyLock<#topcoat_l10n::Catalog> =
+                ::std::sync::LazyLock::new(|| {
+                    #topcoat_l10n::Catalog::new(#fallback, [#(#entries),*])
+                });
         }
     }
 }

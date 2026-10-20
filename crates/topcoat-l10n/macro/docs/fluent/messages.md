@@ -1,10 +1,16 @@
 Creates a module named `msg` for a set of [Fluent] files.
 
 ```rust
-topcoat::l10n::fluent::messages!(pub(crate) "l10n/{locale}.ftl");
+topcoat::l10n::fluent::messages!(pub(crate) "l10n/{locale}.ftl", fallback = "en");
 ```
 
-Both arguments are optional. A visibility before the path applies to the generated module.
+All arguments are optional. A visibility before the path applies to the generated module.
+
+The module contains a `CATALOG` static, a [`Catalog`](topcoat::l10n::Catalog) of the messages in every locale. Its [supported locales](topcoat::l10n::Catalog::supported_locales) are the locales that have files.
+
+# Fallback
+
+A locale does not need to translate every message. A message that a locale lacks is taken from the fallback locale. When there are files for more than one locale, choose the fallback with `fallback = "..."`. It must be one of the locales that have files.
 
 # Paths
 
