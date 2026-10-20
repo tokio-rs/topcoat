@@ -5426,8 +5426,10 @@ dependencies = [
 name = "topcoat-l10n-macro"
 version = "0.10.0"
 dependencies = [
+ "http",
  "quote",
  "syn 3.0.6",
+ "tokio",
  "topcoat",
  "topcoat-l10n-grammar",
 ]

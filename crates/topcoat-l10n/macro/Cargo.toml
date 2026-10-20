@@ -25,7 +25,10 @@ quote.workspace = true
 syn.workspace = true
 
 [dev-dependencies]
-topcoat = { workspace = true, features = ["l10n-fluent", "view"] }
+topcoat = { workspace = true, features = ["l10n-fluent", "router", "view"] }
+
+http.workspace = true
+tokio = { workspace = true, features = ["macros", "rt"] }
 
 [lints]
 workspace = true
