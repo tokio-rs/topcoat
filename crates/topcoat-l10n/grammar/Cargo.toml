@@ -16,14 +16,19 @@ fluent = [
 	"dep:quote",
 	"dep:syn",
 	"dep:topcoat-core-grammar",
+	"dep:icu_locale_core",
 ]
 
 [dependencies]
 topcoat-core-grammar = { workspace = true, optional = true }
 
+icu_locale_core = { workspace = true, optional = true, features = ["alloc"] }
 proc-macro2 = { workspace = true, optional = true }
 quote = { workspace = true, optional = true }
 syn = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile.workspace = true
 
 [lints]
 workspace = true

@@ -1,12 +1,12 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::quote;
 use syn::{
     Visibility,
     parse::{Parse, ParseStream},
 };
 use topcoat_core_grammar::ParseOption;
 
-use crate::fluent::PathPattern;
+use crate::fluent::{CallSite, PathPattern};
 
 /// The input of a `messages!` invocation: an optional visibility followed by
 /// an optional path of the Fluent files to load.
@@ -28,6 +28,21 @@ impl Messages {
     pub fn path(&self) -> PathPattern {
         self.path.clone().unwrap_or_default()
     }
+
+    /// Generates the `msg` module for the files matched by the path from
+    /// `call_site`, or a compile error if they cannot be found.
+    #[must_use]
+    pub fn expand(&self, call_site: &CallSite) -> TokenStream {
+        let _locales = match self.path().resolve(call_site) {
+            Ok(locales) => locales,
+            Err(err) => return err.to_compile_error(),
+        };
+        let vis = &self.vis;
+        // TODO: generate items from the locales' files.
+        quote! {
+            #vis mod msg {}
+        }
+    }
 }
 
 impl Parse for Messages {
@@ -36,16 +51,6 @@ impl Parse for Messages {
             vis: input.parse()?,
             path: input.call(PathPattern::parse_option)?,
         })
-    }
-}
-
-impl ToTokens for Messages {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let vis = &self.vis;
-        quote! {
-            #vis mod msg {}
-        }
-        .to_tokens(tokens);
     }
 }
 
