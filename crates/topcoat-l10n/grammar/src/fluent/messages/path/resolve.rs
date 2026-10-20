@@ -1,5 +1,6 @@
 use std::{
     collections::{BTreeMap, BTreeSet, btree_map::Entry},
+    env,
     ffi::OsStr,
     fs::{self, FileType},
     io,
@@ -7,6 +8,7 @@ use std::{
 };
 
 use icu_locale_core::LanguageIdentifier;
+use proc_macro2::Span;
 
 use crate::fluent::{PathComponent, PathPattern};
 
@@ -34,6 +36,20 @@ impl CallSite {
             manifest_dir: std::path::absolute(manifest_dir)?,
             source_file: source_file.map(std::path::absolute).transpose()?,
         })
+    }
+
+    /// Creates the call site of the macro invocation being expanded: in the
+    /// crate that Cargo is compiling, invoked from the source file of
+    /// [`Span::call_site`].
+    ///
+    /// # Errors
+    ///
+    /// Fails when the current directory is needed but cannot be read.
+    pub fn current() -> io::Result<Self> {
+        let manifest_dir = env::var_os("CARGO_MANIFEST_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_default();
+        Self::new(&manifest_dir, Span::call_site().local_file().as_deref())
     }
 
     /// Returns the directory of the invoking module, where its child modules

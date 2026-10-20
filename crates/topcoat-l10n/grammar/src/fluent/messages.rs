@@ -7,7 +7,7 @@ pub use fallback::*;
 use icu_locale_core::LanguageIdentifier;
 pub use path::*;
 use proc_macro2::{Span, TokenStream};
-use quote::quote;
+use quote::{ToTokens, quote};
 pub use resource::*;
 pub use signature::*;
 use syn::{
@@ -180,6 +180,17 @@ impl Messages {
                     #topcoat_l10n::Catalog::new(#fallback, [#(#entries),*])
                 });
         }
+    }
+}
+
+/// Expands to the `msg` module, with the files found from the
+/// [call site](CallSite::current) of the invocation being expanded.
+impl ToTokens for Messages {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        tokens.extend(match CallSite::current() {
+            Ok(call_site) => self.expand(&call_site),
+            Err(err) => syn::Error::new(Span::call_site(), err).to_compile_error(),
+        });
     }
 }
 
