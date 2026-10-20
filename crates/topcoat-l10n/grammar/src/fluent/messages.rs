@@ -1,6 +1,12 @@
 mod fallback;
+mod path;
+mod resource;
+mod signature;
 
 pub use fallback::*;
+pub use path::*;
+pub use resource::*;
+pub use signature::*;
 
 use icu_locale_core::LanguageIdentifier;
 use proc_macro2::{Span, TokenStream};
@@ -10,8 +16,6 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 use topcoat_core_grammar::{ParseOption, paths::topcoat_l10n};
-
-use crate::fluent::{CallSite, LocaleFiles, LocaleResources, PathPattern};
 
 /// The input of a `messages!` invocation: an optional visibility, an optional
 /// path of the Fluent files to load, and an optional fallback locale.
@@ -123,13 +127,26 @@ impl Messages {
             }
         }
 
-        let body = match catalog {
-            Some(catalog) if errors.is_empty() => catalog,
+        let signatures = MessageSignature::collect(&resources);
+        let messages = match MessageSignature::expand_all(&signatures, span) {
+            Ok(messages) => Some(messages),
+            Err(err) => {
+                errors.push(err.to_compile_error());
+                None
+            }
+        };
+
+        let body = match (catalog, messages) {
+            (Some(catalog), Some(messages)) if errors.is_empty() => quote! {
+                #catalog
+                #messages
+            },
             _ => tracked,
         };
         let vis = &self.vis;
-        // TODO: generate items from `resources`.
         quote! {
+            // Fluent names are often not snake case, such as `loginInput`.
+            #[allow(non_snake_case)]
             #vis mod msg {
                 #body
             }

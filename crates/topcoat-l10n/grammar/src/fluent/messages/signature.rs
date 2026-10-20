@@ -4,6 +4,9 @@ use std::{
 };
 
 use fluent_syntax::ast::{Entry, Expression, InlineExpression, Message, Pattern, PatternElement};
+use proc_macro2::{Ident, Span, TokenStream};
+use quote::quote;
+use topcoat_core_grammar::paths::topcoat_l10n;
 
 use crate::fluent::LocaleResources;
 
@@ -52,6 +55,109 @@ impl MessageSignature {
             }
         }
         signatures.into_values().collect()
+    }
+
+    /// Generates a module for each message, named after its ID, reporting
+    /// errors at `span`.
+    ///
+    /// A message's module holds the `Args` of its value and a module for each
+    /// of its attributes, which holds the `Args` of the attribute.
+    ///
+    /// # Errors
+    ///
+    /// Fails when a name cannot be used in Rust, or when two names become the
+    /// same Rust name.
+    pub fn expand_all(signatures: &[Self], span: Span) -> syn::Result<TokenStream> {
+        let mut names = Names::new(&["CATALOG"]);
+        let modules = signatures
+            .iter()
+            .map(|signature| {
+                let name = names.add(&signature.id, span)?;
+                signature.expand(&name, span)
+            })
+            .collect::<syn::Result<Vec<_>>>()?;
+        Ok(quote! { #(#modules)* })
+    }
+
+    /// Generates the module of this message, named `name`.
+    fn expand(&self, name: &Ident, span: Span) -> syn::Result<TokenStream> {
+        let id = &self.id;
+        let subject = format!("the `{id}` message");
+        let doc = format!("The `{id}` message.");
+        let value = self
+            .value
+            .as_ref()
+            .map(|variables| Self::args(&subject, variables, span))
+            .transpose()?;
+
+        let mut names = Names::new(&["Args", "format"]);
+        let attributes = self
+            .attributes
+            .iter()
+            .map(|(attribute, variables)| {
+                let name = names.add(attribute, span)?;
+                let subject = format!("the `{attribute}` attribute of the `{id}` message");
+                let doc = format!("The `{attribute}` attribute of the `{id}` message.");
+                let args = Self::args(&subject, variables, span)?;
+                Ok(quote! {
+                    #[doc = #doc]
+                    pub mod #name {
+                        #args
+                    }
+                })
+            })
+            .collect::<syn::Result<Vec<_>>>()?;
+
+        Ok(quote! {
+            #[doc = #doc]
+            pub mod #name {
+                #value
+                #(#attributes)*
+            }
+        })
+    }
+
+    /// Generates the `Args` struct of `subject`, a message or attribute, with
+    /// a field for each variable, and its conversion to Fluent arguments.
+    fn args(subject: &str, variables: &BTreeSet<String>, span: Span) -> syn::Result<TokenStream> {
+        let doc = format!("The arguments of {subject}.");
+        let mut names = Names::new(&[]);
+        let fields = variables
+            .iter()
+            .map(|variable| names.add(variable, span))
+            .collect::<syn::Result<Vec<_>>>()?;
+        let variables = variables.iter();
+        let count = fields.len();
+
+        if fields.is_empty() {
+            return Ok(quote! {
+                #[doc = #doc]
+                pub struct Args {}
+
+                impl ::core::convert::From<Args> for #topcoat_l10n::FluentArgs<'_> {
+                    fn from(_: Args) -> Self {
+                        #topcoat_l10n::FluentArgs::new()
+                    }
+                }
+            });
+        }
+        // Interpolated in a repetition, which cannot use the `topcoat_l10n`
+        // constant directly.
+        let value = quote! { #topcoat_l10n::FluentValue<'a> };
+        Ok(quote! {
+            #[doc = #doc]
+            pub struct Args<'a> {
+                #(pub #fields: #value,)*
+            }
+
+            impl<'a> ::core::convert::From<Args<'a>> for #topcoat_l10n::FluentArgs<'a> {
+                fn from(args: Args<'a>) -> Self {
+                    let mut fluent = #topcoat_l10n::FluentArgs::with_capacity(#count);
+                    #(fluent.set(#variables, args.#fields);)*
+                    fluent
+                }
+            }
+        })
     }
 }
 
@@ -156,6 +262,56 @@ impl<'a> Walk<'_, 'a, '_> {
     }
 }
 
+/// The Rust names given to Fluent names within one scope, such as the
+/// messages of a catalog or the variables of a message.
+struct Names<'a> {
+    /// The Fluent name behind each Rust name given so far.
+    given: HashMap<String, &'a str>,
+    /// Rust names that generated code already uses in this scope.
+    reserved: &'static [&'static str],
+}
+
+impl<'a> Names<'a> {
+    fn new(reserved: &'static [&'static str]) -> Self {
+        Self {
+            given: HashMap::new(),
+            reserved,
+        }
+    }
+
+    /// Returns the Rust name of the Fluent name `name`, reporting errors at
+    /// `span`.
+    ///
+    /// Hyphens become underscores, and keywords become raw identifiers, such
+    /// as `r#type`.
+    fn add(&mut self, name: &'a str, span: Span) -> syn::Result<Ident> {
+        let rust = name.replace('-', "_");
+        if let Some(other) = self.given.insert(rust.clone(), name) {
+            return Err(syn::Error::new(
+                span,
+                format!("`{other}` and `{name}` both become `{rust}` in Rust"),
+            ));
+        }
+        if self.reserved.contains(&rust.as_str()) {
+            return Err(syn::Error::new(
+                span,
+                format!("`{name}` cannot be used as a name here, because it is reserved"),
+            ));
+        }
+        if let Ok(ident) = syn::parse_str::<Ident>(&rust) {
+            return Ok(ident);
+        }
+        // `syn` rejects keywords as identifiers. These cannot be raw.
+        if matches!(rust.as_str(), "self" | "Self" | "super" | "crate") {
+            return Err(syn::Error::new(
+                span,
+                format!("`{name}` cannot be used as a name in Rust"),
+            ));
+        }
+        Ok(Ident::new_raw(&rust, Span::call_site()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -257,6 +413,105 @@ mod tests {
         let signatures = collect(&["a = { b } { $x }\nb = { a } { $y }\n"]);
         assert_eq!(find(&signatures, "a").value, Some(set(&["x", "y"])));
         assert_eq!(find(&signatures, "b").value, Some(set(&["x", "y"])));
+    }
+
+    fn names(name: &str) -> syn::Result<String> {
+        Names::new(&[])
+            .add(name, Span::call_site())
+            .map(|ident| ident.to_string())
+    }
+
+    #[test]
+    fn names_replace_hyphens_with_underscores() {
+        assert_eq!(names("login-input").unwrap(), "login_input");
+    }
+
+    #[test]
+    fn names_make_keywords_raw() {
+        assert_eq!(names("type").unwrap(), "r#type");
+    }
+
+    #[test]
+    fn names_reject_keywords_that_cannot_be_raw() {
+        assert!(names("self").is_err());
+        assert!(names("crate").is_err());
+    }
+
+    #[test]
+    fn names_reject_clashes() {
+        let mut names = Names::new(&[]);
+        assert!(names.add("a-b", Span::call_site()).is_ok());
+        assert!(names.add("a_b", Span::call_site()).is_err());
+    }
+
+    #[test]
+    fn names_reject_reserved_names() {
+        let mut names = Names::new(&["Args"]);
+        assert!(names.add("Args", Span::call_site()).is_err());
+    }
+
+    fn expand(sources: &[&str]) -> syn::Result<syn::File> {
+        let signatures = collect(sources);
+        let tokens = MessageSignature::expand_all(&signatures, Span::call_site())?;
+        Ok(syn::parse2(tokens).expect("the generated code is valid Rust"))
+    }
+
+    /// Returns the items of the module `name` among `items`.
+    fn module<'a>(items: &'a [syn::Item], name: &str) -> &'a [syn::Item] {
+        items
+            .iter()
+            .find_map(|item| match item {
+                syn::Item::Mod(module) if module.ident == name => {
+                    Some(&module.content.as_ref().unwrap().1[..])
+                }
+                _ => None,
+            })
+            .unwrap()
+    }
+
+    /// Returns the field names of the `Args` struct among `items`.
+    fn args_fields(items: &[syn::Item]) -> Vec<String> {
+        items
+            .iter()
+            .find_map(|item| match item {
+                syn::Item::Struct(args) if args.ident == "Args" => Some(
+                    args.fields
+                        .iter()
+                        .map(|field| field.ident.as_ref().unwrap().to_string())
+                        .collect(),
+                ),
+                _ => None,
+            })
+            .unwrap()
+    }
+
+    #[test]
+    fn generates_a_module_with_args_for_each_message_and_attribute() {
+        let file = expand(&[
+            "login-input = Log in as { $user-name }\n    .placeholder = Name\nitems = { $count } { $type }\n",
+        ])
+        .unwrap();
+        let login_input = module(&file.items, "login_input");
+        assert_eq!(args_fields(login_input), ["user_name"]);
+        assert!(args_fields(module(login_input, "placeholder")).is_empty());
+        assert_eq!(args_fields(module(&file.items, "items")), ["count", "r#type"]);
+    }
+
+    #[test]
+    fn generates_no_args_for_a_message_without_a_value() {
+        let file = expand(&["input =\n    .placeholder = Name\n"]).unwrap();
+        let input = module(&file.items, "input");
+        assert!(
+            !input
+                .iter()
+                .any(|item| matches!(item, syn::Item::Struct(_)))
+        );
+    }
+
+    #[test]
+    fn rejects_names_that_clash_with_generated_items() {
+        assert!(expand(&["CATALOG = Catalog\n"]).is_err());
+        assert!(expand(&["input = Input\n    .Args = Arguments\n"]).is_err());
     }
 
     #[test]
