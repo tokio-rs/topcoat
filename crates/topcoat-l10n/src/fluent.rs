@@ -1,7 +1,8 @@
 mod catalog;
 mod format;
+mod translation;
 
 pub use catalog::*;
-pub use format::*;
-
 pub use fluent_bundle::{FluentArgs, FluentValue};
+pub use format::*;
+pub use translation::*;

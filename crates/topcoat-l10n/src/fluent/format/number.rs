@@ -99,8 +99,8 @@ impl Memoizable for NumberFormatter {
         lang: unic_langid::LanguageIdentifier,
         (use_grouping,): Self::Args,
     ) -> Result<Self, Self::Error> {
-        let locale = icu_locale_core::LanguageIdentifier::try_from_str(&lang.to_string())
-            .map_err(|_| ())?;
+        let locale =
+            icu_locale_core::LanguageIdentifier::try_from_str(&lang.to_string()).map_err(|_| ())?;
         let mut options = DecimalFormatterOptions::default();
         if !use_grouping {
             options.grouping_strategy = Some(GroupingStrategy::Never);

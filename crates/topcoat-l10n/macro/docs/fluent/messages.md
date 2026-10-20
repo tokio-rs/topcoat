@@ -8,6 +8,22 @@ All arguments are optional. A visibility before the path applies to the generate
 
 The module contains a `CATALOG` static, a [`Catalog`](topcoat::l10n::Catalog) of the messages in every locale. Its [supported locales](topcoat::l10n::Catalog::supported_locales) are the locales that have files.
 
+# Messages
+
+Each message has a module named after its ID, with hyphens replaced by underscores, such as `msg::login_input` for `login-input`. An ID that is a Rust keyword becomes a raw identifier, such as `msg::r#type`.
+
+The module holds an `Args` struct with a field for each variable the message uses in any locale, including the variables of the messages it references. Its `format` function returns a [`Translation`](topcoat::l10n::Translation), which renders in a view as the message in the locale of the scope, or turns into text with [`resolve`](topcoat::l10n::Translation::resolve):
+
+```rust
+# use topcoat::context::Cx;
+topcoat::l10n::fluent::messages!("l10n/{locale}.ftl");
+
+let hello = msg::hello::format(msg::hello::Args {});
+assert_eq!(hello.resolve(&Cx::default()), "Hello, world!");
+```
+
+Each attribute of a message has a module within the message's module, such as `msg::login_input::placeholder`, with its own `Args` and `format`.
+
 # Fallback
 
 A locale does not need to translate every message. A message that a locale lacks is taken from the fallback locale. When there are files for more than one locale, choose the fallback with `fallback = "..."`. It must be one of the locales that have files.

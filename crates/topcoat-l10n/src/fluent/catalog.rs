@@ -108,9 +108,10 @@ impl LocaleBundle {
         for source in sources {
             let resource = FluentResource::try_new((*source).to_owned())
                 .unwrap_or_else(|_| panic!("a Fluent source of `{locale}` has syntax errors"));
-            if bundle.add_resource(resource).is_err() {
-                panic!("a Fluent source of `{locale}` defines a message or term twice");
-            }
+            assert!(
+                bundle.add_resource(resource).is_ok(),
+                "a Fluent source of `{locale}` defines a message or term twice"
+            );
         }
         Self(bundle)
     }
@@ -176,8 +177,14 @@ login-input = Anmelden
     #[test]
     fn formats_in_the_best_matching_locale() {
         let catalog = catalog();
-        assert_eq!(catalog.format(&[locale!("de-AT")], "title", None, None), "Willkommen");
-        assert_eq!(catalog.format(&[locale!("en-US")], "title", None, None), "Welcome");
+        assert_eq!(
+            catalog.format(&[locale!("de-AT")], "title", None, None),
+            "Willkommen"
+        );
+        assert_eq!(
+            catalog.format(&[locale!("en-US")], "title", None, None),
+            "Welcome"
+        );
         assert_eq!(
             catalog.format(&[locale!("fr"), locale!("de")], "title", None, None),
             "Willkommen"
@@ -187,7 +194,10 @@ login-input = Anmelden
     #[test]
     fn uses_the_fallback_when_no_locale_matches() {
         let catalog = catalog();
-        assert_eq!(catalog.format(&[locale!("ja")], "title", None, None), "Welcome");
+        assert_eq!(
+            catalog.format(&[locale!("ja")], "title", None, None),
+            "Welcome"
+        );
         assert_eq!(catalog.format(&[], "title", None, None), "Welcome");
     }
 
@@ -218,15 +228,24 @@ login-input = Anmelden
         let catalog = catalog();
         let args = count(1234.0);
         let text = catalog.format(&[locale!("de")], "items", None, Some(&args));
-        assert!(text.contains("1.234") && text.ends_with(" Artikel"), "{text}");
+        assert!(
+            text.contains("1.234") && text.ends_with(" Artikel"),
+            "{text}"
+        );
         let args = count(1.0);
-        assert_eq!(catalog.format(&[locale!("de")], "items", None, Some(&args)), "Ein Artikel");
+        assert_eq!(
+            catalog.format(&[locale!("de")], "items", None, Some(&args)),
+            "Ein Artikel"
+        );
     }
 
     #[test]
     fn returns_the_id_of_a_message_no_locale_has() {
         let catalog = catalog();
-        assert_eq!(catalog.format(&[locale!("de")], "missing", None, None), "missing");
+        assert_eq!(
+            catalog.format(&[locale!("de")], "missing", None, None),
+            "missing"
+        );
     }
 
     #[test]

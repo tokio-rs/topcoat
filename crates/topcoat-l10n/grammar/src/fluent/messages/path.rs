@@ -1,8 +1,7 @@
 mod resolve;
 
-pub use resolve::*;
-
 use proc_macro2::Span;
+pub use resolve::*;
 use syn::{
     LitStr,
     parse::{Parse, ParseStream},

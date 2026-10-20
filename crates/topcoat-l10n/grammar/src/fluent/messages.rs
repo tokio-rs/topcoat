@@ -4,13 +4,12 @@ mod resource;
 mod signature;
 
 pub use fallback::*;
-pub use path::*;
-pub use resource::*;
-pub use signature::*;
-
 use icu_locale_core::LanguageIdentifier;
+pub use path::*;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
+pub use resource::*;
+pub use signature::*;
 use syn::{
     Token, Visibility,
     parse::{Parse, ParseStream},
@@ -77,7 +76,9 @@ impl Messages {
             None => match locales {
                 [only] => Ok(&only.locale),
                 _ => Err(syn::Error::new(
-                    self.path.as_ref().map_or_else(Span::call_site, |path| path.lit.span()),
+                    self.path
+                        .as_ref()
+                        .map_or_else(Span::call_site, |path| path.lit.span()),
                     format!(
                         "add `fallback = \"...\"` to choose the locale of messages that other \
                          locales lack; found {}",

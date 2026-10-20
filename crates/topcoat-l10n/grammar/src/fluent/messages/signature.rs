@@ -60,8 +60,9 @@ impl MessageSignature {
     /// Generates a module for each message, named after its ID, reporting
     /// errors at `span`.
     ///
-    /// A message's module holds the `Args` of its value and a module for each
-    /// of its attributes, which holds the `Args` of the attribute.
+    /// A message's module holds the `Args` and `format` of its value, and a
+    /// module for each of its attributes, which holds the `Args` and `format`
+    /// of the attribute.
     ///
     /// # Errors
     ///
@@ -81,13 +82,11 @@ impl MessageSignature {
 
     /// Generates the module of this message, named `name`.
     fn expand(&self, name: &Ident, span: Span) -> syn::Result<TokenStream> {
-        let id = &self.id;
-        let subject = format!("the `{id}` message");
-        let doc = format!("The `{id}` message.");
+        let doc = format!("The {}.", self.subject(None));
         let value = self
             .value
             .as_ref()
-            .map(|variables| Self::args(&subject, variables, span))
+            .map(|variables| self.translation(None, variables, &quote! { super::CATALOG }, span))
             .transpose()?;
 
         let mut names = Names::new(&["Args", "format"]);
@@ -96,13 +95,13 @@ impl MessageSignature {
             .iter()
             .map(|(attribute, variables)| {
                 let name = names.add(attribute, span)?;
-                let subject = format!("the `{attribute}` attribute of the `{id}` message");
-                let doc = format!("The `{attribute}` attribute of the `{id}` message.");
-                let args = Self::args(&subject, variables, span)?;
+                let doc = format!("The {}.", self.subject(Some(attribute)));
+                let catalog = quote! { super::super::CATALOG };
+                let translation = self.translation(Some(attribute), variables, &catalog, span)?;
                 Ok(quote! {
                     #[doc = #doc]
                     pub mod #name {
-                        #args
+                        #translation
                     }
                 })
             })
@@ -117,10 +116,19 @@ impl MessageSignature {
         })
     }
 
-    /// Generates the `Args` struct of `subject`, a message or attribute, with
-    /// a field for each variable, and its conversion to Fluent arguments.
-    fn args(subject: &str, variables: &BTreeSet<String>, span: Span) -> syn::Result<TokenStream> {
-        let doc = format!("The arguments of {subject}.");
+    /// Generates the `Args` struct of this message's value, or of its
+    /// `attribute`, with a field for each variable, and the `format` function
+    /// that translates it with the `catalog` static.
+    fn translation(
+        &self,
+        attribute: Option<&str>,
+        variables: &BTreeSet<String>,
+        catalog: &TokenStream,
+        span: Span,
+    ) -> syn::Result<TokenStream> {
+        let subject = self.subject(attribute);
+        let args_doc = format!("The arguments of the {subject}.");
+        let format_doc = format!("Translates the {subject} with `args`.");
         let mut names = Names::new(&[]);
         let fields = variables
             .iter()
@@ -129,9 +137,23 @@ impl MessageSignature {
         let variables = variables.iter();
         let count = fields.len();
 
+        let id = &self.id;
+        let attribute = attribute.map_or_else(
+            || quote! { ::core::option::Option::None },
+            |attribute| quote! { ::core::option::Option::Some(#attribute) },
+        );
+        let translation = quote! {
+            #topcoat_l10n::Translation::new(
+                &#catalog,
+                #id,
+                #attribute,
+                ::core::convert::From::from(args),
+            )
+        };
+
         if fields.is_empty() {
             return Ok(quote! {
-                #[doc = #doc]
+                #[doc = #args_doc]
                 pub struct Args {}
 
                 impl ::core::convert::From<Args> for #topcoat_l10n::FluentArgs<'_> {
@@ -139,13 +161,19 @@ impl MessageSignature {
                         #topcoat_l10n::FluentArgs::new()
                     }
                 }
+
+                #[doc = #format_doc]
+                #[must_use]
+                pub fn format(args: Args) -> #topcoat_l10n::Translation<'static> {
+                    #translation
+                }
             });
         }
         // Interpolated in a repetition, which cannot use the `topcoat_l10n`
         // constant directly.
         let value = quote! { #topcoat_l10n::FluentValue<'a> };
         Ok(quote! {
-            #[doc = #doc]
+            #[doc = #args_doc]
             pub struct Args<'a> {
                 #(pub #fields: #value,)*
             }
@@ -157,7 +185,23 @@ impl MessageSignature {
                     fluent
                 }
             }
+
+            #[doc = #format_doc]
+            #[must_use]
+            pub fn format(args: Args<'_>) -> #topcoat_l10n::Translation<'_> {
+                #translation
+            }
         })
+    }
+
+    /// Describes this message's value, or its `attribute`, for documentation,
+    /// such as "`placeholder` attribute of the `login-input` message".
+    fn subject(&self, attribute: Option<&str>) -> String {
+        let id = &self.id;
+        match attribute {
+            Some(attribute) => format!("`{attribute}` attribute of the `{id}` message"),
+            None => format!("`{id}` message"),
+        }
     }
 }
 
@@ -391,10 +435,7 @@ mod tests {
         let signatures = collect(&[
             "items = { $count ->\n    [one] One { $kind }\n   *[other] { NUMBER($amount, minimumFractionDigits: 2) }\n}\n",
         ]);
-        assert_eq!(
-            signatures[0].value,
-            Some(set(&["amount", "count", "kind"]))
-        );
+        assert_eq!(signatures[0].value, Some(set(&["amount", "count", "kind"])));
     }
 
     #[test]
@@ -493,8 +534,34 @@ mod tests {
         .unwrap();
         let login_input = module(&file.items, "login_input");
         assert_eq!(args_fields(login_input), ["user_name"]);
-        assert!(args_fields(module(login_input, "placeholder")).is_empty());
-        assert_eq!(args_fields(module(&file.items, "items")), ["count", "r#type"]);
+        assert_eq!(
+            args_fields(module(login_input, "placeholder")),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            args_fields(module(&file.items, "items")),
+            ["count", "r#type"]
+        );
+    }
+
+    /// Returns the names of the functions among `items`.
+    fn functions(items: &[syn::Item]) -> Vec<String> {
+        items
+            .iter()
+            .filter_map(|item| match item {
+                syn::Item::Fn(function) => Some(function.sig.ident.to_string()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn generates_a_format_function_next_to_each_args() {
+        let file =
+            expand(&["login-input = Log in as { $name }\n    .placeholder = Name\n"]).unwrap();
+        let login_input = module(&file.items, "login_input");
+        assert_eq!(functions(login_input), ["format"]);
+        assert_eq!(functions(module(login_input, "placeholder")), ["format"]);
     }
 
     #[test]
@@ -504,7 +571,7 @@ mod tests {
         assert!(
             !input
                 .iter()
-                .any(|item| matches!(item, syn::Item::Struct(_)))
+                .any(|item| matches!(item, syn::Item::Struct(_) | syn::Item::Fn(_)))
         );
     }
 

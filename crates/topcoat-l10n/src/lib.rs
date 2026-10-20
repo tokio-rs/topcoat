@@ -9,7 +9,7 @@ mod extensions;
 mod fluent;
 mod langid;
 mod locale;
-#[cfg(feature = "router")]
+#[cfg(feature = "http")]
 mod request;
 #[cfg(feature = "router")]
 mod router;
@@ -24,7 +24,7 @@ pub use extensions::*;
 pub use fluent::*;
 pub use langid::*;
 pub use locale::*;
-#[cfg(feature = "router")]
+#[cfg(feature = "http")]
 pub use request::*;
 #[cfg(feature = "router")]
 pub use router::*;

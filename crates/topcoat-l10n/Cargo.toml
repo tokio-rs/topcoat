@@ -18,10 +18,14 @@ fluent = [
 	"dep:icu_provider",
 	"dep:intl-memoizer",
 	"dep:unic-langid",
+	"http",
+]
+http = [
+	"dep:http",
 ]
 router = [
 	"dep:topcoat-router",
-	"dep:http",
+	"http",
 ]
 view = [
 	"dep:topcoat-view",

@@ -259,7 +259,10 @@ mod tests {
 
     #[tokio::test]
     async fn locale_negotiates_the_accept_language_header() {
-        assert_eq!(respond(true, Some("fr, de-AT;q=0.8"), current_locale).await, "de");
+        assert_eq!(
+            respond(true, Some("fr, de-AT;q=0.8"), current_locale).await,
+            "de"
+        );
     }
 
     #[tokio::test]
@@ -295,7 +298,7 @@ mod tests {
     #[test]
     fn outside_a_request_the_locale_is_the_fallback() {
         let cx = Cx::default().with(SupportedLocales::from([locale!("de"), locale!("en")]));
-        assert!(accept_language(&cx).is_empty());
+        assert_eq!(accept_language(&cx), []);
         assert_eq!(locale(&cx), &locale!("de"));
     }
 

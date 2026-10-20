@@ -3,7 +3,6 @@ mod message_path;
 
 pub use argument::*;
 pub use message_path::*;
-
 use syn::parse::{Parse, ParseStream};
 
 /// The input of a `t!` invocation: a message, optionally followed by a comma
