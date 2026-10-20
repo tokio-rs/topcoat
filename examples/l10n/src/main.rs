@@ -3,10 +3,12 @@ mod locale;
 use topcoat::{
     Result,
     context::Cx,
-    l10n::langid,
+    l10n::{fluent::messages, langid},
     router::{error::redirect, href, module_router, page},
     view::View,
 };
+
+messages!("l10n/{locale}.ftl");
 
 #[tokio::main]
 async fn main() {

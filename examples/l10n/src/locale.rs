@@ -1,16 +1,13 @@
 use topcoat::{
     Result,
-    l10n::{
-        LanguageIdentifier,
-        fluent::{messages, t},
-    },
+    l10n::{LanguageIdentifier, fluent::t},
     router::{Slot, layout, module_param, page},
     view::{View, view},
 };
 
-module_param!(pub locale: LanguageIdentifier, error = not_found);
+use crate::msg;
 
-messages!("./l10n/{locale}.ftl");
+module_param!(pub locale: LanguageIdentifier, error = not_found);
 
 #[layout]
 async fn layout(slot: Slot<'_>) -> Result<impl View> {
@@ -28,5 +25,5 @@ async fn layout(slot: Slot<'_>) -> Result<impl View> {
 
 #[page]
 pub async fn page() -> Result<impl View> {
-    Ok(view! { "hi" })
+    Ok(view! { (t!(msg::current_date)) })
 }
