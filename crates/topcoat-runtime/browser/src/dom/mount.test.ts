@@ -158,3 +158,16 @@ it("formats times, shows a saved message, and resumes an interrupted operation o
 	expect((rt.context.signal("moved").get() as F64).dehydrate()).toBe(5);
 	expect(sessionStorage.getItem("moved")).toBe(null);
 });
+
+it("does not run handlers when hydration fails part-way", async () => {
+	globals.log = [];
+	document.body.innerHTML = `
+		<p ${logs("before")}></p>
+		<p><!--::topcoat::expr::start("cx.signal('missing').get()")--><!--::topcoat::expr::end--></p>
+	`;
+	runtime = new Runtime();
+	expect(() => runtime?.start(document)).toThrow();
+	await settle();
+	// A failed navigation loads the page again, which would run them twice.
+	expect(globals.log).toEqual([]);
+});
