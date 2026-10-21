@@ -15,6 +15,12 @@ pub fn messages(tokens: TokenStream) -> TokenStream {
 #[doc = include_str!("../docs/fluent/t.md")]
 #[proc_macro]
 pub fn t(tokens: TokenStream) -> TokenStream {
-    let translate = syn::parse_macro_input!(tokens as topcoat_l10n_grammar::fluent::Translate);
-    quote::quote! { #translate }.into()
+    // TODO: Expand once `messages!` generates the namespaced `t!`.
+    let _translate = syn::parse_macro_input!(tokens as topcoat_l10n_grammar::fluent::Translate);
+    syn::Error::new(
+        proc_macro::Span::call_site().into(),
+        "`t!` cannot be expanded yet",
+    )
+    .to_compile_error()
+    .into()
 }

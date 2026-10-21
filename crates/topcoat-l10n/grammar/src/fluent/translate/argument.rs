@@ -1,47 +1,42 @@
 use proc_macro2::{Delimiter, Spacing, TokenStream, TokenTree};
 use quote::ToTokens;
 use syn::{
-    Ident, Token,
+    Token,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
 };
 use topcoat_core_grammar::ParseOption;
 
-/// The arguments of a `t!` invocation, after the message.
+use crate::fluent::{DocComments, FluentIdent, FluentIdentToken};
+
+/// The arguments of a `t!` invocation, after the key.
 ///
-/// The arguments are split at commas. Each value is kept as the tokens written
-/// up to the next comma that separates arguments, so a value that is still
-/// being typed does not fail to parse. Commas inside brackets, turbofish
-/// generics such as `HashMap::<K, V>::new()`, and the parameters and return
-/// type of a closure that starts the value belong to the value. Any other comma
-/// ends the value, such as in `<HashMap<K, V> as Default>::default()`; wrap such
-/// a value in parentheses.
+/// Each name may only be passed once.
 pub struct TranslateArguments {
-    /// The comma between the message and its arguments, if any.
+    /// The comma between the key and the arguments, if any.
     pub comma_token: Option<Token![,]>,
     /// The arguments.
     pub arguments: Punctuated<TranslateArgument, Token![,]>,
 }
 
-impl TranslateArguments {
-    /// Returns whether every argument is complete.
-    #[must_use]
-    pub fn is_complete(&self) -> bool {
-        self.arguments.iter().all(TranslateArgument::is_complete)
-    }
-}
-
 impl Parse for TranslateArguments {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let comma_token: Option<Token![,]> = input.parse()?;
-        let mut arguments = Punctuated::new();
-        if comma_token.is_some() {
-            while !input.is_empty() {
-                arguments.push_value(input.parse()?);
-                if input.is_empty() {
-                    break;
-                }
-                arguments.push_punct(input.parse()?);
+        let arguments = match comma_token {
+            Some(_) => Punctuated::<TranslateArgument, _>::parse_terminated(input)?,
+            None => Punctuated::new(),
+        };
+        let names: Vec<_> = arguments
+            .iter()
+            .map(|argument| argument.name.value())
+            .collect();
+        for (index, argument) in arguments.iter().enumerate() {
+            let name = &names[index];
+            if names[..index].contains(name) {
+                return Err(syn::Error::new_spanned(
+                    &argument.name,
+                    format!("the argument `{name}` is passed more than once"),
+                ));
             }
         }
         Ok(Self {
@@ -53,23 +48,21 @@ impl Parse for TranslateArguments {
 
 /// An argument of a message, either `name = value` or the shorthand `name`
 /// for a variable of the same name.
+///
+/// The name is the name of the Fluent variable, so `user_name` passes
+/// `$user_name`. A name that is not a Rust identifier can be written as a
+/// string literal, such as `"user-name" = name`. The shorthand only accepts a
+/// Rust identifier, and a raw identifier such as `r#type` passes `$type`.
 pub struct TranslateArgument {
-    /// The name of the message variable.
-    pub name: Ident,
+    /// The doc comments of the argument.
+    pub docs: DocComments,
+    /// The name of the Fluent variable.
+    pub name: FluentIdent,
     /// The value of the variable, if not written as a shorthand.
     pub value: Option<TranslateArgumentValue>,
 }
 
 impl TranslateArgument {
-    /// Returns whether the argument is complete: a shorthand, or an `=`
-    /// followed by a value.
-    #[must_use]
-    pub fn is_complete(&self) -> bool {
-        self.value
-            .as_ref()
-            .is_none_or(|value| !value.tokens.is_empty())
-    }
-
     /// Returns the expression of the argument: the written value, or the name
     /// for a shorthand.
     ///
@@ -81,7 +74,7 @@ impl TranslateArgument {
             None => self.name.to_token_stream(),
             Some(value) if value.tokens.is_empty() => syn::Error::new(
                 value.eq_token.span,
-                format!("expected a value for `{}` after `=`", self.name),
+                format!("expected a value for `{}` after `=`", self.name.value()),
             )
             .to_compile_error(),
             Some(value) => value.tokens.clone(),
@@ -91,14 +84,37 @@ impl TranslateArgument {
 
 impl Parse for TranslateArgument {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        Ok(Self {
+        let argument = Self {
+            docs: input.parse()?,
             name: input.parse()?,
             value: input.call(TranslateArgumentValue::parse_option)?,
-        })
+        };
+        let is_rust_ident = matches!(
+            &argument.name,
+            FluentIdent::Tokens(tokens) if matches!(tokens.as_slice(), [FluentIdentToken::Ident(_)])
+        );
+        if argument.value.is_none() && !is_rust_ident {
+            return Err(syn::Error::new_spanned(
+                &argument.name,
+                format!(
+                    "the shorthand only accepts a Rust identifier; write `{} = value`",
+                    argument.name.to_token_stream()
+                ),
+            ));
+        }
+        Ok(argument)
     }
 }
 
 /// The `= value` part of a [`TranslateArgument`].
+///
+/// The value is kept as the tokens written up to the next comma that
+/// separates arguments, so a value that is still being typed does not fail to
+/// parse. Commas inside brackets, turbofish generics such as
+/// `HashMap::<K, V>::new()`, and the parameters and return type of a closure
+/// that starts the value belong to the value. Any other comma ends the value,
+/// such as in `<HashMap<K, V> as Default>::default()`; wrap such a value in
+/// parentheses.
 pub struct TranslateArgumentValue {
     /// The `=` before the value.
     pub eq_token: Token![=],
@@ -246,7 +262,7 @@ mod tests {
             .iter()
             .map(|argument| {
                 (
-                    argument.name.to_string(),
+                    argument.name.value(),
                     argument
                         .value
                         .as_ref()
@@ -351,8 +367,6 @@ mod tests {
 
     #[test]
     fn accepts_a_value_being_typed() {
-        let parsed = parse(", count =, name = user").unwrap();
-        assert!(!parsed.is_complete());
         assert_eq!(
             arguments(", count =, name = user"),
             [
@@ -393,11 +407,6 @@ mod tests {
     }
 
     #[test]
-    fn is_complete_with_values_and_shorthands() {
-        assert!(parse(", count = 5, name").unwrap().is_complete());
-    }
-
-    #[test]
     fn rejects_an_argument_without_a_name() {
         assert!(parse(", = 5").is_err());
         assert!(parse(", 5").is_err());
@@ -406,5 +415,60 @@ mod tests {
     #[test]
     fn rejects_arguments_without_a_comma() {
         assert!(parse("count = 5").is_err());
+    }
+
+    #[test]
+    fn parses_names_that_are_not_rust_identifiers() {
+        assert_eq!(
+            arguments(r#", "userName" = a, user-name = b, "x-1e" = c"#),
+            [
+                ("userName".to_owned(), Some(tokens("a"))),
+                ("user-name".to_owned(), Some(tokens("b"))),
+                ("x-1e".to_owned(), Some(tokens("c"))),
+            ]
+        );
+    }
+
+    #[test]
+    fn keeps_underscores_in_names() {
+        assert_eq!(
+            arguments(", user_name = a"),
+            [("user_name".to_owned(), Some(tokens("a")))]
+        );
+    }
+
+    #[test]
+    fn a_raw_shorthand_passes_the_unraw_name() {
+        let parsed = parse(", r#type").unwrap();
+        let argument = &parsed.arguments[0];
+        assert_eq!(argument.name.value(), "type");
+        assert_eq!(argument.value().to_string(), tokens("r#type"));
+    }
+
+    #[test]
+    fn rejects_a_shorthand_that_is_not_a_rust_identifier() {
+        for input in [", user-name", r#", "name""#] {
+            assert!(parse(input).is_err(), "{input}");
+        }
+    }
+
+    #[test]
+    fn rejects_a_name_passed_twice() {
+        for input in [
+            ", count = 1, count = 2",
+            ", name, name = x",
+            ", r#type, type = x",
+            r#", user-name = a, "user-name" = b"#,
+        ] {
+            assert!(parse(input).is_err(), "{input}");
+        }
+    }
+
+    #[test]
+    fn parses_doc_comments_before_a_name() {
+        let parsed = parse(", /// The minimum length.\n min = 8, /// The user.\n name").unwrap();
+        for argument in &parsed.arguments {
+            assert_eq!(argument.docs.attrs.len(), 1);
+        }
     }
 }

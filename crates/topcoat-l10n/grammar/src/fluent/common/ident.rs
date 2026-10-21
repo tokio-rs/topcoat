@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
 use syn::{
@@ -40,6 +42,43 @@ impl FluentIdent {
             Self::Str(lit) => lit.value(),
         }
     }
+
+    /// Checks that a string literal has no suffix, such as the `x` of `"a"x`.
+    pub(crate) fn check_str_suffix(lit: &LitStr) -> syn::Result<()> {
+        if lit.suffix().is_empty() {
+            Ok(())
+        } else {
+            Err(syn::Error::new(
+                lit.span(),
+                "a Fluent identifier cannot have a suffix",
+            ))
+        }
+    }
+
+    /// Checks that the bytes `range` of `value`, the value of `lit`, are a
+    /// Fluent identifier.
+    pub(crate) fn check_str_part(
+        lit: &LitStr,
+        value: &str,
+        range: Range<usize>,
+    ) -> syn::Result<()> {
+        if range.is_empty() {
+            return Err(syn::Error::new(
+                lit.span(),
+                "expected a Fluent identifier, found an empty string",
+            ));
+        }
+        match InvalidChar::find(&value[range.clone()], true) {
+            Some(mut invalid) => {
+                invalid.offset += range.start;
+                Err(syn::Error::new(
+                    invalid.span_in(lit, value),
+                    invalid.message(),
+                ))
+            }
+            None => Ok(()),
+        }
+    }
 }
 
 impl Parse for FluentIdent {
@@ -47,25 +86,9 @@ impl Parse for FluentIdent {
         let lookahead = input.lookahead1();
         if lookahead.peek(LitStr) {
             let lit: LitStr = input.parse()?;
-            if !lit.suffix().is_empty() {
-                return Err(syn::Error::new(
-                    lit.span(),
-                    "a Fluent identifier cannot have a suffix",
-                ));
-            }
+            Self::check_str_suffix(&lit)?;
             let value = lit.value();
-            if value.is_empty() {
-                return Err(syn::Error::new(
-                    lit.span(),
-                    "expected a Fluent identifier, found an empty string",
-                ));
-            }
-            if let Some(invalid) = InvalidChar::find(&value, true) {
-                return Err(syn::Error::new(
-                    invalid.span_in(&lit, &value),
-                    invalid.message(),
-                ));
-            }
+            Self::check_str_part(&lit, &value, 0..value.len())?;
             return Ok(Self::Str(lit));
         }
         if !lookahead.peek(Ident::peek_any) {
@@ -144,7 +167,8 @@ impl ToTokens for FluentIdentToken {
 
 /// A character that a Fluent identifier cannot contain at its position.
 struct InvalidChar {
-    /// The byte offset of the character in the text it was found in.
+    /// The byte offset of the character in the text it was found in, or in
+    /// the value of the literal it is part of.
     offset: usize,
     /// The character.
     char: char,
