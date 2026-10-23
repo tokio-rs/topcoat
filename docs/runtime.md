@@ -122,6 +122,36 @@ Ok(view! {
 
 For operations outside the expression vocabulary, use a JavaScript string literal, such as `@click="alert('hi')"`.
 
+`e.related_target` is an option containing the browser's related event target. For focus entering an element, it refers to the target losing focus. For focus leaving an element, it refers to the target gaining focus. It is `None` when the native target is null or the event has no related target. A present target need not be an element, and the browser can withhold it, for example when focus crosses a security boundary.
+
+`e.old_state` and `e.new_state` are optional strings from a `ToggleEvent`, including native `beforetoggle` and `toggle` events. Native opening goes from `"closed"` to `"open"`; closing goes from `"open"` to `"closed"`. Events without these properties return `None`. Synthetic toggle events preserve their supplied strings, including `Some("")` for the constructor's empty default.
+
+```rust
+# use topcoat::{Result, context::Cx, runtime::{Event, signal}, view::*};
+# #[component]
+# async fn example(cx: &Cx) -> Result<impl View> {
+let destination = signal(cx, String::new);
+let open = signal(cx, || false);
+
+Ok(view! {
+    <input @focusout=$(|e: Event| {
+        if e.related_target.is_some() {
+            destination.set(e.related_target.unwrap().id);
+        } else {
+            destination.set("".to_owned());
+        }
+    })>
+    <div popover="auto" @toggle=$(|e: Event| {
+        if e.new_state.is_some() {
+            open.set(e.new_state.unwrap() == "open");
+        }
+    })>"Popover content"</div>
+})
+# }
+```
+
+Read event handles and call event methods synchronously, before returning or awaiting. They wrap the live native event, so `current_target` only refers to the listener's target during dispatch, and target properties can change. Copy strings or other ordinary values before asynchronous work. `Event` and `EventTarget` are browser-local handles and cannot be serialized into signals or procedure arguments. Existing `e.key` and `e.is_composing` support keyboard and composition handling.
+
 Signals also have methods for common updates. For example, `$(|_e| count.increment())` adds one to a numeric signal.
 
 # Bind attributes

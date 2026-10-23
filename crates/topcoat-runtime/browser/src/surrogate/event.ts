@@ -1,5 +1,6 @@
 import { Bool } from "./bool";
 import { F64 } from "./f64";
+import { Option } from "./option";
 import { String as RuntimeString } from "./string";
 
 type EventTargetLike = globalThis.EventTarget | null;
@@ -95,12 +96,20 @@ export class Event {
 		return f64Prop(this.inner, "movementY");
 	}
 
+	get new_state(): Option<RuntimeString> {
+		return toggleState(this.inner, "newState");
+	}
+
 	get offset_x(): F64 {
 		return f64Prop(this.inner, "offsetX");
 	}
 
 	get offset_y(): F64 {
 		return f64Prop(this.inner, "offsetY");
+	}
+
+	get old_state(): Option<RuntimeString> {
+		return toggleState(this.inner, "oldState");
 	}
 
 	get page_x(): F64 {
@@ -117,6 +126,13 @@ export class Event {
 
 	get pointer_type(): RuntimeString {
 		return stringProp(this.inner, "pointerType");
+	}
+
+	get related_target(): Option<EventTarget> {
+		const { relatedTarget } = this.inner as Partial<FocusEvent>;
+		return relatedTarget == null
+			? Option.none()
+			: Option.some(new EventTarget(relatedTarget));
 	}
 
 	get repeat(): Bool {
@@ -157,7 +173,8 @@ export class Event {
 }
 
 export class EventTarget {
-	constructor(private readonly inner: EventTargetLike) {}
+	/** The native target for browser-local operations. Never dehydrated. */
+	constructor(readonly inner: EventTargetLike) {}
 
 	get checked(): Bool {
 		return boolProp(this.inner, "checked");
@@ -180,6 +197,16 @@ export class EventTarget {
 	get value(): RuntimeString {
 		return stringProp(this.inner, "value");
 	}
+}
+
+function toggleState(
+	source: Partial<ToggleEvent>,
+	name: "oldState" | "newState",
+): Option<RuntimeString> {
+	const value = source[name];
+	return value === undefined
+		? Option.none()
+		: Option.some(new RuntimeString(value));
 }
 
 function boolProp(source: unknown, name: string): Bool {
