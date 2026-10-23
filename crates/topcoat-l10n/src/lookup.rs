@@ -1,4 +1,4 @@
-use icu_locale::fallback::{LocaleFallbackConfig, LocaleFallbacker};
+use icu_locale::fallback::{LocaleFallbackConfig, LocaleFallbacker, LocaleFallbackerWithConfig};
 use icu_locale_core::DataLocale;
 
 use crate::{LanguageIdentifier, Locale};
@@ -29,30 +29,42 @@ use crate::{LanguageIdentifier, Locale};
 /// ```
 #[must_use]
 pub fn lookup<'a>(locale: &Locale, available: &'a [Locale]) -> Option<&'a Locale> {
-    let fallbacker = LocaleFallbacker::new().for_config(LocaleFallbackConfig::default());
-    // The first step of a chain is the locale with implied subtags removed,
-    // such as `zh` for `zh-Hans`, so both sides are compared in that form.
-    let normalize = |id: &LanguageIdentifier| {
-        let id = id.clone().canonicalize();
-        fallbacker
-            .fallback_for(DataLocale::from(id.as_icu()))
-            .take()
-    };
     let normalized: Vec<_> = available
         .iter()
-        .map(|locale| normalize(locale.id()))
+        .map(|locale| normalize_for_lookup(locale.id()))
         .collect();
+    lookup_index(locale, &normalized).map(|index| &available[index])
+}
 
+/// Returns the position in `normalized` of the locale that serves `locale`, as
+/// chosen by [`lookup`]. Each locale of `normalized` comes from
+/// [`normalize_for_lookup`].
+pub(crate) fn lookup_index(locale: &Locale, normalized: &[DataLocale]) -> Option<usize> {
     let id = locale.id().clone().canonicalize();
-    let mut chain = fallbacker.fallback_for(DataLocale::from(id.as_icu()));
+    let mut chain = fallbacker().fallback_for(DataLocale::from(id.as_icu()));
     // The chain ends with the root locale, `und`, which serves no locale.
     while !chain.get().language.is_unknown() {
         if let Some(index) = normalized.iter().position(|step| step == chain.get()) {
-            return Some(&available[index]);
+            return Some(index);
         }
         chain.step();
     }
     None
+}
+
+/// Returns `id` in the form that [`lookup_index`] compares available locales
+/// in.
+pub(crate) fn normalize_for_lookup(id: &LanguageIdentifier) -> DataLocale {
+    // The first step of a chain is the locale with implied subtags removed,
+    // such as `zh` for `zh-Hans`, so both sides are compared in that form.
+    let id = id.clone().canonicalize();
+    fallbacker()
+        .fallback_for(DataLocale::from(id.as_icu()))
+        .take()
+}
+
+fn fallbacker() -> LocaleFallbackerWithConfig<'static> {
+    LocaleFallbacker::new().for_config(LocaleFallbackConfig::default())
 }
 
 #[cfg(test)]
