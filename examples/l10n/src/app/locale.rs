@@ -62,7 +62,7 @@ async fn nav(cx: &Cx) -> Result<impl View> {
                 >
                     // Names each language in itself, like "Deutsch", by translating into
                     // the link's locale instead of the page's.
-                    (t!(language).resolve(&cx.with(link_locale.clone())))
+                    (t!(language).resolve_in(link_locale))
                 </a>
                 " "
             }

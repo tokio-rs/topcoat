@@ -5,7 +5,7 @@ use topcoat_core::context::Cx;
 #[cfg(feature = "view")]
 use topcoat_view::{AttributeValueViewParts, NodeViewParts, PartsWriter};
 
-use crate::{Namespace, try_locale};
+use crate::{Locale, Namespace, try_locale};
 
 /// A message of a `messages!` namespace, or one of its attributes, with its
 /// arguments.
@@ -40,22 +40,31 @@ impl<'a> Translation<'a> {
     }
 
     /// Resolves the translation into its text for the [locale](try_locale) of
-    /// `cx`, as described in [`Catalog::format`](crate::Catalog::format).
+    /// `cx`, like [`resolve_in`](Self::resolve_in).
     ///
-    /// When `cx` has no locale, or the namespace has no text for it, the
-    /// result is a placeholder made of the key and the arguments, such as
+    /// When `cx` has no locale, the result is the placeholder described there.
+    #[must_use]
+    pub fn resolve(&self, cx: &Cx) -> Cow<'static, str> {
+        match try_locale(cx) {
+            Some(locale) => self.resolve_in(locale),
+            None => Cow::Owned(self.placeholder()),
+        }
+    }
+
+    /// Resolves the translation into its text for `locale`, as described in
+    /// [`Catalog::format`](crate::Catalog::format).
+    ///
+    /// When the namespace has no text for `locale`, the result is a
+    /// placeholder made of the key and the arguments, such as
     /// `password-field.placeholder(min = 8)`. String arguments are quoted, and
     /// numbers are shown without formatting.
     ///
     /// The text is borrowed from the catalog when the message has nothing to
     /// format, such as a message without variables.
     #[must_use]
-    pub fn resolve(&self, cx: &Cx) -> Cow<'static, str> {
-        try_locale(cx)
-            .zip(Namespace::catalog(self.namespace))
-            .and_then(|(locale, catalog)| {
-                catalog.format(locale, self.id, self.attribute, Some(&self.args))
-            })
+    pub fn resolve_in(&self, locale: &Locale) -> Cow<'static, str> {
+        Namespace::catalog(self.namespace)
+            .and_then(|catalog| catalog.format(locale, self.id, self.attribute, Some(&self.args)))
             .unwrap_or_else(|| Cow::Owned(self.placeholder()))
     }
 
@@ -168,6 +177,15 @@ greeting = Hallo, { $name }!
     fn resolves_for_the_locale_of_the_scope() {
         let cx = Cx::default().with(locale!("de"));
         assert_eq!(title().resolve(&cx), "Willkommen");
+    }
+
+    #[test]
+    fn resolves_in_a_locale_other_than_the_one_of_the_scope() {
+        let title = title();
+        let cx = Cx::default().with(locale!("en"));
+        assert_eq!(title.resolve(&cx), "Welcome");
+        assert_eq!(title.resolve_in(&locale!("de")), "Willkommen");
+        assert_eq!(title.resolve_in(&locale!("fr")), "title");
     }
 
     #[test]
