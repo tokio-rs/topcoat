@@ -157,7 +157,7 @@ export class Event {
 }
 
 export class EventTarget {
-	constructor(private readonly inner: EventTargetLike) {}
+	constructor(readonly inner: EventTargetLike) {}
 
 	get checked(): Bool {
 		return boolProp(this.inner, "checked");

@@ -3,6 +3,7 @@ import { ShardUnit } from "../render/shard";
 import { type Region, Scope } from "../scope";
 import type { SignalId } from "../signal-registry";
 import { setupBinding } from "./binding";
+import { setupEffect } from "./effect";
 import { setupEventHandler } from "./event";
 import { type CommentMarker, parseComment } from "./markers";
 import { setupTextExpression } from "./text";
@@ -82,6 +83,14 @@ function processElement(el: Element, scope: Scope): void {
 	for (const attr of Array.from(el.attributes)) {
 		setupBinding(el, attr, scope);
 		setupEventHandler(el, attr, scope);
+	}
+	const effect = el.getAttribute("data-topcoat-effect");
+	if (effect !== null) {
+		try {
+			setupEffect(el, effect, scope);
+		} catch (error) {
+			scope.runtime.reportError(error);
+		}
 	}
 	if (
 		el instanceof HTMLAnchorElement &&

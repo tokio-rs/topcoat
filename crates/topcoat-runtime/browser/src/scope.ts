@@ -1,6 +1,6 @@
 import { dehydrate } from "./expression/dehydrate";
 import type { DehydratedSurrogate } from "./expression/serialized";
-import { Effect } from "./reactivity";
+import { Effect, untrack } from "./reactivity";
 import type { RenderToken } from "./render/frames";
 import type { RenderUnit } from "./render/unit";
 import type { Runtime } from "./runtime";
@@ -38,6 +38,7 @@ export class Scope {
 	/** Regions directly owned by this scope, indexed by region id. */
 	readonly regions = new Map<string, Region>();
 	private readonly effects = new Set<Effect>();
+	private readonly cleanups: (() => void)[] = [];
 	/** Aborted on release, removing listeners and cancelling owned requests. */
 	private readonly listenerController = new AbortController();
 	private disposed = false;
@@ -85,14 +86,17 @@ export class Scope {
 
 	/**
 	 * Runs an effect and keeps its subscriptions until this scope is released.
+	 * With `defer`, queues the first run so hydration and subscriptions finish
+	 * before user callbacks run. Releasing the scope cancels that queued run.
 	 * Returns `null` if the scope has already been released.
 	 */
-	effect(fn: () => void): Effect | null {
+	effect(fn: () => void, options: { defer?: boolean } = {}): Effect | null {
 		if (this.disposed) return null;
 		const effect = new Effect(fn);
 		this.effects.add(effect);
 		try {
-			effect.run();
+			if (options.defer) effect.schedule();
+			else effect.run();
 		} catch (error) {
 			effect.dispose();
 			this.effects.delete(effect);
@@ -117,6 +121,20 @@ export class Scope {
 	 */
 	get abortSignal(): AbortSignal {
 		return this.listenerController.signal;
+	}
+
+	/** Registers an owned resource, releasing late registrations immediately. */
+	onCleanup(cleanup: () => void): void {
+		if (this.disposed) this.clean(cleanup);
+		else this.cleanups.push(cleanup);
+	}
+
+	private clean(cleanup: () => void): void {
+		try {
+			untrack(cleanup);
+		} catch (error) {
+			this.runtime.reportError(error);
+		}
 	}
 
 	/**
@@ -150,7 +168,9 @@ export class Scope {
 
 		for (const effect of this.effects) effect.dispose();
 		this.effects.clear();
-		this.listenerController.abort();
+		untrack(() => this.listenerController.abort());
+		for (const cleanup of this.cleanups.reverse()) this.clean(cleanup);
+		this.cleanups.length = 0;
 
 		for (const id of this.signalIds) into.add(id);
 		this.signalIds.clear();

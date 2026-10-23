@@ -1,10 +1,19 @@
 import { compile } from "../expression/compile";
+import { untrack } from "../reactivity";
 import type { Scope } from "../scope";
 import { Event } from "../surrogate";
 
 const EVENT_HANDLER_PREFIX = "data-topcoat-on:";
 
-type EventHandler = (event: unknown) => void;
+export type EventHandler = (event: Event) => void;
+
+/** Handler reads never become dependencies of an effect that dispatches them. */
+export function invokeEventHandler(
+	handler: EventHandler,
+	event: globalThis.Event,
+): void {
+	untrack(() => handler(new Event(event)));
+}
 
 export function setupEventHandler(el: Element, attr: Attr, scope: Scope): void {
 	if (!attr.name.startsWith(EVENT_HANDLER_PREFIX)) return;
@@ -14,7 +23,7 @@ export function setupEventHandler(el: Element, attr: Attr, scope: Scope): void {
 	const handler = expression(scope.runtime.context);
 	// Dispose the listener with its scope. A DOM update may reuse the element
 	// and attach a new listener.
-	el.addEventListener(name, (event) => handler(new Event(event)), {
+	el.addEventListener(name, (event) => invokeEventHandler(handler, event), {
 		signal: scope.abortSignal,
 	});
 }

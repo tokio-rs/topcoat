@@ -177,6 +177,66 @@ Ok(view! {
 # }
 ```
 
+# Scoped effects
+
+Use [`effect`] to attach browser behavior to an element. Pass a compiled synchronous closure and spread the result into the element's attributes. The callback runs after hydration has scanned the inserted DOM and installed its signal watchers. Its body never runs on the server.
+
+```rust
+use topcoat::{
+    Result, context::Cx,
+    runtime::{EffectContext, Event, effect, expr, signal},
+    view::{View, component, view},
+};
+
+#[component]
+async fn editor(cx: &Cx) -> Result<impl View> {
+    let edited = signal(cx, || false);
+    let reset = effect(expr!(|scope: EffectContext| {
+        scope.listen(scope.target(), "reset", |_event: Event| edited.set(false));
+    }));
+    Ok(view! {
+        <form (reset)>
+            <input @input=$(|_event| edited.set(true))>
+            <button type="reset">"Reset"</button>
+            <output>$(if edited.get() { "Edited" } else { "Unchanged" })</output>
+        </form>
+    })
+}
+```
+
+The effect tracks signal reads during its synchronous callback and runs again when those signals change. Reads inside listeners or cleanup callbacks are not effect dependencies. Attach one effect per element. Combine related setup in that callback, or attach independent effects to different elements. Attribute collections support forwarding effects to components.
+
+Each invocation receives a fresh [`EffectContext`]. `on_cleanup` registers callbacks that run once, in reverse registration order, before the next invocation or when the owning content is released. `listen(target, event_name, callback)` owns a listener on an [`EventTarget`], including targets outside the attached element's subtree. `target()` returns the attached element. The callback receives the same [`Event`] facade as an `@event` handler. Listener and cleanup callbacks must be synchronous.
+
+Page, shard, live-region, navigation, and dev replacements release old invocations before updating the DOM, even when morphing reuses an element. New attachments initialize after hydration. Replacing a nested region releases effects attached inside it; effects attached to enclosing content stay active. Removing content releases its effects, cancels queued effect runs, and removes owned listeners. A cleanup error is reported without preventing other resources from being released. Cleanup does not depend on observing DOM attributes. Removing nodes directly from external JavaScript does not release a Topcoat scope; let Topcoat own its rendered content.
+
+An effect's first run is queued on the runtime's effect queue. This makes the inserted DOM and its bindings available, but does not wait for a pending server request, later streaming replacement, layout, or paint. Use `is_active()` before applying deferred results. It becomes false before cleanup begins. Signal reads after an asynchronous boundary do not subscribe the effect.
+
+## Raw resource integrations
+
+For browser APIs outside the Rust expression vocabulary, `raw!` receives the same owned context. Its `element` property is the attached DOM element and `abortSignal` is aborted before cleanup. Pass the signal to native listeners or requests. Register observer disconnection and other releases with `on_cleanup`. Registering cleanup after disposal runs it immediately.
+
+```rust
+# use topcoat::{Result, runtime::{EffectContext, effect, expr}, view::*};
+# #[component]
+# async fn measured() -> Result<impl View> {
+let measure = effect(expr!(|scope: EffectContext| {
+    raw!("(() => {
+        const observer = new ResizeObserver(entries => {
+            if (!${scope}.abortSignal.aborted) {
+                ${scope}.element.style.setProperty('--width', entries[0].contentRect.width + 'px');
+            }
+        });
+        ${scope}.on_cleanup(() => observer.disconnect());
+        observer.observe(${scope}.element);
+    })()");
+}));
+# Ok(view! { <section (measure)>"Measured content"</section> })
+# }
+```
+
+Raw integrations must cancel their queued work or check `abortSignal.aborted` before applying results. The context owns only registered resources. It does not cancel arbitrary promises or browser callbacks automatically.
+
 # Procedures
 
 A **procedure** is an async server function called from a runtime expression. Use one when an event handler needs a server resource, such as a database:
@@ -297,6 +357,9 @@ A shard can also take a signal from its caller, through a parameter typed `Signa
 Use `.get_untracked()` or `.read_untracked()` to read a value on the server without making changes to it trigger another render.
 
 [`Event`]: struct.Event.html
+[`EventTarget`]: struct.EventTarget.html
+[`EffectContext`]: struct.EffectContext.html
+[`effect`]: fn.effect.html
 [`Expr::dynamic`]: struct.Expr.html#method.dynamic
 [`expr!`]: macro.expr.html
 [`signal`]: fn.signal.html
