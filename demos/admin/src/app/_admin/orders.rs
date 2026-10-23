@@ -400,25 +400,25 @@ pub(super) async fn time_ago(timestamp: Timestamp) -> Result<impl View> {
 }
 
 pub(super) fn item_count(count: u32) -> Translation<'static> {
-    t!(item-count, count)
+    t!(item - count, count)
 }
 
 fn status_label(status: OrderStatus) -> Translation<'static> {
     match status {
-        OrderStatus::Pending => t!(status-pending),
-        OrderStatus::Paid => t!(status-paid),
-        OrderStatus::Shipped => t!(status-shipped),
-        OrderStatus::Delivered => t!(status-delivered),
-        OrderStatus::Cancelled => t!(status-cancelled),
-        OrderStatus::Refunded => t!(status-refunded),
+        OrderStatus::Pending => t!(status - pending),
+        OrderStatus::Paid => t!(status - paid),
+        OrderStatus::Shipped => t!(status - shipped),
+        OrderStatus::Delivered => t!(status - delivered),
+        OrderStatus::Cancelled => t!(status - cancelled),
+        OrderStatus::Refunded => t!(status - refunded),
     }
 }
 
 fn sort_label(sort: OrderSort) -> Translation<'static> {
     match sort {
-        OrderSort::Newest => t!(sort-newest),
-        OrderSort::Oldest => t!(sort-oldest),
-        OrderSort::HighestTotal => t!(sort-highest-total),
-        OrderSort::LowestTotal => t!(sort-lowest-total),
+        OrderSort::Newest => t!(sort - newest),
+        OrderSort::Oldest => t!(sort - oldest),
+        OrderSort::HighestTotal => t!(sort - highest - total),
+        OrderSort::LowestTotal => t!(sort - lowest - total),
     }
 }

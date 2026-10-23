@@ -54,22 +54,22 @@ struct NavItem {
 
 static NAV: [NavItem; 4] = [
     NavItem {
-        label: || t!(nav-dashboard),
+        label: || t!(nav - dashboard),
         icon: iconify_icon!("lucide:layout-dashboard"),
         target: &_dashboard::page,
     },
     NavItem {
-        label: || t!(nav-orders),
+        label: || t!(nav - orders),
         icon: iconify_icon!("lucide:shopping-cart"),
         target: &orders::page,
     },
     NavItem {
-        label: || t!(nav-products),
+        label: || t!(nav - products),
         icon: iconify_icon!("lucide:package"),
         target: &products::page,
     },
     NavItem {
-        label: || t!(nav-customers),
+        label: || t!(nav - customers),
         icon: iconify_icon!("lucide:users"),
         target: &customers::page,
     },
@@ -311,9 +311,9 @@ async fn page_breadcrumb(cx: &Cx) -> Result<impl View> {
 async fn theme_toggle(cx: &Cx) -> Result<impl View> {
     let dark = theme(cx) == Theme::Dark;
     let label = if dark {
-        t!(light-theme).resolve(cx)
+        t!(light - theme).resolve(cx)
     } else {
-        t!(dark-theme).resolve(cx)
+        t!(dark - theme).resolve(cx)
     };
     let return_to = uri(cx).path_and_query().map_or("/", |path| path.as_str());
 

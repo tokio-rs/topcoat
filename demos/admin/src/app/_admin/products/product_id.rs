@@ -198,17 +198,17 @@ async fn product_field(
 
 fn error_message(error: ProductError) -> Translation<'static> {
     match error {
-        ProductError::NameMissing => t!(error-name-missing),
-        ProductError::NameTooLong { max } => t!(error-name-too-long, max),
-        ProductError::SkuMissing => t!(error-sku-missing),
-        ProductError::SkuInvalid => t!(error-sku-invalid),
-        ProductError::SkuTooLong { max } => t!(error-sku-too-long, max),
-        ProductError::SkuTaken => t!(error-sku-taken),
-        ProductError::PriceMissing => t!(error-price-missing),
-        ProductError::PriceNotPositive => t!(error-price-not-positive),
-        ProductError::PriceInvalid => t!(error-price-invalid),
-        ProductError::StockMissing => t!(error-stock-missing),
-        ProductError::StockInvalid => t!(error-stock-invalid),
+        ProductError::NameMissing => t!(error - name - missing),
+        ProductError::NameTooLong { max } => t!(error - name - too - long, max),
+        ProductError::SkuMissing => t!(error - sku - missing),
+        ProductError::SkuInvalid => t!(error - sku - invalid),
+        ProductError::SkuTooLong { max } => t!(error - sku - too - long, max),
+        ProductError::SkuTaken => t!(error - sku - taken),
+        ProductError::PriceMissing => t!(error - price - missing),
+        ProductError::PriceNotPositive => t!(error - price - not - positive),
+        ProductError::PriceInvalid => t!(error - price - invalid),
+        ProductError::StockMissing => t!(error - stock - missing),
+        ProductError::StockInvalid => t!(error - stock - invalid),
     }
 }
 

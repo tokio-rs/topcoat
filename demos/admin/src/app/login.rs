@@ -47,9 +47,9 @@ enum SignInError {
 impl SignInError {
     fn message(self) -> Translation<'static> {
         match self {
-            Self::EmailMissing => t!(error-email-missing),
-            Self::PasswordMissing => t!(error-password-missing),
-            Self::WrongCredentials => t!(error-wrong-credentials),
+            Self::EmailMissing => t!(error - email - missing),
+            Self::PasswordMissing => t!(error - password - missing),
+            Self::WrongCredentials => t!(error - wrong - credentials),
         }
     }
 }

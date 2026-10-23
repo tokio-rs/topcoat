@@ -344,16 +344,16 @@ async fn stock_badge(level: StockLevel) -> Result<impl View> {
 fn stock_label(level: StockLevel) -> Translation<'static> {
     match level {
         StockLevel::InStock => t!(stock-in-stock),
-        StockLevel::Low => t!(stock-low),
-        StockLevel::Out => t!(stock-out),
+        StockLevel::Low => t!(stock - low),
+        StockLevel::Out => t!(stock - out),
     }
 }
 
 fn sort_label(sort: ProductSort) -> Translation<'static> {
     match sort {
-        ProductSort::Name => t!(sort-name),
-        ProductSort::HighestPrice => t!(sort-highest-price),
-        ProductSort::LowestPrice => t!(sort-lowest-price),
-        ProductSort::LowestStock => t!(sort-lowest-stock),
+        ProductSort::Name => t!(sort - name),
+        ProductSort::HighestPrice => t!(sort - highest - price),
+        ProductSort::LowestPrice => t!(sort - lowest - price),
+        ProductSort::LowestStock => t!(sort - lowest - stock),
     }
 }

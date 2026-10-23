@@ -87,8 +87,8 @@ pub async fn list_pagination(
     let pages = page.pages();
     let previous = current.saturating_sub(1).max(1);
     let next = (current + 1).min(pages);
-    let previous_label = t!(pagination-previous).resolve(cx);
-    let next_label = t!(pagination-next).resolve(cx);
+    let previous_label = t!(pagination - previous).resolve(cx);
+    let next_label = t!(pagination - next).resolve(cx);
 
     Ok(view! {
         <div class="flex flex-col items-center gap-3 px-6 py-3 sm:flex-row">

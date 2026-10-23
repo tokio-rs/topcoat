@@ -388,12 +388,12 @@ async fn status_actions(cx: &Cx, id: u64, next: &'static [OrderStatus]) -> Resul
 /// The label of a button that moves an order to `status`.
 fn status_action(status: OrderStatus) -> Translation<'static> {
     match status {
-        OrderStatus::Pending => t!(action-pending),
-        OrderStatus::Paid => t!(action-paid),
-        OrderStatus::Shipped => t!(action-shipped),
-        OrderStatus::Delivered => t!(action-delivered),
-        OrderStatus::Cancelled => t!(action-cancelled),
-        OrderStatus::Refunded => t!(action-refunded),
+        OrderStatus::Pending => t!(action - pending),
+        OrderStatus::Paid => t!(action - paid),
+        OrderStatus::Shipped => t!(action - shipped),
+        OrderStatus::Delivered => t!(action - delivered),
+        OrderStatus::Cancelled => t!(action - cancelled),
+        OrderStatus::Refunded => t!(action - refunded),
     }
 }
 

@@ -314,8 +314,8 @@ async fn customer_columns() -> Result<impl View> {
 
 fn sort_label(sort: CustomerSort) -> Translation<'static> {
     match sort {
-        CustomerSort::Name => t!(sort-name),
-        CustomerSort::Newest => t!(sort-newest),
-        CustomerSort::Oldest => t!(sort-oldest),
+        CustomerSort::Name => t!(sort - name),
+        CustomerSort::Newest => t!(sort - newest),
+        CustomerSort::Oldest => t!(sort - oldest),
     }
 }

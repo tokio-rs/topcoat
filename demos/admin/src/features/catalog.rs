@@ -301,12 +301,16 @@ impl ProductForm {
 pub enum ProductError {
     NameMissing,
     /// The name has more than `max` characters.
-    NameTooLong { max: usize },
+    NameTooLong {
+        max: usize,
+    },
     SkuMissing,
     /// The SKU contains characters other than letters, digits, and hyphens.
     SkuInvalid,
     /// The SKU has more than `max` characters.
-    SkuTooLong { max: usize },
+    SkuTooLong {
+        max: usize,
+    },
     /// Another product already uses the SKU.
     SkuTaken,
     PriceMissing,
