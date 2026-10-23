@@ -3,11 +3,16 @@ mod path;
 mod resource;
 mod signature;
 
+use std::{
+    hash::{DefaultHasher, Hash, Hasher},
+    sync::atomic::{AtomicU64, Ordering},
+};
+
 pub use fallback::*;
 use icu_locale_core::LanguageIdentifier;
 pub use path::*;
-use proc_macro2::{Span, TokenStream};
-use quote::{ToTokens, quote};
+use proc_macro2::{Ident, Span, TokenStream};
+use quote::{ToTokens, format_ident, quote};
 pub use resource::*;
 pub use signature::*;
 use syn::{
@@ -89,14 +94,73 @@ impl Messages {
         }
     }
 
-    /// Generates the `msg` module for the files matched by the path from
-    /// `call_site`, or compile errors if they cannot be found or parsed.
+    /// Returns the name of the hidden `macro_rules!` macro behind `t!`.
+    ///
+    /// The name contains a hash of the location and the input of the
+    /// invocation at `call_site`, so every invocation gets its own name. When
+    /// the call site has no source file, as may be the case in rust-analyzer,
+    /// the hash also contains a number that grows with every call, so
+    /// invocations with the same input still get different names.
+    #[must_use]
+    pub fn macro_name(&self, call_site: &CallSite) -> Ident {
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+
+        let start = Span::call_site().start();
+        let file = call_site.source_file();
+        let counter = file
+            .is_none()
+            .then(|| COUNTER.fetch_add(1, Ordering::Relaxed));
+        let mut hasher = DefaultHasher::new();
+        (
+            file,
+            start.line,
+            start.column,
+            self.vis.to_token_stream().to_string(),
+            self.path().lit.value(),
+            counter,
+        )
+            .hash(&mut hasher);
+        format_ident!("__topcoat_l10n_t_{:016x}", hasher.finish())
+    }
+
+    /// Generates `t!`: the hidden macro and a `use` that names it `t` with
+    /// the visibility of the invocation.
+    fn t_macro(&self, call_site: &CallSite) -> TokenStream {
+        let name = self.macro_name(call_site);
+        let vis = &self.vis;
+        // Other crates can only call an exported macro, which is placed at the
+        // root of the crate, so only a `pub` invocation exports it.
+        let export = matches!(vis, Visibility::Public(_)).then(|| quote! { #[macro_export] });
+        // TODO: Forward the input to the `t` proc macro with the namespace ID.
+        quote! {
+            #[doc(hidden)]
+            #export
+            #[allow(unused_macros)]
+            macro_rules! #name {
+                ($($input:tt)*) => {
+                    ::core::compile_error!("`t!` cannot be expanded yet")
+                };
+            }
+            #[allow(unused_imports)]
+            #vis use #name as t;
+        }
+    }
+
+    /// Generates `t!` and the `msg` module for the files matched by the path
+    /// from `call_site`, or compile errors if they cannot be found or parsed.
     #[must_use]
     pub fn expand(&self, call_site: &CallSite) -> TokenStream {
+        let t = self.t_macro(call_site);
         let path = self.path();
         let locales = match path.resolve(call_site) {
             Ok(locales) => locales,
-            Err(err) => return err.to_compile_error(),
+            Err(err) => {
+                let err = err.to_compile_error();
+                return quote! {
+                    #t
+                    #err
+                };
+            }
         };
 
         let mut errors = Vec::new();
@@ -146,6 +210,7 @@ impl Messages {
         };
         let vis = &self.vis;
         quote! {
+            #t
             // Fluent names are often not snake case, such as `loginInput`.
             #[allow(non_snake_case)]
             #vis mod msg {
@@ -219,6 +284,10 @@ impl Parse for Messages {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
+    use topcoat_core_grammar::testing::assert_deterministic;
+
     use super::*;
 
     fn parse(input: &str) -> syn::Result<Messages> {
@@ -310,5 +379,36 @@ mod tests {
     fn requires_a_fallback_for_several_locales() {
         let messages = parse("").unwrap();
         assert!(messages.fallback(&locales(&["de", "en"])).is_err());
+    }
+
+    fn call_site(source_file: Option<&str>) -> CallSite {
+        CallSite::new(Path::new("/app"), source_file.map(Path::new)).unwrap()
+    }
+
+    #[test]
+    fn the_macro_name_is_the_same_for_the_same_invocation() {
+        let call_site = call_site(Some("/app/src/lib.rs"));
+        assert_deterministic(|| {
+            parse(r#"pub "./l10n/{locale}.ftl""#).map(|messages| messages.macro_name(&call_site))
+        });
+    }
+
+    #[test]
+    fn the_macro_name_depends_on_the_file_and_the_input() {
+        let name = |file, input| parse(input).unwrap().macro_name(&call_site(Some(file)));
+        let lib = "/app/src/lib.rs";
+        assert_ne!(name(lib, "pub"), name("/app/src/admin.rs", "pub"));
+        assert_ne!(name(lib, "pub"), name(lib, "pub(crate)"));
+        assert_ne!(
+            name(lib, r#""./a/{locale}.ftl""#),
+            name(lib, r#""./b/{locale}.ftl""#)
+        );
+    }
+
+    #[test]
+    fn invocations_without_a_file_get_different_macro_names() {
+        let call_site = call_site(None);
+        let name = || parse("pub").unwrap().macro_name(&call_site);
+        assert_ne!(name(), name());
     }
 }

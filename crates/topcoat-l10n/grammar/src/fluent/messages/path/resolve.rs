@@ -52,6 +52,12 @@ impl CallSite {
         Self::new(&manifest_dir, Span::call_site().local_file().as_deref())
     }
 
+    /// Returns the source file of the invocation, if it is a file on disk.
+    #[must_use]
+    pub fn source_file(&self) -> Option<&Path> {
+        self.source_file.as_deref()
+    }
+
     /// Returns the directory of the invoking module, where its child modules
     /// live.
     ///

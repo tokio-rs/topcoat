@@ -31,6 +31,8 @@ quote = { workspace = true, optional = true }
 syn = { workspace = true, optional = true }
 
 [dev-dependencies]
+topcoat-core-grammar = { workspace = true, features = ["testing"] }
+
 tempfile.workspace = true
 
 [lints]
