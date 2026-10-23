@@ -5233,6 +5233,7 @@ dependencies = [
  "topcoat-font",
  "topcoat-font-grammar",
  "topcoat-l10n",
+ "topcoat-l10n-grammar",
  "topcoat-mail-grammar",
  "topcoat-router",
  "topcoat-ui",

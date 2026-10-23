@@ -43,6 +43,17 @@ impl Parse for Translate {
     }
 }
 
+/// Prints the call on one line if it fits. Otherwise, puts the key and each argument
+/// on their own lines, followed by a comma.
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for Translate {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.docs.pretty_print(printer);
+        self.key.pretty_print(printer);
+        self.arguments.pretty_print(printer);
+    }
+}
+
 /// Input forwarded by the generated `t!` macro. It starts with the hidden macro name
 /// that identifies the namespace, then a semicolon and the caller's arguments.
 ///

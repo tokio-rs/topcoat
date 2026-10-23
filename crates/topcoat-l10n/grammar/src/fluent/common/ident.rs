@@ -126,6 +126,17 @@ impl ToTokens for FluentIdent {
     }
 }
 
+/// Prints the identifier without spaces between its tokens, as in `password-field`.
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FluentIdent {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        match self {
+            Self::Tokens(tokens) => tokens.pretty_print(printer),
+            Self::Str(lit) => lit.pretty_print(printer),
+        }
+    }
+}
+
 /// One token in a [`FluentIdent`].
 pub enum FluentIdentToken {
     /// A Rust identifier or keyword, such as `password`, `type` or `r#type`.
@@ -158,6 +169,18 @@ impl ToTokens for FluentIdentToken {
             Self::Hyphen(hyphen) => hyphen.to_tokens(tokens),
             Self::Int(lit) => lit.to_tokens(tokens),
             Self::Float(lit) => lit.to_tokens(tokens),
+        }
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FluentIdentToken {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        match self {
+            Self::Ident(ident) => ident.pretty_print(printer),
+            Self::Hyphen(hyphen) => hyphen.pretty_print(printer),
+            Self::Int(lit) => lit.pretty_print(printer),
+            Self::Float(lit) => lit.pretty_print(printer),
         }
     }
 }

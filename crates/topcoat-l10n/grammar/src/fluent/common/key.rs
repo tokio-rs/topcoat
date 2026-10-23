@@ -98,6 +98,19 @@ impl Parse for FluentKey {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FluentKey {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        match self {
+            Self::Idents { message, attribute } => {
+                message.pretty_print(printer);
+                attribute.pretty_print(printer);
+            }
+            Self::Str(lit) => lit.pretty_print(printer),
+        }
+    }
+}
+
 /// An attribute selector such as `.placeholder`.
 pub struct FluentKeyAttribute {
     /// The dot separating the message and attribute names.
@@ -118,6 +131,14 @@ impl Parse for FluentKeyAttribute {
 impl ParseOption for FluentKeyAttribute {
     fn peek(input: ParseStream) -> bool {
         input.peek(Token![.])
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for FluentKeyAttribute {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.dot_token.pretty_print(printer);
+        self.name.pretty_print(printer);
     }
 }
 

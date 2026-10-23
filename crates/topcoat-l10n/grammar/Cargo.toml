@@ -21,6 +21,7 @@ fluent = [
 	"dep:icu_locale",
 	"dep:icu_locale_core",
 ]
+pretty = ["topcoat-core-grammar?/pretty"]
 
 [dependencies]
 topcoat-core-grammar = { workspace = true, optional = true }
@@ -36,6 +37,10 @@ syn = { workspace = true, optional = true }
 topcoat-core-grammar = { workspace = true, features = ["testing"] }
 
 tempfile.workspace = true
+
+[[test]]
+name = "pretty"
+required-features = ["fluent", "pretty"]
 
 [lints]
 workspace = true

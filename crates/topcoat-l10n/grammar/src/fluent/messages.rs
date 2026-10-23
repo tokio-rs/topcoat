@@ -223,6 +223,14 @@ impl Parse for Messages {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for Messages {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.vis.pretty_print(printer);
+        self.path.lit.pretty_print(printer);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;

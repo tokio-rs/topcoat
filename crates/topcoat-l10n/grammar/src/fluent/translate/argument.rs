@@ -46,6 +46,43 @@ impl Parse for TranslateArguments {
     }
 }
 
+/// Separates the arguments with a comma and a break. The last argument gets a comma
+/// only when the list is split over several lines. A comma without arguments is
+/// dropped.
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for TranslateArguments {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        use topcoat_core_grammar::pretty::TextMode;
+
+        let Some(comma_token) = &self.comma_token else {
+            return;
+        };
+        if self.arguments.is_empty() {
+            printer.move_cursor(comma_token.span.end());
+            return;
+        }
+
+        comma_token.pretty_print(printer);
+        for (index, pair) in self.arguments.pairs().enumerate() {
+            printer.scan_same_line_trivia();
+            printer.scan_break();
+            " ".pretty_print(printer);
+            printer.scan_trivia(true, true);
+            pair.value().pretty_print(printer);
+            if pair.punct().is_some() {
+                printer.scan_no_break_trivia();
+            }
+            match pair.punct() {
+                Some(punct) if index < self.arguments.len() - 1 => punct.pretty_print(printer),
+                _ => {
+                    printer.scan_text(",".into(), TextMode::Break);
+                    printer.advance_cursor(",");
+                }
+            }
+        }
+    }
+}
+
 /// A named message argument, written as `name = value` or just `name` to use a Rust
 /// variable with that name.
 ///
@@ -106,6 +143,15 @@ impl Parse for TranslateArgument {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for TranslateArgument {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.docs.pretty_print(printer);
+        self.name.pretty_print(printer);
+        self.value.pretty_print(printer);
+    }
+}
+
 /// An explicit value in a [`TranslateArgument`], including its leading `=`.
 ///
 /// Stores tokens up to the next argument separator, even if the expression is
@@ -142,6 +188,35 @@ impl Parse for TranslateArgumentValue {
 impl ParseOption for TranslateArgumentValue {
     fn peek(input: ParseStream) -> bool {
         input.peek(Token![=])
+    }
+}
+
+/// Formats the value as a Rust expression. A value that is not a complete expression
+/// is copied as written.
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for TranslateArgumentValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        use syn::spanned::Spanned;
+        use topcoat_core_grammar::pretty::TextMode;
+
+        " ".pretty_print(printer);
+        self.eq_token.pretty_print(printer);
+        if self.tokens.is_empty() {
+            return;
+        }
+        " ".pretty_print(printer);
+        if let Ok(expr) = syn::parse2::<syn::Expr>(self.tokens.clone()) {
+            expr.pretty_print(printer);
+        } else {
+            let span = self.tokens.span();
+            let text = span
+                .source_text()
+                .unwrap_or_else(|| self.tokens.to_string());
+            printer.move_cursor(span.start());
+            printer.scan_text(text.into(), TextMode::Always);
+            printer.move_cursor(span.end());
+            printer.skip_trivia();
+        }
     }
 }
 
