@@ -57,6 +57,8 @@ fn to_decimal(number: &FluentNumber) -> Option<Decimal> {
             .max(minimum);
         let start = decimal.absolute.nonzero_magnitude_start();
         decimal.round_with_mode(start - maximum + 1, ROUNDING);
+        // Rounding pads zeros up to the rounding position.
+        decimal.absolute.trim_end();
         // Rounding can add a digit, as from 999 to 1000.
         let start = decimal.absolute.nonzero_magnitude_start();
         decimal.absolute.pad_end(start - minimum + 1);
@@ -71,6 +73,7 @@ fn to_decimal(number: &FluentNumber) -> Option<Decimal> {
             })
             .max(minimum);
         decimal.round_with_mode(-maximum, ROUNDING);
+        decimal.absolute.trim_end();
         decimal.absolute.pad_end(-minimum);
     }
 
