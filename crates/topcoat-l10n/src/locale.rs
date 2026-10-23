@@ -5,6 +5,7 @@ use std::{
 
 use icu_locale::LocaleCanonicalizer;
 use icu_locale_core::extensions::unicode::{Attributes, Keywords, Unicode, Value};
+use topcoat_core::context::{Cx, try_request_context};
 
 use crate::{Extensions, LanguageIdentifier, LocaleParseError};
 
@@ -199,6 +200,30 @@ macro_rules! locale {
     };
 }
 
+/// Reads the [`Locale`] from the current request context, returning `None` if none is
+/// set.
+///
+/// Set it with [`Cx::with`], usually in a layer.
+#[must_use]
+pub fn try_locale(cx: &Cx) -> Option<&Locale> {
+    try_request_context(cx)
+}
+
+/// Reads the locale from the current request context. See [`try_locale`] for how to set
+/// it.
+///
+/// # Panics
+///
+/// Panics if the context contains no [`Locale`].
+#[must_use]
+#[track_caller]
+pub fn locale(cx: &Cx) -> &Locale {
+    let Some(locale) = try_locale(cx) else {
+        panic!("no locale: register a `Locale` on the request context, such as in a layer");
+    };
+    locale
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -259,5 +284,17 @@ mod tests {
             locale!("iw-u-ca-hebrew").canonicalize(),
             locale!("he-u-ca-hebrew")
         );
+    }
+
+    #[test]
+    fn the_locale_is_the_one_in_the_scope() {
+        let cx = Cx::default().with(locale!("fr"));
+        assert_eq!(locale(&cx), &locale!("fr"));
+    }
+
+    #[test]
+    #[should_panic(expected = "no locale")]
+    fn locale_panics_without_a_locale() {
+        let _ = locale(&Cx::default());
     }
 }

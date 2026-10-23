@@ -19,30 +19,6 @@ pub fn accept_language(cx: &Cx) -> &[Locale] {
     })
 }
 
-/// Reads the [`Locale`] from the current request context, returning `None` if none is
-/// set.
-///
-/// Set it with [`Cx::with`], usually in a layer.
-#[must_use]
-pub fn try_locale(cx: &Cx) -> Option<&Locale> {
-    try_request_context(cx)
-}
-
-/// Reads the locale from the current request context. See [`try_locale`] for how to set
-/// it.
-///
-/// # Panics
-///
-/// Panics if the context contains no [`Locale`].
-#[must_use]
-#[track_caller]
-pub fn locale(cx: &Cx) -> &Locale {
-    let Some(locale) = try_locale(cx) else {
-        panic!("no locale: register a `Locale` on the request context, such as in a layer");
-    };
-    locale
-}
-
 /// Parses header values into locales sorted by preference. Equal weights preserve the
 /// input order.
 fn parse_accept_language<'a>(values: impl Iterator<Item = &'a str>) -> Vec<Locale> {
@@ -98,7 +74,7 @@ mod tests {
     use http::Request;
 
     use super::*;
-    use crate::locale;
+    use crate::{locale, try_locale};
 
     fn parse(value: &str) -> Vec<Locale> {
         parse_accept_language([value].into_iter())
@@ -181,19 +157,7 @@ mod tests {
     }
 
     #[test]
-    fn the_locale_is_the_one_in_the_scope() {
-        let cx = request("de").with(locale!("fr"));
-        assert_eq!(locale(&cx), &locale!("fr"));
-    }
-
-    #[test]
     fn the_header_does_not_choose_a_locale() {
         assert_eq!(try_locale(&request("de")), None);
-    }
-
-    #[test]
-    #[should_panic(expected = "no locale")]
-    fn locale_panics_without_a_locale() {
-        let _ = locale(&Cx::default());
     }
 }
