@@ -9,6 +9,7 @@ mod extensions;
 mod fluent;
 mod langid;
 mod locale;
+mod lookup;
 mod negotiate;
 #[cfg(feature = "http")]
 mod request;
@@ -23,6 +24,7 @@ pub use extensions::*;
 pub use fluent::*;
 pub use langid::*;
 pub use locale::*;
+pub use lookup::*;
 pub use negotiate::*;
 #[cfg(feature = "http")]
 pub use request::*;

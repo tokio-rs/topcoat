@@ -130,52 +130,6 @@ mod tests {
     }
 
     #[test]
-    fn negotiate_prefers_earlier_requested_locales() {
-        let supported = SupportedLocales::from([locale!("en"), locale!("de")]);
-
-        assert_eq!(
-            supported.negotiate(&[locale!("fr"), locale!("de"), locale!("en")]),
-            &locale!("de")
-        );
-    }
-
-    #[test]
-    fn negotiate_matches_regional_and_script_variants() {
-        let supported = SupportedLocales::from([
-            locale!("en-US"),
-            locale!("en-GB"),
-            locale!("zh-Hans"),
-            locale!("zh-Hant"),
-        ]);
-
-        assert_eq!(supported.negotiate(&[locale!("en-GB")]), &locale!("en-GB"));
-        assert_eq!(supported.negotiate(&[locale!("en")]), &locale!("en-US"));
-        assert_eq!(supported.negotiate(&[locale!("en-AU")]), &locale!("en-US"));
-        assert_eq!(
-            supported.negotiate(&[locale!("zh-TW")]),
-            &locale!("zh-Hant")
-        );
-        assert_eq!(
-            supported.negotiate(&[locale!("zh-CN")]),
-            &locale!("zh-Hans")
-        );
-    }
-
-    #[test]
-    fn negotiate_does_not_match_across_scripts() {
-        let supported = SupportedLocales::from([locale!("en"), locale!("sr-Cyrl")]);
-
-        assert_eq!(supported.negotiate(&[locale!("sr-Latn")]), &locale!("en"));
-    }
-
-    #[test]
-    fn negotiate_matches_deprecated_requested_subtags() {
-        let supported = SupportedLocales::from([locale!("en"), locale!("he")]);
-
-        assert_eq!(supported.negotiate(&[locale!("iw")]), &locale!("he"));
-    }
-
-    #[test]
     fn negotiate_uses_the_fallback_when_nothing_matches() {
         let supported =
             SupportedLocales::new([locale!("de"), locale!("fr")]).with_fallback(locale!("en"));

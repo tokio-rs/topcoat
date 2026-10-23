@@ -40,7 +40,9 @@ pub fn negotiate<'a, 'r>(
 
         let id = id.maximize();
         let tiers: [fn(&LanguageIdentifier, &LanguageIdentifier) -> bool; 2] = [
-            |a, b| a.language() == b.language() && a.script() == b.script() && a.region() == b.region(),
+            |a, b| {
+                a.language() == b.language() && a.script() == b.script() && a.region() == b.region()
+            },
             |a, b| a.language() == b.language() && a.script() == b.script(),
         ];
         for matches in tiers {
