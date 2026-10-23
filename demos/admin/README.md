@@ -37,7 +37,7 @@ The dashboard's sales and visitor counts are simulated from the current time. Th
 
 ## Translations
 
-Each page module keeps its [Fluent](https://projectfluent.org/) files in an `l10n/` directory next to it, such as `src/app/_admin/orders/l10n/`. To add a language, add a file next to each existing one and add its locale to `LOCALES` in [`src/features/locale.rs`](src/features/locale.rs). Run `cargo topcoat l10n check -p admin` from the repository root to find missing messages.
+Each page module and the custom components keep their [Fluent](https://projectfluent.org/) files in an `l10n/` directory next to them, such as `src/app/_admin/orders/l10n/`. To add a language, add a file next to each existing one and add its locale to `LOCALES` in [`src/features/locale.rs`](src/features/locale.rs). Run `cargo topcoat l10n check -p admin` from the repository root to find missing messages.
 
 ## Changing a model
 
