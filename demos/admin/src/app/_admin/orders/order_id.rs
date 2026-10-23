@@ -68,15 +68,18 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
             <div class="flex flex-col gap-1">
                 <div class="flex items-center gap-3">
                     <h1 class="text-2xl font-semibold tracking-tight">
-                        (t!(order-title, id = order.id.to_string()))
+                        (t!(order_title, id = order.id.to_string()))
                     </h1>
                     status_badge(status: order.status)
                 </div>
                 <p class="text-sm text-muted-foreground">
                     <time datetime=(order.placed_at.to_string())>
                         (t!(
-                            placed-on,
-                            date = order.placed_at.strftime("%b %-d, %Y at %H:%M UTC").to_string()
+                            placed_on,
+                            date = order
+                                .placed_at
+                                .strftime("%b %-d, %Y at %H:%M UTC")
+                                .to_string(),
                         ))
                     </time>
                 </p>
@@ -114,7 +117,7 @@ async fn order_items(cx: &Cx, id: u64, total: Money) -> Result<impl View> {
     Ok(view! {
         card_header(
             card_title((t!(items)))
-            card_description((t!(unit-count, count = units)))
+            card_description((t!(unit_count, count = units)))
         )
         table(
             order_item_columns()
@@ -214,10 +217,19 @@ async fn order_item_columns() -> Result<impl View> {
     Ok(view! {
         table_header(
             table_row(
-                table_head(attrs: attributes! { class="w-full" }, (t!(column-product)))
-                table_head(attrs: attributes! { class="text-right" }, (t!(column-quantity)))
-                table_head(attrs: attributes! { class="text-right" }, (t!(column-price)))
-                table_head(attrs: attributes! { class="text-right" }, (t!(column-subtotal)))
+                table_head(attrs: attributes! { class="w-full" }, (t!(column_product)))
+                table_head(
+                    attrs: attributes! { class="text-right" },
+                    (t!(column_quantity))
+                )
+                table_head(
+                    attrs: attributes! { class="text-right" },
+                    (t!(column_price))
+                )
+                table_head(
+                    attrs: attributes! { class="text-right" },
+                    (t!(column_subtotal))
+                )
             )
         )
     })
@@ -251,7 +263,7 @@ async fn customer_details(cx: &Cx, id: u64) -> Result<impl View> {
                     <dd>(&customer.city)</dd>
                 </div>
                 <div class="flex flex-col gap-1">
-                    <dt class="text-muted-foreground">(t!(customer-since))</dt>
+                    <dt class="text-muted-foreground">(t!(customer_since))</dt>
                     <dd>
                         <time datetime=(customer.joined_at.to_string())>
                             (customer.joined_at.strftime("%b %Y").to_string())
@@ -287,7 +299,7 @@ async fn customer_details_skeleton() -> Result<impl View> {
                     </dd>
                 </div>
                 <div class="flex flex-col gap-1">
-                    <dt class="text-muted-foreground">(t!(customer-since))</dt>
+                    <dt class="text-muted-foreground">(t!(customer_since))</dt>
                     <dd class="flex h-5 items-center">
                         skeleton(attrs: attributes! { class="h-3.5 w-16" })
                     </dd>
@@ -355,9 +367,9 @@ async fn status_actions(cx: &Cx, id: u64, next: &'static [OrderStatus]) -> Resul
                     dialog_header(
                         dialog_title(
                             attrs: attributes! { id=(&title_id) },
-                            (t!(confirm-status, status = status.slug()))
+                            (t!(confirm_status, status = status.slug()))
                         )
-                        dialog_description((t!(final-status, id = id.to_string())))
+                        dialog_description((t!(final_status, id = id.to_string())))
                     )
                     dialog_footer(
                         button(
@@ -366,7 +378,7 @@ async fn status_actions(cx: &Cx, id: u64, next: &'static [OrderStatus]) -> Resul
                                 type="button"
                                 @click=$(|_e: Event| confirming.set(false))
                             },
-                            (t!(keep-order))
+                            (t!(keep_order))
                         )
                         button(
                             variant: ButtonVariant::Destructive,
@@ -388,12 +400,12 @@ async fn status_actions(cx: &Cx, id: u64, next: &'static [OrderStatus]) -> Resul
 /// The label of a button that moves an order to `status`.
 fn status_action(status: OrderStatus) -> Translation<'static> {
     match status {
-        OrderStatus::Pending => t!(action - pending),
-        OrderStatus::Paid => t!(action - paid),
-        OrderStatus::Shipped => t!(action - shipped),
-        OrderStatus::Delivered => t!(action - delivered),
-        OrderStatus::Cancelled => t!(action - cancelled),
-        OrderStatus::Refunded => t!(action - refunded),
+        OrderStatus::Pending => t!(action_pending),
+        OrderStatus::Paid => t!(action_paid),
+        OrderStatus::Shipped => t!(action_shipped),
+        OrderStatus::Delivered => t!(action_delivered),
+        OrderStatus::Cancelled => t!(action_cancelled),
+        OrderStatus::Refunded => t!(action_refunded),
     }
 }
 

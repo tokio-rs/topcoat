@@ -4,34 +4,34 @@ search = Search customers
     .placeholder = Search names or emails
 sort = Sort by
 
-sort-name = Name
-sort-newest = Newest customers
-sort-oldest = Oldest customers
+sort_name = Name
+sort_newest = Newest customers
+sort_oldest = Oldest customers
 
-no-results = No customers found
+no_results = No customers found
     .description = No customers match your search.
-clear-search = Clear search
+clear_search = Clear search
 
-column-customer = Customer
-column-city = City
-column-joined = Joined
-column-orders = Orders
-column-spent = Spent
+column_customer = Customer
+column_city = City
+column_joined = Joined
+column_orders = Orders
+column_spent = Spent
 
 ## Customer details
 
 # `$date` is the month the customer joined, such as "Oct 2026".
-customer-since = Customer since { $date }
+customer_since = Customer since { $date }
 
-total-spent = Total spent
-average-order = Average order
+total_spent = Total spent
+average_order = Average order
 
 orders = Orders
     .description = Cancelled and refunded orders do not count as spent.
-no-orders = This customer has not placed an order yet.
+no_orders = This customer has not placed an order yet.
 
-column-order = Order
-column-status = Status
-column-items = Items
-column-placed = Placed
-column-total = Total
+column_order = Order
+column_status = Status
+column_items = Items
+column_placed = Placed
+column_total = Total

@@ -100,7 +100,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                     )
                 </div>
                 <div class="grid grid-cols-2 gap-2 sm:ml-auto sm:flex">
-                    <label for=(&stock_id) class="sr-only">(t!(stock-filter))</label>
+                    <label for=(&stock_id) class="sr-only">(t!(stock_filter))</label>
                     select(
                         attrs: attributes! {
                             id=(&stock_id)
@@ -112,7 +112,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                             })
                         },
                         <option value="" selected=(initial_stock.is_empty())>
-                            (t!(stock-filter.all))
+                            (t!(stock_filter.all))
                         </option>
                         for option in StockLevel::ALL {
                             <option
@@ -189,8 +189,10 @@ async fn product_list(
                     icon(data: iconify_icon!("lucide:package-search"))
                 </span>
                 <div class="flex flex-col gap-1">
-                    <p class="font-medium">(t!(no-results))</p>
-                    <p class="text-sm text-muted-foreground">(t!(no-results.description))</p>
+                    <p class="font-medium">(t!(no_results))</p>
+                    <p class="text-sm text-muted-foreground">
+                        (t!(no_results.description))
+                    </p>
                 </div>
                 button(
                     variant: ButtonVariant::Outline,
@@ -203,7 +205,7 @@ async fn product_list(
                             page_number.set(1);
                         })
                     },
-                    (t!(clear-filters))
+                    (t!(clear_filters))
                 )
             </div>
         } else {
@@ -315,10 +317,16 @@ async fn product_columns() -> Result<impl View> {
     Ok(view! {
         table_header(
             table_row(
-                table_head(attrs: attributes! { class="w-full" }, (t!(column-product)))
-                table_head((t!(column-status)))
-                table_head(attrs: attributes! { class="text-right" }, (t!(column-stock)))
-                table_head(attrs: attributes! { class="text-right" }, (t!(column-price)))
+                table_head(attrs: attributes! { class="w-full" }, (t!(column_product)))
+                table_head((t!(column_status)))
+                table_head(
+                    attrs: attributes! { class="text-right" },
+                    (t!(column_stock))
+                )
+                table_head(
+                    attrs: attributes! { class="text-right" },
+                    (t!(column_price))
+                )
             )
         )
     })
@@ -343,17 +351,17 @@ async fn stock_badge(level: StockLevel) -> Result<impl View> {
 
 fn stock_label(level: StockLevel) -> Translation<'static> {
     match level {
-        StockLevel::InStock => t!(stock-in-stock),
-        StockLevel::Low => t!(stock - low),
-        StockLevel::Out => t!(stock - out),
+        StockLevel::InStock => t!(stock_in_stock),
+        StockLevel::Low => t!(stock_low),
+        StockLevel::Out => t!(stock_out),
     }
 }
 
 fn sort_label(sort: ProductSort) -> Translation<'static> {
     match sort {
-        ProductSort::Name => t!(sort - name),
-        ProductSort::HighestPrice => t!(sort - highest - price),
-        ProductSort::LowestPrice => t!(sort - lowest - price),
-        ProductSort::LowestStock => t!(sort - lowest - stock),
+        ProductSort::Name => t!(sort_name),
+        ProductSort::HighestPrice => t!(sort_highest_price),
+        ProductSort::LowestPrice => t!(sort_lowest_price),
+        ProductSort::LowestStock => t!(sort_lowest_stock),
     }
 }

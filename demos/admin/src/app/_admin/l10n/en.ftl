@@ -1,12 +1,12 @@
 navigation = Back office navigation
-close-sidebar = Close sidebar
+close_sidebar = Close sidebar
 store = Store
 
-nav-dashboard = Dashboard
-nav-orders = Orders
-nav-products = Products
-nav-customers = Customers
+nav_dashboard = Dashboard
+nav_orders = Orders
+nav_products = Products
+nav_customers = Customers
 
-sign-out = Sign out
-light-theme = Switch to light theme
-dark-theme = Switch to dark theme
+sign_out = Sign out
+light_theme = Switch to light theme
+dark_theme = Switch to dark theme

@@ -1,12 +1,12 @@
 navigation = Backoffice-Navigation
-close-sidebar = Seitenleiste schließen
+close_sidebar = Seitenleiste schließen
 store = Shop
 
-nav-dashboard = Übersicht
-nav-orders = Bestellungen
-nav-products = Produkte
-nav-customers = Kunden
+nav_dashboard = Übersicht
+nav_orders = Bestellungen
+nav_products = Produkte
+nav_customers = Kunden
 
-sign-out = Abmelden
-light-theme = Zum hellen Design wechseln
-dark-theme = Zum dunklen Design wechseln
+sign_out = Abmelden
+light_theme = Zum hellen Design wechseln
+dark_theme = Zum dunklen Design wechseln

@@ -1,3 +1,3 @@
 # This language's own name.
 language = English
-change-language = Change language
+change_language = Change language

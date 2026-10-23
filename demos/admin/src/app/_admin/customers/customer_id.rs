@@ -83,8 +83,8 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                         data: iconify_icon!("lucide:calendar"),
                         <time datetime=(customer.joined_at.to_string())>
                             (t!(
-                                customer-since,
-                                date = customer.joined_at.strftime("%b %Y").to_string()
+                                customer_since,
+                                date = customer.joined_at.strftime("%b %Y").to_string(),
                             ))
                         </time>
                     )
@@ -117,9 +117,9 @@ async fn customer_orders(cx: &Cx, id: u64) -> Result<impl View> {
     Ok(view! {
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
             stat(label: t!(orders), (spending.orders))
-            stat(label: t!(total-spent), (money(spending.spent)))
+            stat(label: t!(total_spent), (money(spending.spent)))
             stat(
-                label: t!(average-order),
+                label: t!(average_order),
                 match spending.average_order() {
                     Some(average) => (money(average)),
                     None => "-",
@@ -133,7 +133,7 @@ async fn customer_orders(cx: &Cx, id: u64) -> Result<impl View> {
                 card_description((t!(orders.description)))
             )
             if orders.is_empty() {
-                <p class="px-6 text-sm text-muted-foreground">(t!(no-orders))</p>
+                <p class="px-6 text-sm text-muted-foreground">(t!(no_orders))</p>
             } else {
                 table(
                     order_columns()
@@ -184,7 +184,7 @@ async fn customer_orders(cx: &Cx, id: u64) -> Result<impl View> {
 async fn customer_orders_skeleton() -> Result<impl View> {
     Ok(view! {
         <div aria-busy="true" class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            for label in [t!(orders), t!(total-spent), t!(average-order)] {
+            for label in [t!(orders), t!(total_spent), t!(average_order)] {
                 stat(
                     label: label,
                     <div class="flex h-8 items-center">
@@ -246,11 +246,14 @@ async fn order_columns() -> Result<impl View> {
     Ok(view! {
         table_header(
             table_row(
-                table_head((t!(column-order)))
-                table_head((t!(column-status)))
-                table_head((t!(column-items)))
-                table_head(attrs: attributes! { class="w-full" }, (t!(column-placed)))
-                table_head(attrs: attributes! { class="text-right" }, (t!(column-total)))
+                table_head((t!(column_order)))
+                table_head((t!(column_status)))
+                table_head((t!(column_items)))
+                table_head(attrs: attributes! { class="w-full" }, (t!(column_placed)))
+                table_head(
+                    attrs: attributes! { class="text-right" },
+                    (t!(column_total))
+                )
             )
         )
     })

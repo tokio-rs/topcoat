@@ -5,23 +5,23 @@ today = Heute
 live = Live
 revenue = Umsatz
 orders = Bestellungen
-average-order = Durchschnittliche Bestellung
+average_order = Durchschnittliche Bestellung
 visitors = Besucher gerade
 
 count = { $count }
 # `$percent` ist ein Prozentsatz ohne Vorzeichen, etwa 4.2. Das geschützte
 # Leerzeichen hält Zahl und Prozentzeichen in einer Zeile.
-increase = +{ NUMBER($percent, minimumFractionDigits: 1, maximumFractionDigits: 1) }{ " " }%
-decrease = -{ NUMBER($percent, minimumFractionDigits: 1, maximumFractionDigits: 1) }{ " " }%
-compared-to-yesterday = ggü. gestern
+increase = +{ NUMBER($percent, minimumFractionDigits: 1, maximumFractionDigits: 1) }{ "\u00A0" }%
+decrease = -{ NUMBER($percent, minimumFractionDigits: 1, maximumFractionDigits: 1) }{ "\u00A0" }%
+compared_to_yesterday = ggü. gestern
 
-needs-attention = Braucht Aufmerksamkeit
-open-orders = Offene Bestellungen
+needs_attention = Braucht Aufmerksamkeit
+open_orders = Offene Bestellungen
     .description = Bestellungen, die auf Zahlung oder Versand warten, die älteste zuerst.
-no-open-orders = Alles erledigt. Keine Bestellung wartet.
+no_open_orders = Alles erledigt. Keine Bestellung wartet.
 
-column-order = Bestellung
-column-customer = Kunde
-column-status = Status
-column-placed = Bestellt
-column-total = Summe
+column_order = Bestellung
+column_customer = Kunde
+column_status = Status
+column_placed = Bestellt
+column_total = Summe

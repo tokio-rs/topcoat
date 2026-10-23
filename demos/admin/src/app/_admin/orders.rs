@@ -102,7 +102,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                     )
                 </div>
                 <div class="grid grid-cols-2 gap-2 sm:ml-auto sm:flex">
-                    <label for=(&status_id) class="sr-only">(t!(status-filter))</label>
+                    <label for=(&status_id) class="sr-only">(t!(status_filter))</label>
                     select(
                         attrs: attributes! {
                             id=(&status_id)
@@ -114,7 +114,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                             })
                         },
                         <option value="" selected=(initial_status.is_empty())>
-                            (t!(status-filter.all))
+                            (t!(status_filter.all))
                         </option>
                         for option in OrderStatus::ALL {
                             <option
@@ -191,8 +191,10 @@ async fn order_list(
                     icon(data: iconify_icon!("lucide:package-search"))
                 </span>
                 <div class="flex flex-col gap-1">
-                    <p class="font-medium">(t!(no-results))</p>
-                    <p class="text-sm text-muted-foreground">(t!(no-results.description))</p>
+                    <p class="font-medium">(t!(no_results))</p>
+                    <p class="text-sm text-muted-foreground">
+                        (t!(no_results.description))
+                    </p>
                 </div>
                 button(
                     variant: ButtonVariant::Outline,
@@ -205,7 +207,7 @@ async fn order_list(
                             page_number.set(1);
                         })
                     },
-                    (t!(clear-filters))
+                    (t!(clear_filters))
                 )
             </div>
         } else {
@@ -347,12 +349,15 @@ async fn order_columns() -> Result<impl View> {
     Ok(view! {
         table_header(
             table_row(
-                table_head((t!(column-order)))
-                table_head(attrs: attributes! { class="w-full" }, (t!(column-customer)))
-                table_head((t!(column-status)))
-                table_head((t!(column-items)))
-                table_head((t!(column-placed)))
-                table_head(attrs: attributes! { class="text-right" }, (t!(column-total)))
+                table_head((t!(column_order)))
+                table_head(attrs: attributes! { class="w-full" }, (t!(column_customer)))
+                table_head((t!(column_status)))
+                table_head((t!(column_items)))
+                table_head((t!(column_placed)))
+                table_head(
+                    attrs: attributes! { class="text-right" },
+                    (t!(column_total))
+                )
             )
         )
     })
@@ -386,13 +391,13 @@ pub(super) async fn time_ago(timestamp: Timestamp) -> Result<impl View> {
 
     Ok(view! {
         if minutes < 1 {
-            (t!(just-now))
+            (t!(just_now))
         } else if minutes < 60 {
-            (t!(minutes-ago, count = minutes))
+            (t!(minutes_ago, count = minutes))
         } else if minutes < 24 * 60 {
-            (t!(hours-ago, count = minutes / 60))
+            (t!(hours_ago, count = minutes / 60))
         } else if minutes < 7 * 24 * 60 {
-            (t!(days-ago, count = minutes / (24 * 60)))
+            (t!(days_ago, count = minutes / (24 * 60)))
         } else {
             (timestamp.strftime("%b %-d, %Y").to_string())
         }
@@ -400,25 +405,25 @@ pub(super) async fn time_ago(timestamp: Timestamp) -> Result<impl View> {
 }
 
 pub(super) fn item_count(count: u32) -> Translation<'static> {
-    t!(item - count, count)
+    t!(item_count, count)
 }
 
 fn status_label(status: OrderStatus) -> Translation<'static> {
     match status {
-        OrderStatus::Pending => t!(status - pending),
-        OrderStatus::Paid => t!(status - paid),
-        OrderStatus::Shipped => t!(status - shipped),
-        OrderStatus::Delivered => t!(status - delivered),
-        OrderStatus::Cancelled => t!(status - cancelled),
-        OrderStatus::Refunded => t!(status - refunded),
+        OrderStatus::Pending => t!(status_pending),
+        OrderStatus::Paid => t!(status_paid),
+        OrderStatus::Shipped => t!(status_shipped),
+        OrderStatus::Delivered => t!(status_delivered),
+        OrderStatus::Cancelled => t!(status_cancelled),
+        OrderStatus::Refunded => t!(status_refunded),
     }
 }
 
 fn sort_label(sort: OrderSort) -> Translation<'static> {
     match sort {
-        OrderSort::Newest => t!(sort - newest),
-        OrderSort::Oldest => t!(sort - oldest),
-        OrderSort::HighestTotal => t!(sort - highest - total),
-        OrderSort::LowestTotal => t!(sort - lowest - total),
+        OrderSort::Newest => t!(sort_newest),
+        OrderSort::Oldest => t!(sort_oldest),
+        OrderSort::HighestTotal => t!(sort_highest_total),
+        OrderSort::LowestTotal => t!(sort_lowest_total),
     }
 }

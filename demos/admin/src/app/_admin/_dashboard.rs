@@ -55,11 +55,11 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
         todays_stats()
 
         <section class="flex flex-col gap-3">
-            <h2 class="font-semibold">(t!(needs-attention))</h2>
+            <h2 class="font-semibold">(t!(needs_attention))</h2>
             card(
                 card_header(
-                    card_title((t!(open-orders)))
-                    card_description((t!(open-orders.description)))
+                    card_title((t!(open_orders)))
+                    card_description((t!(open_orders.description)))
                 )
                 suspense(fallback: view! { open_orders_skeleton() }, open_orders())
             )
@@ -97,7 +97,7 @@ async fn todays_stats(cx: &Cx) -> Result<impl View> {
                     figure: orders
                 )
                 stat_card(
-                    label: t!(average-order),
+                    label: t!(average_order),
                     accent: class!("text-amber-500"),
                     figure: average_order
                 )
@@ -237,7 +237,7 @@ async fn figure_details(figure: &Figure, accent: StaticClass) -> Result<impl Vie
                         (t!(decrease, percent = percent(change)))
                     </span>
                 }
-                (t!(compared-to-yesterday))
+                (t!(compared_to_yesterday))
             </p>
         }
         <div class=(class!("mt-4 h-16", accent))>
@@ -257,7 +257,7 @@ async fn open_orders(cx: &Cx) -> Result<impl View> {
 
     Ok(view! {
         if orders.is_empty() {
-            <p class="px-6 text-sm text-muted-foreground">(t!(no-open-orders))</p>
+            <p class="px-6 text-sm text-muted-foreground">(t!(no_open_orders))</p>
         } else {
             table(
                 open_order_columns()
@@ -349,11 +349,14 @@ async fn open_order_columns() -> Result<impl View> {
     Ok(view! {
         table_header(
             table_row(
-                table_head((t!(column-order)))
-                table_head(attrs: attributes! { class="w-full" }, (t!(column-customer)))
-                table_head((t!(column-status)))
-                table_head((t!(column-placed)))
-                table_head(attrs: attributes! { class="text-right" }, (t!(column-total)))
+                table_head((t!(column_order)))
+                table_head(attrs: attributes! { class="w-full" }, (t!(column_customer)))
+                table_head((t!(column_status)))
+                table_head((t!(column_placed)))
+                table_head(
+                    attrs: attributes! { class="text-right" },
+                    (t!(column_total))
+                )
             )
         )
     })

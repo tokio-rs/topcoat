@@ -152,8 +152,10 @@ async fn customer_list(
                     icon(data: iconify_icon!("lucide:user-search"))
                 </span>
                 <div class="flex flex-col gap-1">
-                    <p class="font-medium">(t!(no-results))</p>
-                    <p class="text-sm text-muted-foreground">(t!(no-results.description))</p>
+                    <p class="font-medium">(t!(no_results))</p>
+                    <p class="text-sm text-muted-foreground">
+                        (t!(no_results.description))
+                    </p>
                 </div>
                 button(
                     variant: ButtonVariant::Outline,
@@ -165,7 +167,7 @@ async fn customer_list(
                             page_number.set(1);
                         })
                     },
-                    (t!(clear-search))
+                    (t!(clear_search))
                 )
             </div>
         } else {
@@ -302,11 +304,17 @@ async fn customer_columns() -> Result<impl View> {
     Ok(view! {
         table_header(
             table_row(
-                table_head(attrs: attributes! { class="w-full" }, (t!(column-customer)))
-                table_head((t!(column-city)))
-                table_head((t!(column-joined)))
-                table_head(attrs: attributes! { class="text-right" }, (t!(column-orders)))
-                table_head(attrs: attributes! { class="text-right" }, (t!(column-spent)))
+                table_head(attrs: attributes! { class="w-full" }, (t!(column_customer)))
+                table_head((t!(column_city)))
+                table_head((t!(column_joined)))
+                table_head(
+                    attrs: attributes! { class="text-right" },
+                    (t!(column_orders))
+                )
+                table_head(
+                    attrs: attributes! { class="text-right" },
+                    (t!(column_spent))
+                )
             )
         )
     })
@@ -314,8 +322,8 @@ async fn customer_columns() -> Result<impl View> {
 
 fn sort_label(sort: CustomerSort) -> Translation<'static> {
     match sort {
-        CustomerSort::Name => t!(sort - name),
-        CustomerSort::Newest => t!(sort - newest),
-        CustomerSort::Oldest => t!(sort - oldest),
+        CustomerSort::Name => t!(sort_name),
+        CustomerSort::Newest => t!(sort_newest),
+        CustomerSort::Oldest => t!(sort_oldest),
     }
 }

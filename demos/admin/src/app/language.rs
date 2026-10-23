@@ -61,8 +61,8 @@ pub async fn language_menu(cx: &Cx) -> Result<impl View> {
                 target: &menu,
                 attrs: attributes! {
                     class=(button_variants(ButtonVariant::Ghost, ButtonSize::Icon))
-                    aria-label=(t!(change-language))
-                    title=(t!(change-language))
+                    aria-label=(t!(change_language))
+                    title=(t!(change_language))
                 },
                 icon(data: iconify_icon!("lucide:languages"))
             )

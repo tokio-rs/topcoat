@@ -93,13 +93,13 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                             attrs: attributes! { disabled=((!can_edit).then_some("")) },
                             field_group(
                                 product_field(
-                                    label: t!(field-name),
+                                    label: t!(field_name),
                                     name: "name",
                                     value: &form.name,
                                     error: errors.name.map(error_message)
                                 )
                                 product_field(
-                                    label: t!(field-sku),
+                                    label: t!(field_sku),
                                     name: "sku",
                                     value: &form.sku,
                                     error: errors.sku.map(error_message),
@@ -107,14 +107,14 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                                 )
                                 <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                     product_field(
-                                        label: t!(field-price),
+                                        label: t!(field_price),
                                         name: "price",
                                         value: &form.price,
                                         error: errors.price.map(error_message),
                                         attrs: attributes! { inputmode="decimal" }
                                     )
                                     product_field(
-                                        label: t!(field-stock),
+                                        label: t!(field_stock),
                                         name: "stock",
                                         value: &form.stock,
                                         error: errors.stock.map(error_message),
@@ -133,8 +133,8 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                         card_title((t!(save)))
                         card_description((t!(save.description)))
                     } else {
-                        card_title((t!(view-only)))
-                        card_description((t!(view-only.description)))
+                        card_title((t!(view_only)))
+                        card_description((t!(view_only.description)))
                     }
                 )
                 if can_edit {
@@ -198,17 +198,17 @@ async fn product_field(
 
 fn error_message(error: ProductError) -> Translation<'static> {
     match error {
-        ProductError::NameMissing => t!(error - name - missing),
-        ProductError::NameTooLong { max } => t!(error - name - too - long, max),
-        ProductError::SkuMissing => t!(error - sku - missing),
-        ProductError::SkuInvalid => t!(error - sku - invalid),
-        ProductError::SkuTooLong { max } => t!(error - sku - too - long, max),
-        ProductError::SkuTaken => t!(error - sku - taken),
-        ProductError::PriceMissing => t!(error - price - missing),
-        ProductError::PriceNotPositive => t!(error - price - not - positive),
-        ProductError::PriceInvalid => t!(error - price - invalid),
-        ProductError::StockMissing => t!(error - stock - missing),
-        ProductError::StockInvalid => t!(error - stock - invalid),
+        ProductError::NameMissing => t!(error_name_missing),
+        ProductError::NameTooLong { max } => t!(error_name_too_long, max),
+        ProductError::SkuMissing => t!(error_sku_missing),
+        ProductError::SkuInvalid => t!(error_sku_invalid),
+        ProductError::SkuTooLong { max } => t!(error_sku_too_long, max),
+        ProductError::SkuTaken => t!(error_sku_taken),
+        ProductError::PriceMissing => t!(error_price_missing),
+        ProductError::PriceNotPositive => t!(error_price_not_positive),
+        ProductError::PriceInvalid => t!(error_price_invalid),
+        ProductError::StockMissing => t!(error_stock_missing),
+        ProductError::StockInvalid => t!(error_stock_invalid),
     }
 }
 

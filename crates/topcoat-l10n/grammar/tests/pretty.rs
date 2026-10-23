@@ -85,7 +85,10 @@ fn puts_each_argument_on_its_own_line_when_too_long() {
 #[test]
 fn copies_incomplete_values() {
     assert_print::<Translate>("(greeting, name =)", "(greeting, name =)");
-    assert_print::<Translate>("(greeting, name = a +, count)", "(greeting, name = a +, count)");
+    assert_print::<Translate>(
+        "(greeting, name = a +, count)",
+        "(greeting, name = a +, count)",
+    );
 }
 
 #[test]

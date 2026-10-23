@@ -5,22 +5,22 @@ today = Today
 live = Live
 revenue = Revenue
 orders = Orders
-average-order = Average order
+average_order = Average order
 visitors = Visitors right now
 
 count = { $count }
 # `$percent` is an unsigned percentage, such as 4.2.
 increase = +{ NUMBER($percent, minimumFractionDigits: 1, maximumFractionDigits: 1) }%
 decrease = -{ NUMBER($percent, minimumFractionDigits: 1, maximumFractionDigits: 1) }%
-compared-to-yesterday = vs. yesterday
+compared_to_yesterday = vs. yesterday
 
-needs-attention = Needs attention
-open-orders = Open orders
+needs_attention = Needs attention
+open_orders = Open orders
     .description = Orders waiting for payment or shipment, oldest first.
-no-open-orders = All caught up. No orders are waiting.
+no_open_orders = All caught up. No orders are waiting.
 
-column-order = Order
-column-customer = Customer
-column-status = Status
-column-placed = Placed
-column-total = Total
+column_order = Order
+column_customer = Customer
+column_status = Status
+column_placed = Placed
+column_total = Total

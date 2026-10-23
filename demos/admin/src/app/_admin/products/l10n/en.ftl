@@ -2,51 +2,51 @@
 
 search = Search products
     .placeholder = Search names or SKUs
-stock-filter = Stock level
+stock_filter = Stock level
     .all = All stock levels
 sort = Sort by
 
-sort-name = Name
-sort-highest-price = Highest price
-sort-lowest-price = Lowest price
-sort-lowest-stock = Lowest stock
+sort_name = Name
+sort_highest_price = Highest price
+sort_lowest_price = Lowest price
+sort_lowest_stock = Lowest stock
 
-no-results = No products found
+no_results = No products found
     .description = No products match your search and stock level.
-clear-filters = Clear filters
+clear_filters = Clear filters
 
-column-product = Product
-column-status = Status
-column-stock = Stock
-column-price = Price
+column_product = Product
+column_status = Status
+column_stock = Stock
+column_price = Price
 
-stock-in-stock = In stock
-stock-low = Low stock
-stock-out = Out of stock
+stock_in_stock = In stock
+stock_low = Low stock
+stock_out = Out of stock
 
 ## Product details
 
 details = Details
     .description = How the product shows in the store.
-field-name = Name
-field-sku = SKU
-field-price = Price (USD)
-field-stock = Units in stock
+field_name = Name
+field_sku = SKU
+field_price = Price (USD)
+field_stock = Units in stock
 
 save = Save changes
     .description = Changes show in the store as soon as you save them.
-view-only = View only
+view_only = View only
     .description = Viewers can see the product but not change it.
 cancel = Cancel
 
-error-name-missing = Enter a name.
-error-name-too-long = Keep the name to { $max } characters or fewer.
-error-sku-missing = Enter a SKU.
-error-sku-invalid = Use only letters, numbers, and hyphens.
-error-sku-too-long = Keep the SKU to { $max } characters or fewer.
-error-sku-taken = Another product already uses this SKU.
-error-price-missing = Enter a price.
-error-price-not-positive = Enter a price above zero.
-error-price-invalid = Enter a price in dollars, like 24.99.
-error-stock-missing = Enter how many units are in stock.
-error-stock-invalid = Enter a whole number of units, 0 or more.
+error_name_missing = Enter a name.
+error_name_too_long = Keep the name to { $max } characters or fewer.
+error_sku_missing = Enter a SKU.
+error_sku_invalid = Use only letters, numbers, and hyphens.
+error_sku_too_long = Keep the SKU to { $max } characters or fewer.
+error_sku_taken = Another product already uses this SKU.
+error_price_missing = Enter a price.
+error_price_not_positive = Enter a price above zero.
+error_price_invalid = Enter a price in dollars, like 24.99.
+error_stock_missing = Enter how many units are in stock.
+error_stock_invalid = Enter a whole number of units, 0 or more.

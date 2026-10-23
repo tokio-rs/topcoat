@@ -20,9 +20,9 @@ pub fn money(amount: Money) -> Translation<'static> {
 
 pub fn role_label(role: Role) -> Translation<'static> {
     match role {
-        Role::Admin => t!(role - admin),
-        Role::Staff => t!(role - staff),
-        Role::Viewer => t!(role - viewer),
+        Role::Admin => t!(role_admin),
+        Role::Staff => t!(role_staff),
+        Role::Viewer => t!(role_viewer),
     }
 }
 

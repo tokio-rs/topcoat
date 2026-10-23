@@ -2,94 +2,94 @@
 
 search = Search orders
     .placeholder = Search customers or order numbers
-status-filter = Status
+status_filter = Status
     .all = All statuses
 sort = Sort by
 
-sort-newest = Newest first
-sort-oldest = Oldest first
-sort-highest-total = Highest total
-sort-lowest-total = Lowest total
+sort_newest = Newest first
+sort_oldest = Oldest first
+sort_highest_total = Highest total
+sort_lowest_total = Lowest total
 
-no-results = No orders found
+no_results = No orders found
     .description = No orders match your search and status.
-clear-filters = Clear filters
+clear_filters = Clear filters
 
-column-order = Order
-column-customer = Customer
-column-status = Status
-column-items = Items
-column-placed = Placed
-column-total = Total
+column_order = Order
+column_customer = Customer
+column_status = Status
+column_items = Items
+column_placed = Placed
+column_total = Total
 
-item-count =
+item_count =
     { $count ->
         [one] { $count } item
        *[other] { $count } items
     }
 
-just-now = just now
-minutes-ago =
+just_now = just now
+minutes_ago =
     { $count ->
         [one] { $count } minute ago
        *[other] { $count } minutes ago
     }
-hours-ago =
+hours_ago =
     { $count ->
         [one] { $count } hour ago
        *[other] { $count } hours ago
     }
-days-ago =
+days_ago =
     { $count ->
         [one] { $count } day ago
        *[other] { $count } days ago
     }
 
-status-pending = Pending
-status-paid = Paid
-status-shipped = Shipped
-status-delivered = Delivered
-status-cancelled = Cancelled
-status-refunded = Refunded
+status_pending = Pending
+status_paid = Paid
+status_shipped = Shipped
+status_delivered = Delivered
+status_cancelled = Cancelled
+status_refunded = Refunded
 
 ## Order details
 
 # `$id` is the order number.
-order-title = Order #{ $id }
+order_title = Order #{ $id }
 # `$date` is when the order was placed, such as "Oct 12, 2026 at 14:05 UTC".
-placed-on = Placed { $date }
+placed_on = Placed { $date }
 
 items = Items
-unit-count =
+unit_count =
     { $count ->
         [one] { $count } unit
        *[other] { $count } units
     }
-column-product = Product
-column-quantity = Quantity
-column-price = Price
-column-subtotal = Subtotal
+column_product = Product
+column_quantity = Quantity
+column_price = Price
+column_subtotal = Subtotal
 total = Total
 
 customer = Customer
 city = City
-customer-since = Customer since
+customer_since = Customer since
 
 # Buttons that move the order to another status.
-action-pending = Mark as pending
-action-paid = Mark as paid
-action-shipped = Mark as shipped
-action-delivered = Mark as delivered
-action-cancelled = Cancel order
-action-refunded = Refund order
+action_pending = Mark as pending
+action_paid = Mark as paid
+action_shipped = Mark as shipped
+action_delivered = Mark as delivered
+action_cancelled = Cancel order
+action_refunded = Refund order
 
 # Asks to confirm a status change that cannot be undone. `$status` is the new
 # status, such as "cancelled".
-confirm-status =
+confirm_status =
     { $status ->
         [cancelled] Cancel order?
         [refunded] Refund order?
        *[other] Change the status?
     }
-final-status = Order #{ $id } cannot move to another status after this.
-keep-order = Keep order
+final_status = Order #{ $id } cannot move to another status after this.
+keep_order = Keep order

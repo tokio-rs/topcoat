@@ -87,17 +87,17 @@ pub async fn list_pagination(
     let pages = page.pages();
     let previous = current.saturating_sub(1).max(1);
     let next = (current + 1).min(pages);
-    let previous_label = t!(pagination - previous).resolve(cx);
-    let next_label = t!(pagination - next).resolve(cx);
+    let previous_label = t!(pagination_previous).resolve(cx);
+    let next_label = t!(pagination_next).resolve(cx);
 
     Ok(view! {
         <div class="flex flex-col items-center gap-3 px-6 py-3 sm:flex-row">
             <p class="shrink-0 text-sm text-muted-foreground tabular-nums">
                 (t!(
-                    pagination-summary,
+                    pagination_summary,
                     first = page.first(),
                     last = page.last(),
-                    count = page.count
+                    count = page.count,
                 ))
             </p>
             // Offset the Next link's padding to align its arrow with the table content.

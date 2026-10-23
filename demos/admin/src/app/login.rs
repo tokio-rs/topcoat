@@ -47,9 +47,9 @@ enum SignInError {
 impl SignInError {
     fn message(self) -> Translation<'static> {
         match self {
-            Self::EmailMissing => t!(error - email - missing),
-            Self::PasswordMissing => t!(error - password - missing),
-            Self::WrongCredentials => t!(error - wrong - credentials),
+            Self::EmailMissing => t!(error_email_missing),
+            Self::PasswordMissing => t!(error_password_missing),
+            Self::WrongCredentials => t!(error_wrong_credentials),
         }
     }
 }
@@ -76,7 +76,9 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
             (StatusCode::UNPROCESSABLE_ENTITY)
         }
 
-        <main class="relative flex min-h-svh flex-col items-center justify-center gap-6 p-6">
+        <main
+            class="relative flex min-h-svh flex-col items-center justify-center gap-6 p-6"
+        >
             <div class="absolute top-3 right-3">language_menu()</div>
 
             <p class="flex items-center gap-2 text-lg font-semibold">
@@ -87,8 +89,8 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
             card(
                 attrs: attributes! { class="w-full max-w-sm" },
                 card_header(
-                    card_title((t!(sign-in)))
-                    card_description((t!(sign-in.description)))
+                    card_title((t!(sign_in)))
+                    card_description((t!(sign_in.description)))
                 )
                 card_content(
                     // Disable browser validation so the form shows the server's field errors.
@@ -154,7 +156,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                 card_footer(
                     button(
                         attrs: attributes! { type="submit" form=(&form_id) class="w-full" },
-                        (t!(sign-in))
+                        (t!(sign_in))
                     )
                 )
             )
@@ -170,10 +172,10 @@ async fn demo_accounts() -> Result<impl View> {
         card(
             attrs: attributes! { class="w-full max-w-sm" },
             card_header(
-                card_title((t!(demo-accounts)))
+                card_title((t!(demo_accounts)))
                 // A message cannot contain markup, so the password follows the sentence.
                 card_description(
-                    (t!(demo-accounts.description))
+                    (t!(demo_accounts.description))
                     " "
                     <code class="font-mono text-foreground">(DEMO_PASSWORD)</code>
                 )
