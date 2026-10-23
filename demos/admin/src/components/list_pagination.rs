@@ -1,14 +1,16 @@
 use topcoat::{
     Result,
     context::Cx,
-    l10n::Translation,
     runtime::{Event, Signal},
     view::{View, attributes, class, component, view},
 };
 
-use super::pagination::{
-    pagination, pagination_content, pagination_ellipsis, pagination_item, pagination_link,
-    pagination_next, pagination_previous,
+use super::{
+    pagination::{
+        pagination, pagination_content, pagination_ellipsis, pagination_item, pagination_link,
+        pagination_next, pagination_previous,
+    },
+    t,
 };
 
 /// Item counts and page boundaries for a paginated list.
@@ -72,21 +74,12 @@ impl ListPage {
     }
 }
 
-/// Text shown by [`list_pagination`].
-pub struct PaginationText<'a> {
-    /// The items on the page, such as `21-40 of 45`.
-    pub summary: Translation<'a>,
-    pub previous: Translation<'a>,
-    pub next: Translation<'a>,
-}
-
 /// Shows the item range and page links. Clicks update the `number` signal in place.
 /// Each link also gets a URL from `href`, so it can be opened in a new tab.
 #[component]
 pub async fn list_pagination(
     cx: &Cx,
     page: ListPage,
-    text: PaginationText<'_>,
     href: impl Fn(usize) -> String + Send + Sync,
     number: &Signal<usize>,
 ) -> Result<impl View> {
@@ -94,17 +87,19 @@ pub async fn list_pagination(
     let pages = page.pages();
     let previous = current.saturating_sub(1).max(1);
     let next = (current + 1).min(pages);
-    let PaginationText {
-        summary,
-        previous: previous_label,
-        next: next_label,
-    } = text;
-    let previous_label = previous_label.resolve(cx);
-    let next_label = next_label.resolve(cx);
+    let previous_label = t!(pagination-previous).resolve(cx);
+    let next_label = t!(pagination-next).resolve(cx);
 
     Ok(view! {
         <div class="flex flex-col items-center gap-3 px-6 py-3 sm:flex-row">
-            <p class="shrink-0 text-sm text-muted-foreground tabular-nums">(summary)</p>
+            <p class="shrink-0 text-sm text-muted-foreground tabular-nums">
+                (t!(
+                    pagination-summary,
+                    first = page.first(),
+                    last = page.last(),
+                    count = page.count
+                ))
+            </p>
             // Offset the Next link's padding to align its arrow with the table content.
             pagination(
                 attrs: attributes! { class="sm:-mr-3 sm:justify-end" },

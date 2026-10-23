@@ -13,7 +13,7 @@ use topcoat::{
 
 use self::customer_id::CustomerId;
 use crate::{
-    app::_common::{money, pagination_text},
+    app::_common::money,
     components::{
         avatar::{AvatarSize, avatar, avatar_fallback},
         button::{ButtonSize, ButtonVariant, button},
@@ -180,7 +180,6 @@ async fn customer_list(
 
             list_pagination(
                 page: shown,
-                text: pagination_text(shown),
                 href: |number| {
                     href!(page)
                         .query(&CustomersQuery::new(&text, sort, number))

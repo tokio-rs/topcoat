@@ -79,9 +79,12 @@ fn vendored_components_come_from_the_registry() {
     let entries = std::fs::read_dir(&dir)
         .unwrap_or_else(|error| panic!("cannot read {}: {error}", dir.display()));
     for entry in entries {
-        let file = entry
-            .unwrap_or_else(|error| panic!("cannot read an entry of {}: {error}", dir.display()))
-            .file_name();
+        let entry = entry
+            .unwrap_or_else(|error| panic!("cannot read an entry of {}: {error}", dir.display()));
+        if entry.path().is_dir() {
+            continue;
+        }
+        let file = entry.file_name();
         let file = file.to_str().expect("component file names are UTF-8");
         assert!(
             known.iter().any(|known| known == file) || OWN_COMPONENTS.contains(&file),

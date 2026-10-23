@@ -14,7 +14,7 @@ use topcoat::{
 
 use self::order_id::OrderId;
 use crate::{
-    app::_common::{money, pagination_text},
+    app::_common::money,
     components::{
         avatar::{AvatarSize, avatar, avatar_fallback},
         badge::{BadgeVariant, badge},
@@ -220,7 +220,6 @@ async fn order_list(
 
             list_pagination(
                 page: shown,
-                text: pagination_text(shown),
                 href: |number| {
                     href!(page)
                         .query(&OrdersQuery::new(&text, selected, sort, number))

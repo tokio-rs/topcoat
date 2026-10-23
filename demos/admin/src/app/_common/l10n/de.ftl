@@ -2,11 +2,6 @@
 # und Währung in einer Zeile.
 money = { NUMBER($amount, minimumFractionDigits: 2, maximumFractionDigits: 2) }{ " " }$
 
-# Die Einträge einer Seite einer Liste, etwa "21-40 von 45".
-pagination-summary = { $first }-{ $last } von { $count }
-pagination-previous = Zurück
-pagination-next = Weiter
-
 role-admin = Admin
 role-staff = Mitarbeiter
 role-viewer = Betrachter

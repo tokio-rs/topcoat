@@ -19,3 +19,5 @@ pub mod sidebar;
 pub mod skeleton;
 pub mod table;
 pub mod tabs;
+
+topcoat::l10n::fluent::messages!("{mod}/l10n/{locale}.ftl");

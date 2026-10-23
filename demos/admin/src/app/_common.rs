@@ -9,29 +9,13 @@ use topcoat::{
     },
 };
 
-use crate::{
-    components::list_pagination::{ListPage, PaginationText},
-    features::{catalog::Money, user::Role},
-};
+use crate::features::{catalog::Money, user::Role};
 
 messages!("{mod}/l10n/{locale}.ftl");
 
 /// Formats an amount in the request's language, such as `$1,234.50`.
 pub fn money(amount: Money) -> Translation<'static> {
     t!(money, amount = amount.dollars())
-}
-
-pub fn pagination_text(page: ListPage) -> PaginationText<'static> {
-    PaginationText {
-        summary: t!(
-            pagination-summary,
-            first = page.first(),
-            last = page.last(),
-            count = page.count
-        ),
-        previous: t!(pagination-previous),
-        next: t!(pagination-next),
-    }
 }
 
 pub fn role_label(role: Role) -> Translation<'static> {

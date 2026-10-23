@@ -13,7 +13,7 @@ use topcoat::{
 
 use self::product_id::ProductId;
 use crate::{
-    app::_common::{money, pagination_text},
+    app::_common::money,
     components::{
         badge::{BadgeVariant, badge},
         button::{ButtonSize, ButtonVariant, button},
@@ -218,7 +218,6 @@ async fn product_list(
 
             list_pagination(
                 page: shown,
-                text: pagination_text(shown),
                 href: |number| {
                     href!(page)
                         .query(&ProductsQuery::new(&text, selected, sort, number))
