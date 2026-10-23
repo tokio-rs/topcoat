@@ -38,7 +38,7 @@ mod tests {
     fn accepts_doc_comments() {
         assert_eq!(parse("/// One.\n/// Two.").unwrap().attrs.len(), 2);
         assert_eq!(parse(r#"#[doc = "One."]"#).unwrap().attrs.len(), 1);
-        assert!(parse("").unwrap().attrs.is_empty());
+        assert_eq!(parse("").unwrap().attrs.len(), 0);
     }
 
     #[test]

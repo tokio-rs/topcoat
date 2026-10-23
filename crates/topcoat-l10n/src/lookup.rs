@@ -25,7 +25,10 @@ use crate::{LanguageIdentifier, Locale};
 ///
 /// let available = [locale!("de"), locale!("zh-Hant")];
 /// assert_eq!(lookup(&locale!("de-AT"), &available), Some(&locale!("de")));
-/// assert_eq!(lookup(&locale!("zh-TW"), &available), Some(&locale!("zh-Hant")));
+/// assert_eq!(
+///     lookup(&locale!("zh-TW"), &available),
+///     Some(&locale!("zh-Hant"))
+/// );
 /// assert_eq!(lookup(&locale!("fr"), &available), None);
 /// ```
 #[must_use]
