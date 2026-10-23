@@ -2,9 +2,11 @@ import { expect, it } from "vitest";
 import { Context } from "../expression/context";
 import { dehydrate } from "../expression/dehydrate";
 import { SignalRegistry } from "../signal-registry";
+import { Bool } from "./bool";
 import { Integer, integerType } from "./integer";
 import { Option } from "./option";
 import { Panic } from "./panic";
+import { Record } from "./record";
 import { Ref } from "./ref";
 import { type FixedArray, Slice, Vec } from "./sequence";
 import { String as RuntimeString } from "./string";
@@ -13,6 +15,48 @@ for (const bits of [16, 32, 64]) {
 	const type = integerType("usize", bits);
 	const index = (value: bigint) => new Integer(value, type);
 	for (const kind of ["Vec", "Slice", "Array"] as const) {
+		it(`${kind}/${bits} position consumes matches and counts each remaining suffix`, () => {
+			const cx = new Context(new SignalRegistry());
+			const values = cx.hydrate({
+				t: kind,
+				bits,
+				v: ["a", "b", "b", "c"],
+			}) as Slice<RuntimeString>;
+			const iter = values.iter();
+			const visits: string[] = [];
+			const predicate = (value: Ref<RuntimeString> & RuntimeString) => {
+				visits.push(value.toString());
+				return value.eq(new RuntimeString("b"));
+			};
+			expect(dehydrate(iter.position(predicate))).toEqual({
+				t: "Option",
+				v: { t: "usize", bits, v: "1" },
+			});
+			expect(visits).toEqual(["a", "b"]);
+			expect(dehydrate(iter.position(predicate))).toEqual({
+				t: "Option",
+				v: { t: "usize", bits, v: "0" },
+			});
+			expect(iter.position(predicate).is_none().dehydrate()).toBe(true);
+			expect(iter.position(predicate).is_none().dehydrate()).toBe(true);
+			expect(visits).toEqual(["a", "b", "b", "c"]);
+			expect(values.iter().position(predicate).unwrap().toString()).toBe("1");
+			const empty = cx.hydrate({
+				t: kind,
+				bits,
+				v: [],
+			}) as Slice<RuntimeString>;
+			expect(
+				empty
+					.iter()
+					.position(() => {
+						throw new Error("empty predicate");
+					})
+					.is_none()
+					.dehydrate(),
+			).toBe(true);
+		});
+
 		it(`${kind}/${bits} hydrates empty collections and checks bounds`, () => {
 			const cx = new Context(new SignalRegistry());
 			for (const elements of [[], ["first"], ["first", "last"]]) {
@@ -85,6 +129,132 @@ it("rejects malformed collections and indexes of the wrong type or width", () =>
 			"Index must be a usize",
 		);
 	}
+});
+
+it("position shares elements, retains fixed references, and respects slice offsets", () => {
+	const items = ["outside", "first", "last", "outside"].map(
+		(value) => new RuntimeString(value),
+	);
+	const slice = new Slice(items, integerType("usize", 32), 1, 3);
+	const iter = slice.iter();
+	const visited: (Ref<RuntimeString> & RuntimeString)[] = [];
+	expect(
+		iter
+			.position((value) => {
+				visited.push(value);
+				return new Bool(true);
+			})
+			.unwrap()
+			.toString(),
+	).toBe("0");
+	expect(
+		iter
+			.position((value) => {
+				visited.push(value);
+				return new Bool(true);
+			})
+			.unwrap()
+			.toString(),
+	).toBe("0");
+	expect(visited.map((value) => value.deref())).toEqual(items.slice(1, 3));
+	expect(visited[0]?.deref()).toBe(items[1]);
+	expect(visited[1]?.deref()).toBe(items[2]);
+	expect(
+		slice
+			.iter()
+			.position((value) => value.eq(new RuntimeString("last")))
+			.unwrap()
+			.toString(),
+	).toBe("1");
+});
+
+it("position propagates failures and resumes after the failing element", () => {
+	const items = ["a", "b", "c"].map((value) => new RuntimeString(value));
+	for (const failure of [
+		new Panic("predicate failed"),
+		new Error("foreign failure"),
+	]) {
+		const iter = new Vec(items, integerType("usize", 64)).iter();
+		const visited: string[] = [];
+		expect(() =>
+			iter.position((value) => {
+				visited.push(value.toString());
+				if (value.toString() === "b") throw failure;
+				return new Bool(false);
+			}),
+		).toThrow(failure);
+		expect(visited).toEqual(["a", "b"]);
+		expect(
+			iter
+				.position((value) => {
+					visited.push(value.toString());
+					return new Bool(true);
+				})
+				.unwrap()
+				.toString(),
+		).toBe("0");
+		expect(visited).toEqual(["a", "b", "c"]);
+	}
+});
+
+it("position uses the sequence width at its maximum representable length", () => {
+	const type = integerType("usize", 16);
+	const items = Array.from(
+		{ length: Number(type.max) },
+		(_, i) => new Bool(i === Number(type.max) - 1),
+	);
+	const slice = new Slice(items, type);
+	expect(dehydrate(slice.iter().position((value) => value.clone()))).toEqual({
+		t: "Option",
+		v: { t: "usize", bits: 16, v: "65534" },
+	});
+	expect(
+		slice
+			.iter()
+			.position(() => new Bool(false))
+			.is_none()
+			.dehydrate(),
+	).toBe(true);
+	expect(() => new Slice([...items, new Bool(false)], type)).toThrow(Panic);
+});
+
+it("rejects cursor transport directly and through owned containers and signals", () => {
+	const type = integerType("usize", 64);
+	const iter = new Vec([new Bool(true)], type).iter();
+	const registry = new SignalRegistry();
+	registry.insert("cursor", iter);
+	for (const value of [
+		iter,
+		Option.some(iter),
+		new Vec([iter], type),
+		new Record([["cursor", iter]]),
+		new Context(registry).signal("cursor"),
+	]) {
+		expect(() => dehydrate(value)).toThrow();
+	}
+});
+
+it("an existing cursor keeps its storage while a fresh signal read sees replacement", () => {
+	const type = integerType("usize", 64);
+	const registry = new SignalRegistry();
+	registry.insert("rows", new Vec([new RuntimeString("old")], type));
+	const signal = new Context(registry).signal("rows");
+	const read = signal.read() as Ref<Vec<RuntimeString>> & Vec<RuntimeString>;
+	const iter = read.iter();
+	signal.set(new Vec([new RuntimeString("new")], type));
+	expect(
+		iter
+			.position((value) => value.eq(new RuntimeString("old")))
+			.unwrap()
+			.toString(),
+	).toBe("0");
+	expect(
+		read
+			.iter()
+			.position((value) => value.eq(new RuntimeString("new")))
+			.unwrap()
+			.toString(),
+	).toBe("0");
 });
 
 it("serializes nested vectors and arrays without losing integer precision", () => {
