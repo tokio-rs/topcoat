@@ -13,7 +13,6 @@ mod lookup;
 mod negotiate;
 #[cfg(feature = "http")]
 mod request;
-mod supported;
 #[cfg(feature = "view")]
 mod view;
 
@@ -28,4 +27,3 @@ pub use lookup::*;
 pub use negotiate::*;
 #[cfg(feature = "http")]
 pub use request::*;
-pub use supported::*;

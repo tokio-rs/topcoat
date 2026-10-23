@@ -1,3 +1,5 @@
+use std::iter;
+
 use icu_locale::fallback::{LocaleFallbackConfig, LocaleFallbacker, LocaleFallbackerWithConfig};
 use icu_locale_core::DataLocale;
 
@@ -40,16 +42,29 @@ pub fn lookup<'a>(locale: &Locale, available: &'a [Locale]) -> Option<&'a Locale
 /// chosen by [`lookup`]. Each locale of `normalized` comes from
 /// [`normalize_for_lookup`].
 pub(crate) fn lookup_index(locale: &Locale, normalized: &[DataLocale]) -> Option<usize> {
+    lookup_indices(locale, normalized).next()
+}
+
+/// Returns the positions in `normalized` of every locale that could serve
+/// `locale`, from the most specific to the least. The first one is the locale
+/// chosen by [`lookup_index`].
+pub(crate) fn lookup_indices(
+    locale: &Locale,
+    normalized: &[DataLocale],
+) -> impl Iterator<Item = usize> {
     let id = locale.id().clone().canonicalize();
     let mut chain = fallbacker().fallback_for(DataLocale::from(id.as_icu()));
-    // The chain ends with the root locale, `und`, which serves no locale.
-    while !chain.get().language.is_unknown() {
-        if let Some(index) = normalized.iter().position(|step| step == chain.get()) {
-            return Some(index);
+    iter::from_fn(move || {
+        // The chain ends with the root locale, `und`, which serves no locale.
+        while !chain.get().language.is_unknown() {
+            let index = normalized.iter().position(|step| step == chain.get());
+            chain.step();
+            if index.is_some() {
+                return index;
+            }
         }
-        chain.step();
-    }
-    None
+        None
+    })
 }
 
 /// Returns `id` in the form that [`lookup_index`] compares available locales

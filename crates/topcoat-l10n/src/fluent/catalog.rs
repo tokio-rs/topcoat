@@ -1,15 +1,17 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 use fluent_bundle::{FluentArgs, FluentResource, concurrent::FluentBundle};
 use icu_locale_core::DataLocale;
 
-use crate::{Locale, format_value, lookup_index, normalize_for_lookup};
+use crate::{Locale, format_value, lookup_index, lookup_indices, normalize_for_lookup};
 
 /// The Fluent messages of an application or one of its parts, translated into
 /// several locales.
 ///
 /// Each locale has its own messages. A message is formatted in the locale that
-/// serves the requested locale, as chosen by [`lookup`](crate::lookup).
+/// serves the requested locale, as chosen by [`lookup`](crate::lookup). A
+/// locale takes the messages it lacks from the locales that could also serve
+/// it, so `de-CH` only needs the messages that differ from `de`.
 pub struct Catalog {
     locales: Vec<Locale>,
     normalized: Vec<DataLocale>,
@@ -21,8 +23,9 @@ impl Catalog {
     ///
     /// # Panics
     ///
-    /// Panics when a source has syntax errors or defines a message or term
-    /// that the locale already defines.
+    /// Panics when two locales are the same once implied subtags are removed,
+    /// such as `zh` and `zh-Hans`, when a source has syntax errors, or when a
+    /// source defines a message or term that the locale already defines.
     #[must_use]
     #[track_caller]
     pub fn new<'a>(locales: impl IntoIterator<Item = (Locale, &'a [&'a str])>) -> Self {
@@ -31,12 +34,41 @@ impl Catalog {
             normalized: Vec::new(),
             bundles: Vec::new(),
         };
+        let mut resources = Vec::new();
         for (locale, sources) in locales {
             let locale = locale.canonicalize();
-            catalog.normalized.push(normalize_for_lookup(locale.id()));
-            catalog.bundles.push(LocaleBundle::new(&locale, sources));
+            let normalized = normalize_for_lookup(locale.id());
+            if let Some(index) = catalog
+                .normalized
+                .iter()
+                .position(|other| *other == normalized)
+            {
+                panic!(
+                    "the locales `{}` and `{locale}` of a catalog are the same",
+                    catalog.locales[index]
+                );
+            }
+            let sources: Vec<_> = sources
+                .iter()
+                .map(|source| LocaleBundle::parse(&locale, source))
+                .collect();
+            resources.push(sources);
+            catalog.normalized.push(normalized);
             catalog.locales.push(locale);
         }
+        catalog.bundles = catalog
+            .locales
+            .iter()
+            .enumerate()
+            .map(|(index, locale)| {
+                // The first locale that could serve a locale of the catalog is
+                // the locale itself, so the rest are its parents.
+                let parents = lookup_indices(locale, &catalog.normalized)
+                    .skip(1)
+                    .map(|parent| &resources[parent][..]);
+                LocaleBundle::new(locale, &resources[index], parents)
+            })
+            .collect();
         catalog
     }
 
@@ -67,12 +99,18 @@ impl Catalog {
 }
 
 /// The messages of one locale of a [`Catalog`].
-struct LocaleBundle(FluentBundle<FluentResource>);
+struct LocaleBundle(FluentBundle<Arc<FluentResource>>);
 
 impl LocaleBundle {
-    /// Creates the messages of `locale` from its Fluent sources.
+    /// Creates the messages of `locale` from its own parsed sources, then
+    /// adds the messages it lacks from the sources of its parents, the closest
+    /// parent first.
     #[track_caller]
-    fn new(locale: &Locale, sources: &[&str]) -> Self {
+    fn new<'a>(
+        locale: &Locale,
+        sources: &[Arc<FluentResource>],
+        parents: impl IntoIterator<Item = &'a [Arc<FluentResource>]>,
+    ) -> Self {
         let id = locale
             .id()
             .to_string()
@@ -83,15 +121,27 @@ impl LocaleBundle {
         bundle
             .add_builtins()
             .expect("the builtin functions are added to a new bundle");
-        for source in sources {
-            let resource = FluentResource::try_new((*source).to_owned())
-                .unwrap_or_else(|_| panic!("a Fluent source of `{locale}` has syntax errors"));
+        for resource in sources {
             assert!(
-                bundle.add_resource(resource).is_ok(),
+                bundle.add_resource(Arc::clone(resource)).is_ok(),
                 "a Fluent source of `{locale}` defines a message or term twice"
             );
         }
+        for resource in parents.into_iter().flatten() {
+            // Fluent keeps the message that was added first and reports the
+            // other one as an error, which is how the locale's own messages
+            // win over those of its parents.
+            let _ = bundle.add_resource(Arc::clone(resource));
+        }
         Self(bundle)
+    }
+
+    /// Parses a Fluent source of `locale`.
+    #[track_caller]
+    fn parse(locale: &Locale, source: &str) -> Arc<FluentResource> {
+        let resource = FluentResource::try_new(source.to_owned())
+            .unwrap_or_else(|_| panic!("a Fluent source of `{locale}` has syntax errors"));
+        Arc::new(resource)
     }
 
     /// Formats a message, or one of its attributes, or returns `None` when
@@ -215,5 +265,65 @@ login-input = Anmelden
         let catalog = Catalog::new([(locale!("en"), &["a = A\n", "b = B\n"][..])]);
         assert_eq!(catalog.format(&locale!("en"), "a", None, None), "A");
         assert_eq!(catalog.format(&locale!("en"), "b", None, None), "B");
+    }
+
+    #[test]
+    fn a_regional_locale_takes_the_messages_it_lacks_from_its_parent() {
+        let catalog = Catalog::new([
+            (locale!("de"), &[DE][..]),
+            (locale!("de-CH"), &["title = Gruezi\n"][..]),
+        ]);
+        assert_eq!(
+            catalog.format(&locale!("de-CH"), "title", None, None),
+            "Gruezi"
+        );
+        assert_eq!(
+            catalog.format(&locale!("de-CH"), "login-input", None, None),
+            "Anmelden"
+        );
+        // The parent keeps its own messages.
+        assert_eq!(
+            catalog.format(&locale!("de"), "title", None, None),
+            "Willkommen"
+        );
+    }
+
+    #[test]
+    fn a_regional_locale_does_not_take_messages_from_a_sibling() {
+        let catalog = Catalog::new([
+            (locale!("en"), &["color = Color\n"][..]),
+            (locale!("en-GB"), &["color = Colour\n"][..]),
+            (locale!("en-US"), &["title = Welcome\n"][..]),
+        ]);
+        assert_eq!(
+            catalog.format(&locale!("en-US"), "color", None, None),
+            "Color"
+        );
+    }
+
+    #[test]
+    fn the_closest_parent_wins() {
+        // CLDR makes `en-001` the parent of `en-AU`, and `en` its grandparent.
+        let catalog = Catalog::new([
+            (locale!("en"), &["color = Color\n"][..]),
+            (locale!("en-001"), &["color = Colour\n"][..]),
+            (locale!("en-AU"), &["title = Welcome\n"][..]),
+        ]);
+        assert_eq!(
+            catalog.format(&locale!("en-AU"), "color", None, None),
+            "Colour"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "twice")]
+    fn panics_when_a_locale_defines_a_message_twice() {
+        let _ = Catalog::new([(locale!("en"), &["a = A\n", "a = B\n"][..])]);
+    }
+
+    #[test]
+    #[should_panic(expected = "are the same")]
+    fn panics_when_two_locales_are_the_same() {
+        let _ = Catalog::new([(locale!("zh"), &[][..]), (locale!("zh-Hans"), &[][..])]);
     }
 }
