@@ -80,6 +80,29 @@ impl Messages {
         }
     }
 
+    /// Generates the `t` module of the namespace `name`, with the visibility
+    /// of the invocation.
+    fn t_module(&self, name: &Ident) -> TokenStream {
+        let vis = &self.vis;
+        let id = name.to_string();
+        let doc = format!(
+            "The Fluent messages loaded from `{}`.",
+            self.path.lit.value()
+        );
+        quote! {
+            #[doc = #doc]
+            #vis mod t {
+                /// Returns the locales that have files, sorted by their
+                /// canonical spelling.
+                #[allow(dead_code)]
+                #[must_use]
+                pub fn locales() -> &'static [#topcoat_l10n::Locale] {
+                    #topcoat_l10n::Namespace::locales(#id)
+                }
+            }
+        }
+    }
+
     /// Generates the registration of the namespace `name` with the files of
     /// `locales`.
     ///
@@ -104,12 +127,28 @@ impl Messages {
         }
     }
 
-    /// Generates `t!` and the registration of the files matched by the path
-    /// from `call_site`, or compile errors if they cannot be found or parsed.
+    /// Generates `t!`, the `t` module and the registration of the files
+    /// matched by the path from `call_site`, or compile errors if they cannot
+    /// be found or parsed.
+    ///
+    /// When `call_site` has no source file, as may be the case in
+    /// rust-analyzer, only `t!` and the `t` module are generated, without
+    /// reading any files.
     #[must_use]
     pub fn expand(&self, call_site: &CallSite) -> TokenStream {
         let name = self.macro_name(call_site);
-        let t = self.t_macro(&name);
+        let t_macro = self.t_macro(&name);
+        let t_module = self.t_module(&name);
+        let t = quote! {
+            #t_macro
+            #t_module
+        };
+        // The files are only needed when the program runs, and rustc knows the
+        // source file of every invocation written in the crate. Without one,
+        // a relative path cannot be resolved.
+        if call_site.source_file().is_none() {
+            return t;
+        }
         let path = &self.path;
         let locales = match path.resolve(call_site) {
             Ok(locales) => locales,
@@ -137,8 +176,8 @@ impl Messages {
     }
 }
 
-/// Expands to `t!` and the registration of the files found from the
-/// [call site](CallSite::current) of the invocation being expanded.
+/// Expands to `t!`, the `t` module and the registration of the files found
+/// from the [call site](CallSite::current) of the invocation being expanded.
 impl ToTokens for Messages {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         tokens.extend(match CallSite::current() {
@@ -217,6 +256,20 @@ mod tests {
             name(lib, r#""./a/{locale}.ftl""#),
             name(lib, r#""./b/{locale}.ftl""#)
         );
+    }
+
+    #[test]
+    fn reads_no_files_without_a_source_file() {
+        let messages = parse(r#""./missing/{locale}.ftl""#).unwrap();
+        // With a source file, the missing files are an error.
+        let with_file = messages
+            .expand(&call_site(Some("/app/src/lib.rs")))
+            .to_string();
+        assert!(with_file.contains("compile_error"), "{with_file}");
+        // Without one, the files are not looked for.
+        let without_file = messages.expand(&call_site(None)).to_string();
+        assert!(!without_file.contains("compile_error"), "{without_file}");
+        assert!(without_file.contains("macro_rules"), "{without_file}");
     }
 
     #[test]

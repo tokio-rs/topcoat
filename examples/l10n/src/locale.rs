@@ -2,27 +2,30 @@ use topcoat::{
     Result,
     context::Cx,
     l10n::{Locale, locale},
-    router::{Slot, layout, module_param, page, path_param},
+    router::{
+        Body, Next, Slot, error::not_found, layer, layout, module_param, page, path_param,
+        response::Response,
+    },
     view::{View, view},
 };
 
 use crate::t;
 
-module_param!(pub locale_param: Locale, error = not_found);
+module_param!(pub path_locale: Locale, error = not_found);
+
+#[layer]
+async fn layer(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
+    let path_locale = path_param::<PathLocale>(cx)?;
+    if !t::locales().contains(path_locale) {
+        return Err(not_found().into());
+    }
+    let cx = cx.with(path_locale.clone());
+    next.run(&cx, body).await
+}
 
 #[layout]
 async fn layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
-    if !catalog
-        .supported_locales()
-        .contains(path_param::<LocaleParam>())
-    {
-        return Err(not_found().into());
-    }
-
-    let cx = cx.with(path_param::<LocaleParam>());
-
     Ok(view! {
-        cx =>
         <!DOCTYPE html>
         <html lang=(locale(cx).id()) dir=(locale(cx).id().direction())>
             <head>
@@ -34,7 +37,7 @@ async fn layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     })
 }
 
-#[page("./{locale}")]
+#[page]
 pub async fn page() -> Result<impl View> {
-    Ok(view! { (t!(current_date)) })
+    Ok(view! { (t!(current_date, date = "kek")) })
 }

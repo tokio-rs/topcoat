@@ -36,6 +36,21 @@ impl Namespace {
         CATALOGS.get(id)
     }
 
+    /// Returns the locales of the namespace `id`, as given by
+    /// [`Catalog::locales`], or none when no namespace with that ID is
+    /// registered.
+    ///
+    /// # Panics
+    ///
+    /// Panics like [`catalog`](Self::catalog).
+    #[must_use]
+    pub fn locales(id: &str) -> &'static [Locale] {
+        match Self::catalog(id) {
+            Some(catalog) => catalog.locales(),
+            None => &[],
+        }
+    }
+
     /// Builds the catalog of the namespace.
     fn build(&self) -> Catalog {
         Catalog::new(self.locales.iter().map(|locale| {
@@ -100,5 +115,11 @@ mod tests {
     #[test]
     fn returns_none_for_an_unknown_namespace() {
         assert!(Namespace::catalog("unknown").is_none());
+    }
+
+    #[test]
+    fn returns_the_locales_of_a_namespace() {
+        assert_eq!(Namespace::locales("test"), [locale!("en"), locale!("de")]);
+        assert_eq!(Namespace::locales("unknown"), [] as [Locale; 0]);
     }
 }

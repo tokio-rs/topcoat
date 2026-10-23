@@ -117,6 +117,18 @@ fn a_key_can_be_a_string() {
 }
 
 #[test]
+fn each_namespace_lists_the_locales_that_have_files() {
+    assert_eq!(t::locales(), [locale!("de"), locale!("en")]);
+    assert_eq!(admin::t::locales(), [locale!("en")]);
+}
+
+#[test]
+fn a_binding_named_t_still_works_next_to_t() {
+    let t = t!(title);
+    assert_eq!(t.resolve(&scope(locale!("en"))), "Welcome");
+}
+
+#[test]
 fn each_namespace_has_its_own_messages() {
     let de = scope(locale!("de"));
     assert_eq!(t!(title).resolve(&de), "Willkommen");
@@ -149,15 +161,11 @@ async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! { <p lang=(lang)>(t!(title))</p> })
 }
 
-/// The locales that have files.
-// TODO: Use `t::locales()` once `messages!` generates it.
-const LOCALES: [Locale; 2] = [locale!("de"), locale!("en")];
-
 /// Gives every page the locale that best matches the `Accept-Language` header,
 /// or English when none matches.
 #[layer("/")]
 async fn negotiate_locale(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
-    let locale = negotiate(accept_language(cx), &LOCALES)
+    let locale = negotiate(accept_language(cx), t::locales())
         .cloned()
         .unwrap_or(locale!("en"));
     next.run(&cx.with(locale), body).await
