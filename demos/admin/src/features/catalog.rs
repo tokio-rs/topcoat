@@ -5,11 +5,7 @@ use toasty::{
     schema::Model,
     stmt::{Expr, List},
 };
-use topcoat::{
-    Result,
-    context::Cx,
-    view::{NodeViewParts, PartsWriter},
-};
+use topcoat::{Result, context::Cx};
 
 use crate::db::{contains_pattern, db, latency};
 
@@ -66,7 +62,7 @@ impl Product {
                 .await?
             && other.id != self.id
         {
-            sku = Err("Another product already uses this SKU.");
+            sku = Err(ProductError::SkuTaken);
         }
 
         match (name, sku, price, stock) {
@@ -100,14 +96,6 @@ pub enum StockLevel {
 
 impl StockLevel {
     pub const ALL: [Self; 3] = [Self::InStock, Self::Low, Self::Out];
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::InStock => "In stock",
-            Self::Low => "Low stock",
-            Self::Out => "Out of stock",
-        }
-    }
 
     pub fn slug(self) -> &'static str {
         match self {
@@ -158,15 +146,6 @@ impl ProductSort {
         Self::LowestPrice,
         Self::LowestStock,
     ];
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Name => "Name",
-            Self::HighestPrice => "Highest price",
-            Self::LowestPrice => "Lowest price",
-            Self::LowestStock => "Lowest stock",
-        }
-    }
 
     pub fn slug(self) -> &'static str {
         match self {
@@ -269,71 +248,99 @@ impl ProductForm {
         }
     }
 
-    fn name(&self) -> Result<String, &'static str> {
+    fn name(&self) -> Result<String, ProductError> {
         let name = self.name.trim();
         if name.is_empty() {
-            Err("Enter a name.")
+            Err(ProductError::NameMissing)
         } else if name.chars().count() > MAX_NAME {
-            Err("Keep the name to 80 characters or fewer.")
+            Err(ProductError::NameTooLong { max: MAX_NAME })
         } else {
             Ok(name.to_owned())
         }
     }
 
-    fn sku(&self) -> Result<String, &'static str> {
+    fn sku(&self) -> Result<String, ProductError> {
         let sku = self.sku.trim();
         if sku.is_empty() {
-            Err("Enter a SKU.")
+            Err(ProductError::SkuMissing)
         } else if !sku
             .chars()
             .all(|char| char.is_ascii_alphanumeric() || char == '-')
         {
-            Err("Use only letters, numbers, and hyphens.")
+            Err(ProductError::SkuInvalid)
         } else if sku.len() > MAX_SKU {
-            Err("Keep the SKU to 20 characters or fewer.")
+            Err(ProductError::SkuTooLong { max: MAX_SKU })
         } else {
             Ok(sku.to_ascii_uppercase())
         }
     }
 
-    fn price(&self) -> Result<Money, &'static str> {
+    fn price(&self) -> Result<Money, ProductError> {
         let price = self.price.trim();
         if price.is_empty() {
-            return Err("Enter a price.");
+            return Err(ProductError::PriceMissing);
         }
         match price.parse::<Money>() {
             Ok(price) if price.0 > 0 => Ok(price),
-            Ok(_) => Err("Enter a price above zero."),
-            Err(InvalidMoney) => Err("Enter a price in dollars, like 24.99."),
+            Ok(_) => Err(ProductError::PriceNotPositive),
+            Err(InvalidMoney) => Err(ProductError::PriceInvalid),
         }
     }
 
-    fn stock(&self) -> Result<u32, &'static str> {
+    fn stock(&self) -> Result<u32, ProductError> {
         let stock = self.stock.trim();
         if stock.is_empty() {
-            return Err("Enter how many units are in stock.");
+            return Err(ProductError::StockMissing);
         }
-        stock
-            .parse()
-            .map_err(|_| "Enter a whole number of units, 0 or more.")
+        stock.parse().map_err(|_| ProductError::StockInvalid)
     }
+}
+
+/// Why a [`ProductForm`] field is invalid.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProductError {
+    NameMissing,
+    /// The name has more than `max` characters.
+    NameTooLong { max: usize },
+    SkuMissing,
+    /// The SKU contains characters other than letters, digits, and hyphens.
+    SkuInvalid,
+    /// The SKU has more than `max` characters.
+    SkuTooLong { max: usize },
+    /// Another product already uses the SKU.
+    SkuTaken,
+    PriceMissing,
+    PriceNotPositive,
+    /// The price is not a dollar amount.
+    PriceInvalid,
+    StockMissing,
+    /// The stock is not a whole number of 0 or more.
+    StockInvalid,
 }
 
 /// Validation errors for [`ProductForm`]. `None` means the field passed validation.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ProductErrors {
-    pub name: Option<&'static str>,
-    pub sku: Option<&'static str>,
-    pub price: Option<&'static str>,
-    pub stock: Option<&'static str>,
+    pub name: Option<ProductError>,
+    pub sku: Option<ProductError>,
+    pub price: Option<ProductError>,
+    pub stock: Option<ProductError>,
 }
 
-/// US dollars stored as integer cents. In views, `(amount)` renders a value
-/// such as `$1,234.50`. Toasty stores it in one integer column.
+/// US dollars stored as integer cents. Toasty stores it in one integer column.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, toasty::Embed)]
 pub struct Money(pub i64);
 
 impl Money {
+    /// Returns the amount in dollars, such as `1234.5`.
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "amounts stay far below 2^53 cents, which converts exactly"
+    )]
+    pub fn dollars(self) -> f64 {
+        self.0 as f64 / 100.0
+    }
+
     /// Formats dollars without a currency symbol or commas, such as `1234.50`.
     pub fn decimal(self) -> String {
         let sign = if self.0 < 0 { "-" } else { "" };
@@ -398,12 +405,6 @@ impl FromStr for Money {
         }
 
         Ok(Self(if negative { -amount } else { amount }))
-    }
-}
-
-impl NodeViewParts for Money {
-    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_string(self.to_string());
     }
 }
 

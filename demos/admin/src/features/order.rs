@@ -111,17 +111,6 @@ impl OrderStatus {
         Self::Refunded,
     ];
 
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Pending => "Pending",
-            Self::Paid => "Paid",
-            Self::Shipped => "Shipped",
-            Self::Delivered => "Delivered",
-            Self::Cancelled => "Cancelled",
-            Self::Refunded => "Refunded",
-        }
-    }
-
     pub fn slug(self) -> &'static str {
         match self {
             Self::Pending => "pending",
@@ -130,17 +119,6 @@ impl OrderStatus {
             Self::Delivered => "delivered",
             Self::Cancelled => "cancelled",
             Self::Refunded => "refunded",
-        }
-    }
-
-    pub fn action(self) -> &'static str {
-        match self {
-            Self::Pending => "Mark as pending",
-            Self::Paid => "Mark as paid",
-            Self::Shipped => "Mark as shipped",
-            Self::Delivered => "Mark as delivered",
-            Self::Cancelled => "Cancel order",
-            Self::Refunded => "Refund order",
         }
     }
 
@@ -230,15 +208,6 @@ impl OrderSort {
         Self::HighestTotal,
         Self::LowestTotal,
     ];
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Newest => "Newest first",
-            Self::Oldest => "Oldest first",
-            Self::HighestTotal => "Highest total",
-            Self::LowestTotal => "Lowest total",
-        }
-    }
 
     pub fn slug(self) -> &'static str {
         match self {

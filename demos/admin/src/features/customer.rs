@@ -87,14 +87,6 @@ pub enum CustomerSort {
 impl CustomerSort {
     pub const ALL: [Self; 3] = [Self::Name, Self::Newest, Self::Oldest];
 
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Name => "Name",
-            Self::Newest => "Newest customers",
-            Self::Oldest => "Oldest customers",
-        }
-    }
-
     pub fn slug(self) -> &'static str {
         match self {
             Self::Name => "name",

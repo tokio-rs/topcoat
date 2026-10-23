@@ -3,6 +3,7 @@ use topcoat::{
     Result,
     context::{Cx, try_request_context},
     icon::{icon, iconify::iconify_icon},
+    l10n::{Translation, fluent::messages},
     router::{
         Body, Method, StatusCode,
         content::Form,
@@ -12,6 +13,7 @@ use topcoat::{
     view::{View, attributes, element_id, view},
 };
 
+use super::{_common::role_label, language::language_menu};
 use crate::{
     components::{
         badge::{BadgeVariant, badge},
@@ -27,10 +29,29 @@ use crate::{
     seed::{DEMO_PASSWORD, DEMO_USERS},
 };
 
+messages!("{mod}/l10n/{locale}.ftl");
+
 struct SignInFailed {
     email: String,
-    email_error: Option<&'static str>,
-    password_error: Option<&'static str>,
+    email_error: Option<SignInError>,
+    password_error: Option<SignInError>,
+}
+
+#[derive(Clone, Copy)]
+enum SignInError {
+    EmailMissing,
+    PasswordMissing,
+    WrongCredentials,
+}
+
+impl SignInError {
+    fn message(self) -> Translation<'static> {
+        match self {
+            Self::EmailMissing => t!(error-email-missing),
+            Self::PasswordMissing => t!(error-password-missing),
+            Self::WrongCredentials => t!(error-wrong-credentials),
+        }
+    }
 }
 
 #[page]
@@ -55,7 +76,9 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
             (StatusCode::UNPROCESSABLE_ENTITY)
         }
 
-        <main class="flex min-h-svh flex-col items-center justify-center gap-6 p-6">
+        <main class="relative flex min-h-svh flex-col items-center justify-center gap-6 p-6">
+            <div class="absolute top-3 right-3">language_menu()</div>
+
             <p class="flex items-center gap-2 text-lg font-semibold">
                 icon(data: iconify_icon!("lucide:store"))
                 "Backroom"
@@ -64,8 +87,8 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
             card(
                 attrs: attributes! { class="w-full max-w-sm" },
                 card_header(
-                    card_title("Sign in")
-                    card_description("Use your staff account to manage the store.")
+                    card_title((t!(sign-in)))
+                    card_description((t!(sign-in.description)))
                 )
                 card_content(
                     // Disable browser validation so the form shows the server's field errors.
@@ -79,7 +102,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                             field(
                                 field_label(
                                     attrs: attributes! { for=(&email_id) },
-                                    "Email"
+                                    (t!(email))
                                 )
                                 input(
                                     attrs: attributes! {
@@ -97,14 +120,14 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                                 if let Some(error) = email_error {
                                     field_error(
                                         attrs: attributes! { id=(&email_error_id) },
-                                        (error)
+                                        (error.message())
                                     )
                                 }
                             )
                             field(
                                 field_label(
                                     attrs: attributes! { for=(&password_id) },
-                                    "Password"
+                                    (t!(password))
                                 )
                                 input(
                                     attrs: attributes! {
@@ -121,7 +144,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                                 if let Some(error) = password_error {
                                     field_error(
                                         attrs: attributes! { id=(&password_error_id) },
-                                        (error)
+                                        (error.message())
                                     )
                                 }
                             )
@@ -131,7 +154,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                 card_footer(
                     button(
                         attrs: attributes! { type="submit" form=(&form_id) class="w-full" },
-                        "Sign in"
+                        (t!(sign-in))
                     )
                 )
             )
@@ -147,11 +170,12 @@ async fn demo_accounts() -> Result<impl View> {
         card(
             attrs: attributes! { class="w-full max-w-sm" },
             card_header(
-                card_title("Demo accounts")
+                card_title((t!(demo-accounts)))
+                // A message cannot contain markup, so the password follows the sentence.
                 card_description(
-                    "Every account uses the password "
+                    (t!(demo-accounts.description))
+                    " "
                     <code class="font-mono text-foreground">(DEMO_PASSWORD)</code>
-                    "."
                 )
             )
             card_content(
@@ -162,7 +186,7 @@ async fn demo_accounts() -> Result<impl View> {
                                 <span class="font-medium">(name)</span>
                                 <span class="text-muted-foreground">(email)</span>
                             </div>
-                            badge(variant: BadgeVariant::Outline, (role.label()))
+                            badge(variant: BadgeVariant::Outline, (role_label(role)))
                         </li>
                     }
                 </ul>
@@ -180,8 +204,8 @@ struct Credentials {
 #[route(POST)]
 async fn submit(cx: &Cx, Form(credentials): Form<Credentials>) -> Result<SeeOther> {
     let Credentials { email, password } = credentials;
-    let mut email_error = email.trim().is_empty().then_some("Enter your email.");
-    let password_error = password.is_empty().then_some("Enter your password.");
+    let mut email_error = email.trim().is_empty().then_some(SignInError::EmailMissing);
+    let password_error = password.is_empty().then_some(SignInError::PasswordMissing);
 
     if email_error.is_none() && password_error.is_none() {
         if let Some(user) = User::authenticate(cx, &email, password).await? {
@@ -190,7 +214,7 @@ async fn submit(cx: &Cx, Form(credentials): Form<Credentials>) -> Result<SeeOthe
                 href!(super::_admin::_dashboard::page).resolve(cx),
             ));
         }
-        email_error = Some("Wrong email or password.");
+        email_error = Some(SignInError::WrongCredentials);
     }
 
     // Rewrite the POST to keep the submitted email and errors in the request context.

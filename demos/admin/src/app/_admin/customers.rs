@@ -5,6 +5,7 @@ use topcoat::{
     Result,
     context::Cx,
     icon::{icon, iconify::iconify_icon},
+    l10n::{Translation, fluent::messages},
     router::{href, page, query_params},
     runtime::{Event, Signal, link, shard, signal},
     view::{View, attributes, component, element_id, suspense, view},
@@ -12,6 +13,7 @@ use topcoat::{
 
 use self::customer_id::CustomerId;
 use crate::{
+    app::_common::{money, pagination_text},
     components::{
         avatar::{AvatarSize, avatar, avatar_fallback},
         button::{ButtonSize, ButtonVariant, button},
@@ -26,6 +28,8 @@ use crate::{
         customer::{CustomerSearch, CustomerSort, Spending},
     },
 };
+
+messages!("{mod}/l10n/{locale}.ftl");
 
 const PER_PAGE: usize = 20;
 
@@ -68,7 +72,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
         >
             <div class="flex flex-col gap-2 p-3 sm:flex-row sm:items-center">
                 <div class="relative sm:max-w-xs sm:flex-1">
-                    <label for=(&search_id) class="sr-only">"Search customers"</label>
+                    <label for=(&search_id) class="sr-only">(t!(search))</label>
                     icon(
                         data: iconify_icon!("lucide:search"),
                         attrs: attributes! {
@@ -80,7 +84,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                         attrs: attributes! {
                             id=(&search_id)
                             type="search"
-                            placeholder="Search names or emails"
+                            placeholder=(t!(search.placeholder))
                             class="pl-9"
                             :value=$(search.get())
                             @input=$(|e: Event| {
@@ -91,7 +95,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                     )
                 </div>
                 <div class="sm:ml-auto">
-                    <label for=(&sort_id) class="sr-only">"Sort by"</label>
+                    <label for=(&sort_id) class="sr-only">(t!(sort))</label>
                     select(
                         attrs: attributes! {
                             id=(&sort_id)
@@ -107,7 +111,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                                 value=(option.slug())
                                 selected=(initial_sort == option.slug())
                             >
-                                (option.label())
+                                (sort_label(option))
                             </option>
                         }
                     )
@@ -148,10 +152,8 @@ async fn customer_list(
                     icon(data: iconify_icon!("lucide:user-search"))
                 </span>
                 <div class="flex flex-col gap-1">
-                    <p class="font-medium">"No customers found"</p>
-                    <p class="text-sm text-muted-foreground">
-                        "No customers match your search."
-                    </p>
+                    <p class="font-medium">(t!(no-results))</p>
+                    <p class="text-sm text-muted-foreground">(t!(no-results.description))</p>
                 </div>
                 button(
                     variant: ButtonVariant::Outline,
@@ -163,7 +165,7 @@ async fn customer_list(
                             page_number.set(1);
                         })
                     },
-                    "Clear search"
+                    (t!(clear-search))
                 )
             </div>
         } else {
@@ -178,7 +180,7 @@ async fn customer_list(
 
             list_pagination(
                 page: shown,
-                noun: "customers",
+                text: pagination_text(shown),
                 href: |number| {
                     href!(page)
                         .query(&CustomersQuery::new(&text, sort, number))
@@ -243,7 +245,7 @@ async fn customer_rows(
                         )
                         table_cell(
                             attrs: attributes! { class="text-right font-medium tabular-nums" },
-                            (spending.spent)
+                            (money(spending.spent))
                         )
                     )
                 }
@@ -301,12 +303,20 @@ async fn customer_columns() -> Result<impl View> {
     Ok(view! {
         table_header(
             table_row(
-                table_head(attrs: attributes! { class="w-full" }, "Customer")
-                table_head("City")
-                table_head("Joined")
-                table_head(attrs: attributes! { class="text-right" }, "Orders")
-                table_head(attrs: attributes! { class="text-right" }, "Spent")
+                table_head(attrs: attributes! { class="w-full" }, (t!(column-customer)))
+                table_head((t!(column-city)))
+                table_head((t!(column-joined)))
+                table_head(attrs: attributes! { class="text-right" }, (t!(column-orders)))
+                table_head(attrs: attributes! { class="text-right" }, (t!(column-spent)))
             )
         )
     })
+}
+
+fn sort_label(sort: CustomerSort) -> Translation<'static> {
+    match sort {
+        CustomerSort::Name => t!(sort-name),
+        CustomerSort::Newest => t!(sort-newest),
+        CustomerSort::Oldest => t!(sort-oldest),
+    }
 }

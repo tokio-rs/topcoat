@@ -1,4 +1,6 @@
 mod _admin;
+mod _common;
+mod language;
 pub mod login;
 mod logout;
 mod theme;
@@ -9,14 +11,18 @@ use topcoat::{
     context::Cx,
     cookie::RouterBuilderCookieExt,
     font::{Font, fontsource::fontsource_font},
-    router::{RouterBuilder, RouterBuilderDiscoverExt, Slot, layout, module_router},
+    l10n::locale,
+    router::{
+        Body, Next, RouterBuilder, RouterBuilderDiscoverExt, Slot, layer, layout, module_router,
+        response::Response,
+    },
     runtime::RouterBuilderRuntimeExt,
     session::{RouterBuilderSessionExt, SessionConfig},
     tailwind,
     view::{View, view},
 };
 
-use crate::features::theme::theme;
+use crate::features::{locale::preferred_locale, theme::theme};
 
 const GEIST: Font =
     fontsource_font!(GEIST, weight: [400, 500, 600, 700], style: Normal, host: Asset);
@@ -31,13 +37,25 @@ pub fn router() -> RouterBuilder {
         .runtime()
 }
 
+/// Sets the language for every request, including shard updates.
+#[layer]
+async fn set_locale(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
+    let locale = preferred_locale(cx).clone();
+    next.run(&cx.with(locale), body).await
+}
+
 #[layout]
 async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     let theme = theme(cx);
 
     Ok(view! {
         <!DOCTYPE html>
-        <html lang="en" class=(theme.class()) style=(theme.color_scheme())>
+        <html
+            lang=(locale(cx).id())
+            dir=(locale(cx).id().direction())
+            class=(theme.class())
+            style=(theme.color_scheme())
+        >
             <head>
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">

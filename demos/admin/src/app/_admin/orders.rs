@@ -6,6 +6,7 @@ use topcoat::{
     Result,
     context::Cx,
     icon::{icon, iconify::iconify_icon},
+    l10n::{Translation, fluent::messages},
     router::{href, page, query_params},
     runtime::{Event, Signal, link, shard, signal},
     view::{StaticClass, View, attributes, class, component, element_id, suspense, view},
@@ -13,6 +14,7 @@ use topcoat::{
 
 use self::order_id::OrderId;
 use crate::{
+    app::_common::{money, pagination_text},
     components::{
         avatar::{AvatarSize, avatar, avatar_fallback},
         badge::{BadgeVariant, badge},
@@ -28,6 +30,8 @@ use crate::{
         order::{OrderSearch, OrderSort, OrderStatus},
     },
 };
+
+messages!("{mod}/l10n/{locale}.ftl");
 
 const PER_PAGE: usize = 20;
 
@@ -75,7 +79,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
         >
             <div class="flex flex-col gap-2 p-3 sm:flex-row sm:items-center">
                 <div class="relative sm:max-w-xs sm:flex-1">
-                    <label for=(&search_id) class="sr-only">"Search orders"</label>
+                    <label for=(&search_id) class="sr-only">(t!(search))</label>
                     icon(
                         data: iconify_icon!("lucide:search"),
                         attrs: attributes! {
@@ -87,7 +91,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                         attrs: attributes! {
                             id=(&search_id)
                             type="search"
-                            placeholder="Search customers or order numbers"
+                            placeholder=(t!(search.placeholder))
                             class="pl-9"
                             :value=$(search.get())
                             @input=$(|e: Event| {
@@ -98,7 +102,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                     )
                 </div>
                 <div class="grid grid-cols-2 gap-2 sm:ml-auto sm:flex">
-                    <label for=(&status_id) class="sr-only">"Status"</label>
+                    <label for=(&status_id) class="sr-only">(t!(status-filter))</label>
                     select(
                         attrs: attributes! {
                             id=(&status_id)
@@ -110,18 +114,18 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                             })
                         },
                         <option value="" selected=(initial_status.is_empty())>
-                            "All statuses"
+                            (t!(status-filter.all))
                         </option>
                         for option in OrderStatus::ALL {
                             <option
                                 value=(option.slug())
                                 selected=(initial_status == option.slug())
                             >
-                                (option.label())
+                                (status_label(option))
                             </option>
                         }
                     )
-                    <label for=(&sort_id) class="sr-only">"Sort by"</label>
+                    <label for=(&sort_id) class="sr-only">(t!(sort))</label>
                     select(
                         attrs: attributes! {
                             id=(&sort_id)
@@ -137,7 +141,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                                 value=(option.slug())
                                 selected=(initial_sort == option.slug())
                             >
-                                (option.label())
+                                (sort_label(option))
                             </option>
                         }
                     )
@@ -187,10 +191,8 @@ async fn order_list(
                     icon(data: iconify_icon!("lucide:package-search"))
                 </span>
                 <div class="flex flex-col gap-1">
-                    <p class="font-medium">"No orders found"</p>
-                    <p class="text-sm text-muted-foreground">
-                        "No orders match your search and status."
-                    </p>
+                    <p class="font-medium">(t!(no-results))</p>
+                    <p class="text-sm text-muted-foreground">(t!(no-results.description))</p>
                 </div>
                 button(
                     variant: ButtonVariant::Outline,
@@ -203,7 +205,7 @@ async fn order_list(
                             page_number.set(1);
                         })
                     },
-                    "Clear filters"
+                    (t!(clear-filters))
                 )
             </div>
         } else {
@@ -218,7 +220,7 @@ async fn order_list(
 
             list_pagination(
                 page: shown,
-                noun: "orders",
+                text: pagination_text(shown),
                 href: |number| {
                     href!(page)
                         .query(&OrdersQuery::new(&text, selected, sort, number))
@@ -245,7 +247,6 @@ async fn order_rows(
             table_body(
                 for order in &orders {
                     let customer = order.customer.get();
-                    let units = order.units();
                     table_row(
                         attrs: attributes! { class="relative" },
                         table_cell(
@@ -274,12 +275,7 @@ async fn order_rows(
                         table_cell(status_badge(status: order.status))
                         table_cell(
                             attrs: attributes! { class="text-muted-foreground tabular-nums" },
-                            (units)
-                            if units == 1 {
-                                " item"
-                            } else {
-                                " items"
-                            }
+                            (item_count(order.units()))
                         )
                         table_cell(
                             attrs: attributes! { class="text-muted-foreground" },
@@ -290,12 +286,12 @@ async fn order_rows(
                                     .strftime("%b %-d, %Y at %H:%M UTC")
                                     .to_string())
                             >
-                                (time_ago(order.placed_at))
+                                time_ago(timestamp: order.placed_at)
                             </time>
                         )
                         table_cell(
                             attrs: attributes! { class="text-right font-medium tabular-nums" },
-                            (order.total)
+                            (money(order.total))
                         )
                     )
                 }
@@ -352,12 +348,12 @@ async fn order_columns() -> Result<impl View> {
     Ok(view! {
         table_header(
             table_row(
-                table_head("Order")
-                table_head(attrs: attributes! { class="w-full" }, "Customer")
-                table_head("Status")
-                table_head("Items")
-                table_head("Placed")
-                table_head(attrs: attributes! { class="text-right" }, "Total")
+                table_head((t!(column-order)))
+                table_head(attrs: attributes! { class="w-full" }, (t!(column-customer)))
+                table_head((t!(column-status)))
+                table_head((t!(column-items)))
+                table_head((t!(column-placed)))
+                table_head(attrs: attributes! { class="text-right" }, (t!(column-total)))
             )
         )
     })
@@ -378,28 +374,52 @@ pub(super) async fn status_badge(status: OrderStatus) -> Result<impl View> {
         badge(
             variant: BadgeVariant::Outline,
             <span class=(class!("size-1.5 rounded-full", dot))></span>
-            (status.label())
+            (status_label(status))
         )
     })
 }
 
-/// Formats recent timestamps as elapsed time, such as `3 hours ago`.
-/// After a week, uses a date such as `Oct 12, 2026`.
-pub(super) fn time_ago(timestamp: Timestamp) -> String {
+/// Shows recent timestamps as elapsed time, such as `3 hours ago`.
+/// After a week, shows a date such as `Oct 12, 2026`.
+#[component]
+pub(super) async fn time_ago(timestamp: Timestamp) -> Result<impl View> {
     let minutes = Timestamp::now().duration_since(timestamp).as_mins();
-    let (amount, unit) = if minutes < 60 {
-        (minutes, "minute")
-    } else if minutes < 24 * 60 {
-        (minutes / 60, "hour")
-    } else if minutes < 7 * 24 * 60 {
-        (minutes / (24 * 60), "day")
-    } else {
-        return timestamp.strftime("%b %-d, %Y").to_string();
-    };
 
-    match amount {
-        ..1 => "just now".to_owned(),
-        1 => format!("1 {unit} ago"),
-        _ => format!("{amount} {unit}s ago"),
+    Ok(view! {
+        if minutes < 1 {
+            (t!(just-now))
+        } else if minutes < 60 {
+            (t!(minutes-ago, count = minutes))
+        } else if minutes < 24 * 60 {
+            (t!(hours-ago, count = minutes / 60))
+        } else if minutes < 7 * 24 * 60 {
+            (t!(days-ago, count = minutes / (24 * 60)))
+        } else {
+            (timestamp.strftime("%b %-d, %Y").to_string())
+        }
+    })
+}
+
+pub(super) fn item_count(count: u32) -> Translation<'static> {
+    t!(item-count, count)
+}
+
+fn status_label(status: OrderStatus) -> Translation<'static> {
+    match status {
+        OrderStatus::Pending => t!(status-pending),
+        OrderStatus::Paid => t!(status-paid),
+        OrderStatus::Shipped => t!(status-shipped),
+        OrderStatus::Delivered => t!(status-delivered),
+        OrderStatus::Cancelled => t!(status-cancelled),
+        OrderStatus::Refunded => t!(status-refunded),
+    }
+}
+
+fn sort_label(sort: OrderSort) -> Translation<'static> {
+    match sort {
+        OrderSort::Newest => t!(sort-newest),
+        OrderSort::Oldest => t!(sort-oldest),
+        OrderSort::HighestTotal => t!(sort-highest-total),
+        OrderSort::LowestTotal => t!(sort-lowest-total),
     }
 }

@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod catalog;
 pub mod customer;
+pub mod locale;
 pub mod order;
 pub mod stats;
 pub mod theme;

@@ -2,6 +2,7 @@ use topcoat::{
     Result,
     context::{Cx, memoize},
     icon::{IconData, icon, iconify::iconify_icon},
+    l10n::Translation,
     router::{
         Body, Next, error::RouterErrorExt, href, layer, module_param, page, path_param,
         response::Response,
@@ -10,13 +11,18 @@ use topcoat::{
     view::{Child, View, attributes, component, suspense, view},
 };
 
+use super::t;
 use crate::{
-    app::_admin::{
-        Crumb,
-        orders::{
-            order_id::{self, OrderId},
-            status_badge, time_ago,
+    app::{
+        _admin::{
+            Crumb,
+            orders::{
+                item_count,
+                order_id::{self, OrderId},
+                status_badge, time_ago,
+            },
         },
+        _common::money,
     },
     components::{
         avatar::{AvatarSize, avatar, avatar_fallback},
@@ -75,9 +81,11 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                     detail(data: iconify_icon!("lucide:map-pin"), (&customer.city))
                     detail(
                         data: iconify_icon!("lucide:calendar"),
-                        "Customer since "
                         <time datetime=(customer.joined_at.to_string())>
-                            (customer.joined_at.strftime("%b %Y").to_string())
+                            (t!(
+                                customer-since,
+                                date = customer.joined_at.strftime("%b %Y").to_string()
+                            ))
                         </time>
                     )
                 </div>
@@ -108,12 +116,12 @@ async fn customer_orders(cx: &Cx, id: u64) -> Result<impl View> {
 
     Ok(view! {
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            stat(label: "Orders", (spending.orders))
-            stat(label: "Total spent", (spending.spent))
+            stat(label: t!(orders), (spending.orders))
+            stat(label: t!(total-spent), (money(spending.spent)))
             stat(
-                label: "Average order",
+                label: t!(average-order),
                 match spending.average_order() {
-                    Some(average) => (average),
+                    Some(average) => (money(average)),
                     None => "-",
                 }
             )
@@ -121,19 +129,16 @@ async fn customer_orders(cx: &Cx, id: u64) -> Result<impl View> {
 
         card(
             card_header(
-                card_title("Orders")
-                card_description("Cancelled and refunded orders do not count as spent.")
+                card_title((t!(orders)))
+                card_description((t!(orders.description)))
             )
             if orders.is_empty() {
-                <p class="px-6 text-sm text-muted-foreground">
-                    "This customer has not placed an order yet."
-                </p>
+                <p class="px-6 text-sm text-muted-foreground">(t!(no-orders))</p>
             } else {
                 table(
                     order_columns()
                     table_body(
                         for order in &orders {
-                            let units = order.units();
                             table_row(
                                 attrs: attributes! { class="relative" },
                                 table_cell(
@@ -148,12 +153,7 @@ async fn customer_orders(cx: &Cx, id: u64) -> Result<impl View> {
                                 table_cell(status_badge(status: order.status))
                                 table_cell(
                                     attrs: attributes! { class="text-muted-foreground tabular-nums" },
-                                    (units)
-                                    if units == 1 {
-                                        " item"
-                                    } else {
-                                        " items"
-                                    }
+                                    (item_count(order.units()))
                                 )
                                 table_cell(
                                     attrs: attributes! { class="text-muted-foreground" },
@@ -164,12 +164,12 @@ async fn customer_orders(cx: &Cx, id: u64) -> Result<impl View> {
                                             .strftime("%b %-d, %Y at %H:%M UTC")
                                             .to_string())
                                     >
-                                        (time_ago(order.placed_at))
+                                        time_ago(timestamp: order.placed_at)
                                     </time>
                                 )
                                 table_cell(
                                     attrs: attributes! { class="text-right font-medium tabular-nums" },
-                                    (order.total)
+                                    (money(order.total))
                                 )
                             )
                         }
@@ -184,7 +184,7 @@ async fn customer_orders(cx: &Cx, id: u64) -> Result<impl View> {
 async fn customer_orders_skeleton() -> Result<impl View> {
     Ok(view! {
         <div aria-busy="true" class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            for label in ["Orders", "Total spent", "Average order"] {
+            for label in [t!(orders), t!(total-spent), t!(average-order)] {
                 stat(
                     label: label,
                     <div class="flex h-8 items-center">
@@ -196,8 +196,8 @@ async fn customer_orders_skeleton() -> Result<impl View> {
 
         card(
             card_header(
-                card_title("Orders")
-                card_description("Cancelled and refunded orders do not count as spent.")
+                card_title((t!(orders)))
+                card_description((t!(orders.description)))
             )
             table(
                 attrs: attributes! { aria-busy="true" },
@@ -229,7 +229,7 @@ async fn customer_orders_skeleton() -> Result<impl View> {
 }
 
 #[component]
-async fn stat(label: &str, child: Child<'_>) -> Result<impl View> {
+async fn stat(label: Translation<'_>, child: Child<'_>) -> Result<impl View> {
     Ok(view! {
         card(
             attrs: attributes! { class="gap-1" },
@@ -246,11 +246,11 @@ async fn order_columns() -> Result<impl View> {
     Ok(view! {
         table_header(
             table_row(
-                table_head("Order")
-                table_head("Status")
-                table_head("Items")
-                table_head(attrs: attributes! { class="w-full" }, "Placed")
-                table_head(attrs: attributes! { class="text-right" }, "Total")
+                table_head((t!(column-order)))
+                table_head((t!(column-status)))
+                table_head((t!(column-items)))
+                table_head(attrs: attributes! { class="w-full" }, (t!(column-placed)))
+                table_head(attrs: attributes! { class="text-right" }, (t!(column-total)))
             )
         )
     })

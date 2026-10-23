@@ -6,6 +6,7 @@ use tokio::time::{MissedTickBehavior, interval};
 use topcoat::{
     Result,
     context::Cx,
+    l10n::{Translation, fluent::messages},
     router::{href, page},
     runtime::{connected, link, shard},
     view::{
@@ -18,6 +19,7 @@ use super::orders::{
     status_badge, time_ago,
 };
 use crate::{
+    app::_common::money,
     components::{
         avatar::{AvatarSize, avatar, avatar_fallback},
         card::{card, card_description, card_header, card_title},
@@ -27,10 +29,13 @@ use crate::{
     },
     features::{
         auth::require_user,
+        catalog::Money,
         order::Order,
         stats::{SalesStats, VisitorStats},
     },
 };
+
+messages!("{mod}/l10n/{locale}.ftl");
 
 const TICK: Duration = Duration::from_secs(1);
 
@@ -42,24 +47,19 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <header class="flex flex-col gap-1">
             <h1 class="text-2xl font-semibold tracking-tight">
-                "Welcome back, "
-                (first_name)
+                (t!(welcome, name = first_name))
             </h1>
-            <p class="text-muted-foreground">
-                "Here is what is happening in the store."
-            </p>
+            <p class="text-muted-foreground">(t!(welcome.description))</p>
         </header>
 
         todays_stats()
 
         <section class="flex flex-col gap-3">
-            <h2 class="font-semibold">"Needs attention"</h2>
+            <h2 class="font-semibold">(t!(needs-attention))</h2>
             card(
                 card_header(
-                    card_title("Open orders")
-                    card_description(
-                        "Orders waiting for payment or shipment, oldest first."
-                    )
+                    card_title((t!(open-orders)))
+                    card_description((t!(open-orders.description)))
                 )
                 suspense(fallback: view! { open_orders_skeleton() }, open_orders())
             )
@@ -74,7 +74,7 @@ async fn todays_stats(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <section class="flex flex-col gap-3">
             <div class="flex items-center gap-2">
-                <h2 class="font-semibold">"Today"</h2>
+                <h2 class="font-semibold">(t!(today))</h2>
                 <span class="relative flex size-2" aria-hidden="true">
                     <span
                         class="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-75"
@@ -83,26 +83,26 @@ async fn todays_stats(cx: &Cx) -> Result<impl View> {
                         class="relative inline-flex size-2 rounded-full bg-emerald-500"
                     ></span>
                 </span>
-                <span class="text-sm text-muted-foreground">"Live"</span>
+                <span class="text-sm text-muted-foreground">(t!(live))</span>
             </div>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 stat_card(
-                    label: "Revenue",
+                    label: t!(revenue),
                     accent: class!("text-emerald-500"),
                     figure: revenue
                 )
                 stat_card(
-                    label: "Orders",
+                    label: t!(orders),
                     accent: class!("text-violet-500"),
                     figure: orders
                 )
                 stat_card(
-                    label: "Average order",
+                    label: t!(average-order),
                     accent: class!("text-amber-500"),
                     figure: average_order
                 )
                 stat_card(
-                    label: "Visitors right now",
+                    label: t!(visitors),
                     accent: class!("text-sky-500"),
                     figure: visitors
                 )
@@ -113,10 +113,16 @@ async fn todays_stats(cx: &Cx) -> Result<impl View> {
 
 #[derive(PartialEq, Eq)]
 struct Figure {
-    value: String,
+    value: Value,
     /// Change from the same time yesterday, in tenths of a percent.
     change: Option<i64>,
     chart: Chart,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Value {
+    Money(Money),
+    Count(i64),
 }
 
 /// Chart values run from oldest to newest.
@@ -129,7 +135,7 @@ enum Chart {
 fn revenue() -> Figure {
     let sales = SalesStats::now();
     Figure {
-        value: sales.today.revenue.to_string(),
+        value: Value::Money(sales.today.revenue),
         change: change(sales.today.revenue.0, sales.yesterday.revenue.0),
         chart: Chart::Bars(
             sales
@@ -144,7 +150,7 @@ fn revenue() -> Figure {
 fn orders() -> Figure {
     let sales = SalesStats::now();
     Figure {
-        value: grouped(sales.today.orders),
+        value: Value::Count(sales.today.orders),
         change: change(sales.today.orders, sales.yesterday.orders),
         chart: Chart::Bars(sales.by_minute.iter().map(|sales| sales.orders).collect()),
     }
@@ -154,7 +160,7 @@ fn average_order() -> Figure {
     let sales = SalesStats::now();
     let today = sales.today.average_order();
     Figure {
-        value: today.to_string(),
+        value: Value::Money(today),
         change: change(today.0, sales.yesterday.average_order().0),
         chart: Chart::Line(
             sales
@@ -170,7 +176,7 @@ fn average_order() -> Figure {
 fn visitors() -> Figure {
     let visitors = VisitorStats::now();
     Figure {
-        value: grouped(visitors.current),
+        value: Value::Count(visitors.current),
         change: change(visitors.current, visitors.yesterday),
         chart: Chart::Line(visitors.by_second),
     }
@@ -181,7 +187,7 @@ fn visitors() -> Figure {
 #[component]
 async fn stat_card(
     cx: &Cx,
-    label: &str,
+    label: Translation<'_>,
     accent: StaticClass,
     figure: fn() -> Figure,
 ) -> Result<impl View> {
@@ -213,7 +219,10 @@ async fn stat_card(
 async fn figure_details(figure: &Figure, accent: StaticClass) -> Result<impl View> {
     Ok(view! {
         <p class="mt-1 px-6 text-3xl font-semibold tracking-tight tabular-nums">
-            (&figure.value)
+            match figure.value {
+                Value::Money(amount) => (money(amount)),
+                Value::Count(count) => (t!(count, count)),
+            }
         </p>
         if let Some(change) = figure.change {
             <p
@@ -221,16 +230,14 @@ async fn figure_details(figure: &Figure, accent: StaticClass) -> Result<impl Vie
             >
                 if change >= 0 {
                     <span class="font-medium text-emerald-600">
-                        "+"
-                        (percent(change))
+                        (t!(increase, percent = percent(change)))
                     </span>
                 } else {
                     <span class="font-medium text-rose-600">
-                        "-"
-                        (percent(change))
+                        (t!(decrease, percent = percent(change)))
                     </span>
                 }
-                "vs. yesterday"
+                (t!(compared-to-yesterday))
             </p>
         }
         <div class=(class!("mt-4 h-16", accent))>
@@ -250,9 +257,7 @@ async fn open_orders(cx: &Cx) -> Result<impl View> {
 
     Ok(view! {
         if orders.is_empty() {
-            <p class="px-6 text-sm text-muted-foreground">
-                "All caught up. No orders are waiting."
-            </p>
+            <p class="px-6 text-sm text-muted-foreground">(t!(no-open-orders))</p>
         } else {
             table(
                 open_order_columns()
@@ -291,12 +296,12 @@ async fn open_orders(cx: &Cx) -> Result<impl View> {
                                         .strftime("%b %-d, %Y at %H:%M UTC")
                                         .to_string())
                                 >
-                                    (time_ago(order.placed_at))
+                                    time_ago(timestamp: order.placed_at)
                                 </time>
                             )
                             table_cell(
                                 attrs: attributes! { class="text-right font-medium tabular-nums" },
-                                (order.total)
+                                (money(order.total))
                             )
                         )
                     }
@@ -344,11 +349,11 @@ async fn open_order_columns() -> Result<impl View> {
     Ok(view! {
         table_header(
             table_row(
-                table_head("Order")
-                table_head(attrs: attributes! { class="w-full" }, "Customer")
-                table_head("Status")
-                table_head("Placed")
-                table_head(attrs: attributes! { class="text-right" }, "Total")
+                table_head((t!(column-order)))
+                table_head(attrs: attributes! { class="w-full" }, (t!(column-customer)))
+                table_head((t!(column-status)))
+                table_head((t!(column-placed)))
+                table_head(attrs: attributes! { class="text-right" }, (t!(column-total)))
             )
         )
     })
@@ -360,23 +365,11 @@ fn change(now: i64, before: i64) -> Option<i64> {
     (before != 0).then(|| (now - before) * 1_000 / before)
 }
 
-/// Formats tenths of a percent, so `42` becomes `4.2%`.
-fn percent(change: i64) -> String {
-    let change = change.unsigned_abs();
-    format!("{}.{}%", change / 10, change % 10)
-}
-
-fn grouped(number: i64) -> String {
-    let digits = number.unsigned_abs().to_string();
-    let mut grouped = String::with_capacity(digits.len() + digits.len() / 3 + 1);
-    if number < 0 {
-        grouped.push('-');
-    }
-    for (index, digit) in digits.chars().enumerate() {
-        if index > 0 && (digits.len() - index).is_multiple_of(3) {
-            grouped.push(',');
-        }
-        grouped.push(digit);
-    }
-    grouped
+/// Converts tenths of a percent to an unsigned percentage, so `-42` becomes `4.2`.
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "changes stay far below 2^53, where the conversion is exact"
+)]
+fn percent(change: i64) -> f64 {
+    change.unsigned_abs() as f64 / 10.0
 }

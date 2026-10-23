@@ -1,6 +1,7 @@
 use topcoat::{
     Result,
     context::{Cx, memoize, try_request_context},
+    l10n::Translation,
     router::{
         Body, Method, Next, StatusCode,
         content::Form,
@@ -13,7 +14,7 @@ use topcoat::{
     view::{Attributes, View, attributes, class, component, element_id, view},
 };
 
-use super::stock_badge;
+use super::{stock_badge, t};
 use crate::{
     app::_admin::Crumb,
     components::{
@@ -24,7 +25,7 @@ use crate::{
     },
     features::{
         auth::require_user,
-        catalog::{Product, ProductErrors, ProductForm},
+        catalog::{Product, ProductError, ProductErrors, ProductForm},
     },
 };
 
@@ -79,8 +80,8 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
             card(
                 attrs: attributes! { class="lg:col-span-2" },
                 card_header(
-                    card_title("Details")
-                    card_description("How the product shows in the store.")
+                    card_title((t!(details)))
+                    card_description((t!(details.description)))
                 )
                 card_content(
                     <form
@@ -92,31 +93,31 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                             attrs: attributes! { disabled=((!can_edit).then_some("")) },
                             field_group(
                                 product_field(
-                                    label: "Name",
+                                    label: t!(field-name),
                                     name: "name",
                                     value: &form.name,
-                                    error: errors.name
+                                    error: errors.name.map(error_message)
                                 )
                                 product_field(
-                                    label: "SKU",
+                                    label: t!(field-sku),
                                     name: "sku",
                                     value: &form.sku,
-                                    error: errors.sku,
+                                    error: errors.sku.map(error_message),
                                     attrs: attributes! { class="font-mono uppercase" }
                                 )
                                 <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                     product_field(
-                                        label: "Price (USD)",
+                                        label: t!(field-price),
                                         name: "price",
                                         value: &form.price,
-                                        error: errors.price,
+                                        error: errors.price.map(error_message),
                                         attrs: attributes! { inputmode="decimal" }
                                     )
                                     product_field(
-                                        label: "Units in stock",
+                                        label: t!(field-stock),
                                         name: "stock",
                                         value: &form.stock,
-                                        error: errors.stock,
+                                        error: errors.stock.map(error_message),
                                         attrs: attributes! { inputmode="numeric" }
                                     )
                                 </div>
@@ -129,15 +130,11 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
             card(
                 card_header(
                     if can_edit {
-                        card_title("Save changes")
-                        card_description(
-                            "Changes show in the store as soon as you save them."
-                        )
+                        card_title((t!(save)))
+                        card_description((t!(save.description)))
                     } else {
-                        card_title("View only")
-                        card_description(
-                            "Viewers can see the product but not change it."
-                        )
+                        card_title((t!(view-only)))
+                        card_description((t!(view-only.description)))
                     }
                 )
                 if can_edit {
@@ -145,7 +142,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                         attrs: attributes! { class="flex-col gap-3" },
                         button(
                             attrs: attributes! { type="submit" form=(&form_id) class="w-full" },
-                            "Save changes"
+                            (t!(save))
                         )
                         link(
                             href: href!(super::page),
@@ -155,7 +152,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                                     "w-full",
                                 ))
                             },
-                            "Cancel"
+                            (t!(cancel))
                         )
                     )
                 }
@@ -168,14 +165,15 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
 #[component]
 async fn product_field(
     cx: &Cx,
-    label: &str,
+    label: Translation<'_>,
     name: &str,
     value: &str,
-    error: Option<&str>,
+    error: Option<Translation<'_>>,
     #[default] attrs: Attributes,
 ) -> Result<impl View> {
     let input_id = element_id(cx);
     let error_id = element_id(cx);
+    let invalid = error.is_some();
 
     Ok(view! {
         field(
@@ -186,8 +184,8 @@ async fn product_field(
                     name=(name)
                     value=(value)
                     autocomplete="off"
-                    aria-invalid=(error.is_some().then_some("true"))
-                    aria-describedby=(error.is_some().then_some(&error_id))
+                    aria-invalid=(invalid.then_some("true"))
+                    aria-describedby=(invalid.then_some(&error_id))
                     (attrs)
                 }
             )
@@ -196,6 +194,22 @@ async fn product_field(
             }
         )
     })
+}
+
+fn error_message(error: ProductError) -> Translation<'static> {
+    match error {
+        ProductError::NameMissing => t!(error-name-missing),
+        ProductError::NameTooLong { max } => t!(error-name-too-long, max),
+        ProductError::SkuMissing => t!(error-sku-missing),
+        ProductError::SkuInvalid => t!(error-sku-invalid),
+        ProductError::SkuTooLong { max } => t!(error-sku-too-long, max),
+        ProductError::SkuTaken => t!(error-sku-taken),
+        ProductError::PriceMissing => t!(error-price-missing),
+        ProductError::PriceNotPositive => t!(error-price-not-positive),
+        ProductError::PriceInvalid => t!(error-price-invalid),
+        ProductError::StockMissing => t!(error-stock-missing),
+        ProductError::StockInvalid => t!(error-stock-invalid),
+    }
 }
 
 #[route(POST)]

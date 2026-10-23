@@ -62,14 +62,6 @@ pub enum Role {
 }
 
 impl Role {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Admin => "Admin",
-            Self::Staff => "Staff",
-            Self::Viewer => "Viewer",
-        }
-    }
-
     pub fn can_edit(self) -> bool {
         matches!(self, Self::Admin | Self::Staff)
     }

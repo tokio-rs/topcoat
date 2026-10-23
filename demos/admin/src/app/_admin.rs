@@ -9,12 +9,13 @@ use topcoat::{
     Result,
     context::{Cx, try_request_context},
     icon::{IconData, icon, iconify::iconify_icon},
+    l10n::{Translation, fluent::messages},
     router::{HrefTarget, Slot, href, layout, request::uri},
     runtime::{Event, Signal, link, link_attrs, prefetch_mode, signal},
     view::{View, attributes, component, element_id, view},
 };
 
-use super::logout;
+use super::{_common::role_label, language::language_menu, logout};
 use crate::{
     components::{
         avatar::{AvatarSize, avatar, avatar_fallback},
@@ -43,30 +44,32 @@ use crate::{
     },
 };
 
+messages!("{mod}/l10n/{locale}.ftl");
+
 struct NavItem {
-    label: &'static str,
+    label: fn() -> Translation<'static>,
     icon: IconData,
     target: &'static (dyn HrefTarget + Sync),
 }
 
 static NAV: [NavItem; 4] = [
     NavItem {
-        label: "Dashboard",
+        label: || t!(nav-dashboard),
         icon: iconify_icon!("lucide:layout-dashboard"),
         target: &_dashboard::page,
     },
     NavItem {
-        label: "Orders",
+        label: || t!(nav-orders),
         icon: iconify_icon!("lucide:shopping-cart"),
         target: &orders::page,
     },
     NavItem {
-        label: "Products",
+        label: || t!(nav-products),
         icon: iconify_icon!("lucide:package"),
         target: &products::page,
     },
     NavItem {
-        label: "Customers",
+        label: || t!(nav-customers),
         icon: iconify_icon!("lucide:users"),
         target: &customers::page,
     },
@@ -121,6 +124,7 @@ async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
                     separator(orientation: SeparatorOrientation::Vertical)
                     page_breadcrumb()
                     theme_toggle()
+                    language_menu()
                 )
                 <div class="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-6">
                     (slot)
@@ -145,7 +149,7 @@ async fn app_sidebar(
             collapsible: SidebarCollapsible::Icon,
             sheet_attrs: attributes! {
                 id=(id)
-                aria-label="Back office navigation"
+                aria-label=(t!(navigation))
                 @keydown=$(|e: Event| {
                     if e.key == "Escape" {
                         mobile_open.set(false);
@@ -175,7 +179,7 @@ async fn app_sidebar(
                         attrs: attributes! {
                             type="button"
                             class="md:hidden"
-                            aria-label="Close sidebar"
+                            aria-label=(t!(close-sidebar))
                             @click=$(|_e: Event| mobile_open.set(false))
                         },
                         icon(data: iconify_icon!("lucide:x"))
@@ -184,7 +188,7 @@ async fn app_sidebar(
             )
             sidebar_content(
                 sidebar_group(
-                    sidebar_group_label("Store")
+                    sidebar_group_label((t!(store)))
                     sidebar_group_content(
                         sidebar_menu(
                             for item in &NAV {
@@ -197,7 +201,7 @@ async fn app_sidebar(
                                             data-sidebar="menu-button"
                                             data-active=(if current { "true" } else { "false" })
                                             aria-current=(current.then_some("page"))
-                                            title=(item.label)
+                                            title=((item.label)())
                                             class=(sidebar_menu_button_variants(
                                                 SidebarMenuButtonVariant::Default,
                                                 SidebarMenuButtonSize::Md,
@@ -205,7 +209,7 @@ async fn app_sidebar(
                                             @click=$(|_e: Event| mobile_open.set(false))
                                         },
                                         icon(data: item.icon.clone())
-                                        <span>(item.label)</span>
+                                        <span>((item.label)())</span>
                                     )
                                 )
                             }
@@ -239,7 +243,7 @@ async fn user_menu(cx: &Cx, user: &User) -> Result<impl View> {
                     <span class="flex min-w-0 flex-col">
                         <span class="truncate font-medium">(&user.name)</span>
                         <span class="truncate text-xs text-muted-foreground">
-                            (user.role.label())
+                            (role_label(user.role))
                         </span>
                     </span>
                     icon(
@@ -261,7 +265,7 @@ async fn user_menu(cx: &Cx, user: &User) -> Result<impl View> {
                     dropdown_menu_item(
                         attrs: attributes! { type="submit" },
                         icon(data: iconify_icon!("lucide:log-out"))
-                        "Sign out"
+                        (t!(sign-out))
                     )
                 </form>
             )
@@ -285,11 +289,11 @@ async fn page_breadcrumb(cx: &Cx) -> Result<impl View> {
                     breadcrumb_separator()
                     breadcrumb_item(
                         if href.is_current(cx) {
-                            breadcrumb_page((item.label))
+                            breadcrumb_page(((item.label)()))
                         } else {
                             breadcrumb_link(
                                 attrs: attributes! { (link_attrs(cx, href, prefetch_mode(cx))) },
-                                (item.label)
+                                ((item.label)())
                             )
                         }
                     )
@@ -307,9 +311,9 @@ async fn page_breadcrumb(cx: &Cx) -> Result<impl View> {
 async fn theme_toggle(cx: &Cx) -> Result<impl View> {
     let dark = theme(cx) == Theme::Dark;
     let label = if dark {
-        "Switch to light theme"
+        t!(light-theme).resolve(cx)
     } else {
-        "Switch to dark theme"
+        t!(dark-theme).resolve(cx)
     };
     let return_to = uri(cx).path_and_query().map_or("/", |path| path.as_str());
 
@@ -319,7 +323,7 @@ async fn theme_toggle(cx: &Cx) -> Result<impl View> {
             button(
                 variant: ButtonVariant::Ghost,
                 size: ButtonSize::Icon,
-                attrs: attributes! { type="submit" aria-label=(label) title=(label) },
+                attrs: attributes! { type="submit" aria-label=(&*label) title=(&*label) },
                 if dark {
                     icon(data: iconify_icon!("lucide:sun"))
                 } else {

@@ -1,5 +1,7 @@
 use topcoat::{
     Result,
+    context::Cx,
+    l10n::Translation,
     runtime::{Event, Signal},
     view::{View, attributes, class, component, view},
 };
@@ -70,13 +72,21 @@ impl ListPage {
     }
 }
 
-/// Shows the item range and page links. `noun` is the item label, such as `orders`.
-/// Clicks update the `number` signal in place. Each link also gets a URL from
-/// `href`, so it can be opened in a new tab.
+/// Text shown by [`list_pagination`].
+pub struct PaginationText<'a> {
+    /// The items on the page, such as `21-40 of 45`.
+    pub summary: Translation<'a>,
+    pub previous: Translation<'a>,
+    pub next: Translation<'a>,
+}
+
+/// Shows the item range and page links. Clicks update the `number` signal in place.
+/// Each link also gets a URL from `href`, so it can be opened in a new tab.
 #[component]
 pub async fn list_pagination(
+    cx: &Cx,
     page: ListPage,
-    noun: &str,
+    text: PaginationText<'_>,
     href: impl Fn(usize) -> String + Send + Sync,
     number: &Signal<usize>,
 ) -> Result<impl View> {
@@ -84,27 +94,24 @@ pub async fn list_pagination(
     let pages = page.pages();
     let previous = current.saturating_sub(1).max(1);
     let next = (current + 1).min(pages);
+    let PaginationText {
+        summary,
+        previous: previous_label,
+        next: next_label,
+    } = text;
+    let previous_label = previous_label.resolve(cx);
+    let next_label = next_label.resolve(cx);
 
     Ok(view! {
         <div class="flex flex-col items-center gap-3 px-6 py-3 sm:flex-row">
-            <p class="shrink-0 text-sm text-muted-foreground tabular-nums">
-                "Showing "
-                <span class="font-medium text-foreground">
-                    (page.first())
-                    "-"
-                    (page.last())
-                </span>
-                " of "
-                <span class="font-medium text-foreground">(page.count)</span>
-                " "
-                (noun)
-            </p>
+            <p class="shrink-0 text-sm text-muted-foreground tabular-nums">(summary)</p>
             // Offset the Next link's padding to align its arrow with the table content.
             pagination(
                 attrs: attributes! { class="sm:-mr-3 sm:justify-end" },
                 pagination_content(
                     pagination_item(
                         pagination_previous(
+                            label: previous_label,
                             attrs: attributes! {
                                 href=(href(previous))
                                 aria-disabled=((current == 1).then_some("true"))
@@ -138,6 +145,7 @@ pub async fn list_pagination(
                     }
                     pagination_item(
                         pagination_next(
+                            label: next_label,
                             attrs: attributes! {
                                 href=(href(next))
                                 aria-disabled=((current == pages).then_some("true"))
