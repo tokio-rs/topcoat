@@ -9,24 +9,23 @@ use crate::app::t;
 #[page]
 pub async fn page() -> Result<impl View> {
     Ok(view! {
-        // `t!(title)` shows the message `title` in the visitor's language.
+        // Translates the message `title` into the locale of the page.
         <h1>(t!(title))</h1>
         <p>(t!(intro))</p>
 
-        // `name = "Ada"` fills in `{ $name }` in the message.
+        // Arguments fill in the `{ $name }` in the message.
         <p>(t!(greeting, name = "Ada"))</p>
 
-        // The text changes with the number, as in "One item" and "5 items". Large numbers
-        // are written the local way: 1,234 in English and 1.234 in German.
+        // Fluent picks the plural form, like "One item" or "5 items", and formats the
+        // number for the locale, like 1,234 or 1.234.
         <ul>
             for count in [1, 5, 1234] {
-                // `count` is short for `count = count`.
+                // Short for `count = count`.
                 <li>(t!(items, count))</li>
             }
         </ul>
 
-        // A translation can also be used as an attribute. `search.placeholder` is the
-        // `placeholder` part of the `search` message.
+        // `search.placeholder` is the `.placeholder` attribute of the `search` message.
         <input
             type="search"
             aria-label=(t!(search))

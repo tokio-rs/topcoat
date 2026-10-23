@@ -1,16 +1,14 @@
 title = Localization
-# The name of the language, in that language.
+# This language's own name, used by the language links.
 language = English
 intro = This page is translated with Fluent.
 greeting = Hello, { $name }!
-# Picks one of the variants below based on `$count`. The one marked with `*` is used when
-# no other one matches.
+# Picks a form based on `$count`. `*` marks the default.
 items =
     { $count ->
         [one] One item
        *[other] { $count } items
     }
-# `.placeholder` is an extra part of the message, used here for the placeholder of the
-# search field.
+# `.placeholder` is an attribute: an extra text that belongs to the message.
 search = Search
     .placeholder = Type to search

@@ -13,14 +13,14 @@ use topcoat::{
 
 use super::t;
 
-// The locale comes from the URL, as in /en or /de.
+// The locale is the first part of the URL, as in /en or /de.
 module_param!(pub path_locale: Locale, error = not_found);
 
-// Only accept locales that have messages, then put the locale in `cx`. `t!` reads it from
-// there to pick the translation.
+// Sets the locale for every page in this module. Each `t!` translates into it.
 #[layer]
 async fn layer(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
     let path_locale = path_param::<PathLocale>(cx)?;
+    // Any locale can be typed into the URL, so reject the ones without messages.
     if !t::locales().contains(path_locale) {
         return Err(not_found().into());
     }
@@ -32,7 +32,7 @@ async fn layer(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
 async fn layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
-        // The `lang` and `dir` attributes come from the locale.
+        // Set `lang` and `dir` to match the locale.
         <html lang=(locale(cx).id()) dir=(locale(cx).id().direction())>
             <head>
                 <title>(t!(title))</title>
@@ -51,8 +51,6 @@ async fn layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
 #[component]
 async fn nav(cx: &Cx) -> Result<impl View> {
     Ok(view! {
-        // Each link shows its language's own name, like "Deutsch", so it is translated
-        // into the link's locale instead of the page's.
         <nav>
             for link_locale in t::locales() {
                 <a
@@ -62,6 +60,8 @@ async fn nav(cx: &Cx) -> Result<impl View> {
                         aria-current="page"
                     }
                 >
+                    // Names each language in itself, like "Deutsch", by translating into
+                    // the link's locale instead of the page's.
                     (t!(language).resolve(&cx.with(link_locale.clone())))
                 </a>
                 " "

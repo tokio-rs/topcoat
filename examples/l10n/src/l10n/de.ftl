@@ -1,5 +1,5 @@
 title = Lokalisierung
-# The name of the language, in that language.
+# This language's own name, used by the language links.
 language = Deutsch
 intro = Diese Seite wird mit Fluent übersetzt.
 greeting = Hallo, { $name }!
