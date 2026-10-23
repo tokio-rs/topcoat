@@ -16,8 +16,7 @@ const MODULE: &str = "{mod}";
 /// single path component.
 ///
 /// - `*` matches any characters within one path component.
-/// - `**` matches any number of directories, including none, and must occupy a whole
-///   component.
+/// - `**` matches any number of directories, including none, and must occupy a whole component.
 ///
 /// A leading `{mod}` uses the directory where the current module's child modules
 /// belong. For both `src/about.rs` and `src/about/mod.rs`, this is `src/about/`.
