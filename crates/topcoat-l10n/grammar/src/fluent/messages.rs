@@ -17,27 +17,24 @@ use syn::{
 };
 use topcoat_core_grammar::paths::{topcoat_inventory, topcoat_l10n, topcoat_l10n_fluent_macro};
 
-/// The input of a `messages!` invocation: an optional visibility and the path
-/// of the Fluent files to load.
+/// Arguments to `messages!`: a file pattern, optionally preceded by a visibility.
 ///
 /// ```text
 /// messages!(pub(crate) "./l10n/{locale}.ftl")
 /// ```
 pub struct Messages {
-    /// The visibility of the generated `t!`.
+    /// Visibility to apply to the generated `t!` macro.
     pub vis: Visibility,
-    /// The path of the Fluent files.
+    /// The file pattern to load.
     pub path: PathPattern,
 }
 
 impl Messages {
-    /// Returns the name of the hidden `macro_rules!` macro behind `t!`.
+    /// Chooses a unique name for the hidden `macro_rules!` macro used by `t!`.
     ///
-    /// The name contains a hash of the location and the input of the
-    /// invocation at `call_site`, so every invocation gets its own name. When
-    /// the call site has no source file, as may be the case in rust-analyzer,
-    /// the hash also contains a number that grows with every call, so
-    /// invocations with the same input still get different names.
+    /// The name includes a hash of the call's location and input. If `call_site` has no
+    /// source file, as can happen in rust-analyzer, a counter also distinguishes calls
+    /// with identical input.
     #[must_use]
     pub fn macro_name(&self, call_site: &CallSite) -> Ident {
         static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -60,8 +57,8 @@ impl Messages {
         format_ident!("__topcoat_l10n_t_{:016x}", hasher.finish())
     }
 
-    /// Generates `t!`: the hidden macro `name` and a `use` that names it `t`
-    /// with the visibility of the invocation.
+    /// Generates the hidden macro `name` and imports it as `t` with the requested
+    /// visibility.
     fn t_macro(&self, name: &Ident) -> TokenStream {
         let vis = &self.vis;
         // Other crates can only call an exported macro, which is placed at the
@@ -81,8 +78,7 @@ impl Messages {
         }
     }
 
-    /// Generates the `t` module of the namespace `name`, with the visibility
-    /// of the invocation.
+    /// Generates the `t` module for namespace `name` with the requested visibility.
     fn t_module(&self, name: &Ident) -> TokenStream {
         let vis = &self.vis;
         let id = name.to_string();
@@ -93,8 +89,7 @@ impl Messages {
         quote! {
             #[doc = #doc]
             #vis mod t {
-                /// Returns the locales that have files, sorted by their
-                /// canonical spelling.
+                /// Lists the loaded locales in canonical name order.
                 #[allow(dead_code)]
                 #[must_use]
                 pub fn locales() -> &'static [#topcoat_l10n::Locale] {
@@ -104,11 +99,10 @@ impl Messages {
         }
     }
 
-    /// Generates the registration of the namespace `name` with the files of
-    /// `locales`, and a record of the invocation at `call_site` for tools.
+    /// Generates the registration for namespace `name`, its locale files and a record
+    /// of `call_site` for tools.
     ///
-    /// Including the files also makes the compiler rebuild the crate when one
-    /// of them changes.
+    /// The file includes also tell the compiler to rebuild when a loaded file changes.
     fn register(&self, name: &Ident, call_site: &CallSite, locales: &[LocaleFiles]) -> TokenStream {
         let id = name.to_string();
         let source_file = call_site
@@ -161,13 +155,12 @@ impl Messages {
         }
     }
 
-    /// Generates `t!`, the `t` module and the registration of the files
-    /// matched by the path from `call_site`, or compile errors if they cannot
-    /// be found or parsed.
+    /// Generates the translation macro, locale module and registration for files
+    /// matched from `call_site`. Reports compile errors if the files cannot be found or
+    /// parsed.
     ///
-    /// When `call_site` has no source file, as may be the case in
-    /// rust-analyzer, only `t!` and the `t` module are generated, without
-    /// reading any files.
+    /// If no source file is available, as can happen in rust-analyzer, generates only
+    /// `t!` and the `t` module without reading files.
     #[must_use]
     pub fn expand(&self, call_site: &CallSite) -> TokenStream {
         let name = self.macro_name(call_site);
@@ -210,8 +203,8 @@ impl Messages {
     }
 }
 
-/// Expands to `t!`, the `t` module and the registration of the files found
-/// from the [call site](CallSite::current) of the invocation being expanded.
+/// Generates `t!`, the `t` module and file registration using the current [call
+/// site](CallSite::current).
 impl ToTokens for Messages {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         tokens.extend(match CallSite::current() {

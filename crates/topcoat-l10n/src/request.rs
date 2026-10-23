@@ -3,12 +3,11 @@ use topcoat_core::context::{Cx, memoize_cache, try_request_context};
 
 use crate::Locale;
 
-/// Returns the locales listed in the request's `Accept-Language` header, most
-/// preferred first, or none outside a router request.
+/// Reads the request's `Accept-Language` header and lists locales in preference order.
+/// Returns an empty slice outside a router request.
 ///
-/// The locales are [canonicalized](Locale::canonicalize). Entries that fail to
-/// parse, the `*` wildcard, and entries with a weight of zero are skipped. The
-/// result is computed once per request.
+/// [Canonicalizes](Locale::canonicalize) the locale names and skips invalid entries,
+/// `*` and entries with zero weight. Caches the result for the request.
 #[must_use]
 pub fn accept_language(cx: &Cx) -> &[Locale] {
     memoize_cache(cx).memoize(cx, (), (), |cx, ()| {
@@ -20,22 +19,21 @@ pub fn accept_language(cx: &Cx) -> &[Locale] {
     })
 }
 
-/// Returns the locale of the current scope, or `None` when it has none.
+/// Reads the [`Locale`] from the current request context, returning `None` if none is
+/// set.
 ///
-/// The locale is the [`Locale`] registered on the request context, such as by
-/// a layer with [`Cx::with`].
+/// Set it with [`Cx::with`], usually in a layer.
 #[must_use]
 pub fn try_locale(cx: &Cx) -> Option<&Locale> {
     try_request_context(cx)
 }
 
-/// Returns the locale of the current scope.
-///
-/// See [`try_locale`] for where it is registered.
+/// Reads the locale from the current request context. See [`try_locale`] for how to set
+/// it.
 ///
 /// # Panics
 ///
-/// Panics if no [`Locale`] is registered.
+/// Panics if the context contains no [`Locale`].
 #[must_use]
 #[track_caller]
 pub fn locale(cx: &Cx) -> &Locale {
@@ -45,8 +43,8 @@ pub fn locale(cx: &Cx) -> &Locale {
     locale
 }
 
-/// Parses `Accept-Language` header values into locales, most preferred
-/// first. Entries with the same weight keep their order.
+/// Parses header values into locales sorted by preference. Equal weights preserve the
+/// input order.
 fn parse_accept_language<'a>(values: impl Iterator<Item = &'a str>) -> Vec<Locale> {
     let mut weighted: Vec<_> = values
         .flat_map(|value| value.split(','))
@@ -56,8 +54,7 @@ fn parse_accept_language<'a>(values: impl Iterator<Item = &'a str>) -> Vec<Local
     weighted.into_iter().map(|(_, locale)| locale).collect()
 }
 
-/// Parses one `tag;q=weight` entry into its weight in thousandths and its
-/// locale.
+/// Parses a `tag;q=weight` entry into a locale and a weight measured in thousandths.
 fn parse_entry(entry: &str) -> Option<(u16, Locale)> {
     let mut parts = entry.split(';');
     let tag = parts.next()?.trim();
@@ -75,7 +72,7 @@ fn parse_entry(entry: &str) -> Option<(u16, Locale)> {
     Some((weight, locale))
 }
 
-/// Parses a weight between `0` and `1` with up to three decimals into
+/// Converts a weight from `0` to `1`, with at most three decimal places, into
 /// thousandths.
 fn parse_weight(value: &str) -> Option<u16> {
     let (whole, fraction) = value.split_once('.').unwrap_or((value, ""));
@@ -160,8 +157,7 @@ mod tests {
         assert_eq!(parse_weight(".5"), None);
     }
 
-    /// Returns a context for a request with the `Accept-Language` header
-    /// `header`.
+    /// Creates a request context with the given `Accept-Language` header.
     fn request(header: &str) -> Cx {
         let (parts, ()) = Request::builder()
             .header(ACCEPT_LANGUAGE, header)

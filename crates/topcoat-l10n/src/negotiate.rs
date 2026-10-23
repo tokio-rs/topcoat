@@ -1,18 +1,17 @@
 use crate::{LanguageIdentifier, Locale};
 
-/// Returns the locale of `available` that best matches `requested`, or `None`
-/// when none matches.
+/// Chooses the best available match for the requested locales, or returns `None` if
+/// none matches.
 ///
-/// Requested locales are tried most preferred first. Each one matches an
-/// available locale with the same language identifier, then one with the same
-/// language, script, and region after filling in
-/// [likely subtags](crate::LanguageIdentifier::maximize), then one with the
-/// same language and script. So `en-GB` matches an available `en`, and `zh-TW`
-/// matches `zh-Hant` but not `zh-Hans`. Earlier available locales win when a
-/// requested locale matches several of them equally well.
+/// Tries requests in the order supplied, so put the most preferred locale first. For
+/// each request, first looks for the same language identifier. Then fills in [likely
+/// subtags](crate::LanguageIdentifier::maximize) and looks for the same language,
+/// script and region. Finally, accepts a match on language and script alone. If several
+/// available locales match equally well, picks the first.
 ///
-/// Locales are compared after [canonicalization](Locale::canonicalize), so a
-/// requested `iw` matches an available `he`.
+/// For example, `en-GB` can match `en`, while `zh-TW` can match `zh-Hant` but not
+/// `zh-Hans`. [Canonicalizes](Locale::canonicalize) names before comparing them, so
+/// `iw` matches `he`.
 ///
 /// ```
 /// use topcoat_l10n::{locale, negotiate};

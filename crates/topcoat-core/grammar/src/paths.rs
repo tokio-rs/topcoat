@@ -185,12 +185,11 @@ pub const topcoat_font_fontsource_macro: Crate =
 #[allow(non_upper_case_globals)]
 pub const topcoat_icon: Crate = Crate::new("icon", "topcoat-icon", "");
 
-/// `::topcoat::l10n`, or `topcoat_l10n` standalone.
+/// The localization module, through `::topcoat::l10n` or the `topcoat_l10n` crate.
 #[allow(non_upper_case_globals)]
 pub const topcoat_l10n: Crate = Crate::new("l10n", "topcoat-l10n", "");
 
-/// The Fluent macros: `::topcoat::l10n::fluent`, or `topcoat_l10n_macro`
-/// standalone.
+/// Fluent macros, through `::topcoat::l10n::fluent` or the `topcoat_l10n_macro` crate.
 #[allow(non_upper_case_globals)]
 pub const topcoat_l10n_fluent_macro: Crate = Crate::new("l10n::fluent", "topcoat-l10n-macro", "");
 

@@ -5,20 +5,19 @@ use std::{
 
 use crate::LocaleParseError;
 
-/// A script subtag, such as `Latn` or `Hant`: four ASCII letters.
+/// A script code made of four ASCII letters, such as `Latn` or `Hant`.
 ///
-/// Create one with the [`script!`](crate::script) macro for text known at
-/// compile time, or parse one with [`str::parse`]. Parsing canonicalizes the
-/// text to title case.
+/// Use [`script!`](crate::script) for a fixed code or [`str::parse`] for runtime input.
+/// Parsing capitalizes the first letter and lowercases the rest.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Script(icu_locale_core::subtags::Script);
 
 impl Script {
-    /// Parses a script subtag, canonicalizing its case.
+    /// Parses a script code and normalizes its capitalization.
     ///
     /// # Errors
     ///
-    /// Fails when the text is not four ASCII letters.
+    /// Returns an error unless the input is four ASCII letters.
     pub const fn try_from_str(text: &str) -> Result<Self, LocaleParseError> {
         match icu_locale_core::subtags::Script::try_from_str(text) {
             Ok(script) => Ok(Self(script)),
@@ -26,19 +25,19 @@ impl Script {
         }
     }
 
-    /// Returns the canonical text of the subtag.
+    /// Returns the normalized script code.
     #[must_use]
     pub const fn as_str(&self) -> &str {
         self.0.as_str()
     }
 
-    /// Converts to the `icu_locale_core` subtag.
+    /// Returns the code as an `icu_locale_core` subtag.
     #[must_use]
     pub const fn to_icu(self) -> icu_locale_core::subtags::Script {
         self.0
     }
 
-    /// Converts from the `icu_locale_core` subtag.
+    /// Wraps a script subtag from `icu_locale_core`.
     #[must_use]
     pub const fn from_icu(script: icu_locale_core::subtags::Script) -> Self {
         Self(script)
@@ -71,10 +70,9 @@ impl FromStr for Script {
     }
 }
 
-/// Creates a [`Script`] from text known at compile time.
+/// Checks a fixed script code at compile time and creates a [`Script`].
 ///
-/// Malformed text is a compile error. The macro is usable in `const` and
-/// `static` items.
+/// Invalid codes cause a compile error. Works in `const` and `static` items.
 #[macro_export]
 macro_rules! script {
     ($text:literal) => {

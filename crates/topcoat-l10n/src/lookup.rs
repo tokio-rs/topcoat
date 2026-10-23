@@ -5,21 +5,20 @@ use icu_locale_core::DataLocale;
 
 use crate::{LanguageIdentifier, Locale};
 
-/// Returns the locale of `available` that serves `locale`, or `None` when none
-/// does.
+/// Finds an available locale that can provide translations for `locale`. Returns `None`
+/// if there is no match.
 ///
-/// The locale is looked up along its fallback chain as defined by CLDR, from
-/// the most specific locale to the least, without the root locale. Each step
-/// drops a subtag without changing the script: `de-CH-1996` is served by
-/// `de-CH`, then by `de-1996`, then by `de`, and `zh-TW` is served by
-/// `zh-Hant`, but never by `zh`, which is written in another script. The chain
-/// follows the parent locales of CLDR, so `es-MX` is served by `es-419` before
-/// `es`, and `pt-AO` by `pt-PT` before `pt`. A less specific locale never
-/// serves a more specific one, so an available `en-US` does not serve `en` or
-/// `en-GB`.
+/// Searches the locale's fallback chain from most specific to least specific, following
+/// CLDR rules and excluding the root locale. For example, `de-CH-1996` tries `de-CH`,
+/// then `de-1996`, then `de`. Fallback preserves the script, so `zh-TW` can use
+/// `zh-Hant` but not `zh`.
 ///
-/// Extensions are ignored, and locales are compared after
-/// [canonicalization](Locale::canonicalize), so `iw` is served by `he`.
+/// CLDR also defines parent locales. For example, `es-MX` tries `es-419` before `es`,
+/// and `pt-AO` tries `pt-PT` before `pt`. Lookup does not choose a sibling or a more
+/// specific locale. An available `en-US` therefore cannot serve `en` or `en-GB`.
+///
+/// Ignores extensions and [canonicalizes](Locale::canonicalize) names before comparing
+/// them, so `iw` can use `he`.
 ///
 /// ```
 /// use topcoat_l10n::{locale, lookup};
@@ -38,16 +37,14 @@ pub fn lookup<'a>(locale: &Locale, available: &'a [Locale]) -> Option<&'a Locale
     lookup_index(locale, &normalized).map(|index| &available[index])
 }
 
-/// Returns the position in `normalized` of the locale that serves `locale`, as
-/// chosen by [`lookup`]. Each locale of `normalized` comes from
-/// [`normalize_for_lookup`].
+/// Returns the index selected by [`lookup`]. Normalize the input locales with
+/// [`normalize_for_lookup`] first.
 pub(crate) fn lookup_index(locale: &Locale, normalized: &[DataLocale]) -> Option<usize> {
     lookup_indices(locale, normalized).next()
 }
 
-/// Returns the positions in `normalized` of every locale that could serve
-/// `locale`, from the most specific to the least. The first one is the locale
-/// chosen by [`lookup_index`].
+/// Lists matching locale indices in fallback order, from most specific to least
+/// specific. The first result is the one returned by [`lookup_index`].
 pub(crate) fn lookup_indices(
     locale: &Locale,
     normalized: &[DataLocale],
@@ -67,8 +64,7 @@ pub(crate) fn lookup_indices(
     })
 }
 
-/// Returns `id` in the form that [`lookup_index`] compares available locales
-/// in.
+/// Normalizes an identifier for comparisons in [`lookup_index`].
 pub(crate) fn normalize_for_lookup(id: &LanguageIdentifier) -> DataLocale {
     // The first step of a chain is the locale with implied subtags removed,
     // such as `zh` for `zh-Hans`, so both sides are compared in that form.

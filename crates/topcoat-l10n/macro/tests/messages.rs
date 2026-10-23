@@ -12,7 +12,7 @@ mod admin {
     topcoat::l10n::fluent::messages!(pub "./admin/{locale}.ftl");
 }
 
-/// Returns a context whose locale is `locale`.
+/// Creates a context with the given locale.
 fn scope(locale: Locale) -> Cx {
     Cx::default().with(locale)
 }
@@ -154,15 +154,15 @@ async fn renders_as_content_and_attribute_values() {
     );
 }
 
-/// Shows the locale of the page, if any, and a translated title.
+/// Renders the page's locale, when set, and a translated title.
 #[page("/")]
 async fn home(cx: &Cx) -> Result<impl View> {
     let lang = try_locale(cx).map(ToString::to_string);
     Ok(view! { <p lang=(lang)>(t!(title))</p> })
 }
 
-/// Gives every page the locale that best matches the `Accept-Language` header,
-/// or English when none matches.
+/// Sets the page locale from `Accept-Language`, falling back to English if no locale
+/// matches.
 #[layer("/")]
 async fn negotiate_locale(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
     let locale = negotiate(accept_language(cx), t::locales())
@@ -171,7 +171,7 @@ async fn negotiate_locale(cx: &Cx, body: Body, next: Next<'_>) -> Result<Respons
     next.run(&cx.with(locale), body).await
 }
 
-/// Requests the home page with the `Accept-Language` header `header`.
+/// Sends a home page request with the given `Accept-Language` header.
 async fn get(router: &Router, header: &str) -> String {
     let request = http::Request::builder()
         .uri("/")

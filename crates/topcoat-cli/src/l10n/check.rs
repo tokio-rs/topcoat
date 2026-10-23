@@ -49,7 +49,7 @@ pub(super) async fn run(args: CheckArgs) {
     }
 }
 
-/// Builds the binary and returns its contents, or exits on failure.
+/// Builds the app and reads the binary. Exits if the build fails.
 async fn build(opts: &BuildOpts) -> Vec<u8> {
     let (_, bytes) = opts
         .build_and_read(|_, _| {})
@@ -58,8 +58,7 @@ async fn build(opts: &BuildOpts) -> Vec<u8> {
     bytes
 }
 
-/// Sets the modification time of the file at `path` to now, without changing
-/// its contents.
+/// Updates a file's modification time to now, leaving its contents unchanged.
 fn touch(path: &Path) -> io::Result<()> {
     File::options()
         .write(true)
@@ -67,7 +66,7 @@ fn touch(path: &Path) -> io::Result<()> {
         .set_modified(SystemTime::now())
 }
 
-/// Prints the coverage and the problems of every namespace of `check`.
+/// Prints translation coverage and problems for each checked namespace.
 fn print(check: &Check) {
     if check.namespaces.is_empty() {
         println!("the binary has no `messages!`");
@@ -136,7 +135,7 @@ fn print_namespace(namespace: &NamespaceCheck) {
     }
 }
 
-/// Returns `location` with its file relative to the current directory.
+/// Makes the file path in `location` relative to the current directory when possible.
 pub(crate) fn relative_location(location: &Location) -> Location {
     Location {
         file: relative(&location.file),
@@ -144,7 +143,7 @@ pub(crate) fn relative_location(location: &Location) -> Location {
     }
 }
 
-/// Returns `path` relative to the current directory, if it is inside it.
+/// Makes `path` relative to the current directory if it is inside that directory.
 fn relative(path: &Path) -> PathBuf {
     std::env::current_dir()
         .ok()

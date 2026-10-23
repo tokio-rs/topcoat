@@ -1,22 +1,22 @@
 use std::fmt::{self, Display};
 
-/// The reason a locale, language identifier, or subtag failed to parse.
+/// An error from parsing a locale, language identifier or subtag.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum LocaleParseError {
-    /// The language subtag is missing or malformed.
+    /// The language code is absent or invalid.
     InvalidLanguage,
-    /// A script subtag is malformed.
+    /// The script code is invalid.
     InvalidScript,
-    /// A region subtag is malformed.
+    /// The region code is invalid.
     InvalidRegion,
-    /// A variant subtag is malformed.
+    /// The variant is invalid.
     InvalidVariant,
-    /// A subtag fits none of the positions in a language identifier.
+    /// A subtag cannot be used at any position in the identifier.
     InvalidSubtag,
-    /// An extension is malformed.
+    /// An extension has invalid syntax.
     InvalidExtension,
-    /// The same extension appears twice.
+    /// An extension was supplied more than once.
     DuplicateExtension,
 }
 

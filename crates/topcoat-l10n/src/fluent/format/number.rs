@@ -9,23 +9,22 @@ use icu_decimal::{
 };
 use intl_memoizer::Memoizable;
 
-/// Rounds halves away from zero, as JavaScript's `Intl.NumberFormat` does.
+/// Rounding mode that sends halfway values away from zero, matching
+/// `Intl.NumberFormat`.
 const ROUNDING: SignedRoundingMode = SignedRoundingMode::Unsigned(UnsignedRoundingMode::HalfExpand);
 
-/// The number of fraction digits a number shows at most when its options
-/// do not say, as in `Intl.NumberFormat`.
+/// Default maximum number of decimal places, matching `Intl.NumberFormat`.
 const DEFAULT_MAXIMUM_FRACTION_DIGITS: i16 = 3;
 
-/// The most fraction digits `Intl.NumberFormat` accepts.
+/// Maximum decimal places allowed by `Intl.NumberFormat`.
 const FRACTION_DIGITS_LIMIT: i16 = 100;
 
-/// The most integer or significant digits `Intl.NumberFormat` accepts.
+/// Maximum integer or significant digit setting allowed by `Intl.NumberFormat`.
 const DIGITS_LIMIT: i16 = 21;
 
-/// Formats a number for the locale of `intls`.
+/// Formats a number using the locale stored in `intls`.
 ///
-/// Returns `None` for numbers it does not support yet: currencies,
-/// percentages, and numbers without digits such as infinity.
+/// Returns `None` for unsupported values, including currency, percentages and infinity.
 pub(super) fn format_number<M: MemoizerKind>(number: &FluentNumber, intls: &M) -> Option<String> {
     let options = &number.options;
     if options.style != FluentNumberStyle::Decimal {
@@ -39,10 +38,10 @@ pub(super) fn format_number<M: MemoizerKind>(number: &FluentNumber, intls: &M) -
         .ok()
 }
 
-/// Converts a Fluent number to a decimal with the digits its options ask for.
+/// Converts a Fluent number to a decimal with the requested rounding and padding.
 ///
-/// Significant digits count from the first nonzero digit. When they are
-/// given, they take precedence over fraction digits.
+/// Significant digits start at the first nonzero digit. When specified, they override
+/// decimal-place settings.
 fn to_decimal(number: &FluentNumber) -> Option<Decimal> {
     let options = &number.options;
     let mut decimal = Decimal::try_from_f64(number.value, FloatPrecision::RoundTrip).ok()?;
@@ -81,17 +80,16 @@ fn to_decimal(number: &FluentNumber) -> Option<Decimal> {
     Some(decimal)
 }
 
-/// Converts a digit count from the options to a position offset, capped at
-/// `limit`.
+/// Converts an option's digit count to a position offset, without exceeding `limit`.
 fn digits(count: usize, limit: i16) -> i16 {
     i16::try_from(count).map_or(limit, |count| count.min(limit))
 }
 
-/// A number formatter for one locale, kept by a bundle's memoizer.
+/// A cached number formatter for one bundle locale.
 struct NumberFormatter(DecimalFormatter);
 
 impl Memoizable for NumberFormatter {
-    /// Whether to group digits, such as `1,000` instead of `1000`.
+    /// Whether to insert digit separators, as in `1,000`.
     type Args = (bool,);
     type Error = ();
 
@@ -117,7 +115,8 @@ mod tests {
 
     use crate::format_value;
 
-    /// Formats the message `n` of `source` in `locale` with `$n` set to `n`.
+    /// Formats the test message `n` in the given locale with `$n` set to the supplied
+    /// number.
     fn format(locale: &str, source: &str, n: f64) -> String {
         let resource = FluentResource::try_new(source.to_owned()).unwrap();
         let mut bundle = FluentBundle::new_concurrent(vec![locale.parse().unwrap()]);

@@ -11,7 +11,7 @@ pub struct L10nCommand {
 
 #[derive(Subcommand)]
 enum L10nSubcommand {
-    /// Check the messages of the binary produced by cargo against its Fluent files
+    /// Check Fluent translations used by the compiled app
     Check(check::CheckArgs),
 }
 

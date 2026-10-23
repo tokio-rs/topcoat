@@ -3,11 +3,11 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
-/// Doc comments, written as `///` or `#[doc = "..."]`, or nothing.
+/// Optional documentation written as `///` comments or `#[doc = "..."]` attributes.
 ///
-/// Any other attribute is an error.
+/// Rejects all other attributes.
 pub struct DocComments {
-    /// The `doc` attributes, one per line of a `///` comment.
+    /// Parsed `doc` attributes, with one attribute for each comment line.
     pub attrs: Vec<Attribute>,
 }
 

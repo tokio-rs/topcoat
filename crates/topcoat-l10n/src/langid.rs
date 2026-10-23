@@ -17,23 +17,24 @@ pub use variant::*;
 
 use crate::{Direction, LocaleParseError};
 
-/// A Unicode language identifier, such as `en`, `de-AT`, or `zh-Hant-TW`.
+/// A language code with optional script, region and variant details, such as `en`,
+/// `de-AT` or `zh-Hant-TW`.
 ///
-/// It names a [`Language`] with optional [`Script`], [`Region`], and
-/// [`Variant`] subtags, and is what translations are keyed by. Create one with
-/// the [`langid!`](crate::langid) macro for text known at compile time, or
-/// parse one with [`str::parse`]. Parsing canonicalizes letter case and
-/// variant order, so `de-at` and `de-AT` are the same identifier. It keeps
-/// deprecated subtags such as `iw` for Hebrew; replace those with
-/// [`canonicalize`](Self::canonicalize).
+/// Translations are identified by this combination of [`Language`], [`Script`],
+/// [`Region`] and [`Variant`] subtags. Use [`langid!`](crate::langid) for fixed text or
+/// [`str::parse`] for runtime input.
+///
+/// Parsing normalizes letter case and variant order, so `de-at` and `de-AT` are equal.
+/// It keeps older codes such as `iw` for Hebrew. Call
+/// [`canonicalize`](Self::canonicalize) to replace them with current codes.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct LanguageIdentifier(icu_locale_core::LanguageIdentifier);
 
 impl LanguageIdentifier {
-    /// The identifier of the unknown language, written `und`.
+    /// The `und` identifier for an unknown language.
     pub const UNKNOWN: Self = Self(icu_locale_core::LanguageIdentifier::UNKNOWN);
 
-    /// Creates an identifier for `language` with no other subtags.
+    /// Creates an identifier containing only the given language.
     #[must_use]
     pub const fn new(language: Language) -> Self {
         Self(icu_locale_core::LanguageIdentifier {
@@ -44,21 +45,22 @@ impl LanguageIdentifier {
         })
     }
 
-    /// Parses an identifier of the form `language[-script][-region][-variant]*`,
-    /// canonicalizing letter case and variant order.
+    /// Parses `language[-script][-region][-variant]*` and normalizes case and variant
+    /// order.
     ///
     /// # Errors
     ///
-    /// Fails when the language is missing or malformed, or a subtag fits no
-    /// position.
+    /// Returns an error if the language is missing or invalid, or a subtag cannot be
+    /// used in the identifier.
     pub fn try_from_str(text: &str) -> Result<Self, LocaleParseError> {
         icu_locale_core::LanguageIdentifier::try_from_str(text)
             .map(Self)
             .map_err(LocaleParseError::from_icu)
     }
 
-    /// Parses like [`try_from_str`](Self::try_from_str) in const context,
-    /// accepting at most one variant. Panics with `message` on failure.
+    /// Parses an identifier at compile time using the rules of
+    /// [`try_from_str`](Self::try_from_str), with at most one variant. Panics with
+    /// `message` if parsing fails.
     #[doc(hidden)]
     #[must_use]
     pub const fn parse_const(text: &str, message: &str) -> Self {
@@ -78,13 +80,13 @@ impl LanguageIdentifier {
         }
     }
 
-    /// Returns the language subtag.
+    /// Returns the identifier's language code.
     #[must_use]
     pub const fn language(&self) -> Language {
         Language::from_icu(self.0.language)
     }
 
-    /// Returns the script subtag, if present.
+    /// Returns the script code, when specified.
     #[must_use]
     pub const fn script(&self) -> Option<Script> {
         match self.0.script {
@@ -93,7 +95,7 @@ impl LanguageIdentifier {
         }
     }
 
-    /// Returns the region subtag, if present.
+    /// Returns the region code, when specified.
     #[must_use]
     pub const fn region(&self) -> Option<Region> {
         match self.0.region {
@@ -102,50 +104,50 @@ impl LanguageIdentifier {
         }
     }
 
-    /// Returns the variant subtags in canonical order.
+    /// Lists variants in their normalized order.
     pub fn variants(&self) -> impl Iterator<Item = Variant> + '_ {
         self.0.variants.iter().copied().map(Variant::from_icu)
     }
 
-    /// Returns whether the identifier has any variant subtags.
+    /// Checks whether any variants are present.
     #[must_use]
     pub const fn has_variants(&self) -> bool {
         !self.0.variants.is_empty()
     }
 
-    /// Returns this identifier with `script` in place of its script subtag.
+    /// Replaces the script and returns the updated identifier.
     #[must_use]
     pub fn with_script(mut self, script: Option<Script>) -> Self {
         self.0.script = script.map(Script::to_icu);
         self
     }
 
-    /// Returns this identifier with `region` in place of its region subtag.
+    /// Replaces the region and returns the updated identifier.
     #[must_use]
     pub fn with_region(mut self, region: Option<Region>) -> Self {
         self.0.region = region.map(Region::to_icu);
         self
     }
 
-    /// Returns this identifier with `variant` added in canonical position.
-    /// Adding a variant that is already present has no effect.
+    /// Adds a variant in normalized order and returns the updated identifier. Existing
+    /// variants are not duplicated.
     #[must_use]
     pub fn with_variant(mut self, variant: Variant) -> Self {
         self.0.variants.push(variant.to_icu());
         self
     }
 
-    /// Returns this identifier without any variant subtags.
+    /// Removes all variants and returns the updated identifier.
     #[must_use]
     pub fn without_variants(mut self) -> Self {
         self.0.variants.clear();
         self
     }
 
-    /// Replaces deprecated and aliased subtags with their current
-    /// equivalents, so `iw` becomes `he` and `sh` becomes `sr-Latn`.
+    /// Updates old or alternative codes to their standard forms. For example, `iw`
+    /// becomes `he` and `sh` becomes `sr-Latn`.
     ///
-    /// Identifiers that are already canonical are returned unchanged.
+    /// Leaves identifiers unchanged when they are already canonical.
     #[must_use]
     pub fn canonicalize(self) -> Self {
         let mut locale = icu_locale_core::Locale::from(self.0);
@@ -153,19 +155,19 @@ impl LanguageIdentifier {
         Self(locale.id)
     }
 
-    /// Fills in the most likely script and region for the language, so `en`
-    /// becomes `en-Latn-US` and `zh-TW` becomes `zh-Hant-TW`.
+    /// Adds the most likely missing script and region. For example, `en` becomes
+    /// `en-Latn-US` and `zh-TW` becomes `zh-Hant-TW`.
     ///
-    /// Subtags that are already present are kept.
+    /// Keeps subtags that are already present.
     #[must_use]
     pub fn maximize(mut self) -> Self {
         LocaleExpander::new_common().maximize(&mut self.0);
         self
     }
 
-    /// Returns the direction of the identifier's script, filling in the most
-    /// likely script when none is given. Scripts without a direction are
-    /// treated as left to right.
+    /// Returns the script's writing direction. If no script is specified, uses the most
+    /// likely one for the language. Defaults to left to right for scripts without a
+    /// defined direction.
     #[must_use]
     pub fn direction(&self) -> Direction {
         if LocaleDirectionality::new_common().is_right_to_left(&self.0) {
@@ -175,19 +177,19 @@ impl LanguageIdentifier {
         }
     }
 
-    /// Borrows the `icu_locale_core` identifier.
+    /// Returns a reference to the underlying `icu_locale_core` identifier.
     #[must_use]
     pub const fn as_icu(&self) -> &icu_locale_core::LanguageIdentifier {
         &self.0
     }
 
-    /// Converts to the `icu_locale_core` identifier.
+    /// Returns the identifier as an `icu_locale_core` value.
     #[must_use]
     pub fn into_icu(self) -> icu_locale_core::LanguageIdentifier {
         self.0
     }
 
-    /// Converts from the `icu_locale_core` identifier.
+    /// Wraps a language identifier from `icu_locale_core`.
     #[must_use]
     pub const fn from_icu(identifier: icu_locale_core::LanguageIdentifier) -> Self {
         Self(identifier)
@@ -222,11 +224,12 @@ impl From<Language> for LanguageIdentifier {
     }
 }
 
-/// Creates a [`LanguageIdentifier`] from text known at compile time.
+/// Checks a fixed language identifier at compile time and creates a
+/// [`LanguageIdentifier`].
 ///
-/// Malformed text is a compile error, and so is more than one variant
-/// subtag. Parse identifiers with several variants at runtime instead. The
-/// macro is usable in `const` and `static` items.
+/// Supports at most one variant subtag. Invalid text or additional variants cause a
+/// compile error. Parse identifiers with several variants at runtime instead. Works in
+/// `const` and `static` items.
 ///
 /// # Examples
 ///

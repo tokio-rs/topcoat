@@ -1,6 +1,6 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-//! Localization for Topcoat.
+//! Locale selection and translation support for Topcoat.
 
 mod direction;
 mod error;

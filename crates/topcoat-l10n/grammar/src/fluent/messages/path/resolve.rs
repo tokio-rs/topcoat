@@ -16,25 +16,23 @@ use proc_macro2::Span;
 
 use crate::fluent::{PathComponent, PathPattern};
 
-/// The directories that hold the root files of a package's binaries, tests,
-/// examples and benchmarks, relative to its manifest directory.
+/// Default directories for binary, test, example and benchmark source roots, relative
+/// to the package's manifest directory.
 const TARGET_DIRS: [&str; 4] = ["src/bin", "tests", "examples", "benches"];
 
-/// The location of a macro invocation, which anchors the relative paths of a
-/// [`PathPattern`].
+/// A macro call's location, used to resolve relative paths in a [`PathPattern`].
 pub struct CallSite {
     manifest_dir: PathBuf,
     source_file: Option<PathBuf>,
 }
 
 impl CallSite {
-    /// Creates a call site in the crate whose `Cargo.toml` is in
-    /// `manifest_dir`, invoked from `source_file` if it is a file on disk.
-    /// Relative paths are taken relative to the current directory.
+    /// Creates a call site from a manifest directory and an optional source file on
+    /// disk. Resolves relative paths from the current directory.
     ///
     /// # Errors
     ///
-    /// Fails when the current directory is needed but cannot be read.
+    /// Returns an error if it needs the current directory but cannot read it.
     pub fn new(manifest_dir: &Path, source_file: Option<&Path>) -> io::Result<Self> {
         Ok(Self {
             manifest_dir: std::path::absolute(manifest_dir)?,
@@ -42,13 +40,12 @@ impl CallSite {
         })
     }
 
-    /// Creates the call site of the macro invocation being expanded: in the
-    /// crate that Cargo is compiling, invoked from the source file of
+    /// Finds the current macro call's crate and source file using Cargo and
     /// [`Span::call_site`].
     ///
     /// # Errors
     ///
-    /// Fails when the current directory is needed but cannot be read.
+    /// Returns an error if it needs the current directory but cannot read it.
     pub fn current() -> io::Result<Self> {
         let manifest_dir = env::var_os("CARGO_MANIFEST_DIR")
             .map(PathBuf::from)
@@ -56,17 +53,16 @@ impl CallSite {
         Self::new(&manifest_dir, Span::call_site().local_file().as_deref())
     }
 
-    /// Returns the source file of the invocation, if it is a file on disk.
+    /// Returns the macro call's source file when it exists on disk.
     #[must_use]
     pub fn source_file(&self) -> Option<&Path> {
         self.source_file.as_deref()
     }
 
-    /// Returns the directory of the invoking module, where its child modules
-    /// live.
+    /// Returns the directory where this module's child modules belong.
     ///
-    /// That is the directory of the source file for crate roots and `mod.rs`
-    /// files, and a directory named after the file next to it otherwise.
+    /// For crate roots and `mod.rs`, this is the source file's directory. For other
+    /// files, it is a sibling directory with the file's stem as its name.
     fn module_dir(&self, source_file: &Path) -> Option<PathBuf> {
         let dir = source_file.parent()?;
         let stem = source_file.file_stem()?;
@@ -77,8 +73,8 @@ impl CallSite {
         }
     }
 
-    /// Returns whether the file named `stem` in `dir` is the root file of one of the
-    /// package's targets, judged by Cargo's default target layout.
+    /// Checks whether `stem` in `dir` is a target's source root under Cargo's default
+    /// directory layout.
     fn is_crate_root(&self, dir: &Path, stem: &OsStr) -> bool {
         let is_target_dir = |dir: &Path| {
             TARGET_DIRS
@@ -91,28 +87,26 @@ impl CallSite {
     }
 }
 
-/// The Fluent files of one locale.
+/// Files matched for a single locale.
 #[derive(Debug)]
 pub struct LocaleFiles {
-    /// The locale, as matched by the `{locale}` placeholder.
+    /// The locale parsed from the `{locale}` match.
     pub locale: LanguageIdentifier,
-    /// The absolute paths of the files, sorted.
+    /// Matched files as sorted absolute paths.
     pub files: Vec<PathBuf>,
 }
 
 impl PathPattern {
-    /// Finds the files matched by the path and groups them by locale.
+    /// Finds matching files and groups them by locale, sorted by canonical locale name.
     ///
-    /// The locales are sorted by their canonical spelling. Wildcards do not
-    /// match names starting with `.` unless the pattern does, and `**` does not
-    /// enter symbolic links to directories.
+    /// Wildcards skip names starting with `.` unless the pattern starts with `.` too.
+    /// The `**` wildcard does not follow directory symlinks.
     ///
     /// # Errors
     ///
-    /// Fails when no file matches, a matched locale is invalid, two matched
-    /// locales are spelled differently but are the same, the path is relative
-    /// to the source file but `call_site` has none, or a directory cannot be
-    /// read.
+    /// Returns an error if no files match, a locale name is invalid, different names
+    /// identify the same locale, or a directory cannot be read. Source-relative paths
+    /// also fail if `call_site` has no source file.
     pub fn resolve(&self, call_site: &CallSite) -> syn::Result<Vec<LocaleFiles>> {
         let error = |message: String| syn::Error::new(self.lit.span(), message);
         let path = self.lit.value();
@@ -187,9 +181,9 @@ impl PathPattern {
     }
 }
 
-/// Returns `locale` in the form that catalogs compare locales in: canonical and with
-/// implied subtags removed, so `iw` and `he`, or `zh` and `zh-Hans`, have the same
-/// form.
+/// Normalizes a locale for catalog comparisons by replacing aliases and removing
+/// implied subtags. This gives `iw` and `he` the same form, and likewise `zh` and
+/// `zh-Hans`.
 fn lookup_form(locale: &LanguageIdentifier) -> DataLocale {
     let mut locale = Locale::from(locale.clone());
     LocaleCanonicalizer::new_common().canonicalize(&mut locale);
@@ -199,12 +193,11 @@ fn lookup_form(locale: &LanguageIdentifier) -> DataLocale {
         .take()
 }
 
-/// Matched files, keyed by the text of the `{locale}` placeholder.
+/// Matched files grouped by the text captured by `{locale}`.
 type Matches = BTreeMap<String, BTreeSet<PathBuf>>;
 
-/// Matches `components` against the entries of `dir` and adds each matching
-/// file to `matches`. `locale` is the text matched by the `{locale}`
-/// placeholder so far.
+/// Searches `dir` for paths matching `components` and adds matching files to `matches`.
+/// The `locale` argument holds the locale text captured so far.
 fn walk(
     dir: &Path,
     components: &[PathComponent],
@@ -268,9 +261,8 @@ fn walk(
     }
 }
 
-/// Returns the names and types of the entries of `dir`, sorted by name.
-/// Returns nothing when `dir` is not a directory, and skips names that are not
-/// valid UTF-8.
+/// Lists directory entries with their names and types, sorted by name. Skips names that
+/// are not valid UTF-8 and returns an empty list if `dir` is not a directory.
 fn entries(dir: &Path) -> io::Result<Vec<(String, FileType)>> {
     let error = |err: io::Error| {
         io::Error::new(
@@ -301,14 +293,13 @@ fn entries(dir: &Path) -> io::Result<Vec<(String, FileType)>> {
     Ok(entries)
 }
 
-/// Returns whether a wildcard matches `name`: names starting with `.` only
-/// match a pattern that starts with `.` too.
+/// Tests a wildcard against `name`. A name starting with `.` requires a pattern
+/// starting with `.`.
 fn is_visible(name: &str, pattern: &str) -> bool {
     !name.starts_with('.') || pattern.starts_with('.')
 }
 
-/// Returns whether `name` matches `pattern`, where each `*` matches any
-/// characters.
+/// Tests `name` against a pattern where `*` matches any sequence of characters.
 fn matches_wildcard(pattern: &str, name: &str) -> bool {
     let mut parts = pattern.split('*');
     let Some(mut rest) = parts.next().and_then(|first| name.strip_prefix(first)) else {
@@ -336,7 +327,7 @@ mod tests {
 
     use super::*;
 
-    /// A crate directory with the given files, each relative to its root.
+    /// Creates a test crate containing the given relative file paths.
     fn crate_with(files: &[&str]) -> TempDir {
         let dir = TempDir::new().unwrap();
         for file in files {
@@ -358,8 +349,8 @@ mod tests {
         pattern.resolve(&call_site)
     }
 
-    /// Resolves `pattern` and lists each locale with its files relative to
-    /// the crate directory.
+    /// Lists the files found by `pattern`, grouped by locale and relative to the test
+    /// crate.
     fn resolved(
         dir: &TempDir,
         source_file: Option<&str>,
@@ -563,8 +554,8 @@ mod tests {
         assert!(resolve(&dir, None, "l10n/{locale}.ftl").is_err());
     }
 
-    /// A catalog cannot hold two locales that only differ by subtags that are
-    /// implied, or by a code that was replaced.
+    /// Equivalent locale names must be rejected, including aliases and names with
+    /// implied subtags.
     #[test]
     fn rejects_locales_that_catalogs_consider_the_same() {
         for pair in [["zh", "zh-Hans"], ["iw", "he"], ["en", "en-Latn"]] {

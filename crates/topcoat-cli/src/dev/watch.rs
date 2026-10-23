@@ -33,14 +33,11 @@ pub enum Change {
     Manifest,
 }
 
-/// Watches local packages and combines bursts of file changes into single
-/// notifications.
+/// Watches workspace members and local path dependencies for changes. Groups changes
+/// that arrive close together into one notification.
 ///
-/// Includes workspace members and path dependencies. Ignores hidden paths, gitignored
-/// files, editor temporary files, and Cargo build output.
-///
-/// A file added to a package makes cargo rebuild that package, as described in
-/// [`NewFiles`].
+/// Skips hidden paths, ignored files, editor temporary files and Cargo build output.
+/// Adding a file triggers a package rebuild through [`NewFiles`].
 pub struct SourceWatcher {
     watcher: notify::RecommendedWatcher,
     events: mpsc::UnboundedReceiver<Change>,
@@ -166,7 +163,7 @@ struct WatchPlan {
     /// root, minus roots contained in another root.
     roots: Vec<PathBuf>,
     filter: PathFilter,
-    /// The local packages, whose crate roots are touched when a file is added.
+    /// Packages whose source roots need to be touched when files are added.
     packages: Vec<Package>,
 }
 
@@ -280,8 +277,7 @@ impl PathFilter {
     }
 }
 
-/// The files and directories under `roots`, including the roots, that `filter` does not
-/// ignore.
+/// Lists paths under `roots` that pass `filter`, including the roots themselves.
 fn existing_paths(roots: &[PathBuf], filter: &PathFilter) -> Vec<PathBuf> {
     let Some((first, rest)) = roots.split_first() else {
         return Vec::new();

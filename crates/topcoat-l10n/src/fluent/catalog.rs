@@ -5,13 +5,11 @@ use icu_locale_core::DataLocale;
 
 use crate::{Locale, format_value, lookup_index, lookup_indices, normalize_for_lookup};
 
-/// The Fluent messages of an application or one of its parts, translated into
-/// several locales.
+/// A collection of Fluent messages translated into several locales.
 ///
-/// Each locale has its own messages. A message is formatted in the locale that
-/// serves the requested locale, as chosen by [`lookup`](crate::lookup). A
-/// locale takes the messages it lacks from the locales that could also serve
-/// it, so `de-CH` only needs the messages that differ from `de`.
+/// [`lookup`](crate::lookup) chooses the locale used to format each message. Missing
+/// messages come from that locale's parents. For example, `de-CH` can use messages from
+/// `de` and only needs to define its differences.
 pub struct Catalog {
     locales: Vec<Locale>,
     normalized: Vec<DataLocale>,
@@ -19,13 +17,13 @@ pub struct Catalog {
 }
 
 impl Catalog {
-    /// Creates a catalog from the Fluent sources of each locale.
+    /// Builds a catalog from each locale's Fluent source strings.
     ///
     /// # Panics
     ///
-    /// Panics when two locales are the same once implied subtags are removed,
-    /// such as `zh` and `zh-Hans`, when a source has syntax errors, or when a
-    /// source defines a message or term that the locale already defines.
+    /// Panics if locale names are equivalent after normalization, such as `zh` and
+    /// `zh-Hans`. Also panics on invalid Fluent syntax or duplicate message or term
+    /// definitions within a locale.
     #[must_use]
     #[track_caller]
     pub fn new<'a>(locales: impl IntoIterator<Item = (Locale, &'a [&'a str])>) -> Self {
@@ -72,17 +70,16 @@ impl Catalog {
         catalog
     }
 
-    /// Returns the locales the catalog translates into.
+    /// Lists the locales available in this catalog.
     #[must_use]
     pub fn locales(&self) -> &[Locale] {
         &self.locales
     }
 
-    /// Formats a message, or one of its attributes, with `args`.
+    /// Formats a message or attribute using `args`.
     ///
-    /// The message is taken from the locale that serves `locale`, as chosen by
-    /// [`lookup`](crate::lookup). Returns `None` when no locale serves it, or
-    /// when that locale lacks the message.
+    /// Uses [`lookup`](crate::lookup) to choose a locale. Returns `None` if no locale
+    /// matches or the selected locale has no matching message or attribute.
     #[must_use]
     pub fn format(
         &self,
@@ -96,13 +93,12 @@ impl Catalog {
     }
 }
 
-/// The messages of one locale of a [`Catalog`].
+/// One catalog locale's Fluent bundle.
 struct LocaleBundle(FluentBundle<Arc<FluentResource>>);
 
 impl LocaleBundle {
-    /// Creates the messages of `locale` from its own parsed sources, then
-    /// adds the messages it lacks from the sources of its parents, the closest
-    /// parent first.
+    /// Builds a bundle from the locale's own sources, then fills missing messages from
+    /// its parents, starting with the closest parent.
     #[track_caller]
     fn new<'a>(
         locale: &Locale,
@@ -134,7 +130,7 @@ impl LocaleBundle {
         Self(bundle)
     }
 
-    /// Parses a Fluent source of `locale`.
+    /// Parses Fluent source text for the given locale.
     #[track_caller]
     fn parse(locale: &Locale, source: &str) -> Arc<FluentResource> {
         let resource = FluentResource::try_new(source.to_owned())
@@ -142,8 +138,7 @@ impl LocaleBundle {
         Arc::new(resource)
     }
 
-    /// Formats a message, or one of its attributes, or returns `None` when
-    /// this locale lacks it.
+    /// Formats a message or attribute, returning `None` if it is unavailable.
     fn format(
         &self,
         id: &str,

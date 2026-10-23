@@ -5,22 +5,21 @@ use std::{
 
 use crate::LocaleParseError;
 
-/// A variant subtag, such as `posix` or `1996`: five to eight ASCII
-/// alphanumerics, or a digit followed by three alphanumerics.
+/// A language variant such as `posix` or `1996`.
 ///
-/// Create one with the [`variant!`](crate::variant) macro for text known at
-/// compile time, or parse one with [`str::parse`]. Parsing canonicalizes the
-/// text to lower case.
+/// A variant contains five to eight ASCII letters or digits, or four such characters
+/// starting with a digit. Use [`variant!`](crate::variant) for fixed text or
+/// [`str::parse`] for runtime input. Parsing converts letters to lowercase.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Variant(icu_locale_core::subtags::Variant);
 
 impl Variant {
-    /// Parses a variant subtag, canonicalizing its case.
+    /// Parses a variant and converts letters to lowercase.
     ///
     /// # Errors
     ///
-    /// Fails when the text is neither five to eight ASCII alphanumerics nor
-    /// a digit followed by three alphanumerics.
+    /// Returns an error unless the input contains five to eight ASCII letters or
+    /// digits, or four such characters starting with a digit.
     pub const fn try_from_str(text: &str) -> Result<Self, LocaleParseError> {
         match icu_locale_core::subtags::Variant::try_from_str(text) {
             Ok(variant) => Ok(Self(variant)),
@@ -28,19 +27,19 @@ impl Variant {
         }
     }
 
-    /// Returns the canonical text of the subtag.
+    /// Returns the normalized variant text.
     #[must_use]
     pub const fn as_str(&self) -> &str {
         self.0.as_str()
     }
 
-    /// Converts to the `icu_locale_core` subtag.
+    /// Returns the variant as an `icu_locale_core` subtag.
     #[must_use]
     pub const fn to_icu(self) -> icu_locale_core::subtags::Variant {
         self.0
     }
 
-    /// Converts from the `icu_locale_core` subtag.
+    /// Wraps a variant subtag from `icu_locale_core`.
     #[must_use]
     pub const fn from_icu(variant: icu_locale_core::subtags::Variant) -> Self {
         Self(variant)
@@ -73,10 +72,9 @@ impl FromStr for Variant {
     }
 }
 
-/// Creates a [`Variant`] from text known at compile time.
+/// Checks a fixed variant at compile time and creates a [`Variant`].
 ///
-/// Malformed text is a compile error. The macro is usable in `const` and
-/// `static` items.
+/// Invalid variants cause a compile error. Works in `const` and `static` items.
 #[macro_export]
 macro_rules! variant {
     ($text:literal) => {

@@ -12,28 +12,27 @@ use console::style;
 
 use super::{PathFilter, existing_paths};
 
-/// Makes cargo rebuild a package when a file is added to it.
+/// Triggers a package rebuild when a file is added.
 ///
-/// Cargo rebuilds a crate only when a file that its last build read changes. A macro
-/// that reads every file in a directory cannot tell cargo about a file that did not
-/// exist yet, so cargo would consider the crate up to date. When a file appears in a
-/// package, this sets the modification time of the package's crate roots to now,
-/// which makes cargo rebuild the package and run its macros again.
+/// Cargo tracks files read during a build, but cannot track files that do not exist
+/// yet. A macro that searches a directory may therefore miss new files on later builds.
+/// This tracker updates the modification times of the package's source roots so Cargo
+/// runs its macros again.
 ///
-/// A file that is moved into a package, alone or inside a directory, counts as added
-/// too, even when it was there before.
+/// Moving a file or a directory of files into a package also counts as adding files,
+/// even if they were there before.
 pub struct NewFiles {
     filter: Arc<PathFilter>,
-    /// The files and directories that exist, as far as the events have told.
+    /// Paths known to exist from the initial scan and later events.
     known: HashSet<PathBuf>,
     packages: Vec<Package>,
-    /// The crate roots that were touched, with the modification time they were given,
-    /// so the events caused by touching them are not reported as changes.
+    /// Source roots touched by this tracker and their new modification times. Used to
+    /// ignore the resulting events.
     touched: HashMap<PathBuf, SystemTime>,
 }
 
 impl NewFiles {
-    /// Starts tracking new files in `packages`, under `roots` and not ignored by
+    /// Tracks files under `roots` for the given packages, skipping paths rejected by
     /// `filter`.
     pub fn new(roots: &[PathBuf], filter: Arc<PathFilter>, packages: Vec<Package>) -> Self {
         Self {
@@ -44,10 +43,10 @@ impl NewFiles {
         }
     }
 
-    /// Records an event for `path` and returns whether it is a change.
+    /// Processes an event for `path` and reports whether it should trigger a rebuild.
     ///
-    /// When `path` is a new file, or a new directory with files in it, the crate roots
-    /// of its package are touched. The events caused by touching them are not changes.
+    /// A new file, or a new directory containing files, causes the package's source
+    /// roots to be touched. Events from those touches are ignored.
     pub fn observe(&mut self, path: &Path) -> bool {
         if let Some(touched) = self.touched.get(path)
             && modified(path).as_ref() == Some(touched)
@@ -63,8 +62,8 @@ impl NewFiles {
         true
     }
 
-    /// Returns whether the new `path` is a file or a directory with files, and records
-    /// the contents of a directory as known.
+    /// Checks whether `path` adds any files. For a directory, also records its contents
+    /// as known paths.
     fn adds_files(&mut self, path: &Path) -> bool {
         if !path.is_dir() {
             return true;
@@ -77,10 +76,10 @@ impl NewFiles {
         adds_files
     }
 
-    /// Touches the crate roots of the package containing `path`.
+    /// Updates the modification times of the source roots for the package containing
+    /// `path`.
     ///
-    /// The deepest package wins, so a package nested in another one is touched
-    /// instead of the one that contains it.
+    /// If packages are nested, uses the innermost package.
     fn touch_package_of(&mut self, path: &Path) {
         let Some(package) = self
             .packages
@@ -104,23 +103,23 @@ impl NewFiles {
     }
 }
 
-/// A local package and the root source files of its library and binary crates.
+/// A local package with the source roots of its libraries and binaries.
 pub struct Package {
-    /// The directory of the package's manifest.
+    /// The directory containing `Cargo.toml`.
     pub dir: PathBuf,
-    /// The root source files of the package's library and binary crates.
+    /// Source files at the roots of the package's libraries and binaries.
     pub crate_roots: Vec<PathBuf>,
 }
 
-/// Sets the modification time of the file at `path` to now, without changing its
-/// contents, and returns the time the file system stored.
+/// Updates a file's modification time to now and returns the stored timestamp. Leaves
+/// the contents unchanged.
 fn touch(path: &Path) -> io::Result<SystemTime> {
     let file = File::options().write(true).open(path)?;
     file.set_modified(SystemTime::now())?;
     file.metadata()?.modified()
 }
 
-/// The modification time of the file at `path`, if it can be read.
+/// Reads a file's modification time, returning `None` if it cannot be read.
 fn modified(path: &Path) -> Option<SystemTime> {
     path.metadata().ok()?.modified().ok()
 }
@@ -131,7 +130,7 @@ mod tests {
 
     use super::*;
 
-    /// A temporary package with a `src/main.rs` and an existing `src/en.ftl`.
+    /// A temporary test package containing `src/main.rs` and `src/en.ftl`.
     struct Fixture {
         dir: PathBuf,
     }
@@ -153,8 +152,8 @@ mod tests {
             self.new_files_in(self.dir.clone())
         }
 
-        /// Tracks the fixture, with a package in `dir` whose crate root is
-        /// `src/main.rs`.
+        /// Creates a tracker for the package in `dir`, using `src/main.rs` as its
+        /// source root.
         fn new_files_in(&self, dir: PathBuf) -> NewFiles {
             let filter = PathFilter {
                 roots: vec![self.dir.clone()],
@@ -171,8 +170,8 @@ mod tests {
             )
         }
 
-        /// Sets the modification time of `src/main.rs` back to the start, so a
-        /// later touch is visible.
+        /// Resets the modification time of `src/main.rs` so the test can detect a later
+        /// touch.
         fn untouch_main(&self) {
             set_modified(&self.path("src/main.rs"), SystemTime::UNIX_EPOCH);
         }
@@ -181,7 +180,7 @@ mod tests {
             self.dir.join(file)
         }
 
-        /// Whether `src/main.rs` was touched since the fixture was created.
+        /// Checks whether the test has touched `src/main.rs`.
         fn main_touched(&self) -> bool {
             modified(&self.path("src/main.rs")).unwrap() > SystemTime::UNIX_EPOCH
         }

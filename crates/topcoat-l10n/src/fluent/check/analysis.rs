@@ -9,9 +9,8 @@ use fluent_syntax::ast::{Attribute, Entry, InlineExpression, Pattern};
 use super::{Coverage, Location, ParsedFile, Problem, Severity, Sources, visit_expressions};
 use crate::{Locale, RawTranslation, lookup_indices, normalize_for_lookup};
 
-/// Checks the files of `sources` against `calls`, the `t!` calls of their
-/// namespace. Adds the problems to `problems` and returns the coverage of
-/// each locale.
+/// Checks a namespace's sources against its recorded translation calls. Collects
+/// problems and returns coverage for each locale.
 pub(super) fn analyze(
     sources: &Sources,
     calls: &[RawTranslation<'_>],
@@ -36,18 +35,16 @@ pub(super) fn analyze(
     coverage(calls, &locales, &bundles)
 }
 
-/// The messages and terms that one locale has: its own, then the ones it takes
-/// from its parents.
+/// A locale's available messages and terms, including those inherited from parents.
 #[derive(Default)]
 struct Bundle<'s> {
-    /// The indices of the locales whose files the bundle takes from, the
-    /// locale itself first.
+    /// Source locale indices in fallback order, starting with this locale.
     sources: Vec<usize>,
     messages: HashMap<&'s str, Definition<'s>>,
     terms: HashMap<&'s str, Definition<'s>>,
 }
 
-/// The value and the attributes of a message or term.
+/// The main value and attributes of a Fluent message or term.
 #[derive(Clone, Copy)]
 struct Definition<'s> {
     entry: &'s Entry<&'s str>,
@@ -56,7 +53,7 @@ struct Definition<'s> {
 }
 
 impl<'s> Bundle<'s> {
-    /// Returns the bundle of each locale, made like the bundles of a
+    /// Builds each locale's bundle using the same fallback rules as
     /// [`Catalog`](crate::Catalog).
     fn of_locales(locales: &[&Locale], files: &'s [Vec<ParsedFile<'s>>]) -> Vec<Self> {
         let own: Vec<_> = files.iter().map(|files| Self::own(files)).collect();
@@ -83,8 +80,7 @@ impl<'s> Bundle<'s> {
             .collect()
     }
 
-    /// Returns the messages and terms that `files` define. The first
-    /// definition of an ID wins.
+    /// Collects definitions from `files`, keeping the first definition for each ID.
     fn own(files: &'s [ParsedFile<'s>]) -> Self {
         let mut bundle = Self::default();
         for entry in files.iter().flat_map(|file| &file.resource.body) {
@@ -112,14 +108,12 @@ impl<'s> Bundle<'s> {
         bundle
     }
 
-    /// Returns the pattern of the message `id`, or of its `attribute`, or
-    /// `None` when the bundle lacks it.
+    /// Looks up a message or attribute pattern, returning `None` if it is missing.
     fn message(&self, id: &str, attribute: Option<&str>) -> Option<&'s Pattern<&'s str>> {
         self.messages.get(id)?.pattern(attribute)
     }
 
-    /// Returns whether the bundle uses `entry` for its ID, rather than another
-    /// definition of the ID.
+    /// Checks whether `entry` is the definition selected for its ID in this bundle.
     fn uses(&self, entry: &Entry<&str>) -> bool {
         let (definitions, id) = match entry {
             Entry::Message(message) => (&self.messages, message.id.name),
@@ -131,8 +125,8 @@ impl<'s> Bundle<'s> {
             .is_some_and(|definition| ptr::eq(definition.entry, entry))
     }
 
-    /// Returns the name in `expression` and why the bundle cannot format it,
-    /// or `None` when it can or `expression` references nothing.
+    /// Describes a missing reference and returns its name. Returns `None` for valid
+    /// references and expressions without references.
     fn broken_reference(
         &self,
         expression: &'s InlineExpression<&'s str>,
@@ -158,9 +152,8 @@ impl<'s> Bundle<'s> {
         Some((id.name, message))
     }
 
-    /// Adds the variables of `pattern` to `variables`, including the ones of
-    /// the messages it references, since those are formatted with the same
-    /// arguments.
+    /// Collects the variables needed by `pattern` and the messages it references.
+    /// Referenced messages share the caller's arguments.
     fn variables(&self, pattern: &'s Pattern<&'s str>, variables: &mut BTreeSet<&'s str>) {
         let mut followed = HashSet::new();
         let mut pending = vec![pattern];
@@ -184,7 +177,7 @@ impl<'s> Bundle<'s> {
 }
 
 impl<'s> Definition<'s> {
-    /// Returns the value, or the pattern of `attribute`.
+    /// Selects the main value or the named attribute's pattern.
     fn pattern(&self, attribute: Option<&str>) -> Option<&'s Pattern<&'s str>> {
         match attribute {
             Some(attribute) => self
@@ -197,8 +190,7 @@ impl<'s> Definition<'s> {
     }
 }
 
-/// Reports the keys that locales lack, the variables that calls do not pass,
-/// and the arguments that no locale uses.
+/// Finds missing keys, missing call arguments and arguments unused by every locale.
 fn check_calls(
     calls: &[RawTranslation<'_>],
     locales: &[&Locale],
@@ -263,12 +255,11 @@ fn check_calls(
     }
 }
 
-/// Reports the references to messages, terms and attributes that a locale
-/// lacks.
+/// Finds references to messages, terms or attributes missing from a locale.
 ///
-/// A locale formats the messages it takes from its parents with its own
-/// messages and terms, so their references are checked against it too. Such
-/// a reference is only reported for the locale when the parent can format it.
+/// Also checks inherited messages against the locale's own definitions. Reports an
+/// inherited reference separately only when it works in the parent but fails in this
+/// locale.
 fn check_references(
     locales: &[&Locale],
     files: &[Vec<ParsedFile<'_>>],
@@ -307,8 +298,7 @@ fn check_references(
     }
 }
 
-/// Reports the messages that no `t!` call and no other message uses, once per
-/// message ID.
+/// Reports each message ID that is unused by translation calls and other messages.
 fn check_unused(
     calls: &[RawTranslation<'_>],
     files: &[Vec<ParsedFile<'_>>],
@@ -339,8 +329,7 @@ fn check_unused(
     }
 }
 
-/// Returns the coverage of each locale: which of the keys that `calls` use it
-/// lacks.
+/// Counts required keys and lists the missing ones for each locale.
 fn coverage(
     calls: &[RawTranslation<'_>],
     locales: &[&Locale],
@@ -365,13 +354,12 @@ fn coverage(
         .collect()
 }
 
-/// Returns every pattern of the messages and terms of `file`.
+/// Iterates over all message and term patterns in `file`.
 fn patterns<'s>(file: &'s ParsedFile<'s>) -> impl Iterator<Item = &'s Pattern<&'s str>> {
     file.resource.body.iter().flat_map(entry_patterns)
 }
 
-/// Returns the value and the attribute patterns of `entry`, if it is a
-/// message or term.
+/// Iterates over a message or term's main value and attribute patterns.
 fn entry_patterns<'s>(entry: &'s Entry<&'s str>) -> impl Iterator<Item = &'s Pattern<&'s str>> {
     let (value, attributes) = match entry {
         Entry::Message(message) => (message.value.as_ref(), &message.attributes[..]),
@@ -383,7 +371,7 @@ fn entry_patterns<'s>(entry: &'s Entry<&'s str>) -> impl Iterator<Item = &'s Pat
         .chain(attributes.iter().map(|attribute| &attribute.value))
 }
 
-/// Returns the key of a message, such as `title` or `search.placeholder`.
+/// Joins a message ID and optional attribute into a key such as `search.placeholder`.
 fn key(id: &str, attribute: Option<&str>) -> String {
     match attribute {
         Some(attribute) => format!("{id}.{attribute}"),
@@ -391,8 +379,7 @@ fn key(id: &str, attribute: Option<&str>) -> String {
     }
 }
 
-/// Returns the key of some locale that is closest to `key`, if one is close
-/// enough to be a likely typo.
+/// Suggests an existing key when its spelling is close enough to suggest a typo.
 fn suggestion(key: &str, bundles: &[Bundle<'_>]) -> Option<String> {
     let max_distance = (key.chars().count() / 3).max(1);
     bundles

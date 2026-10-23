@@ -66,8 +66,8 @@ impl Metadata {
             .collect()
     }
 
-    /// The manifest directory of every local package, with the root source files of its
-    /// library and binary crates.
+    /// Lists each local package's manifest directory and its library and binary source
+    /// roots.
     pub fn local_crate_roots(&self) -> Vec<(PathBuf, Vec<PathBuf>)> {
         self.0["packages"]
             .as_array()
@@ -152,8 +152,8 @@ fn is_bin(target: &serde_json::Value) -> bool {
         .is_some_and(|kinds| kinds.iter().any(|kind| kind == "bin"))
 }
 
-/// Whether the target builds a library or an executable, as opposed to an example, a
-/// test, a benchmark or a build script.
+/// Checks whether the target is a library or binary. Examples, tests, benchmarks and
+/// build scripts are excluded.
 fn is_lib_or_bin(target: &serde_json::Value) -> bool {
     target["kind"].as_array().is_some_and(|kinds| {
         kinds.iter().any(|kind| {
@@ -331,8 +331,8 @@ mod tests {
         );
     }
 
-    /// Only libraries and executables are compiled by a plain build, so only their
-    /// roots are listed, and registry dependencies are never touched.
+    /// A plain build lists only library and binary roots from local packages. Registry
+    /// dependencies are excluded.
     #[test]
     fn crate_roots_are_the_libraries_and_executables_of_local_packages() {
         let metadata = Metadata(json!({

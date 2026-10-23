@@ -9,13 +9,13 @@ use topcoat_core_grammar::ParseOption;
 
 use crate::fluent::{DocComments, FluentIdent, FluentIdentToken};
 
-/// The arguments of a `t!` invocation, after the key.
+/// Arguments supplied after the key in `t!`.
 ///
-/// Each name may only be passed once.
+/// Argument names must be unique.
 pub struct TranslateArguments {
-    /// The comma between the key and the arguments, if any.
+    /// The optional comma before the argument list.
     pub comma_token: Option<Token![,]>,
-    /// The arguments.
+    /// The supplied message arguments.
     pub arguments: Punctuated<TranslateArgument, Token![,]>,
 }
 
@@ -46,28 +46,28 @@ impl Parse for TranslateArguments {
     }
 }
 
-/// An argument of a message, either `name = value` or the shorthand `name`
-/// for a variable of the same name.
+/// A named message argument, written as `name = value` or just `name` to use a Rust
+/// variable with that name.
 ///
-/// The name is the name of the Fluent variable, so `user_name` passes
-/// `$user_name`. A name that is not a Rust identifier can be written as a
-/// string literal, such as `"user-name" = name`. The shorthand only accepts a
-/// Rust identifier, and a raw identifier such as `r#type` passes `$type`.
+/// Names identify Fluent variables, so `user_name` supplies `$user_name`. Use a string
+/// literal for names that are not Rust identifiers, such as `"user-name" = name`. The
+/// shorthand requires a Rust identifier. A raw identifier such as `r#type` supplies
+/// `$type`.
 pub struct TranslateArgument {
-    /// The doc comments of the argument.
+    /// Documentation attached to this argument.
     pub docs: DocComments,
-    /// The name of the Fluent variable.
+    /// The Fluent variable to fill.
     pub name: FluentIdent,
-    /// The value of the variable, if not written as a shorthand.
+    /// The explicit value, absent for shorthand arguments.
     pub value: Option<TranslateArgumentValue>,
 }
 
 impl TranslateArgument {
-    /// Returns the expression of the argument: the written value, or the name
-    /// for a shorthand.
+    /// Returns the supplied value expression, or the variable name for shorthand
+    /// arguments.
     ///
-    /// A value that is still being typed becomes a compile error at its `=`,
-    /// so that the argument keeps its place in the expansion.
+    /// An incomplete value produces a compile error at `=` while preserving the
+    /// argument's place in the expansion.
     #[must_use]
     pub fn value(&self) -> TokenStream {
         match &self.value {
@@ -106,20 +106,18 @@ impl Parse for TranslateArgument {
     }
 }
 
-/// The `= value` part of a [`TranslateArgument`].
+/// An explicit value in a [`TranslateArgument`], including its leading `=`.
 ///
-/// The value is kept as the tokens written up to the next comma that
-/// separates arguments, so a value that is still being typed does not fail to
-/// parse. Commas inside brackets, turbofish generics such as
-/// `HashMap::<K, V>::new()`, and the parameters and return type of a closure
-/// that starts the value belong to the value. Any other comma ends the value,
-/// such as in `<HashMap<K, V> as Default>::default()`; wrap such a value in
-/// parentheses.
+/// Stores tokens up to the next argument separator, even if the expression is
+/// incomplete. Commas inside brackets, `::<...>` generics or a leading closure's
+/// signature stay in the value. Other commas end it. Wrap expressions such as
+/// `<HashMap<K, V> as Default>::default()` in parentheses to keep their commas inside
+/// the value.
 pub struct TranslateArgumentValue {
-    /// The `=` before the value.
+    /// The assignment sign before the expression.
     pub eq_token: Token![=],
-    /// The tokens of the value up to the comma that ends it, as written. Empty
-    /// while the value is being typed.
+    /// Original value tokens up to the argument separator. May be empty while the user
+    /// types.
     pub tokens: TokenStream,
 }
 
@@ -147,24 +145,23 @@ impl ParseOption for TranslateArgumentValue {
     }
 }
 
-/// Tracks the tokens of an argument value to tell whether a comma ends it.
+/// Tracks argument tokens to decide which commas separate arguments.
 ///
-/// A comma does not end the value inside turbofish generics, or inside the
-/// parameters or return type of a closure that starts the value. The scanner
-/// only looks at opening tokens, so an unclosed `::<` or `|` keeps the rest of
-/// the input in the value while it is being typed.
+/// Commas in `::<...>` generics and a leading closure's signature stay inside the
+/// value. An unclosed `::<` or `|` keeps the rest of the input in the value so
+/// incomplete expressions can still be parsed.
 #[derive(Default)]
 struct ValueScanner {
-    /// The nesting depth of `<` inside turbofish generics.
+    /// Current depth of angle brackets in `::<...>` generics.
     angle_depth: usize,
-    /// The progress through a closure that starts the value.
+    /// Current position in a leading closure's signature.
     closure: ClosureState,
-    /// The previous two tokens, if they were punctuation.
+    /// The last two tokens, recorded only when they are punctuation.
     previous: [Option<(char, Spacing)>; 2],
 }
 
 impl ValueScanner {
-    /// Returns whether a comma at the current position ends the value.
+    /// Checks whether a comma here would end the argument.
     fn ends_at_comma(&self) -> bool {
         self.angle_depth == 0
             && !matches!(
@@ -173,7 +170,7 @@ impl ValueScanner {
             )
     }
 
-    /// Advances the scanner past `token`.
+    /// Updates the scanner after reading `token`.
     fn push(&mut self, token: &TokenTree) {
         let punct = match token {
             TokenTree::Punct(punct) => Some((punct.as_char(), punct.spacing())),
@@ -226,19 +223,19 @@ impl ValueScanner {
     }
 }
 
-/// The progress through a closure at the start of an argument value.
+/// The scanner's position within a closure at the start of a value.
 #[derive(Default, Clone, Copy)]
 enum ClosureState {
-    /// No token other than `move` or `async` has been seen yet.
+    /// At the start of the value, possibly after `move` or `async`.
     #[default]
     Start,
-    /// Inside the closure's parameters, between the `|`s.
+    /// Reading parameters between the opening and closing `|`.
     Params,
-    /// After the closure's parameters, before its return type or body.
+    /// Finished reading parameters, but not yet in the return type or body.
     AfterParams,
-    /// Inside the closure's return type, before its block body.
+    /// Reading a return type before the closure's block.
     ReturnType,
-    /// The value is not a closure, or the closure's signature has ended.
+    /// Outside a closure signature.
     None,
 }
 
@@ -254,7 +251,7 @@ mod tests {
         input.parse::<TokenStream>().unwrap().to_string()
     }
 
-    /// The name and value tokens of each argument.
+    /// Extracts each argument's name and original value tokens.
     fn arguments(input: &str) -> Vec<(String, Option<String>)> {
         parse(input)
             .unwrap()
@@ -376,7 +373,7 @@ mod tests {
         );
     }
 
-    /// The expression of each argument.
+    /// Extracts the value expression for each argument.
     fn values(input: &str) -> Vec<String> {
         parse(input)
             .unwrap()

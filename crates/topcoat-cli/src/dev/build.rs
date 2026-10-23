@@ -93,10 +93,10 @@ impl Drop for BuildTask {
     }
 }
 
-/// Compile the application, bundle its assets and report problems with its
-/// translations.
+/// Builds the app, bundles its assets and checks its translations.
 ///
-/// Returns the built outputs, or `None` after reporting the failure to the terminal.
+/// Returns the build outputs on success. On failure, prints the error and returns
+/// `None`.
 async fn build(kind: BuildKind, opts: BuildOpts) -> Option<BuildOutput> {
     let label = kind.label();
     let spinner = Spinner::new(label);
@@ -146,8 +146,7 @@ async fn build(kind: BuildKind, opts: BuildOpts) -> Option<BuildOutput> {
     })
 }
 
-/// Prints one line for each `messages!` that `topcoat l10n check` would report
-/// problems for.
+/// Prints a warning for each `messages!` namespace with translation problems.
 fn report_l10n_problems(check: &Check) {
     let mut reported = false;
     for namespace in &check.namespaces {

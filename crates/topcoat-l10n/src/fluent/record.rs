@@ -1,31 +1,30 @@
 use topcoat_core::cursor::{ConstReader, ConstWriter};
 
-/// A `t!` call, recovered from a compiled binary.
+/// A record of a `t!` call stored in a compiled binary.
 ///
-/// `t!` embeds a record of itself in the binary, which is what the created
-/// [`Translation`](crate::Translation) reads its key from. Tools find the
-/// records of every `t!` call that the compiler kept with
-/// [`find_in_binary`](Self::find_in_binary).
+/// The generated [`Translation`](crate::Translation) reads its key from this record.
+/// Tools can use [`find_in_binary`](Self::find_in_binary) to find calls that remain
+/// after compilation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawTranslation<'a> {
-    /// The ID of the namespace of the `t!`.
+    /// The namespace containing this translation call.
     pub namespace: &'a str,
-    /// The ID of the message.
+    /// The translated message's ID.
     pub id: &'a str,
-    /// The attribute of the message, if any.
+    /// The selected message attribute, if present.
     pub attribute: Option<&'a str>,
-    /// The names of the arguments, as written.
+    /// Argument names supplied by the caller.
     pub arguments: Vec<&'a str>,
-    /// The source file of the call, as given by `file!()`.
+    /// The caller's source file path from `file!()`.
     pub file: &'a str,
-    /// The line of the key, starting at 1.
+    /// The key's line number, counted from 1.
     pub line: u32,
-    /// The column of the key, starting at 1.
+    /// The key's column number, counted from 1.
     pub column: u32,
 }
 
 impl<'a> RawTranslation<'a> {
-    /// Returns the size of the record that [`encode`](Self::encode) creates.
+    /// Calculates the byte length needed by [`encode`](Self::encode).
     #[doc(hidden)]
     #[must_use]
     pub const fn encoded_len(
@@ -50,8 +49,8 @@ impl<'a> RawTranslation<'a> {
         len
     }
 
-    /// Creates the record of a `t!` call. `N` must be the
-    /// [`encoded_len`](Self::encoded_len) of the same values.
+    /// Encodes a translation call as a byte record. Set `N` to
+    /// [`encoded_len`](Self::encoded_len) for the same inputs.
     #[doc(hidden)]
     #[must_use]
     #[allow(clippy::cast_possible_truncation)]
@@ -82,8 +81,8 @@ impl<'a> RawTranslation<'a> {
         out
     }
 
-    /// Reads the record at the start of `bytes`, or returns `None` when it is
-    /// not one.
+    /// Decodes a record at the start of `bytes`, returning `None` if no valid record is
+    /// present.
     #[must_use]
     pub fn decode(bytes: &'a [u8]) -> Option<Self> {
         let mut r = ConstReader::new(bytes);
@@ -101,7 +100,7 @@ impl<'a> RawTranslation<'a> {
         })
     }
 
-    /// Reads the namespace, the message ID and the attribute of the record.
+    /// Reads the namespace ID, message ID and optional attribute from a record.
     pub(crate) fn decode_key(
         r: &mut ConstReader<'a>,
     ) -> Option<(&'a str, &'a str, Option<&'a str>)> {
@@ -111,7 +110,7 @@ impl<'a> RawTranslation<'a> {
         Some((r.read_str()?, r.read_str()?, r.read_str_opt()?))
     }
 
-    /// Returns the records of every `t!` call in a compiled binary.
+    /// Finds translation call records in a compiled binary.
     #[cfg(feature = "check")]
     #[must_use]
     pub fn find_in_binary(binary: &'a [u8]) -> Vec<Self> {
@@ -119,37 +118,37 @@ impl<'a> RawTranslation<'a> {
     }
 }
 
-/// A `messages!` invocation, recovered from a compiled binary.
+/// A record of a `messages!` call stored in a compiled binary.
 ///
-/// `messages!` embeds a record of itself in the binary. Tools find the records
-/// of every namespace with [`find_in_binary`](Self::find_in_binary).
+/// Use [`find_in_binary`](Self::find_in_binary) to find the namespace records generated
+/// by the macro.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawNamespace<'a> {
-    /// The ID of the namespace.
+    /// The namespace's unique ID.
     pub id: &'a str,
-    /// The absolute path of the source file that invokes `messages!`.
+    /// The absolute path of the file containing `messages!`.
     pub source_file: &'a str,
-    /// The line of the invocation, starting at 1.
+    /// The call's line number, counted from 1.
     pub line: u32,
-    /// The column of the invocation, starting at 1.
+    /// The call's column number, counted from 1.
     pub column: u32,
-    /// The path of the Fluent files, as written.
+    /// The file pattern supplied to the macro.
     pub pattern: &'a str,
-    /// The locales, with the files that were embedded for each.
+    /// Locales and the source files embedded for each one.
     pub locales: Vec<RawNamespaceLocale<'a>>,
 }
 
-/// The files that were embedded for one locale of a [`RawNamespace`].
+/// Embedded file paths for a locale in a [`RawNamespace`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawNamespaceLocale<'a> {
-    /// The locale, as matched by the path.
+    /// The locale name captured by the file pattern.
     pub locale: &'a str,
-    /// The absolute path of each file.
+    /// Absolute paths of the embedded files.
     pub files: Vec<&'a str>,
 }
 
 impl<'a> RawNamespace<'a> {
-    /// Returns the size of the record that [`encode`](Self::encode) creates.
+    /// Calculates the byte length needed by [`encode`](Self::encode).
     #[doc(hidden)]
     #[must_use]
     pub const fn encoded_len(
@@ -173,8 +172,8 @@ impl<'a> RawNamespace<'a> {
         len
     }
 
-    /// Creates the record of a `messages!` invocation. `N` must be the
-    /// [`encoded_len`](Self::encoded_len) of the same values.
+    /// Encodes a namespace call as a byte record. Set `N` to
+    /// [`encoded_len`](Self::encoded_len) for the same inputs.
     #[doc(hidden)]
     #[must_use]
     #[allow(clippy::cast_possible_truncation)]
@@ -210,8 +209,8 @@ impl<'a> RawNamespace<'a> {
         out
     }
 
-    /// Reads the record at the start of `bytes`, or returns `None` when it is
-    /// not one.
+    /// Decodes a record at the start of `bytes`, returning `None` if no valid record is
+    /// present.
     #[must_use]
     pub fn decode(bytes: &'a [u8]) -> Option<Self> {
         let mut r = ConstReader::new(bytes);
@@ -239,7 +238,7 @@ impl<'a> RawNamespace<'a> {
         })
     }
 
-    /// Reads the ID of the namespace.
+    /// Reads the namespace ID from a record.
     pub(crate) fn decode_id(r: &mut ConstReader<'a>) -> Option<&'a str> {
         if r.read_bytes(PREFIX_LEN)? != prefix(NAMESPACE) {
             return None;
@@ -247,7 +246,7 @@ impl<'a> RawNamespace<'a> {
         r.read_str()
     }
 
-    /// Returns the records of every namespace in a compiled binary.
+    /// Finds namespace records in a compiled binary.
     #[cfg(feature = "check")]
     #[must_use]
     pub fn find_in_binary(binary: &'a [u8]) -> Vec<Self> {
@@ -255,7 +254,7 @@ impl<'a> RawNamespace<'a> {
     }
 }
 
-/// Returns the records of `kind` in `binary`, decoded by `decode`.
+/// Finds records of the requested kind and decodes them with `decode`.
 #[cfg(feature = "check")]
 fn find_in_binary<'a, T>(
     binary: &'a [u8],
@@ -278,9 +277,9 @@ const fn str_opt_len(s: Option<&str>) -> usize {
     }
 }
 
-/// The kind of a namespace record.
+/// Record type marker for namespaces.
 const NAMESPACE: u8 = b'N';
-/// The kind of a translation record.
+/// Record type marker for translations.
 const TRANSLATION: u8 = b'T';
 
 const PREFIX_KEY: u8 = 0xA7;
@@ -303,10 +302,10 @@ const SCRAMBLED_PREFIX: [u8; 12] = [
     b'N' ^ PREFIX_KEY,
 ];
 
-/// The length of the marker and the kind that start every record.
+/// Byte length of a record's opening marker and type.
 const PREFIX_LEN: usize = SCRAMBLED_PREFIX.len() + 1;
 
-/// Returns the marker that starts every record of `kind`.
+/// Builds the opening marker for the given record type.
 const fn prefix(kind: u8) -> [u8; PREFIX_LEN] {
     let mut out = [kind; PREFIX_LEN];
     let mut i = 0;
@@ -317,8 +316,8 @@ const fn prefix(kind: u8) -> [u8; PREFIX_LEN] {
     out
 }
 
-/// Creates the record of a namespace with the ID `$id` and nothing else, for
-/// tests that register a namespace by hand.
+/// Creates a minimal namespace record with ID `$id` for tests that register namespaces
+/// directly.
 #[cfg(test)]
 macro_rules! test_namespace_record {
     ($id:expr) => {{
@@ -328,9 +327,8 @@ macro_rules! test_namespace_record {
     }};
 }
 
-/// Creates the record of a `t!` call of the message `$id` and its optional
-/// `$attribute` in the namespace `$namespace`, for tests that create a
-/// translation by hand.
+/// Creates a translation record for tests, using message `$id`, optional `$attribute`
+/// and namespace `$namespace`.
 #[cfg(test)]
 macro_rules! test_translation_record {
     ($namespace:expr, $id:expr, $attribute:expr) => {{

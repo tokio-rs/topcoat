@@ -1,5 +1,5 @@
-//! Checks the messages of this test binary, whose `t!` calls and Fluent files
-//! have known problems.
+//! Checks a test binary with deliberate translation errors in its `t!` calls and Fluent
+//! files.
 
 #![cfg(feature = "check")]
 
@@ -11,7 +11,7 @@ use topcoat_l10n::{Check, Locale, NamespaceCheck, Severity, Translation, locale}
 messages!("./check/{locale}.ftl");
 const MESSAGES_LINE: u32 = line!() - 1;
 
-/// The `t!` calls of the test, with their lines.
+/// Translation calls used by the test, paired with their line numbers.
 fn calls() -> Vec<(u32, Translation<'static>)> {
     vec![
         (line!(), t!(title)),
@@ -39,7 +39,7 @@ fn check() -> NamespaceCheck {
         .expect("the binary has the namespace")
 }
 
-/// Returns the severity and the line of each problem in the file named `name`.
+/// Lists each problem's severity and line number for the file `name`.
 fn problems_in(check: &NamespaceCheck, name: &str) -> Vec<(Severity, u32)> {
     check
         .problems

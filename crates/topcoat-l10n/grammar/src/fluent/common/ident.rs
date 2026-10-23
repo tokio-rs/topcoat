@@ -8,13 +8,11 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
-/// A Fluent identifier, such as the ID of a message, the name of one of its
-/// attributes, or the name of a variable.
+/// A name used by Fluent for a message, attribute or variable.
 ///
-/// An identifier is written as tokens, such as `password-field`, or as a
-/// string literal, such as `"item-1e"`, for identifiers that are not valid Rust
-/// tokens. Either way, it must follow Fluent's grammar: an ASCII letter,
-/// followed by ASCII letters, digits, `_` and `-`.
+/// Write the name as tokens, such as `password-field`, or as a string literal when Rust
+/// cannot tokenize it, such as `"item-1e"`. Names must start with an ASCII letter. The
+/// remaining characters may be ASCII letters, digits, `_` or `-`.
 ///
 /// ```text
 /// password-field
@@ -23,18 +21,17 @@ use syn::{
 /// "item-1e"
 /// ```
 pub enum FluentIdent {
-    /// The identifier written as tokens: an identifier, followed by
-    /// identifiers and numbers joined with hyphens.
+    /// An identifier built from names and numbers separated by hyphens.
     Tokens(Vec<FluentIdentToken>),
-    /// The identifier written as a string literal.
+    /// An identifier supplied as a string literal.
     Str(LitStr),
 }
 
 impl FluentIdent {
-    /// Returns the identifier.
+    /// Returns the identifier as text.
     ///
-    /// Tokens are joined without the whitespace between them, and the `r#` of
-    /// a raw identifier is removed, so `password - r#type` is `password-type`.
+    /// Removes spaces between tokens and the `r#` prefix on raw identifiers. For
+    /// example, `password - r#type` becomes `password-type`.
     #[must_use]
     pub fn value(&self) -> String {
         match self {
@@ -43,7 +40,7 @@ impl FluentIdent {
         }
     }
 
-    /// Checks that a string literal has no suffix, such as the `x` of `"a"x`.
+    /// Rejects suffixes on string literals, such as `x` in `"a"x`.
     pub(crate) fn check_str_suffix(lit: &LitStr) -> syn::Result<()> {
         if lit.suffix().is_empty() {
             Ok(())
@@ -55,8 +52,8 @@ impl FluentIdent {
         }
     }
 
-    /// Checks that the bytes `range` of `value`, the value of `lit`, are a
-    /// Fluent identifier.
+    /// Checks whether the byte range `range` in the literal's `value` is a valid Fluent
+    /// identifier.
     pub(crate) fn check_str_part(
         lit: &LitStr,
         value: &str,
@@ -115,7 +112,7 @@ impl Parse for FluentIdent {
     }
 }
 
-/// Emits the identifier as written.
+/// Writes the identifier's original tokens.
 impl ToTokens for FluentIdent {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
@@ -129,21 +126,21 @@ impl ToTokens for FluentIdent {
     }
 }
 
-/// A token of a [`FluentIdent`] written as tokens.
+/// One token in a [`FluentIdent`].
 pub enum FluentIdentToken {
-    /// An identifier, such as `password`, `type` or `r#type`.
+    /// A Rust identifier or keyword, such as `password`, `type` or `r#type`.
     Ident(Ident),
-    /// A hyphen.
+    /// The `-` separator.
     Hyphen(Token![-]),
-    /// An integer, such as the `2a` of `step-2a`, which Rust reads as `2`
-    /// with the suffix `a`.
+    /// An integer token, possibly with a suffix. For example, Rust reads `2a` in
+    /// `step-2a` as `2` with suffix `a`.
     Int(LitInt),
-    /// A float, such as the `1e5` of `x-1e5`.
+    /// A floating-point token, such as `1e5` in `x-1e5`.
     Float(LitFloat),
 }
 
 impl FluentIdentToken {
-    /// Returns the text of the token within the identifier.
+    /// Returns the text this token contributes to the identifier.
     fn text(&self) -> String {
         match self {
             Self::Ident(ident) => ident.unraw().to_string(),
@@ -165,20 +162,19 @@ impl ToTokens for FluentIdentToken {
     }
 }
 
-/// A character that a Fluent identifier cannot contain at its position.
+/// A character that is invalid at its position in a Fluent identifier.
 struct InvalidChar {
-    /// The byte offset of the character in the text it was found in, or in
-    /// the value of the literal it is part of.
+    /// The character's byte offset in the input text or string literal value.
     offset: usize,
-    /// The character.
+    /// The invalid character.
     char: char,
-    /// Whether the character starts the identifier.
+    /// Whether this is the first character of the identifier.
     first: bool,
 }
 
 impl InvalidChar {
-    /// Finds the first invalid character of `text`, where `first` tells
-    /// whether `text` starts the identifier.
+    /// Finds the first invalid character in `text`. Set `first` when the text starts
+    /// the identifier.
     fn find(text: &str, first: bool) -> Option<Self> {
         text.char_indices().find_map(|(offset, char)| {
             let first = first && offset == 0;
@@ -195,11 +191,10 @@ impl InvalidChar {
         })
     }
 
-    /// Returns the span of the character in `lit`, whose value is `value`.
+    /// Finds the character's source span in `lit`, using its decoded `value`.
     ///
-    /// The span covers the whole literal when the character cannot be found
-    /// in the source, such as in a literal with escapes, or when the compiler
-    /// cannot point at part of a literal.
+    /// Falls back to the whole literal if the character cannot be located in the source
+    /// or the compiler cannot return a smaller span. Escapes can require this fallback.
     fn span_in(&self, lit: &LitStr, value: &str) -> Span {
         let token = lit.token();
         let source = token.to_string();
@@ -214,7 +209,7 @@ impl InvalidChar {
             .unwrap_or_else(|| lit.span())
     }
 
-    /// Returns the error message for the character.
+    /// Describes why this character is invalid.
     fn message(&self) -> String {
         let char = self.char;
         if self.first {
@@ -242,8 +237,8 @@ mod tests {
         parse(input).unwrap().value()
     }
 
-    /// Parses an identifier at the start of `input`, and returns its value
-    /// and the remaining tokens.
+    /// Reads the leading identifier from `input`, returning its text and the tokens
+    /// left over.
     fn parse_prefix(input: &str) -> (String, String) {
         let parser =
             |input: ParseStream| Ok((input.parse::<FluentIdent>()?, input.parse::<TokenStream>()?));

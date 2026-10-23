@@ -7,7 +7,7 @@ use fluent_syntax::{
 
 use super::Location;
 
-/// A parsed Fluent file.
+/// Fluent syntax parsed from a source file.
 pub(super) struct ParsedFile<'s> {
     path: &'s Path,
     text: &'s str,
@@ -15,9 +15,10 @@ pub(super) struct ParsedFile<'s> {
 }
 
 impl<'s> ParsedFile<'s> {
-    /// Parses `text`, the contents of `path`.
+    /// Parses the contents of `path`.
     ///
-    /// Syntax errors are skipped, since `messages!` already rejects them.
+    /// Keeps valid entries if parsing finds errors. The `messages!` macro already
+    /// rejects syntax errors during compilation.
     pub(super) fn parse(path: &'s Path, text: &'s str) -> Self {
         let resource = parser::parse(text).unwrap_or_else(|(resource, _)| resource);
         Self {
@@ -27,8 +28,7 @@ impl<'s> ParsedFile<'s> {
         }
     }
 
-    /// Returns the location of `slice`, a part of the contents such as the
-    /// name of an identifier.
+    /// Finds the source location of a slice of the file, such as an identifier.
     pub(super) fn location(&self, slice: &str) -> Location {
         let offset = slice
             .as_ptr()
@@ -48,8 +48,8 @@ impl<'s> ParsedFile<'s> {
     }
 }
 
-/// Calls `visit` with every expression in `pattern`, including the ones
-/// nested in selectors, variants and the arguments of calls.
+/// Visits all expressions in a pattern, including expressions inside selectors,
+/// variants and call arguments.
 pub(super) fn visit_expressions<'s>(
     pattern: &'s Pattern<&'s str>,
     visit: &mut dyn FnMut(&'s InlineExpression<&'s str>),

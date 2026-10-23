@@ -14,32 +14,30 @@ use syntax::{ParsedFile, visit_expressions};
 
 use crate::{Locale, RawNamespace, RawTranslation};
 
-/// The problems with the messages of a compiled binary.
+/// Results from checking a compiled app's translations.
 ///
-/// The binary names its namespaces and `t!` calls in records, which
-/// [`RawNamespace`] and [`RawTranslation`] describe. The check reads the
-/// Fluent files of each namespace from disk and compares them with the `t!`
-/// calls that use the namespace, so the files must not change between the
-/// build and the check.
+/// Uses [`RawNamespace`] and [`RawTranslation`] records in the binary to find
+/// namespaces and `t!` calls. Reads the corresponding Fluent files from disk, so those
+/// files must stay unchanged between the build and this check.
 ///
-/// It reports these errors:
+/// Reports errors for:
 ///
-/// - a message or attribute that a `t!` call uses, but a locale lacks,
-/// - a variable of a message that a `t!` call does not pass,
-/// - a reference to a message, term or attribute that does not exist.
+/// - messages or attributes used by `t!` but missing from a locale,
+/// - message variables that a `t!` call does not supply,
+/// - references to missing messages, terms or attributes.
 ///
-/// It reports these warnings:
+/// Reports warnings for:
 ///
-/// - a message that no `t!` call or other message uses,
-/// - an argument that no locale uses.
+/// - messages unused by both `t!` calls and other messages,
+/// - arguments unused by every locale.
 #[derive(Debug)]
 pub struct Check {
-    /// The namespaces of the binary, sorted by where they are invoked.
+    /// Checked namespaces, sorted by their source locations.
     pub namespaces: Vec<NamespaceCheck>,
 }
 
 impl Check {
-    /// Checks the messages of the compiled `binary`.
+    /// Checks translations referenced by `binary`.
     #[must_use]
     pub fn binary(binary: &[u8]) -> Self {
         let mut translations: BTreeMap<&str, Vec<RawTranslation<'_>>> = BTreeMap::new();
@@ -60,7 +58,7 @@ impl Check {
         Self { namespaces }
     }
 
-    /// Returns whether any namespace has an error.
+    /// Checks whether any namespace contains an error.
     #[must_use]
     pub fn has_errors(&self) -> bool {
         self.namespaces.iter().any(|namespace| {
@@ -72,22 +70,21 @@ impl Check {
     }
 }
 
-/// The result of checking one namespace, created by one `messages!`.
+/// Check results for the namespace defined by one `messages!` call.
 #[derive(Debug)]
 pub struct NamespaceCheck {
-    /// Where `messages!` is invoked.
+    /// The source location of the `messages!` call.
     pub location: Location,
-    /// The path of the Fluent files, as written.
+    /// The original Fluent file pattern.
     pub pattern: String,
-    /// How many of the keys that `t!` calls use each locale has, by locale.
+    /// Translation coverage for each locale.
     pub coverage: Vec<Coverage>,
-    /// The problems, errors first, then sorted by location.
+    /// Reported problems, sorted by severity and then source location.
     pub problems: Vec<Problem>,
 }
 
 impl NamespaceCheck {
-    /// Checks the current Fluent files of `namespace` against `calls`, its
-    /// `t!` calls.
+    /// Checks the namespace's files on disk against its recorded `t!` calls.
     fn new(namespace: &RawNamespace<'_>, mut calls: Vec<RawTranslation<'_>>) -> Self {
         // A call can be found more than once, such as when the linker keeps two
         // copies of its record.
@@ -110,53 +107,51 @@ impl NamespaceCheck {
     }
 }
 
-/// How many of the keys that the `t!` calls of a namespace use one locale has.
+/// The keys a locale provides for a namespace's `t!` calls.
 ///
-/// A locale has a key when its own files or the files of a locale it takes
-/// messages from define it.
+/// Keys inherited from fallback locales count as available.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Coverage {
-    /// The locale.
+    /// The locale being checked.
     pub locale: Locale,
-    /// The number of keys that `t!` calls use.
+    /// The number of distinct keys used by `t!`.
     pub keys: usize,
-    /// The keys the locale lacks, sorted, such as `title` or
-    /// `search.placeholder`.
+    /// Missing keys in sorted order, such as `title` or `search.placeholder`.
     pub missing: Vec<String>,
 }
 
-/// A problem found by a [`Check`].
+/// A translation issue reported by [`Check`].
 #[derive(Debug, PartialEq, Eq)]
 pub struct Problem {
-    /// Whether the problem is an error or a warning.
+    /// The issue's severity.
     pub severity: Severity,
-    /// Where the problem is.
+    /// The issue's source location.
     pub location: Location,
-    /// What is wrong, in one sentence.
+    /// A one-sentence description of the issue.
     pub message: String,
 }
 
-/// Whether a [`Problem`] is an error or a warning.
+/// The severity assigned to a [`Problem`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Severity {
-    /// Something that shows a placeholder or wrong text.
+    /// A problem that produces missing or incorrect text.
     Error,
-    /// Something that is likely a mistake, but does no harm.
+    /// A likely mistake that does not break the translation.
     Warning,
 }
 
-/// A place in a source file or a Fluent file.
+/// A position in Rust source or a Fluent file.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Location {
-    /// The path of the file.
+    /// The source file's path.
     pub file: PathBuf,
-    /// The line, starting at 1.
+    /// The line number, counted from 1.
     pub line: u32,
-    /// The column, starting at 1, when known.
+    /// The column number, counted from 1, if available.
     pub column: Option<u32>,
 }
 
-/// Shows the location as `file:line:column`, or `file:line` without a column.
+/// Formats a source location as `file:line:column`, omitting the column when unknown.
 impl Display for Location {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.file.display(), self.line)?;

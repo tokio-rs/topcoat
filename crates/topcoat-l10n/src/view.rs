@@ -39,8 +39,8 @@ impl AttributeValueViewParts for LanguageIdentifier {
     }
 }
 
-/// Implements the node view trait for a type and references to it by
-/// rendering its [`Display`](std::fmt::Display) text.
+/// Lets a type and references to it render as view text through
+/// [`Display`](std::fmt::Display).
 macro_rules! impl_node_view_parts {
     ($ty:ty) => {
         impl NodeViewParts for &$ty {

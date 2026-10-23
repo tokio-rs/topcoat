@@ -1,41 +1,41 @@
 use std::fmt::{self, Debug, Display};
 
-/// The extensions of a [`Locale`](crate::Locale), such as the Unicode
-/// extension `u-ca-buddhist` that selects the Buddhist calendar.
+/// Extra settings on a [`Locale`](crate::Locale), such as `u-ca-buddhist` for the
+/// Buddhist calendar.
 ///
-/// Extensions refine how a locale formats and processes text without changing
-/// its language. They are written after the language identifier, each
-/// introduced by a single-letter subtag: `u` for Unicode extensions, `t` for
-/// transformed content, and `x` for private use.
+/// Extensions describe how to format or process text without changing the language.
+/// They follow the language identifier and start with a single-letter subtag. For
+/// example, `u` introduces Unicode settings, `t` describes transformed content and `x`
+/// marks private-use data.
 #[derive(Clone, Default, PartialEq, Eq, Hash)]
 pub struct Extensions(icu_locale_core::extensions::Extensions);
 
 impl Extensions {
-    /// Creates an empty set of extensions.
+    /// Creates extensions with no settings.
     #[must_use]
     pub const fn new() -> Self {
         Self(icu_locale_core::extensions::Extensions::new())
     }
 
-    /// Returns whether there are no extensions.
+    /// Checks whether the extension set is empty.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
-    /// Borrows the `icu_locale_core` extensions.
+    /// Returns a reference to the underlying `icu_locale_core` extensions.
     #[must_use]
     pub const fn as_icu(&self) -> &icu_locale_core::extensions::Extensions {
         &self.0
     }
 
-    /// Converts to the `icu_locale_core` extensions.
+    /// Returns the extensions as an `icu_locale_core` value.
     #[must_use]
     pub fn into_icu(self) -> icu_locale_core::extensions::Extensions {
         self.0
     }
 
-    /// Converts from the `icu_locale_core` extensions.
+    /// Wraps extensions from `icu_locale_core`.
     #[must_use]
     pub const fn from_icu(extensions: icu_locale_core::extensions::Extensions) -> Self {
         Self(extensions)

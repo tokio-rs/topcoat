@@ -13,20 +13,20 @@ use proc_macro2::Span;
 
 use crate::fluent::LocaleFiles;
 
-/// A parsed Fluent file.
+/// A Fluent file and its parsed contents.
 pub struct FluentFile {
-    /// The absolute path of the file.
+    /// The file's absolute path.
     pub path: PathBuf,
-    /// The entries of the file.
+    /// The parsed Fluent entries.
     pub resource: Resource<String>,
 }
 
 impl FluentFile {
-    /// Reads and parses the Fluent file at `path`, reporting errors at `span`.
+    /// Loads and parses `path`, attaching errors to `span`.
     ///
     /// # Errors
     ///
-    /// Fails when the file cannot be read or has syntax errors.
+    /// Returns an error if the file cannot be read or contains invalid Fluent syntax.
     pub fn read(path: &Path, span: Span) -> syn::Result<Self> {
         let source = fs::read_to_string(path).map_err(|err| {
             syn::Error::new(span, format!("failed to read `{}`: {err}", path.display()))
@@ -48,21 +48,21 @@ impl FluentFile {
     }
 }
 
-/// The parsed Fluent files of one locale.
+/// Parsed Fluent files belonging to one locale.
 pub struct LocaleResources {
-    /// The locale of the files.
+    /// The locale shared by these files.
     pub locale: LanguageIdentifier,
-    /// The files, in the order they were given.
+    /// Parsed files in input order.
     pub files: Vec<FluentFile>,
 }
 
 impl LocaleResources {
-    /// Reads and parses the files of a locale, reporting errors at `span`.
+    /// Loads and parses a locale's files, attaching errors to `span`.
     ///
     /// # Errors
     ///
-    /// Fails when a file cannot be read or has syntax errors, or when a message
-    /// or term is defined more than once across the files.
+    /// Returns an error for unreadable files, invalid Fluent syntax or duplicate
+    /// message or term definitions.
     pub fn read(files: &LocaleFiles, span: Span) -> syn::Result<Self> {
         let mut parsed = Vec::with_capacity(files.files.len());
         let mut errors = Vec::new();
@@ -86,8 +86,7 @@ impl LocaleResources {
         }
     }
 
-    /// Returns an error for each message or term defined after its first
-    /// definition.
+    /// Reports each repeated message or term definition.
     fn duplicate_errors(&self, span: Span) -> Vec<syn::Error> {
         let mut first = HashMap::new();
         let mut errors = Vec::new();
@@ -122,8 +121,7 @@ impl LocaleResources {
     }
 }
 
-/// Returns an error for a syntax error in `source`, the contents of `path`,
-/// naming the line and column where it occurs.
+/// Creates a syntax error with the file path, line and column in `source`.
 fn syntax_error(path: &Path, source: &str, err: &ParserError, span: Span) -> syn::Error {
     let before = source.get(..err.pos.start).unwrap_or(source);
     let line_start = before.rfind('\n').map_or(0, |index| index + 1);
@@ -132,8 +130,7 @@ fn syntax_error(path: &Path, source: &str, err: &ParserError, span: Span) -> syn
     syn::Error::new(span, format!("{}:{line}:{column}: {err}", path.display()))
 }
 
-/// Combines `errors` into one error that reports each of them, or returns
-/// `None` when there are none.
+/// Merges all errors into one, or returns `None` for an empty input.
 fn combine(errors: impl IntoIterator<Item = syn::Error>) -> Option<syn::Error> {
     errors.into_iter().reduce(|mut combined, err| {
         combined.combine(err);
@@ -147,8 +144,7 @@ mod tests {
 
     use super::*;
 
-    /// Writes the files to a temporary directory and reads them as the files of
-    /// one locale.
+    /// Creates temporary files and loads them as one locale.
     fn read(files: &[(&str, &str)]) -> syn::Result<LocaleResources> {
         let dir = TempDir::new().unwrap();
         let mut paths = Vec::new();

@@ -47,7 +47,7 @@ async fn layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     })
 }
 
-/// Links to the page in every locale that has messages.
+/// Displays a link to this page for each available translation locale.
 #[component]
 async fn nav(cx: &Cx) -> Result<impl View> {
     Ok(view! {

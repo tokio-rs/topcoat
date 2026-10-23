@@ -3,15 +3,15 @@ use std::{fs, path::PathBuf};
 use super::{Location, Problem, Severity};
 use crate::{Locale, RawNamespace};
 
-/// The Fluent files of a namespace, read from disk.
+/// A namespace's Fluent source files loaded from disk.
 pub(super) struct Sources {
-    /// Each locale with the path and the contents of its files.
+    /// File paths and contents grouped by locale.
     pub(super) locales: Vec<(Locale, Vec<(PathBuf, String)>)>,
 }
 
 impl Sources {
-    /// Reads the files that were embedded for `namespace`, adding an error to
-    /// `problems` for each file that cannot be read.
+    /// Loads the files recorded for `namespace` and reports each read failure in
+    /// `problems`.
     pub(super) fn load(namespace: &RawNamespace<'_>, problems: &mut Vec<Problem>) -> Self {
         let locales = namespace
             .locales

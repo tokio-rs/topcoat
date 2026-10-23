@@ -9,35 +9,33 @@ use syn::{
 const PLACEHOLDER: &str = "{locale}";
 const MODULE: &str = "{mod}";
 
-/// A path to Fluent files with a `{locale}` placeholder, such as
-/// `"./l10n/{locale}.ftl"` or `"./**/l10n/{locale}/**/*.ftl"`.
+/// A Fluent file pattern containing `{locale}`, such as `"./l10n/{locale}.ftl"` or
+/// `"./**/l10n/{locale}/**/*.ftl"`.
 ///
-/// The path contains exactly one `{locale}` placeholder, which matches the
-/// locale within a single path component. The path may also contain these
-/// wildcards:
+/// Exactly one `{locale}` placeholder is required. It matches a locale name within a
+/// single path component.
 ///
-/// - `*` matches any characters within a single path component.
-/// - `**` matches zero or more directories and must be a whole path component.
+/// - `*` matches any characters within one path component.
+/// - `**` matches any number of directories, including none, and must occupy a whole
+/// component.
 ///
-/// The path may start with a `{mod}` component, which stands for the directory
-/// of the invoking module. That is the directory where its child modules live,
-/// such as `src/about/` for both `src/about.rs` and `src/about/mod.rs`.
+/// A leading `{mod}` uses the directory where the current module's child modules
+/// belong. For both `src/about.rs` and `src/about/mod.rs`, this is `src/about/`.
 ///
-/// `*` cannot appear in the same path component as `{locale}`. Other braces,
-/// `?`, `[` and `]` are reserved and rejected.
+/// A component containing `{locale}` cannot also contain `*`. Other braces and the
+/// characters `?`, `[` and `]` are not supported.
 #[derive(Clone)]
 pub struct PathPattern {
-    /// The path as written.
+    /// The original path string.
     pub lit: LitStr,
 }
 
 impl PathPattern {
-    /// Returns the `/`-separated components of the path.
+    /// Splits the pattern into components at `/` separators.
     ///
     /// # Panics
     ///
-    /// Panics if the path is not a valid pattern. A parsed `PathPattern` is
-    /// always valid.
+    /// Panics for an invalid pattern. Successfully parsed patterns are always valid.
     #[must_use]
     pub fn components(&self) -> Vec<PathComponent> {
         Self::parse_components(&self.lit.value()).expect("the path is validated during parsing")
@@ -71,23 +69,22 @@ impl Parse for PathPattern {
     }
 }
 
-/// One `/`-separated component of a [`PathPattern`].
+/// One part of a [`PathPattern`], separated from others by `/`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PathComponent {
-    /// `{mod}`, the directory of the invoking module.
+    /// The `{mod}` placeholder for the current module's directory.
     Module,
-    /// A name without wildcards or placeholders.
+    /// A literal file or directory name.
     Literal(String),
-    /// A name containing `*` wildcards, as written.
+    /// A file or directory pattern containing `*`.
     Wildcard(String),
-    /// `**`, matching zero or more directories.
+    /// The `**` wildcard for any number of directories.
     Recursive,
-    /// A name containing the `{locale}` placeholder, split into the text
-    /// before and after it.
+    /// A component containing `{locale}`, stored as the text on either side.
     Locale {
-        /// The text before the placeholder.
+        /// Text immediately before `{locale}`.
         prefix: String,
-        /// The text after the placeholder.
+        /// Text immediately after `{locale}`.
         suffix: String,
     },
 }

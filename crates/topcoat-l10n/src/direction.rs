@@ -1,10 +1,9 @@
 use std::fmt::{self, Display};
 
-/// The direction in which a script is written, as used by the HTML `dir`
-/// attribute.
+/// The writing direction of a script, suitable for the HTML `dir` attribute.
 ///
-/// Get it from a language identifier with
-/// [`LanguageIdentifier::direction`](crate::LanguageIdentifier::direction).
+/// Use [`LanguageIdentifier::direction`](crate::LanguageIdentifier::direction) to get
+/// it from a language identifier.
 ///
 /// # Examples
 ///
@@ -29,21 +28,20 @@ use std::fmt::{self, Display};
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Direction {
-    /// Left to right, written `ltr`.
+    /// Text runs from left to right. Displays as `ltr`.
     Ltr,
-    /// Right to left, written `rtl`.
+    /// Text runs from right to left. Displays as `rtl`.
     Rtl,
 }
 
 impl Direction {
-    /// Returns the value of the HTML `dir` attribute for this direction.
+    /// Returns `ltr` or `rtl` for an HTML `dir` attribute.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         self.as_promoted_str()
     }
 
-    /// Returns the text held by a `'static` reference, as the view writer's
-    /// promoted strings expect.
+    /// Returns a static reference to the direction text for the view writer.
     pub(crate) const fn as_promoted_str(self) -> &'static &'static str {
         match self {
             Self::Ltr => &"ltr",

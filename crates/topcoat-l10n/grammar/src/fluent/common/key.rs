@@ -8,10 +8,9 @@ use topcoat_core_grammar::ParseOption;
 
 use crate::fluent::FluentIdent;
 
-/// A Fluent message, optionally followed by one of its attributes.
+/// A message ID with an optional attribute name.
 ///
-/// The key is written as identifiers, or as a single string literal that
-/// contains both.
+/// Use separate identifiers or put the whole key in one string literal.
 ///
 /// ```text
 /// password-field
@@ -20,19 +19,19 @@ use crate::fluent::FluentIdent;
 /// "item-1e.label"
 /// ```
 pub enum FluentKey {
-    /// The key written as identifiers.
+    /// A key supplied as separate identifiers.
     Idents {
-        /// The ID of the message.
+        /// The message ID.
         message: FluentIdent,
-        /// The attribute of the message, if any.
+        /// The selected attribute, if present.
         attribute: Option<FluentKeyAttribute>,
     },
-    /// The key written as a single string literal.
+    /// A key supplied in one string literal.
     Str(LitStr),
 }
 
 impl FluentKey {
-    /// Returns the ID of the message.
+    /// Returns the message ID.
     #[must_use]
     pub fn message(&self) -> String {
         match self {
@@ -47,7 +46,7 @@ impl FluentKey {
         }
     }
 
-    /// Returns the span of the message ID, where the key starts.
+    /// Locates the message ID at the start of the key.
     #[must_use]
     pub fn span(&self) -> Span {
         match self {
@@ -56,7 +55,7 @@ impl FluentKey {
         }
     }
 
-    /// Returns the name of the attribute, if any.
+    /// Returns the selected attribute's name, if present.
     #[must_use]
     pub fn attribute(&self) -> Option<String> {
         match self {
@@ -99,11 +98,11 @@ impl Parse for FluentKey {
     }
 }
 
-/// The attribute selected from a message, such as `.placeholder`.
+/// An attribute selector such as `.placeholder`.
 pub struct FluentKeyAttribute {
-    /// The `.` before the attribute name.
+    /// The dot separating the message and attribute names.
     pub dot_token: Token![.],
-    /// The name of the attribute.
+    /// The selected attribute's name.
     pub name: FluentIdent,
 }
 
@@ -130,7 +129,7 @@ mod tests {
         syn::parse_str(input)
     }
 
-    /// The message ID and attribute name of a key.
+    /// Splits a key into its message ID and optional attribute name.
     fn key(input: &str) -> (String, Option<String>) {
         let key = parse(input).unwrap();
         (key.message(), key.attribute())

@@ -40,7 +40,7 @@ enum Command {
     Fmt(fmt::FmtCommand),
     /// Inspect assets embedded in the binary
     Asset(asset::AssetCommand),
-    /// Check the translations of the binary
+    /// Check the app's translations
     L10n(l10n::L10nCommand),
     /// Manage premade UI components in your project
     Ui(ui::UiCommand),

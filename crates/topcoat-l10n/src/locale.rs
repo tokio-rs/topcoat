@@ -8,13 +8,13 @@ use icu_locale_core::extensions::unicode::{Attributes, Keywords, Unicode, Value}
 
 use crate::{Extensions, LanguageIdentifier, LocaleParseError};
 
-/// A Unicode locale identifier, such as `en-US` or `th-TH-u-ca-buddhist`.
+/// A locale combines a [`LanguageIdentifier`] with optional [`Extensions`], such as
+/// `en-US` or `th-TH-u-ca-buddhist`.
 ///
-/// It is a [`LanguageIdentifier`] followed by optional [`Extensions`]. Create
-/// one with the [`locale!`](macro@crate::locale) macro for text known at compile
-/// time, or parse one with [`str::parse`]. Parsing canonicalizes letter case
-/// and the order of variants and extensions, but keeps deprecated subtags;
-/// replace those with [`canonicalize`](Self::canonicalize).
+/// Use [`locale!`](macro@crate::locale) for fixed text or [`str::parse`] for runtime
+/// input. Parsing normalizes letter case and the order of variants and extensions. Call
+/// [`canonicalize`](Self::canonicalize) to also replace old language codes and other
+/// aliases.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Locale {
     id: LanguageIdentifier,
@@ -22,10 +22,10 @@ pub struct Locale {
 }
 
 impl Locale {
-    /// The locale of the unknown language, written `und`.
+    /// The `und` locale for an unknown language.
     pub const UNKNOWN: Self = Self::new(LanguageIdentifier::UNKNOWN);
 
-    /// Creates a locale for `id` with no extensions.
+    /// Creates a locale from a language identifier without extensions.
     #[must_use]
     pub const fn new(id: LanguageIdentifier) -> Self {
         Self {
@@ -34,22 +34,24 @@ impl Locale {
         }
     }
 
-    /// Parses a locale of the form `language[-script][-region][-variant]*`
-    /// followed by any extensions, canonicalizing letter case and order.
+    /// Parses a language identifier followed by optional extensions, normalizing letter
+    /// case and ordering.
+    ///
+    /// The identifier has the form `language[-script][-region][-variant]*`.
     ///
     /// # Errors
     ///
-    /// Fails when the language identifier or an extension is malformed, or an
-    /// extension appears twice.
+    /// Returns an error for an invalid identifier, invalid extension or repeated
+    /// extension.
     pub fn try_from_str(text: &str) -> Result<Self, LocaleParseError> {
         icu_locale_core::Locale::try_from_str(text)
             .map(Self::from_icu)
             .map_err(LocaleParseError::from_icu)
     }
 
-    /// Parses like [`try_from_str`](Self::try_from_str) in const context,
-    /// accepting at most one variant and one Unicode extension keyword.
-    /// Panics with `message` on failure.
+    /// Parses a locale at compile time using the rules of
+    /// [`try_from_str`](Self::try_from_str). Accepts at most one variant and one
+    /// Unicode extension keyword. Panics with `message` if parsing fails.
     #[doc(hidden)]
     #[must_use]
     pub const fn parse_const(text: &str, message: &str) -> Self {
@@ -82,36 +84,36 @@ impl Locale {
         }
     }
 
-    /// Returns the language identifier.
+    /// Returns this locale's language identifier.
     #[must_use]
     pub const fn id(&self) -> &LanguageIdentifier {
         &self.id
     }
 
-    /// Returns the extensions.
+    /// Returns this locale's extension settings.
     #[must_use]
     pub const fn extensions(&self) -> &Extensions {
         &self.extensions
     }
 
-    /// Returns this locale with `id` in place of its language identifier.
+    /// Replaces the language identifier and returns the updated locale.
     #[must_use]
     pub fn with_id(mut self, id: LanguageIdentifier) -> Self {
         self.id = id;
         self
     }
 
-    /// Returns this locale with `extensions` in place of its extensions.
+    /// Replaces the extensions and returns the updated locale.
     #[must_use]
     pub fn with_extensions(mut self, extensions: Extensions) -> Self {
         self.extensions = extensions;
         self
     }
 
-    /// Replaces deprecated and aliased subtags with their current
-    /// equivalents, so `iw` becomes `he` and `sh` becomes `sr-Latn`.
+    /// Updates old or alternative codes to their standard forms. For example, `iw`
+    /// becomes `he` and `sh` becomes `sr-Latn`.
     ///
-    /// Locales that are already canonical are returned unchanged.
+    /// Leaves locales unchanged when they are already canonical.
     #[must_use]
     pub fn canonicalize(self) -> Self {
         let mut locale = self.into_icu();
@@ -119,7 +121,7 @@ impl Locale {
         Self::from_icu(locale)
     }
 
-    /// Converts to the `icu_locale_core` locale.
+    /// Returns the locale as an `icu_locale_core` value.
     #[must_use]
     pub fn into_icu(self) -> icu_locale_core::Locale {
         icu_locale_core::Locale {
@@ -128,7 +130,7 @@ impl Locale {
         }
     }
 
-    /// Converts from the `icu_locale_core` locale.
+    /// Wraps a locale from `icu_locale_core`.
     #[must_use]
     pub fn from_icu(locale: icu_locale_core::Locale) -> Self {
         Self {
@@ -168,12 +170,10 @@ impl From<LanguageIdentifier> for Locale {
     }
 }
 
-/// Creates a [`Locale`] from text known at compile time.
-///
-/// Malformed text is a compile error, and so are more than one variant
-/// subtag and extensions other than a single Unicode extension keyword. Parse
-/// other locales at runtime instead. The macro is usable in `const` and
-/// `static` items.
+/// Checks a fixed locale at compile time and creates a [`Locale`].\n
+/// Supports at most one variant and one Unicode extension keyword. Invalid text, extra
+/// variants or other extensions cause a compile error. Parse those more complex locales
+/// at runtime instead. Works in `const` and `static` items.
 ///
 /// # Examples
 ///

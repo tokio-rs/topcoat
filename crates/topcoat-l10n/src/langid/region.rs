@@ -5,22 +5,20 @@ use std::{
 
 use crate::LocaleParseError;
 
-/// A region subtag, such as `AT` or `419`: two ASCII letters or three ASCII
-/// digits.
+/// A region code made of two ASCII letters or three ASCII digits, such as `AT` or
+/// `419`.
 ///
-/// Create one with the [`region!`](crate::region) macro for text known at
-/// compile time, or parse one with [`str::parse`]. Parsing canonicalizes the
-/// text to upper case.
+/// Use [`region!`](crate::region) for a fixed code or [`str::parse`] for runtime input.
+/// Parsing converts letters to uppercase.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Region(icu_locale_core::subtags::Region);
 
 impl Region {
-    /// Parses a region subtag, canonicalizing its case.
+    /// Parses a region code and converts letters to uppercase.
     ///
     /// # Errors
     ///
-    /// Fails when the text is neither two ASCII letters nor three ASCII
-    /// digits.
+    /// Returns an error unless the input is two ASCII letters or three ASCII digits.
     pub const fn try_from_str(text: &str) -> Result<Self, LocaleParseError> {
         match icu_locale_core::subtags::Region::try_from_str(text) {
             Ok(region) => Ok(Self(region)),
@@ -28,19 +26,19 @@ impl Region {
         }
     }
 
-    /// Returns the canonical text of the subtag.
+    /// Returns the normalized region code.
     #[must_use]
     pub const fn as_str(&self) -> &str {
         self.0.as_str()
     }
 
-    /// Converts to the `icu_locale_core` subtag.
+    /// Returns the code as an `icu_locale_core` subtag.
     #[must_use]
     pub const fn to_icu(self) -> icu_locale_core::subtags::Region {
         self.0
     }
 
-    /// Converts from the `icu_locale_core` subtag.
+    /// Wraps a region subtag from `icu_locale_core`.
     #[must_use]
     pub const fn from_icu(region: icu_locale_core::subtags::Region) -> Self {
         Self(region)
@@ -73,10 +71,9 @@ impl FromStr for Region {
     }
 }
 
-/// Creates a [`Region`] from text known at compile time.
+/// Checks a fixed region code at compile time and creates a [`Region`].
 ///
-/// Malformed text is a compile error. The macro is usable in `const` and
-/// `static` items.
+/// Invalid codes cause a compile error. Works in `const` and `static` items.
 #[macro_export]
 macro_rules! region {
     ($text:literal) => {
