@@ -1,4 +1,5 @@
 export * from "./bool";
+export * from "./element-ref";
 export * from "./event";
 export * from "./f64";
 export * from "./integer";

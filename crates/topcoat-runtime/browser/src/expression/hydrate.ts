@@ -1,4 +1,5 @@
 import { Bool } from "../surrogate/bool";
+import { ElementRef } from "../surrogate/element-ref";
 import { F64 } from "../surrogate/f64";
 import { Integer, integerType } from "../surrogate/integer";
 import { Option } from "../surrogate/option";
@@ -32,6 +33,8 @@ export function hydrate(value: DehydratedSurrogate, cx: Context): unknown {
 				return new Tuple(value.map((item) => hydrate(item, cx)));
 			}
 			switch (value.t) {
+				case "ElementRef":
+					return new ElementRef(value.id, value.kind);
 				case "u8":
 				case "u16":
 				case "u32":

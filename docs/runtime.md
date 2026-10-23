@@ -124,6 +124,45 @@ For operations outside the expression vocabulary, use a JavaScript string litera
 
 Signals also have methods for common updates. For example, `$(|_e| count.increment())` adds one to a numeric signal.
 
+# Element references
+
+An [`ElementRef`] identifies an HTML element by its stable ID and expected native type. Create the ID with [`element_id`](../view/fn.element_id.html), then put it on the element:
+
+```rust
+# use topcoat::{Result, context::Cx, view::*};
+use topcoat::runtime::{ElementRef, InputElement, signal};
+
+# #[component]
+# async fn example(cx: &Cx) -> Result<impl View> {
+let input = ElementRef::<InputElement>::new(element_id(cx));
+let status = signal(cx, String::new);
+
+Ok(view! {
+    <input id=(input.id())>
+    <button @click=$(|_e| {
+        let result = input.resolve();
+        if result.is_ok() {
+            status.set("Input found".to_owned());
+        } else {
+            let error = result.unwrap_err();
+            status.set(if error.is_missing() {
+                "Input removed".to_owned()
+            } else {
+                "Wrong element type".to_owned()
+            });
+        }
+    })>"Check input"</button>
+    <p>$(status.get())</p>
+})
+# }
+```
+
+Use [`HtmlElement`] for any HTML element, [`InputElement`] for an input, and [`DialogElement`] for a dialog. `resolve()` looks up the current document each time. It returns a typed handle on success and an [`ElementRefError`] when the ID is missing or the element has the wrong type. The error exposes `is_missing()` and `is_wrong_type()` inside expressions.
+
+Resolve inside a browser event-handler closure. Evaluating resolution on the server panics. A reference captures only its ID and type. Resolved handles cannot be captured, stored in signals, or sent in requests. Resolve again after an `await` or a DOM update, since a previously resolved handle still refers to the node that call found. DOM changes do not trigger reactive evaluation.
+
+IDs must be unique in the document. Follow the [`element_id`](../view/fn.element_id.html) identity rules for keyed components and helpers. References use those same IDs across shard rerenders, live updates, and navigation. Removing an element makes the next resolution fail; inserting a matching replacement makes it resolve to the replacement. References do not keep removed nodes alive. Lookup covers the current document, not shadow roots or other frames.
+
 # Bind attributes
 
 An attribute starting with `:` is a **bind attribute**. The server renders its expression's initial value. The browser updates the attribute whenever a signal read by the expression changes:
@@ -297,6 +336,11 @@ A shard can also take a signal from its caller, through a parameter typed `Signa
 Use `.get_untracked()` or `.read_untracked()` to read a value on the server without making changes to it trigger another render.
 
 [`Event`]: struct.Event.html
+[`ElementRef`]: struct.ElementRef.html
+[`ElementRefError`]: struct.ElementRefError.html
+[`HtmlElement`]: struct.HtmlElement.html
+[`InputElement`]: struct.InputElement.html
+[`DialogElement`]: struct.DialogElement.html
 [`Expr::dynamic`]: struct.Expr.html#method.dynamic
 [`expr!`]: macro.expr.html
 [`signal`]: fn.signal.html

@@ -26,7 +26,14 @@ export interface SerializedSequence {
 	v: DehydratedSurrogate[];
 }
 
+export interface SerializedElementRef {
+	t: "ElementRef";
+	id: string;
+	kind: "html" | "input" | "dialog";
+}
+
 export type DehydratedSurrogate =
+	| SerializedElementRef
 	| SerializedInteger
 	| SerializedSequence
 	| DehydratedSurrogate[]

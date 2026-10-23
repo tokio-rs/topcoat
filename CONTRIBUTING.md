@@ -79,6 +79,8 @@ yarn test
 
 Commit the regenerated `dist/index.js` with the source changes. The runtime also builds `dist/coherence.js`, which must be committed when it changes.
 
+The runtime's native browser tests run separately in Chromium, Firefox, and WebKit. From `crates/topcoat-runtime/browser`, run `yarn playwright install --with-deps chromium firefox webkit` to install the browsers, then `yarn test:browser`. Unit tests exclude `*.browser.test.ts` files.
+
 The full check list, including when each command is needed, is in the [`check`](.agents/skills/check/SKILL.md) skill.
 
 ## Code and documentation style
