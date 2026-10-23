@@ -1,6 +1,6 @@
 # Admin Panel
 
-Backroom is a demo admin app for an online store. Staff can sign in, update orders, edit products, and view customer histories. The app uses Toasty with SQLite, session cookies for sign-in, and Topcoat UI components.
+Backroom is a demo admin app for an online store. Staff can sign in, update orders, edit products, and view customer histories. The app uses Toasty with SQLite, session cookies for sign-in, and Topcoat UI components. It is available in English and German.
 
 Clone the repository and start the app:
 
@@ -18,7 +18,9 @@ The dashboard's sales and visitor counts are simulated from the current time. Th
 
 | Path | Contents |
 | --- | --- |
-| [`src/app.rs`](src/app.rs) | Router setup and the shared HTML layout. |
+| [`src/app.rs`](src/app.rs) | Router setup, the shared HTML layout, and the layer that sets each request's language. |
+| [`src/app/_common.rs`](src/app/_common.rs) | Amounts, role names, and other text shared by several pages. |
+| [`src/app/language.rs`](src/app/language.rs) | Language menu and the route that saves the choice. |
 | [`src/app/login.rs`](src/app/login.rs) | Sign-in form and request handler. |
 | [`src/app/_admin.rs`](src/app/_admin.rs) | Sign-in check, sidebar, and breadcrumbs. |
 | [`src/app/_admin/_dashboard.rs`](src/app/_admin/_dashboard.rs) | Updating dashboard cards and orders awaiting action. |
@@ -28,10 +30,14 @@ The dashboard's sales and visitor counts are simulated from the current time. Th
 | [`src/app/_admin/products/product_id.rs`](src/app/_admin/products/product_id.rs) | Product editing and form errors. |
 | [`src/app/_admin/customers.rs`](src/app/_admin/customers.rs) | Customer search and spending totals. |
 | [`src/app/_admin/customers/customer_id.rs`](src/app/_admin/customers/customer_id.rs) | Customer details and past orders. |
-| [`src/features/`](src/features) | Database models, queries, validation, and simulated statistics. |
+| [`src/features/`](src/features) | Database models, queries, validation, simulated statistics, and the theme and language preferences. |
 | [`src/seed.rs`](src/seed.rs) | Sample accounts, products, customers, and orders. |
 | [`src/components/`](src/components) | Copies of registry components, plus custom charts and pagination. |
 | [`toasty/`](toasty) | Database migrations and schema snapshots. |
+
+## Translations
+
+Each page module keeps its [Fluent](https://projectfluent.org/) files in an `l10n/` directory next to it, such as `src/app/_admin/orders/l10n/`. To add a language, add a file next to each existing one and add its locale to `LOCALES` in [`src/features/locale.rs`](src/features/locale.rs). Run `cargo topcoat l10n check -p admin` from the repository root to find missing messages.
 
 ## Changing a model
 
