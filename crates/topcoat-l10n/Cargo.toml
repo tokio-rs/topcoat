@@ -17,6 +17,7 @@ fluent = [
 	"dep:icu_decimal",
 	"dep:icu_provider",
 	"dep:intl-memoizer",
+	"dep:inventory",
 	"dep:unic-langid",
 	"http",
 ]
@@ -39,6 +40,7 @@ icu_locale.workspace = true
 icu_locale_core = { workspace = true, features = ["alloc"] }
 icu_provider = { workspace = true, optional = true, features = ["sync"] }
 intl-memoizer = { workspace = true, optional = true }
+inventory = { workspace = true, optional = true }
 unic-langid = { workspace = true, optional = true }
 
 [dev-dependencies]

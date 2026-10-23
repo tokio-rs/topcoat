@@ -63,7 +63,7 @@ impl LocaleResources {
     ///
     /// Fails when a file cannot be read or has syntax errors, or when a message
     /// or term is defined more than once across the files.
-    pub fn read(files: LocaleFiles, span: Span) -> syn::Result<Self> {
+    pub fn read(files: &LocaleFiles, span: Span) -> syn::Result<Self> {
         let mut parsed = Vec::with_capacity(files.files.len());
         let mut errors = Vec::new();
         for path in &files.files {
@@ -77,7 +77,7 @@ impl LocaleResources {
         }
 
         let resources = Self {
-            locale: files.locale,
+            locale: files.locale.clone(),
             files: parsed,
         };
         match combine(resources.duplicate_errors(span)) {
@@ -161,7 +161,7 @@ mod tests {
             locale: LanguageIdentifier::UNKNOWN,
             files: paths,
         };
-        LocaleResources::read(files, Span::call_site())
+        LocaleResources::read(&files, Span::call_site())
     }
 
     fn message_ids(resources: &LocaleResources) -> Vec<String> {

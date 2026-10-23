@@ -5409,6 +5409,7 @@ dependencies = [
  "icu_locale_core",
  "icu_provider",
  "intl-memoizer",
+ "inventory",
  "tokio",
  "topcoat",
  "topcoat-core",

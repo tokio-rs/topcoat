@@ -1,44 +1,35 @@
-mod fallback;
 mod path;
 mod resource;
-mod signature;
 
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
     sync::atomic::{AtomicU64, Ordering},
 };
 
-pub use fallback::*;
-use icu_locale_core::LanguageIdentifier;
 pub use path::*;
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{ToTokens, format_ident, quote};
 pub use resource::*;
-pub use signature::*;
 use syn::{
-    Token, Visibility,
+    Visibility,
     parse::{Parse, ParseStream},
 };
 use topcoat_core_grammar::{
     ParseOption,
-    paths::{topcoat_l10n, topcoat_l10n_fluent_macro},
+    paths::{topcoat_inventory, topcoat_l10n, topcoat_l10n_fluent_macro},
 };
 
-/// The input of a `messages!` invocation: an optional visibility, an optional
-/// path of the Fluent files to load, and an optional fallback locale.
+/// The input of a `messages!` invocation: an optional visibility and an
+/// optional path of the Fluent files to load.
 ///
 /// ```text
-/// messages!(pub(crate) "./l10n/{locale}.ftl", fallback = "en")
+/// messages!(pub(crate) "./l10n/{locale}.ftl")
 /// ```
 pub struct Messages {
-    /// The visibility of the generated module.
+    /// The visibility of the generated `t!`.
     pub vis: Visibility,
     /// The path of the Fluent files, if written.
     pub path: Option<PathPattern>,
-    /// The comma after the path, if written.
-    pub comma_token: Option<Token![,]>,
-    /// The fallback locale, if written.
-    pub fallback: Option<MessagesFallback>,
 }
 
 impl Messages {
@@ -47,54 +38,6 @@ impl Messages {
     #[must_use]
     pub fn path(&self) -> PathPattern {
         self.path.clone().unwrap_or_default()
-    }
-
-    /// Returns the fallback locale among the `locales` that have files: the
-    /// written one, or the only locale when none is written.
-    ///
-    /// # Errors
-    ///
-    /// Fails when the written fallback has no files, or when none is written
-    /// and there is more than one locale.
-    pub fn fallback<'a>(&self, locales: &'a [LocaleFiles]) -> syn::Result<&'a LanguageIdentifier> {
-        let found = || {
-            locales
-                .iter()
-                .map(|files| format!("`{}`", files.locale))
-                .collect::<Vec<_>>()
-                .join(", ")
-        };
-        match &self.fallback {
-            Some(fallback) => {
-                let locale = fallback.locale();
-                locales
-                    .iter()
-                    .map(|files| &files.locale)
-                    .find(|candidate| **candidate == locale)
-                    .ok_or_else(|| {
-                        syn::Error::new(
-                            fallback.locale.span(),
-                            format!(
-                                "the fallback locale `{locale}` has no Fluent files; found {}",
-                                found()
-                            ),
-                        )
-                    })
-            }
-            None => match locales {
-                [only] => Ok(&only.locale),
-                _ => Err(syn::Error::new(
-                    self.path
-                        .as_ref()
-                        .map_or_else(Span::call_site, |path| path.lit.span()),
-                    format!(
-                        "add `fallback = \"...\"` to choose the locale of messages that other \
-                         locales lack; found {}",
-                        found()
-                    ),
-                )),
-            },
-        }
     }
 
     /// Returns the name of the hidden `macro_rules!` macro behind `t!`.
@@ -126,10 +69,9 @@ impl Messages {
         format_ident!("__topcoat_l10n_t_{:016x}", hasher.finish())
     }
 
-    /// Generates `t!`: the hidden macro and a `use` that names it `t` with
-    /// the visibility of the invocation.
-    fn t_macro(&self, call_site: &CallSite) -> TokenStream {
-        let name = self.macro_name(call_site);
+    /// Generates `t!`: the hidden macro `name` and a `use` that names it `t`
+    /// with the visibility of the invocation.
+    fn t_macro(&self, name: &Ident) -> TokenStream {
         let vis = &self.vis;
         // Other crates can only call an exported macro, which is placed at the
         // root of the crate, so only a `pub` invocation exports it.
@@ -148,11 +90,36 @@ impl Messages {
         }
     }
 
-    /// Generates `t!` and the `msg` module for the files matched by the path
+    /// Generates the registration of the namespace `name` with the files of
+    /// `locales`.
+    ///
+    /// Including the files also makes the compiler rebuild the crate when one
+    /// of them changes.
+    fn register(name: &Ident, locales: &[LocaleFiles]) -> TokenStream {
+        let id = name.to_string();
+        let locales = locales.iter().map(|files| {
+            let locale = files.locale.to_string();
+            let sources = files.files.iter().map(|file| file.to_string_lossy());
+            quote! {
+                #topcoat_l10n::NamespaceLocale::new(
+                    #locale,
+                    &[#(::core::include_str!(#sources)),*],
+                )
+            }
+        });
+        quote! {
+            #topcoat_inventory::submit! {
+                #topcoat_l10n::Namespace::new(#id, &[#(#locales),*])
+            }
+        }
+    }
+
+    /// Generates `t!` and the registration of the files matched by the path
     /// from `call_site`, or compile errors if they cannot be found or parsed.
     #[must_use]
     pub fn expand(&self, call_site: &CallSite) -> TokenStream {
-        let t = self.t_macro(call_site);
+        let name = self.macro_name(call_site);
+        let t = self.t_macro(&name);
         let path = self.path();
         let locales = match path.resolve(call_site) {
             Ok(locales) => locales,
@@ -165,92 +132,22 @@ impl Messages {
             }
         };
 
-        let mut errors = Vec::new();
-        let catalog = match self.fallback(&locales) {
-            Ok(fallback) => Some(Self::catalog(fallback, &locales)),
-            Err(err) => {
-                errors.push(err.to_compile_error());
-                None
-            }
-        };
-
-        // Including the files makes the compiler rebuild the crate when one of
-        // them changes. The catalog includes them, so they are only included
-        // on their own when there is no catalog because of an error.
-        let files = locales
-            .iter()
-            .flat_map(|locale| &locale.files)
-            .map(|file| file.to_string_lossy());
-        let tracked = quote! {
-            #(const _: &str = ::core::include_str!(#files);)*
-        };
-
+        // The files are parsed only to report their errors at compile time.
         let span = path.lit.span();
-        let mut resources = Vec::with_capacity(locales.len());
-        for files in locales {
-            match LocaleResources::read(files, span) {
-                Ok(locale) => resources.push(locale),
-                Err(err) => errors.push(err.to_compile_error()),
-            }
-        }
-
-        let signatures = MessageSignature::collect(&resources);
-        let messages = match MessageSignature::expand_all(&signatures, span) {
-            Ok(messages) => Some(messages),
-            Err(err) => {
-                errors.push(err.to_compile_error());
-                None
-            }
-        };
-
-        let body = match (catalog, messages) {
-            (Some(catalog), Some(messages)) if errors.is_empty() => quote! {
-                #catalog
-                #messages
-            },
-            _ => tracked,
-        };
-        let vis = &self.vis;
+        let errors = locales
+            .iter()
+            .filter_map(|files| LocaleResources::read(files, span).err())
+            .map(|err| err.to_compile_error());
+        let register = Self::register(&name, &locales);
         quote! {
             #t
-            // Fluent names are often not snake case, such as `loginInput`.
-            #[allow(non_snake_case)]
-            #vis mod msg {
-                #body
-            }
+            #register
             #(#errors)*
-        }
-    }
-
-    /// Generates the `CATALOG` static, which loads the files of `locales` and
-    /// takes missing messages from `fallback`.
-    fn catalog(fallback: &LanguageIdentifier, locales: &[LocaleFiles]) -> TokenStream {
-        let new_locale = |locale: &LanguageIdentifier| {
-            let locale = locale.to_string();
-            quote! {
-                #topcoat_l10n::Locale::try_from_str(#locale)
-                    .expect("the locale is validated by `messages!`")
-            }
-        };
-        let fallback = new_locale(fallback);
-        let entries = locales.iter().map(|files| {
-            let locale = new_locale(&files.locale);
-            let sources = files.files.iter().map(|file| file.to_string_lossy());
-            quote! {
-                (#locale, &[#(::core::include_str!(#sources)),*][..])
-            }
-        });
-        quote! {
-            /// The translations of the messages in this module.
-            pub static CATALOG: ::std::sync::LazyLock<#topcoat_l10n::Catalog> =
-                ::std::sync::LazyLock::new(|| {
-                    #topcoat_l10n::Catalog::new(#fallback, [#(#entries),*])
-                });
         }
     }
 }
 
-/// Expands to the `msg` module, with the files found from the
+/// Expands to `t!` and the registration of the files found from the
 /// [call site](CallSite::current) of the invocation being expanded.
 impl ToTokens for Messages {
     fn to_tokens(&self, tokens: &mut TokenStream) {
@@ -263,23 +160,9 @@ impl ToTokens for Messages {
 
 impl Parse for Messages {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let vis = input.parse()?;
-        let path = input.call(PathPattern::parse_option)?;
-        // A written path is separated from the fallback by a comma.
-        let comma_token = match path {
-            Some(_) => input.parse()?,
-            None => None,
-        };
-        let fallback = if path.is_none() || comma_token.is_some() {
-            input.call(MessagesFallback::parse_option)?
-        } else {
-            None
-        };
         Ok(Self {
-            vis,
-            path,
-            comma_token,
-            fallback,
+            vis: input.parse()?,
+            path: input.call(PathPattern::parse_option)?,
         })
     }
 }
@@ -317,70 +200,7 @@ mod tests {
     #[test]
     fn rejects_trailing_input() {
         assert!(parse(r#""./l10n/{locale}.ftl" "./other/{locale}.ftl""#).is_err());
-    }
-
-    #[test]
-    fn parses_a_fallback_after_the_path() {
-        let messages = parse(r#"pub "./l10n/{locale}.ftl", fallback = "de""#).unwrap();
-        assert!(messages.path.is_some());
-        assert!(messages.fallback.is_some());
-    }
-
-    #[test]
-    fn parses_a_fallback_without_a_path() {
-        let messages = parse(r#"pub fallback = "de""#).unwrap();
-        assert!(matches!(messages.vis, Visibility::Public(_)));
-        assert!(messages.path.is_none());
-        assert!(messages.fallback.is_some());
-    }
-
-    #[test]
-    fn accepts_a_trailing_comma_after_the_path() {
-        let messages = parse(r#""./l10n/{locale}.ftl","#).unwrap();
-        assert!(messages.fallback.is_none());
-    }
-
-    #[test]
-    fn rejects_a_fallback_without_a_comma_after_the_path() {
-        assert!(parse(r#""./l10n/{locale}.ftl" fallback = "de""#).is_err());
-    }
-
-    fn locales(locales: &[&str]) -> Vec<LocaleFiles> {
-        locales
-            .iter()
-            .map(|locale| LocaleFiles {
-                locale: LanguageIdentifier::try_from_str(locale).unwrap(),
-                files: Vec::new(),
-            })
-            .collect()
-    }
-
-    #[test]
-    fn uses_the_written_fallback() {
-        let messages = parse(r#"fallback = "de""#).unwrap();
-        let locales = locales(&["de", "en"]);
-        let fallback = messages.fallback(&locales).unwrap();
-        assert_eq!(fallback.to_string(), "de");
-    }
-
-    #[test]
-    fn rejects_a_fallback_without_files() {
-        let messages = parse(r#"fallback = "fr""#).unwrap();
-        assert!(messages.fallback(&locales(&["de", "en"])).is_err());
-    }
-
-    #[test]
-    fn falls_back_to_the_only_locale() {
-        let messages = parse("").unwrap();
-        let locales = locales(&["en"]);
-        let fallback = messages.fallback(&locales).unwrap();
-        assert_eq!(fallback.to_string(), "en");
-    }
-
-    #[test]
-    fn requires_a_fallback_for_several_locales() {
-        let messages = parse("").unwrap();
-        assert!(messages.fallback(&locales(&["de", "en"])).is_err());
+        assert!(parse(r#""./l10n/{locale}.ftl", fallback = "de""#).is_err());
     }
 
     fn call_site(source_file: Option<&str>) -> CallSite {
