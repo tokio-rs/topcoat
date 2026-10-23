@@ -1,6 +1,6 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, fmt::Write};
 
-use fluent_bundle::FluentArgs;
+use fluent_bundle::{FluentArgs, FluentValue};
 use topcoat_core::context::Cx;
 #[cfg(feature = "view")]
 use topcoat_view::{AttributeValueViewParts, NodeViewParts, PartsWriter};
@@ -39,20 +39,48 @@ impl<'a> Translation<'a> {
     }
 
     /// Resolves the translation into its text for the [locale](try_locale) of
-    /// `cx`, as described in [`Catalog::format`]. When `cx` has no locale, the
-    /// result is the message ID.
+    /// `cx`, as described in [`Catalog::format`].
+    ///
+    /// When `cx` has no locale, or the catalog has no text for it, the result
+    /// is a placeholder made of the key and the arguments, such as
+    /// `password-field.placeholder(min = 8)`. String arguments are quoted, and
+    /// numbers are shown without formatting.
     ///
     /// The text is borrowed from the catalog when the message has nothing to
     /// format, such as a message without variables.
     #[must_use]
     pub fn resolve(&self, cx: &Cx) -> Cow<'static, str> {
-        // TODO: Render the placeholder `key.attr(args)` instead of the ID.
-        match try_locale(cx) {
-            Some(locale) => self
-                .catalog
-                .format(locale, self.id, self.attribute, Some(&self.args)),
-            None => Cow::Borrowed(self.id),
+        try_locale(cx)
+            .and_then(|locale| {
+                self.catalog
+                    .format(locale, self.id, self.attribute, Some(&self.args))
+            })
+            .unwrap_or_else(|| Cow::Owned(self.placeholder()))
+    }
+
+    /// Returns the key and the arguments of the translation, which stand in
+    /// for a missing message.
+    fn placeholder(&self) -> String {
+        let mut text = String::from(self.id);
+        if let Some(attribute) = self.attribute {
+            text.push('.');
+            text.push_str(attribute);
         }
+        // The arguments are sorted by name.
+        for (index, (name, value)) in self.args.iter().enumerate() {
+            text.push_str(if index == 0 { "(" } else { ", " });
+            text.push_str(name);
+            text.push_str(" = ");
+            let _ = match value {
+                FluentValue::String(value) => write!(text, "{value:?}"),
+                FluentValue::Number(number) => write!(text, "{}", number.value),
+                value => write!(text, "{value:?}"),
+            };
+        }
+        if self.args.iter().next().is_some() {
+            text.push(')');
+        }
+        text
     }
 
     /// Appends the resolved text to the view being built, escaped.
@@ -139,7 +167,7 @@ greeting = Hallo, { $name }!
     }
 
     #[test]
-    fn a_locale_the_catalog_lacks_resolves_to_the_id_instead_of_using_the_header() {
+    fn a_locale_the_catalog_lacks_resolves_to_the_placeholder_instead_of_using_the_header() {
         // The page is in French, so the German the header asks for would be
         // out of place.
         let cx = request("de").with(locale!("fr"));
@@ -147,9 +175,22 @@ greeting = Hallo, { $name }!
     }
 
     #[test]
-    fn resolves_to_the_id_without_a_locale() {
+    fn resolves_to_the_placeholder_without_a_locale() {
         let cx = request("de");
         assert_eq!(title().resolve(&cx), "title");
+    }
+
+    #[test]
+    fn the_placeholder_shows_the_key_and_the_arguments_sorted_by_name() {
+        let mut args = FluentArgs::new();
+        args.set("name", "Ada");
+        args.set("count", 8);
+        let missing = Translation::new(&CATALOG, "missing", Some("label"), args);
+        let cx = Cx::default().with(locale!("en"));
+        assert_eq!(
+            missing.resolve(&cx),
+            r#"missing.label(count = 8, name = "Ada")"#
+        );
     }
 
     #[test]

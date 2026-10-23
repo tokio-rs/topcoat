@@ -81,20 +81,18 @@ impl Catalog {
     /// Formats a message, or one of its attributes, with `args`.
     ///
     /// The message is taken from the locale that serves `locale`, as chosen by
-    /// [`lookup`](crate::lookup). When no locale serves it, or that locale
-    /// lacks the message, the result is `id`.
+    /// [`lookup`](crate::lookup). Returns `None` when no locale serves it, or
+    /// when that locale lacks the message.
     #[must_use]
-    pub fn format<'a>(
-        &'a self,
+    pub fn format(
+        &self,
         locale: &Locale,
-        id: &'a str,
+        id: &str,
         attribute: Option<&str>,
         args: Option<&FluentArgs<'_>>,
-    ) -> Cow<'a, str> {
-        // TODO: Render the placeholder `key.attr(args)` instead of `id`.
-        lookup_index(locale, &self.normalized)
-            .and_then(|index| self.bundles[index].format(id, attribute, args))
-            .unwrap_or(Cow::Borrowed(id))
+    ) -> Option<Cow<'_, str>> {
+        let index = lookup_index(locale, &self.normalized)?;
+        self.bundles[index].format(id, attribute, args)
     }
 }
 
@@ -203,44 +201,47 @@ login-input = Anmelden
     fn formats_in_the_locale_that_serves_the_requested_one() {
         let catalog = catalog();
         assert_eq!(
-            catalog.format(&locale!("de-AT"), "title", None, None),
-            "Willkommen"
+            catalog
+                .format(&locale!("de-AT"), "title", None, None)
+                .as_deref(),
+            Some("Willkommen")
         );
         assert_eq!(
-            catalog.format(&locale!("en-US"), "title", None, None),
-            "Welcome"
+            catalog
+                .format(&locale!("en-US"), "title", None, None)
+                .as_deref(),
+            Some("Welcome")
         );
     }
 
     #[test]
-    fn returns_the_id_when_no_locale_serves_the_requested_one() {
+    fn returns_none_when_no_locale_serves_the_requested_one() {
         let catalog = catalog();
-        assert_eq!(catalog.format(&locale!("ja"), "title", None, None), "title");
+        assert_eq!(catalog.format(&locale!("ja"), "title", None, None), None);
     }
 
     #[test]
-    fn returns_the_id_of_a_message_the_locale_lacks() {
+    fn returns_none_for_a_message_the_locale_lacks() {
         let catalog = catalog();
         assert_eq!(
             catalog.format(&locale!("de"), "only-english", None, None),
-            "only-english"
+            None
         );
         assert_eq!(
             catalog.format(&locale!("de"), "login-input", Some("placeholder"), None),
-            "login-input"
+            None
         );
-        assert_eq!(
-            catalog.format(&locale!("de"), "missing", None, None),
-            "missing"
-        );
+        assert_eq!(catalog.format(&locale!("de"), "missing", None, None), None);
     }
 
     #[test]
     fn formats_attributes() {
         let catalog = catalog();
         assert_eq!(
-            catalog.format(&locale!("en"), "login-input", Some("placeholder"), None),
-            "Your name"
+            catalog
+                .format(&locale!("en"), "login-input", Some("placeholder"), None)
+                .as_deref(),
+            Some("Your name")
         );
     }
 
@@ -248,23 +249,33 @@ login-input = Anmelden
     fn formats_arguments_for_the_locale() {
         let catalog = catalog();
         let args = count(1234.0);
-        let text = catalog.format(&locale!("de"), "items", None, Some(&args));
+        let text = catalog
+            .format(&locale!("de"), "items", None, Some(&args))
+            .expect("German has the message");
         assert!(
             text.contains("1.234") && text.ends_with(" Artikel"),
             "{text}"
         );
         let args = count(1.0);
         assert_eq!(
-            catalog.format(&locale!("de"), "items", None, Some(&args)),
-            "Ein Artikel"
+            catalog
+                .format(&locale!("de"), "items", None, Some(&args))
+                .as_deref(),
+            Some("Ein Artikel")
         );
     }
 
     #[test]
     fn combines_the_sources_of_a_locale() {
         let catalog = Catalog::new([(locale!("en"), &["a = A\n", "b = B\n"][..])]);
-        assert_eq!(catalog.format(&locale!("en"), "a", None, None), "A");
-        assert_eq!(catalog.format(&locale!("en"), "b", None, None), "B");
+        assert_eq!(
+            catalog.format(&locale!("en"), "a", None, None).as_deref(),
+            Some("A")
+        );
+        assert_eq!(
+            catalog.format(&locale!("en"), "b", None, None).as_deref(),
+            Some("B")
+        );
     }
 
     #[test]
@@ -274,17 +285,23 @@ login-input = Anmelden
             (locale!("de-CH"), &["title = Gruezi\n"][..]),
         ]);
         assert_eq!(
-            catalog.format(&locale!("de-CH"), "title", None, None),
-            "Gruezi"
+            catalog
+                .format(&locale!("de-CH"), "title", None, None)
+                .as_deref(),
+            Some("Gruezi")
         );
         assert_eq!(
-            catalog.format(&locale!("de-CH"), "login-input", None, None),
-            "Anmelden"
+            catalog
+                .format(&locale!("de-CH"), "login-input", None, None)
+                .as_deref(),
+            Some("Anmelden")
         );
         // The parent keeps its own messages.
         assert_eq!(
-            catalog.format(&locale!("de"), "title", None, None),
-            "Willkommen"
+            catalog
+                .format(&locale!("de"), "title", None, None)
+                .as_deref(),
+            Some("Willkommen")
         );
     }
 
@@ -296,8 +313,10 @@ login-input = Anmelden
             (locale!("en-US"), &["title = Welcome\n"][..]),
         ]);
         assert_eq!(
-            catalog.format(&locale!("en-US"), "color", None, None),
-            "Color"
+            catalog
+                .format(&locale!("en-US"), "color", None, None)
+                .as_deref(),
+            Some("Color")
         );
     }
 
@@ -310,8 +329,10 @@ login-input = Anmelden
             (locale!("en-AU"), &["title = Welcome\n"][..]),
         ]);
         assert_eq!(
-            catalog.format(&locale!("en-AU"), "color", None, None),
-            "Colour"
+            catalog
+                .format(&locale!("en-AU"), "color", None, None)
+                .as_deref(),
+            Some("Colour")
         );
     }
 
