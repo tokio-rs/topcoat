@@ -1,16 +1,13 @@
 mod resolve;
 
-use proc_macro2::Span;
 pub use resolve::*;
 use syn::{
     LitStr,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::ParseOption;
 
 const PLACEHOLDER: &str = "{locale}";
 const MODULE: &str = "{mod}";
-const DEFAULT: &str = "{mod}/l10n/{locale}.ftl";
 
 /// A path to Fluent files with a `{locale}` placeholder, such as
 /// `"./l10n/{locale}.ftl"` or `"./**/l10n/{locale}/**/*.ftl"`.
@@ -62,21 +59,6 @@ impl PathPattern {
                 _ => PathComponent::parse(component),
             })
             .collect()
-    }
-}
-
-/// The default path, `"{mod}/l10n/{locale}.ftl"`.
-impl Default for PathPattern {
-    fn default() -> Self {
-        Self {
-            lit: LitStr::new(DEFAULT, Span::call_site()),
-        }
-    }
-}
-
-impl ParseOption for PathPattern {
-    fn peek(input: ParseStream) -> bool {
-        input.peek(LitStr)
     }
 }
 
@@ -188,15 +170,6 @@ mod tests {
                 PathComponent::Recursive,
                 PathComponent::Wildcard("*.ftl".to_owned()),
             ]
-        );
-    }
-
-    #[test]
-    fn default_is_a_valid_pattern() {
-        // `components` panics on an invalid pattern.
-        assert_eq!(
-            PathPattern::default().components().first(),
-            Some(&PathComponent::Module)
         );
     }
 

@@ -14,13 +14,10 @@ use syn::{
     Visibility,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::{
-    ParseOption,
-    paths::{topcoat_inventory, topcoat_l10n, topcoat_l10n_fluent_macro},
-};
+use topcoat_core_grammar::paths::{topcoat_inventory, topcoat_l10n, topcoat_l10n_fluent_macro};
 
-/// The input of a `messages!` invocation: an optional visibility and an
-/// optional path of the Fluent files to load.
+/// The input of a `messages!` invocation: an optional visibility and the path
+/// of the Fluent files to load.
 ///
 /// ```text
 /// messages!(pub(crate) "./l10n/{locale}.ftl")
@@ -28,18 +25,11 @@ use topcoat_core_grammar::{
 pub struct Messages {
     /// The visibility of the generated `t!`.
     pub vis: Visibility,
-    /// The path of the Fluent files, if written.
-    pub path: Option<PathPattern>,
+    /// The path of the Fluent files.
+    pub path: PathPattern,
 }
 
 impl Messages {
-    /// Returns the path of the Fluent files, or the
-    /// [default path](PathPattern::default) when none is written.
-    #[must_use]
-    pub fn path(&self) -> PathPattern {
-        self.path.clone().unwrap_or_default()
-    }
-
     /// Returns the name of the hidden `macro_rules!` macro behind `t!`.
     ///
     /// The name contains a hash of the location and the input of the
@@ -62,7 +52,7 @@ impl Messages {
             start.line,
             start.column,
             self.vis.to_token_stream().to_string(),
-            self.path().lit.value(),
+            self.path.lit.value(),
             counter,
         )
             .hash(&mut hasher);
@@ -120,7 +110,7 @@ impl Messages {
     pub fn expand(&self, call_site: &CallSite) -> TokenStream {
         let name = self.macro_name(call_site);
         let t = self.t_macro(&name);
-        let path = self.path();
+        let path = &self.path;
         let locales = match path.resolve(call_site) {
             Ok(locales) => locales,
             Err(err) => {
@@ -162,7 +152,7 @@ impl Parse for Messages {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
             vis: input.parse()?,
-            path: input.call(PathPattern::parse_option)?,
+            path: input.parse()?,
         })
     }
 }
@@ -180,21 +170,19 @@ mod tests {
     }
 
     #[test]
-    fn uses_the_default_path_when_none_is_written() {
-        let messages = parse("pub(crate)").unwrap();
+    fn parses_the_visibility_and_the_path() {
+        let messages = parse(r#"pub(crate) "./l10n/{locale}.ftl""#).unwrap();
         assert!(matches!(messages.vis, Visibility::Restricted(_)));
-        assert_eq!(
-            messages.path().lit.value(),
-            PathPattern::default().lit.value()
-        );
-        assert!(parse("").is_ok());
+        assert_eq!(messages.path.lit.value(), "./l10n/{locale}.ftl");
+
+        let messages = parse(r#""./l10n/{locale}.ftl""#).unwrap();
+        assert!(matches!(messages.vis, Visibility::Inherited));
     }
 
     #[test]
-    fn uses_the_written_path() {
-        let messages = parse(r#""./l10n/{locale}.ftl""#).unwrap();
-        assert!(matches!(messages.vis, Visibility::Inherited));
-        assert_eq!(messages.path().lit.value(), "./l10n/{locale}.ftl");
+    fn requires_a_path() {
+        assert!(parse("").is_err());
+        assert!(parse("pub(crate)").is_err());
     }
 
     #[test]
@@ -219,8 +207,12 @@ mod tests {
     fn the_macro_name_depends_on_the_file_and_the_input() {
         let name = |file, input| parse(input).unwrap().macro_name(&call_site(Some(file)));
         let lib = "/app/src/lib.rs";
-        assert_ne!(name(lib, "pub"), name("/app/src/admin.rs", "pub"));
-        assert_ne!(name(lib, "pub"), name(lib, "pub(crate)"));
+        let path = r#""./l10n/{locale}.ftl""#;
+        assert_ne!(name(lib, path), name("/app/src/admin.rs", path));
+        assert_ne!(
+            name(lib, r#"pub "./l10n/{locale}.ftl""#),
+            name(lib, r#"pub(crate) "./l10n/{locale}.ftl""#)
+        );
         assert_ne!(
             name(lib, r#""./a/{locale}.ftl""#),
             name(lib, r#""./b/{locale}.ftl""#)
@@ -230,7 +222,11 @@ mod tests {
     #[test]
     fn invocations_without_a_file_get_different_macro_names() {
         let call_site = call_site(None);
-        let name = || parse("pub").unwrap().macro_name(&call_site);
+        let name = || {
+            parse(r#"pub "./l10n/{locale}.ftl""#)
+                .unwrap()
+                .macro_name(&call_site)
+        };
         assert_ne!(name(), name());
     }
 }

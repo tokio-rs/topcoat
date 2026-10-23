@@ -1,5 +1,5 @@
 title = Welcome
-greeting = Hello, { $user-name }!
+greeting = Hello, { $name }!
 items = { $count ->
     [one] One item
    *[other] { $count } items
