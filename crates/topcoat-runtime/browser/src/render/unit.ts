@@ -211,6 +211,23 @@ export abstract class RenderUnit implements ConnectionTarget {
 	}
 
 	/**
+	 * Schedules a correction when newly hydrated content used older signal
+	 * values. Only server dependencies and shard inputs need a new render.
+	 * Returns whether this unit's render will cover its descendants too.
+	 */
+	refreshIfChanged(signals: ReadonlySet<SignalId>): boolean {
+		if (this.watch === null) return false;
+		for (const id of signals) {
+			const signal = this.runtime.registry.get(id);
+			if (signal !== undefined && this.watch.dependsOn(signal)) {
+				this.watch.schedule();
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * Re-runs this unit immediately with its current inputs.
 	 *
 	 * Content that needs a connection re-runs over the document's connection

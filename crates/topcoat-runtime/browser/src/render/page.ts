@@ -68,6 +68,7 @@ export class PageUnit extends RenderUnit {
 		const active = document.activeElement;
 		if (active instanceof HTMLElement) active.blur();
 		this.replace((scope, adoptable) => {
+			replaceDocumentComments(next);
 			const root = document.documentElement;
 			const fresh = next.documentElement;
 			for (const attr of Array.from(root.attributes)) {
@@ -124,6 +125,23 @@ export class PageUnit extends RenderUnit {
 		// The whole document, so declarations outside the body are adopted
 		// again.
 		this.runtime.hydrate(document, null, null, scope, adoptable);
+	}
+}
+
+/** Replaces markers outside html while keeping the document element and doctype. */
+function replaceDocumentComments(next: Document): void {
+	for (const node of Array.from(document.childNodes)) {
+		if (node.nodeType === Node.COMMENT_NODE) node.remove();
+	}
+	let before: ChildNode | null = document.doctype ?? document.documentElement;
+	for (const node of Array.from(next.childNodes)) {
+		if (node === next.doctype) {
+			before = document.documentElement;
+		} else if (node === next.documentElement) {
+			before = null;
+		} else if (node.nodeType === Node.COMMENT_NODE) {
+			document.insertBefore(node, before);
+		}
 	}
 }
 

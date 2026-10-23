@@ -1,5 +1,6 @@
 let activeEffect: Effect | null = null;
 const pending = new Set<Effect>();
+const subscriptions = new WeakMap<WriteSignal<unknown>, Set<Effect>>();
 let scheduled = false;
 let flushing = false;
 
@@ -27,6 +28,7 @@ export function signal<T>(initial: T): WriteSignal<T> {
 		}
 		return value;
 	};
+	subscriptions.set(read, subscribers);
 	return read;
 }
 
@@ -57,6 +59,11 @@ export class Effect {
 		if (this.disposed) return;
 		subscribers.add(this);
 		this.dependencies.add(subscribers);
+	}
+
+	/** Whether the last run subscribed to changes of this signal. */
+	dependsOn(signal: WriteSignal<unknown>): boolean {
+		return subscriptions.get(signal)?.has(this) ?? false;
 	}
 
 	schedule(): void {
