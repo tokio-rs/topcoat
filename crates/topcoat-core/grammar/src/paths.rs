@@ -189,6 +189,11 @@ pub const topcoat_icon: Crate = Crate::new("icon", "topcoat-icon", "");
 #[allow(non_upper_case_globals)]
 pub const topcoat_l10n: Crate = Crate::new("l10n", "topcoat-l10n", "");
 
+/// The Fluent macros: `::topcoat::l10n::fluent`, or `topcoat_l10n_macro`
+/// standalone.
+#[allow(non_upper_case_globals)]
+pub const topcoat_l10n_fluent_macro: Crate = Crate::new("l10n::fluent", "topcoat-l10n-macro", "");
+
 /// `::topcoat::mail`, or `topcoat_mail` standalone.
 #[allow(non_upper_case_globals)]
 pub const topcoat_mail: Crate = Crate::new("mail", "topcoat-mail", "");

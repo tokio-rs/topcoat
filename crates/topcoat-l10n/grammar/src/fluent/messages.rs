@@ -19,7 +19,10 @@ use syn::{
     Token, Visibility,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::{ParseOption, paths::topcoat_l10n};
+use topcoat_core_grammar::{
+    ParseOption,
+    paths::{topcoat_l10n, topcoat_l10n_fluent_macro},
+};
 
 /// The input of a `messages!` invocation: an optional visibility, an optional
 /// path of the Fluent files to load, and an optional fallback locale.
@@ -131,14 +134,13 @@ impl Messages {
         // Other crates can only call an exported macro, which is placed at the
         // root of the crate, so only a `pub` invocation exports it.
         let export = matches!(vis, Visibility::Public(_)).then(|| quote! { #[macro_export] });
-        // TODO: Forward the input to the `t` proc macro with the namespace ID.
         quote! {
             #[doc(hidden)]
             #export
             #[allow(unused_macros)]
             macro_rules! #name {
                 ($($input:tt)*) => {
-                    ::core::compile_error!("`t!` cannot be expanded yet")
+                    #topcoat_l10n_fluent_macro::__t!(#name; $($input)*)
                 };
             }
             #[allow(unused_imports)]
