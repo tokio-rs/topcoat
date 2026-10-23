@@ -14,3 +14,7 @@ node_modules
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Browser test failure artifacts
+.vitest-attachments/
+tests/browser/__screenshots__/

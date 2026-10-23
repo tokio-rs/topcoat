@@ -3,6 +3,7 @@ import { expect, it } from "vitest";
 import { Effect, flushEffects, signal } from "../reactivity";
 import { Bool } from "./bool";
 import { F64 } from "./f64";
+import { Integer, integerType } from "./integer";
 import { WriteSignal } from "./signal";
 import { String as RuntimeString, Str } from "./string";
 
@@ -79,5 +80,98 @@ it("each write notifies subscribers exactly once", () => {
 		expect(runs).toBe(3);
 	} finally {
 		effect.dispose();
+	}
+});
+
+it("aliases share one u64 revision without changing serialization or reads", () => {
+	const inner = signal(new Bool(false));
+	const first = new WriteSignal("same", inner);
+	const second = new WriteSignal("same", inner);
+	const independent = write(new Bool(false));
+	const before = first.write_revision();
+	first.set(new Bool(false));
+	second.read().deref_mut();
+	first.get();
+	first.read();
+	expect(first.dehydrate()).toEqual({ t: "Signal", id: "same", v: false });
+	expect(before.dehydrate()).toEqual({ t: "u64", bits: 64, v: "0" });
+	expect(second.write_revision().dehydrate()).toEqual({
+		t: "u64",
+		bits: 64,
+		v: "2",
+	});
+	expect(independent.write_revision().dehydrate()).toEqual({
+		t: "u64",
+		bits: 64,
+		v: "0",
+	});
+});
+
+it("every surrogate mutation commits once, including no-op writes through Ref", () => {
+	const bool = write(new Bool(false));
+	const number = write(new F64(0));
+	const integer = write(new Integer(0n, integerType("u64", 64)));
+	const text = write(new RuntimeString(""));
+	for (const [s, mutate] of [
+		[bool, () => bool.toggle()],
+		[number, () => number.increment()],
+		[number, () => number.decrement()],
+		[integer, () => integer.increment()],
+		[integer, () => integer.decrement()],
+		[text, () => text.push_str(new Str(""))],
+		[text, () => text.push_str(new Str("hello"))],
+		[text, () => text.read().deref_mut()],
+	] as const) {
+		const before = s.write_revision();
+		mutate();
+		expect(s.write_revision().eq(before.increment()).dehydrate()).toBe(true);
+	}
+});
+
+it("failed mutation helpers do not commit or schedule revision subscribers", () => {
+	const s = write(new Integer(0n, integerType("u8", 8)));
+	const revisions: string[] = [];
+	const effect = new Effect(() =>
+		revisions.push(s.write_revision().toString()),
+	);
+	try {
+		effect.run();
+		expect(() => s.decrement()).toThrow();
+		flushEffects();
+		expect(revisions).toEqual(["0"]);
+		expect(s.get().toString()).toBe("0");
+		s.increment();
+		flushEffects();
+		expect(revisions).toEqual(["0", "1"]);
+	} finally {
+		effect.dispose();
+	}
+});
+
+it("same-surrogate writes notify only revisions while equal new surrogates keep value notifications", () => {
+	const initial = new Bool(false);
+	const s = write(initial);
+	let valueRuns = 0;
+	const seen: string[] = [];
+	const valueEffect = new Effect(() => {
+		s.read().deref();
+		valueRuns += 1;
+	});
+	const revisionEffect = new Effect(() =>
+		seen.push(s.write_revision().toString()),
+	);
+	try {
+		valueEffect.run();
+		revisionEffect.run();
+		s.set(initial);
+		flushEffects();
+		expect(valueRuns).toBe(1);
+		s.set(new Bool(false));
+		flushEffects();
+		expect(valueRuns).toBe(2);
+		expect(seen).toEqual(["0", "1", "2"]);
+	} finally {
+		valueEffect.dispose();
+		revisionEffect.dispose();
 	}
 });

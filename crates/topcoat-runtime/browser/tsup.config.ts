@@ -1,6 +1,7 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
+	define: { "import.meta.vitest": "undefined" },
 	entry: ["src/index.ts"],
 	format: ["esm"],
 
