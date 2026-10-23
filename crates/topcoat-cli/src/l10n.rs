@@ -1,5 +1,6 @@
 mod check;
 
+pub(crate) use check::relative_location;
 use clap::{Args, Subcommand};
 
 #[derive(Args)]

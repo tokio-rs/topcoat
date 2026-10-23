@@ -54,12 +54,7 @@ fn print_namespace(namespace: &NamespaceCheck) {
     println!(
         "{} {}",
         style(format!("messages!({:?})", namespace.pattern)).bold(),
-        style(format!(
-            "at {}:{}",
-            relative(&namespace.source_file).display(),
-            namespace.line
-        ))
-        .dim(),
+        style(format!("at {}", relative_location(&namespace.location))).dim(),
     );
     let width = namespace
         .coverage
@@ -100,7 +95,7 @@ fn print_namespace(namespace: &NamespaceCheck) {
 }
 
 /// Returns `location` with its file relative to the current directory.
-fn relative_location(location: &Location) -> Location {
+pub(crate) fn relative_location(location: &Location) -> Location {
     Location {
         file: relative(&location.file),
         ..location.clone()

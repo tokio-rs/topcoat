@@ -115,7 +115,9 @@ impl Messages {
             .source_file()
             .map(Path::to_string_lossy)
             .unwrap_or_default();
-        let line = u32::try_from(Span::call_site().start().line).unwrap_or(0);
+        let start = Span::call_site().start();
+        let line = u32::try_from(start.line).unwrap_or(0);
+        let column = u32::try_from(start.column + 1).unwrap_or(0);
         let pattern = self.path.lit.value();
         let record_locales = locales.iter().map(|files| {
             let locale = files.locale.to_string();
@@ -147,6 +149,7 @@ impl Messages {
                             #id,
                             #source_file,
                             #line,
+                            #column,
                             #pattern,
                             LOCALES,
                         );

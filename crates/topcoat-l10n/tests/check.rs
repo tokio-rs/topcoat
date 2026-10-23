@@ -9,6 +9,7 @@ use topcoat::l10n::fluent::messages;
 use topcoat_l10n::{Check, Locale, NamespaceCheck, Severity, Translation, locale};
 
 messages!("./check/{locale}.ftl");
+const MESSAGES_LINE: u32 = line!() - 1;
 
 /// The `t!` calls of the test, with their lines.
 fn calls() -> Vec<(u32, Translation<'static>)> {
@@ -52,9 +53,11 @@ fn problems_in(check: &NamespaceCheck, name: &str) -> Vec<(Severity, u32)> {
 fn finds_the_namespace_where_it_is_invoked() {
     let check = check();
     assert_eq!(
-        check.source_file,
+        check.location.file,
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/check.rs")
     );
+    assert_eq!(check.location.line, MESSAGES_LINE);
+    assert_eq!(check.location.column, Some(1));
 }
 
 #[test]

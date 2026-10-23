@@ -56,7 +56,7 @@ impl Check {
                 NamespaceCheck::new(namespace, calls)
             })
             .collect();
-        namespaces.sort_by(|a, b| (&a.source_file, a.line).cmp(&(&b.source_file, b.line)));
+        namespaces.sort_by(|a, b| a.location.cmp(&b.location));
         Self { namespaces }
     }
 
@@ -75,10 +75,8 @@ impl Check {
 /// The result of checking one namespace, created by one `messages!`.
 #[derive(Debug)]
 pub struct NamespaceCheck {
-    /// The source file that invokes `messages!`.
-    pub source_file: PathBuf,
-    /// The line of the invocation, starting at 1.
-    pub line: u32,
+    /// Where `messages!` is invoked.
+    pub location: Location,
     /// The path of the Fluent files, as written.
     pub pattern: String,
     /// How many of the keys that `t!` calls use each locale has, by locale.
@@ -100,8 +98,11 @@ impl NamespaceCheck {
         let coverage = analyze(&sources, &calls, &mut problems);
         problems.sort_by(|a, b| (a.severity, &a.location).cmp(&(b.severity, &b.location)));
         Self {
-            source_file: PathBuf::from(namespace.source_file),
-            line: namespace.line,
+            location: Location {
+                file: PathBuf::from(namespace.source_file),
+                line: namespace.line,
+                column: Some(namespace.column),
+            },
             pattern: namespace.pattern.to_owned(),
             coverage,
             problems,

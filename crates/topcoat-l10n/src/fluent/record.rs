@@ -131,6 +131,8 @@ pub struct RawNamespace<'a> {
     pub source_file: &'a str,
     /// The line of the invocation, starting at 1.
     pub line: u32,
+    /// The column of the invocation, starting at 1.
+    pub column: u32,
     /// The path of the Fluent files, as written.
     pub pattern: &'a str,
     /// The locales, with the files that were embedded for each.
@@ -156,7 +158,7 @@ impl<'a> RawNamespace<'a> {
         pattern: &str,
         locales: &[(&str, &[&str])],
     ) -> usize {
-        let mut len = PREFIX_LEN + str_len(id) + str_len(source_file) + 4 + str_len(pattern) + 2;
+        let mut len = PREFIX_LEN + str_len(id) + str_len(source_file) + 8 + str_len(pattern) + 2;
         let mut i = 0;
         while i < locales.len() {
             let (locale, files) = locales[i];
@@ -180,6 +182,7 @@ impl<'a> RawNamespace<'a> {
         id: &str,
         source_file: &str,
         line: u32,
+        column: u32,
         pattern: &str,
         locales: &[(&str, &[&str])],
     ) -> [u8; N] {
@@ -189,6 +192,7 @@ impl<'a> RawNamespace<'a> {
         w.write_str(id);
         w.write_str(source_file);
         w.write_u32_le(line);
+        w.write_u32_le(column);
         w.write_str(pattern);
         w.write_u16_le(locales.len() as u16);
         let mut i = 0;
@@ -214,6 +218,7 @@ impl<'a> RawNamespace<'a> {
         let id = Self::decode_id(&mut r)?;
         let source_file = r.read_str()?;
         let line = r.read_u32_le()?;
+        let column = r.read_u32_le()?;
         let pattern = r.read_str()?;
         let count = r.read_u16_le()?;
         let locales = (0..count)
@@ -228,6 +233,7 @@ impl<'a> RawNamespace<'a> {
             id,
             source_file,
             line,
+            column,
             pattern,
             locales,
         })
@@ -317,7 +323,7 @@ const fn prefix(kind: u8) -> [u8; PREFIX_LEN] {
 macro_rules! test_namespace_record {
     ($id:expr) => {{
         const LEN: usize = $crate::RawNamespace::encoded_len($id, "", "", &[]);
-        static RECORD: [u8; LEN] = $crate::RawNamespace::encode($id, "", 0, "", &[]);
+        static RECORD: [u8; LEN] = $crate::RawNamespace::encode($id, "", 0, 0, "", &[]);
         &RECORD
     }};
 }
@@ -355,8 +361,14 @@ mod tests {
     ];
     const NAMESPACE_LEN: usize =
         RawNamespace::encoded_len("ns", "/app/src/lib.rs", "l10n/{locale}/*.ftl", LOCALES);
-    static NAMESPACE_RECORD: [u8; NAMESPACE_LEN] =
-        RawNamespace::encode("ns", "/app/src/lib.rs", 3, "l10n/{locale}/*.ftl", LOCALES);
+    static NAMESPACE_RECORD: [u8; NAMESPACE_LEN] = RawNamespace::encode(
+        "ns",
+        "/app/src/lib.rs",
+        3,
+        5,
+        "l10n/{locale}/*.ftl",
+        LOCALES,
+    );
 
     #[test]
     fn decodes_what_a_translation_record_encodes() {
@@ -382,6 +394,7 @@ mod tests {
                 id: "ns",
                 source_file: "/app/src/lib.rs",
                 line: 3,
+                column: 5,
                 pattern: "l10n/{locale}/*.ftl",
                 locales: vec![
                     RawNamespaceLocale {

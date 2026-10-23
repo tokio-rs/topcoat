@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use console::style;
 use tokio::task::JoinHandle;
 use topcoat_asset::MANIFEST_NAME;
+use topcoat_l10n::Check;
 
 use super::spinner::Spinner;
 use crate::common::cargo::{BuildError, BuildOpts, BuildStamp as ExecutableStamp};
@@ -92,7 +93,8 @@ impl Drop for BuildTask {
     }
 }
 
-/// Compile the application and bundle its assets.
+/// Compile the application, bundle its assets and report problems with its
+/// translations.
 ///
 /// Returns the built outputs, or `None` after reporting the failure to the terminal.
 async fn build(kind: BuildKind, opts: BuildOpts) -> Option<BuildOutput> {
@@ -132,10 +134,41 @@ async fn build(kind: BuildKind, opts: BuildOpts) -> Option<BuildOutput> {
         }
     };
 
+    // Problems with translations do not stop the application, which shows
+    // placeholders for missing messages.
+    if let Ok(check) = tokio::task::spawn_blocking(move || Check::binary(&bytes)).await {
+        report_l10n_problems(&check);
+    }
+
     Some(BuildOutput {
         stamp: BuildStamp::of(&exe, &assets),
         exe,
     })
+}
+
+/// Prints one line for each `messages!` that `topcoat l10n check` would report
+/// problems for.
+fn report_l10n_problems(check: &Check) {
+    let mut reported = false;
+    for namespace in &check.namespaces {
+        let summary = if namespace.coverage.iter().any(|c| !c.missing.is_empty()) {
+            "has missing translation keys"
+        } else if !namespace.problems.is_empty() {
+            "has translation problems"
+        } else {
+            continue;
+        };
+        eprintln!(
+            "  {} {} {summary}; run {} for details",
+            style("warning:").yellow().bold(),
+            crate::l10n::relative_location(&namespace.location),
+            style("topcoat l10n check").bold()
+        );
+        reported = true;
+    }
+    if reported {
+        eprintln!();
+    }
 }
 
 fn report_build_error(error: &BuildError) {
