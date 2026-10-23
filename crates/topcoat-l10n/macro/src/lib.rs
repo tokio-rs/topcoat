@@ -15,12 +15,6 @@ pub fn messages(tokens: TokenStream) -> TokenStream {
 #[doc(hidden)]
 #[proc_macro]
 pub fn __t(tokens: TokenStream) -> TokenStream {
-    // TODO: Expand once `messages!` generates the namespaced `t!`.
-    let _call = syn::parse_macro_input!(tokens as topcoat_l10n_grammar::fluent::TranslateCall);
-    syn::Error::new(
-        proc_macro::Span::call_site().into(),
-        "`t!` cannot be expanded yet",
-    )
-    .to_compile_error()
-    .into()
+    let call = syn::parse_macro_input!(tokens as topcoat_l10n_grammar::fluent::TranslateCall);
+    quote::quote! { #call }.into()
 }

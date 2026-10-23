@@ -5,33 +5,34 @@ use topcoat_core::context::Cx;
 #[cfg(feature = "view")]
 use topcoat_view::{AttributeValueViewParts, NodeViewParts, PartsWriter};
 
-use crate::{Catalog, try_locale};
+use crate::{Namespace, try_locale};
 
-/// A message of a [`Catalog`], or one of its attributes, with its arguments.
+/// A message of a `messages!` namespace, or one of its attributes, with its
+/// arguments.
 ///
 /// A translation is not formatted until it is [resolved](Self::resolve), so it
 /// can be created without a [`Cx`] and translated wherever it is used. In a
 /// view, as content or as an attribute value, it renders as the text it
 /// resolves to.
 pub struct Translation<'a> {
-    catalog: &'static Catalog,
+    namespace: &'static str,
     id: &'static str,
     attribute: Option<&'static str>,
     args: FluentArgs<'a>,
 }
 
 impl<'a> Translation<'a> {
-    /// Creates a translation of the message `id` of `catalog`, or of its
-    /// `attribute`, formatted with `args`.
+    /// Creates a translation of the message `id` of the namespace `namespace`,
+    /// or of its `attribute`, formatted with `args`.
     #[must_use]
     pub const fn new(
-        catalog: &'static Catalog,
+        namespace: &'static str,
         id: &'static str,
         attribute: Option<&'static str>,
         args: FluentArgs<'a>,
     ) -> Self {
         Self {
-            catalog,
+            namespace,
             id,
             attribute,
             args,
@@ -39,10 +40,10 @@ impl<'a> Translation<'a> {
     }
 
     /// Resolves the translation into its text for the [locale](try_locale) of
-    /// `cx`, as described in [`Catalog::format`].
+    /// `cx`, as described in [`Catalog::format`](crate::Catalog::format).
     ///
-    /// When `cx` has no locale, or the catalog has no text for it, the result
-    /// is a placeholder made of the key and the arguments, such as
+    /// When `cx` has no locale, or the namespace has no text for it, the
+    /// result is a placeholder made of the key and the arguments, such as
     /// `password-field.placeholder(min = 8)`. String arguments are quoted, and
     /// numbers are shown without formatting.
     ///
@@ -51,9 +52,9 @@ impl<'a> Translation<'a> {
     #[must_use]
     pub fn resolve(&self, cx: &Cx) -> Cow<'static, str> {
         try_locale(cx)
-            .and_then(|locale| {
-                self.catalog
-                    .format(locale, self.id, self.attribute, Some(&self.args))
+            .zip(Namespace::catalog(self.namespace))
+            .and_then(|(locale, catalog)| {
+                catalog.format(locale, self.id, self.attribute, Some(&self.args))
             })
             .unwrap_or_else(|| Cow::Owned(self.placeholder()))
     }
@@ -102,7 +103,7 @@ impl NodeViewParts for Translation<'_> {
 }
 
 /// A translation used in attribute value position renders as the text it
-/// resolves to, e.g. `placeholder=(t!(msg::login_input::placeholder))`.
+/// resolves to, e.g. `placeholder=(t!(login-input.placeholder))`.
 #[cfg(feature = "view")]
 impl AttributeValueViewParts for Translation<'_> {
     fn attribute_present(&self) -> bool {
@@ -116,37 +117,40 @@ impl AttributeValueViewParts for Translation<'_> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::LazyLock;
-
     use http::{Request, header::ACCEPT_LANGUAGE};
     use topcoat::view::{View, ViewExt, view};
 
     use super::*;
-    use crate::locale;
+    use crate::{NamespaceLocale, locale};
 
-    static CATALOG: LazyLock<Catalog> = LazyLock::new(|| {
-        Catalog::new([
-            (
-                locale!("en"),
-                &["\
+    const NAMESPACE: &str = "translation";
+
+    inventory::submit! {
+        Namespace::new(
+            NAMESPACE,
+            &[
+                NamespaceLocale::new(
+                    "en",
+                    &["\
 title = Welcome
 greeting = Hello, { $name }!
 login-input = Log in
     .placeholder = Your name
-"][..],
-            ),
-            (
-                locale!("de"),
-                &["\
+"],
+                ),
+                NamespaceLocale::new(
+                    "de",
+                    &["\
 title = Willkommen
 greeting = Hallo, { $name }!
-"][..],
-            ),
-        ])
-    });
+"],
+                ),
+            ],
+        )
+    }
 
     fn title() -> Translation<'static> {
-        Translation::new(&CATALOG, "title", None, FluentArgs::new())
+        Translation::new(NAMESPACE, "title", None, FluentArgs::new())
     }
 
     /// Returns a context for a request with the `Accept-Language` header
@@ -181,11 +185,18 @@ greeting = Hallo, { $name }!
     }
 
     #[test]
+    fn resolves_to_the_placeholder_for_an_unknown_namespace() {
+        let title = Translation::new("unknown", "title", None, FluentArgs::new());
+        let cx = Cx::default().with(locale!("en"));
+        assert_eq!(title.resolve(&cx), "title");
+    }
+
+    #[test]
     fn the_placeholder_shows_the_key_and_the_arguments_sorted_by_name() {
         let mut args = FluentArgs::new();
         args.set("name", "Ada");
         args.set("count", 8);
-        let missing = Translation::new(&CATALOG, "missing", Some("label"), args);
+        let missing = Translation::new(NAMESPACE, "missing", Some("label"), args);
         let cx = Cx::default().with(locale!("en"));
         assert_eq!(
             missing.resolve(&cx),
@@ -198,7 +209,7 @@ greeting = Hallo, { $name }!
         let name = String::from("Ada");
         let mut args = FluentArgs::new();
         args.set("name", name.as_str());
-        let greeting = Translation::new(&CATALOG, "greeting", None, args);
+        let greeting = Translation::new(NAMESPACE, "greeting", None, args);
         let cx = Cx::default().with(locale!("de"));
         // Fluent isolates the argument from the surrounding text.
         assert_eq!(greeting.resolve(&cx), "Hallo, \u{2068}Ada\u{2069}!");
@@ -218,7 +229,7 @@ greeting = Hallo, { $name }!
     async fn renders_as_escaped_content() {
         let mut args = FluentArgs::new();
         args.set("name", "<b>");
-        let greeting = Translation::new(&CATALOG, "greeting", None, args);
+        let greeting = Translation::new(NAMESPACE, "greeting", None, args);
         let cx = &Cx::default().with(locale!("en"));
         let html = render(view! { cx => <p>(greeting)</p> }, cx).await;
         assert_eq!(html, "<p>Hello, \u{2068}&lt;b&gt;\u{2069}!</p>");
@@ -227,7 +238,7 @@ greeting = Hallo, { $name }!
     #[tokio::test]
     async fn renders_as_an_attribute_value() {
         let placeholder = Translation::new(
-            &CATALOG,
+            NAMESPACE,
             "login-input",
             Some("placeholder"),
             FluentArgs::new(),

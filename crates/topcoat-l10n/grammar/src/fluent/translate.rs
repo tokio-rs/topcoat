@@ -1,10 +1,13 @@
 mod argument;
 
 pub use argument::*;
+use proc_macro2::{Span, TokenStream};
+use quote::{ToTokens, quote};
 use syn::{
     Ident, Token,
     parse::{Parse, ParseStream},
 };
+use topcoat_core_grammar::paths::topcoat_l10n;
 
 use crate::fluent::{DocComments, FluentKey};
 
@@ -55,6 +58,33 @@ pub struct TranslateCall {
     pub semi_token: Token![;],
     /// The input of the `t!` invocation.
     pub translate: Translate,
+}
+
+/// Expands to the `Translation` of the key in the namespace, with the
+/// arguments set by name.
+impl ToTokens for TranslateCall {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let namespace = self.namespace.to_string();
+        let id = self.translate.key.message();
+        let attribute = self.translate.key.attribute().map_or_else(
+            || quote! { ::core::option::Option::None },
+            |attribute| quote! { ::core::option::Option::Some(#attribute) },
+        );
+        let arguments = &self.translate.arguments.arguments;
+        let count = arguments.len();
+        let names = arguments.iter().map(|argument| argument.name.value());
+        let values = arguments.iter().map(TranslateArgument::value);
+        // The values are the caller's expressions, which must not see this
+        // local.
+        let args = Ident::new("args", Span::mixed_site());
+        tokens.extend(quote! {
+            {
+                let mut #args = #topcoat_l10n::FluentArgs::with_capacity(#count);
+                #(#args.set(#names, #values);)*
+                #topcoat_l10n::Translation::new(#namespace, #id, #attribute, #args)
+            }
+        });
+    }
 }
 
 impl Parse for TranslateCall {
