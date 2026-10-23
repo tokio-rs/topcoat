@@ -1,6 +1,8 @@
+use proc_macro2::Span;
 use syn::{
     LitStr, Token,
     parse::{Parse, ParseStream},
+    spanned::Spanned,
 };
 use topcoat_core_grammar::ParseOption;
 
@@ -42,6 +44,15 @@ impl FluentKey {
                 }
                 value
             }
+        }
+    }
+
+    /// Returns the span of the message ID, where the key starts.
+    #[must_use]
+    pub fn span(&self) -> Span {
+        match self {
+            Self::Idents { message, .. } => message.span(),
+            Self::Str(lit) => lit.span(),
         }
     }
 

@@ -1,11 +1,11 @@
-use std::{borrow::Cow, fmt::Write};
+use std::{borrow::Cow, fmt::Write, hint};
 
 use fluent_bundle::{FluentArgs, FluentValue};
-use topcoat_core::context::Cx;
+use topcoat_core::{context::Cx, cursor::ConstReader};
 #[cfg(feature = "view")]
 use topcoat_view::{AttributeValueViewParts, NodeViewParts, PartsWriter};
 
-use crate::{Locale, Namespace, try_locale};
+use crate::{Locale, Namespace, RawTranslation, try_locale};
 
 /// A message of a `messages!` namespace, or one of its attributes, with its
 /// arguments.
@@ -22,15 +22,21 @@ pub struct Translation<'a> {
 }
 
 impl<'a> Translation<'a> {
-    /// Creates a translation of the message `id` of the namespace `namespace`,
-    /// or of its `attribute`, formatted with `args`.
+    /// Creates a translation of the message that `record`, a
+    /// [`RawTranslation`], names, formatted with `args`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the record is invalid. The records that `t!` creates are
+    /// always valid.
+    #[doc(hidden)]
     #[must_use]
-    pub const fn new(
-        namespace: &'static str,
-        id: &'static str,
-        attribute: Option<&'static str>,
-        args: FluentArgs<'a>,
-    ) -> Self {
+    pub fn new(record: &'static [u8], args: FluentArgs<'a>) -> Self {
+        // Tools find `t!` calls by searching the binary for their records.
+        // Reading through `black_box` keeps the optimizer from removing them.
+        let record = hint::black_box(record);
+        let (namespace, id, attribute) = RawTranslation::decode_key(&mut ConstReader::new(record))
+            .expect("the translation record is valid");
         Self {
             namespace,
             id,
@@ -130,13 +136,13 @@ mod tests {
     use topcoat::view::{View, ViewExt, view};
 
     use super::*;
-    use crate::{NamespaceLocale, locale};
+    use crate::{NamespaceLocale, locale, test_namespace_record, test_translation_record};
 
     const NAMESPACE: &str = "translation";
 
     inventory::submit! {
         Namespace::new(
-            NAMESPACE,
+            test_namespace_record!(NAMESPACE),
             &[
                 NamespaceLocale::new(
                     "en",
@@ -159,7 +165,10 @@ greeting = Hallo, { $name }!
     }
 
     fn title() -> Translation<'static> {
-        Translation::new(NAMESPACE, "title", None, FluentArgs::new())
+        Translation::new(
+            test_translation_record!(NAMESPACE, "title", None),
+            FluentArgs::new(),
+        )
     }
 
     /// Returns a context for a request with the `Accept-Language` header
@@ -204,7 +213,10 @@ greeting = Hallo, { $name }!
 
     #[test]
     fn resolves_to_the_placeholder_for_an_unknown_namespace() {
-        let title = Translation::new("unknown", "title", None, FluentArgs::new());
+        let title = Translation::new(
+            test_translation_record!("unknown", "title", None),
+            FluentArgs::new(),
+        );
         let cx = Cx::default().with(locale!("en"));
         assert_eq!(title.resolve(&cx), "title");
     }
@@ -214,7 +226,10 @@ greeting = Hallo, { $name }!
         let mut args = FluentArgs::new();
         args.set("name", "Ada");
         args.set("count", 8);
-        let missing = Translation::new(NAMESPACE, "missing", Some("label"), args);
+        let missing = Translation::new(
+            test_translation_record!(NAMESPACE, "missing", Some("label")),
+            args,
+        );
         let cx = Cx::default().with(locale!("en"));
         assert_eq!(
             missing.resolve(&cx),
@@ -227,7 +242,8 @@ greeting = Hallo, { $name }!
         let name = String::from("Ada");
         let mut args = FluentArgs::new();
         args.set("name", name.as_str());
-        let greeting = Translation::new(NAMESPACE, "greeting", None, args);
+        let greeting =
+            Translation::new(test_translation_record!(NAMESPACE, "greeting", None), args);
         let cx = Cx::default().with(locale!("de"));
         // Fluent isolates the argument from the surrounding text.
         assert_eq!(greeting.resolve(&cx), "Hallo, \u{2068}Ada\u{2069}!");
@@ -247,7 +263,8 @@ greeting = Hallo, { $name }!
     async fn renders_as_escaped_content() {
         let mut args = FluentArgs::new();
         args.set("name", "<b>");
-        let greeting = Translation::new(NAMESPACE, "greeting", None, args);
+        let greeting =
+            Translation::new(test_translation_record!(NAMESPACE, "greeting", None), args);
         let cx = &Cx::default().with(locale!("en"));
         let html = render(view! { cx => <p>(greeting)</p> }, cx).await;
         assert_eq!(html, "<p>Hello, \u{2068}&lt;b&gt;\u{2069}!</p>");
@@ -256,9 +273,7 @@ greeting = Hallo, { $name }!
     #[tokio::test]
     async fn renders_as_an_attribute_value() {
         let placeholder = Translation::new(
-            NAMESPACE,
-            "login-input",
-            Some("placeholder"),
+            test_translation_record!(NAMESPACE, "login-input", Some("placeholder")),
             FluentArgs::new(),
         );
         let cx = &Cx::default().with(locale!("en"));

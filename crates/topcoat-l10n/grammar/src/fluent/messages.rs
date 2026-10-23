@@ -3,6 +3,7 @@ mod resource;
 
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
+    path::Path,
     sync::atomic::{AtomicU64, Ordering},
 };
 
@@ -104,12 +105,23 @@ impl Messages {
     }
 
     /// Generates the registration of the namespace `name` with the files of
-    /// `locales`.
+    /// `locales`, and a record of the invocation at `call_site` for tools.
     ///
     /// Including the files also makes the compiler rebuild the crate when one
     /// of them changes.
-    fn register(name: &Ident, locales: &[LocaleFiles]) -> TokenStream {
+    fn register(&self, name: &Ident, call_site: &CallSite, locales: &[LocaleFiles]) -> TokenStream {
         let id = name.to_string();
+        let source_file = call_site
+            .source_file()
+            .map(Path::to_string_lossy)
+            .unwrap_or_default();
+        let line = u32::try_from(Span::call_site().start().line).unwrap_or(0);
+        let pattern = self.path.lit.value();
+        let record_locales = locales.iter().map(|files| {
+            let locale = files.locale.to_string();
+            let paths = files.files.iter().map(|file| file.to_string_lossy());
+            quote! { (#locale, &[#(#paths),*]) }
+        });
         let locales = locales.iter().map(|files| {
             let locale = files.locale.to_string();
             let sources = files.files.iter().map(|file| file.to_string_lossy());
@@ -122,7 +134,26 @@ impl Messages {
         });
         quote! {
             #topcoat_inventory::submit! {
-                #topcoat_l10n::Namespace::new(#id, &[#(#locales),*])
+                #topcoat_l10n::Namespace::new(
+                    {
+                        const LOCALES: &[(&str, &[&str])] = &[#(#record_locales),*];
+                        const LEN: usize = #topcoat_l10n::RawNamespace::encoded_len(
+                            #id,
+                            #source_file,
+                            #pattern,
+                            LOCALES,
+                        );
+                        static RECORD: [u8; LEN] = #topcoat_l10n::RawNamespace::encode(
+                            #id,
+                            #source_file,
+                            #line,
+                            #pattern,
+                            LOCALES,
+                        );
+                        &RECORD
+                    },
+                    &[#(#locales),*],
+                )
             }
         }
     }
@@ -167,7 +198,7 @@ impl Messages {
             .iter()
             .filter_map(|files| LocaleResources::read(files, span).err())
             .map(|err| err.to_compile_error());
-        let register = Self::register(&name, &locales);
+        let register = self.register(&name, call_site, &locales);
         quote! {
             #t
             #register

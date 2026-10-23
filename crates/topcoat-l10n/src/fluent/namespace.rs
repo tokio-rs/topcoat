@@ -1,20 +1,37 @@
-use std::{collections::HashMap, sync::LazyLock};
+use std::{collections::HashMap, hint, sync::LazyLock};
 
-use crate::{Catalog, Locale};
+use topcoat_core::cursor::ConstReader;
+
+use crate::{Catalog, Locale, RawNamespace};
 
 /// The Fluent files of one `messages!` invocation, registered so that its
 /// `t!` can find them. Created by the expanded `messages!` macro.
 #[doc(hidden)]
 pub struct Namespace {
-    id: &'static str,
+    record: &'static [u8],
     locales: &'static [NamespaceLocale],
 }
 
 impl Namespace {
-    /// Creates the namespace `id` with the Fluent sources of each locale.
+    /// Creates the namespace described by `record`, a [`RawNamespace`], with
+    /// the Fluent sources of each locale.
     #[must_use]
-    pub const fn new(id: &'static str, locales: &'static [NamespaceLocale]) -> Self {
-        Self { id, locales }
+    pub const fn new(record: &'static [u8], locales: &'static [NamespaceLocale]) -> Self {
+        Self { record, locales }
+    }
+
+    /// Returns the ID of the namespace, read from its record.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the record is invalid. The records that `messages!`
+    /// creates are always valid.
+    fn id(&self) -> &'static str {
+        // Tools find namespaces by searching the binary for their records.
+        // Reading through `black_box` keeps the optimizer from removing them.
+        let record = hint::black_box(self.record);
+        RawNamespace::decode_id(&mut ConstReader::new(record))
+            .expect("the namespace record is valid")
     }
 
     /// Returns the catalog of the namespace `id`, or `None` when no namespace
@@ -30,7 +47,7 @@ impl Namespace {
     pub fn catalog(id: &str) -> Option<&'static Catalog> {
         static CATALOGS: LazyLock<HashMap<&'static str, Catalog>> = LazyLock::new(|| {
             inventory::iter::<Namespace>()
-                .map(|namespace| (namespace.id, namespace.build()))
+                .map(|namespace| (namespace.id(), namespace.build()))
                 .collect()
         });
         CATALOGS.get(id)
@@ -81,11 +98,11 @@ impl NamespaceLocale {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::locale;
+    use crate::{locale, test_namespace_record};
 
     inventory::submit! {
         Namespace::new(
-            "test",
+            test_namespace_record!("test"),
             &[
                 NamespaceLocale::new("en", &["greeting = Hello\n"]),
                 NamespaceLocale::new("de", &["greeting = Hallo\n"]),

@@ -11,6 +11,13 @@ categories.workspace = true
 rust-version.workspace = true
 
 [features]
+# Checks the messages of a compiled binary against its Fluent files.
+check = [
+	"dep:fluent-syntax",
+	"dep:memchr",
+	"dep:strsim",
+	"fluent",
+]
 fluent = [
 	"dep:fixed_decimal",
 	"dep:fluent-bundle",
@@ -34,6 +41,7 @@ topcoat-view = { workspace = true, optional = true }
 
 fixed_decimal = { workspace = true, optional = true, features = ["ryu"] }
 fluent-bundle = { workspace = true, optional = true }
+fluent-syntax = { workspace = true, optional = true }
 http = { workspace = true, optional = true }
 icu_decimal = { workspace = true, optional = true, features = ["alloc"] }
 icu_locale.workspace = true
@@ -41,11 +49,13 @@ icu_locale_core = { workspace = true, features = ["alloc"] }
 icu_provider = { workspace = true, optional = true, features = ["sync"] }
 intl-memoizer = { workspace = true, optional = true }
 inventory = { workspace = true, optional = true }
+memchr = { workspace = true, optional = true }
+strsim = { workspace = true, optional = true }
 unic-langid = { workspace = true, optional = true }
 
 [dev-dependencies]
 http.workspace = true
-topcoat = { workspace = true, features = ["l10n", "view"] }
+topcoat = { workspace = true, features = ["l10n-fluent", "view"] }
 tokio = { workspace = true, features = ["macros", "rt"] }
 
 [lints]

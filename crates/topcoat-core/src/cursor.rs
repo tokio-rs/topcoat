@@ -22,6 +22,10 @@ impl<'a> ConstWriter<'a> {
         self.write_bytes(&v.to_le_bytes());
     }
 
+    pub const fn write_u32_le(&mut self, v: u32) {
+        self.write_bytes(&v.to_le_bytes());
+    }
+
     pub const fn write_u64_le(&mut self, v: u64) {
         self.write_bytes(&v.to_le_bytes());
     }
@@ -75,6 +79,13 @@ impl<'a> ConstReader<'a> {
             return None;
         };
         Some(u16::from_le_bytes([bytes[0], bytes[1]]))
+    }
+
+    pub const fn read_u32_le(&mut self) -> Option<u32> {
+        let Some(bytes) = self.read_bytes(4) else {
+            return None;
+        };
+        Some(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
     }
 
     pub const fn read_u64_le(&mut self) -> Option<u64> {

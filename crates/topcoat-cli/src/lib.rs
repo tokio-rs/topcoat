@@ -4,6 +4,7 @@ mod asset;
 mod common;
 mod dev;
 mod fmt;
+mod l10n;
 mod new;
 mod ui;
 
@@ -24,6 +25,7 @@ impl TopcoatCli {
             Command::Fmt(cmd) => cmd.run().await,
             Command::Dev(cmd) => cmd.run().await,
             Command::Asset(cmd) => cmd.run().await,
+            Command::L10n(cmd) => cmd.run().await,
         }
     }
 }
@@ -38,6 +40,8 @@ enum Command {
     Fmt(fmt::FmtCommand),
     /// Inspect assets embedded in the binary
     Asset(asset::AssetCommand),
+    /// Check the translations of the binary
+    L10n(l10n::L10nCommand),
     /// Manage premade UI components in your project
     Ui(ui::UiCommand),
 }

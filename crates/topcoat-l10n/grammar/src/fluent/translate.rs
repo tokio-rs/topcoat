@@ -61,19 +61,26 @@ pub struct TranslateCall {
 }
 
 /// Expands to the `Translation` of the key in the namespace, with the
-/// arguments set by name.
+/// arguments set by name, created from a record of the call.
 impl ToTokens for TranslateCall {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let namespace = self.namespace.to_string();
-        let id = self.translate.key.message();
-        let attribute = self.translate.key.attribute().map_or_else(
+        let key = &self.translate.key;
+        let id = key.message();
+        let attribute = key.attribute().map_or_else(
             || quote! { ::core::option::Option::None },
             |attribute| quote! { ::core::option::Option::Some(#attribute) },
         );
         let arguments = &self.translate.arguments.arguments;
         let count = arguments.len();
-        let names = arguments.iter().map(|argument| argument.name.value());
+        let names: Vec<_> = arguments
+            .iter()
+            .map(|argument| argument.name.value())
+            .collect();
         let values = arguments.iter().map(TranslateArgument::value);
+        let start = key.span().start();
+        let line = u32::try_from(start.line).unwrap_or(0);
+        let column = u32::try_from(start.column + 1).unwrap_or(0);
         // The values are the caller's expressions, which must not see this
         // local.
         let args = Ident::new("args", Span::mixed_site());
@@ -81,7 +88,28 @@ impl ToTokens for TranslateCall {
             {
                 let mut #args = #topcoat_l10n::FluentArgs::with_capacity(#count);
                 #(#args.set(#names, #values);)*
-                #topcoat_l10n::Translation::new(#namespace, #id, #attribute, #args)
+                #topcoat_l10n::Translation::new(
+                    {
+                        const LEN: usize = #topcoat_l10n::RawTranslation::encoded_len(
+                            #namespace,
+                            #id,
+                            #attribute,
+                            &[#(#names),*],
+                            ::core::file!(),
+                        );
+                        static RECORD: [u8; LEN] = #topcoat_l10n::RawTranslation::encode(
+                            #namespace,
+                            #id,
+                            #attribute,
+                            &[#(#names),*],
+                            ::core::file!(),
+                            #line,
+                            #column,
+                        );
+                        &RECORD
+                    },
+                    #args,
+                )
             }
         });
     }
