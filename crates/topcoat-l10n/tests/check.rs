@@ -117,5 +117,22 @@ fn reports_unknown_references_and_unused_messages_in_the_files() {
             (Severity::Warning, 6),
         ]
     );
-    assert_eq!(problems_in(&check, "de.ftl"), []);
+}
+
+#[test]
+fn checks_inherited_messages_against_the_locale_that_takes_them() {
+    let check = check();
+    assert_eq!(
+        problems_in(&check, "de.ftl"),
+        [
+            // `about` works in `de`, but not in `de-CH`.
+            (Severity::Error, 7),
+            // `nowhere` is not defined, which is reported once, not again
+            // for `de-CH`.
+            (Severity::Error, 8),
+            (Severity::Warning, 7),
+            (Severity::Warning, 8),
+        ]
+    );
+    assert_eq!(problems_in(&check, "de-CH.ftl"), []);
 }

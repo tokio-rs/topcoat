@@ -59,7 +59,7 @@ These are compile errors:
 - a file has a Fluent syntax error,
 - a message or term is defined more than once in the files of one locale.
 
-The crate is rebuilt when a matched file changes. Cargo does not notice a new file that starts to match, so it is only included once another file of the crate changes. `topcoat dev` rebuilds the crate when a file is added.
+The crate is rebuilt when a matched file changes. Cargo does not notice a new file that starts to match, so it is only included once another file of the crate changes. `topcoat dev` rebuilds the crate when a file is added, and `topcoat l10n check` rebuilds it before it checks.
 
 [Fluent]: https://projectfluent.org/
 [`Translation`]: ../struct.Translation.html

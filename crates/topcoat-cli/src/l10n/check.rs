@@ -1,4 +1,10 @@
-use std::path::{Path, PathBuf};
+use std::{
+    collections::BTreeSet,
+    fs::File,
+    io,
+    path::{Path, PathBuf},
+    time::SystemTime,
+};
 
 use clap::Args;
 use console::style;
@@ -13,16 +19,52 @@ pub(super) struct CheckArgs {
 }
 
 pub(super) async fn run(args: CheckArgs) {
-    let (_, bytes) = BuildOpts::from(args.build)
-        .build_and_read(|_, _| {})
-        .await
-        .unwrap_or_else(|e| e.print_and_exit());
+    let opts = BuildOpts::from(args.build);
+    let mut check = Check::binary(&build(&opts).await);
 
-    let check = Check::binary(&bytes);
+    // Cargo does not notice a new file that the path of a `messages!` matches,
+    // so the build can miss it. Touching the files that invoke `messages!`
+    // makes cargo expand them again.
+    if !check.namespaces.is_empty() {
+        let files: BTreeSet<&Path> = check
+            .namespaces
+            .iter()
+            .map(|namespace| namespace.location.file.as_path())
+            .collect();
+        for file in files {
+            if let Err(error) = touch(file) {
+                eprintln!(
+                    "{} could not touch {}: {error}",
+                    style("warning:").yellow().bold(),
+                    relative(file).display()
+                );
+            }
+        }
+        check = Check::binary(&build(&opts).await);
+    }
+
     print(&check);
     if check.has_errors() {
         std::process::exit(1);
     }
+}
+
+/// Builds the binary and returns its contents, or exits on failure.
+async fn build(opts: &BuildOpts) -> Vec<u8> {
+    let (_, bytes) = opts
+        .build_and_read(|_, _| {})
+        .await
+        .unwrap_or_else(|e| e.print_and_exit());
+    bytes
+}
+
+/// Sets the modification time of the file at `path` to now, without changing
+/// its contents.
+fn touch(path: &Path) -> io::Result<()> {
+    File::options()
+        .write(true)
+        .open(path)?
+        .set_modified(SystemTime::now())
 }
 
 /// Prints the coverage and the problems of every namespace of `check`.

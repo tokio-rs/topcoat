@@ -1,6 +1,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     path::PathBuf,
+    ptr,
 };
 
 use fluent_syntax::ast::{Attribute, Entry, InlineExpression, Pattern};
@@ -30,7 +31,7 @@ pub(super) fn analyze(
     let bundles = Bundle::of_locales(&locales, &files);
 
     check_calls(calls, &locales, &bundles, problems);
-    check_references(&files, &bundles, problems);
+    check_references(&locales, &files, &bundles, problems);
     check_unused(calls, &files, problems);
     coverage(calls, &locales, &bundles)
 }
@@ -39,6 +40,9 @@ pub(super) fn analyze(
 /// from its parents.
 #[derive(Default)]
 struct Bundle<'s> {
+    /// The indices of the locales whose files the bundle takes from, the
+    /// locale itself first.
+    sources: Vec<usize>,
     messages: HashMap<&'s str, Definition<'s>>,
     terms: HashMap<&'s str, Definition<'s>>,
 }
@@ -46,6 +50,7 @@ struct Bundle<'s> {
 /// The value and the attributes of a message or term.
 #[derive(Clone, Copy)]
 struct Definition<'s> {
+    entry: &'s Entry<&'s str>,
     value: Option<&'s Pattern<&'s str>>,
     attributes: &'s [Attribute<&'s str>],
 }
@@ -65,6 +70,7 @@ impl<'s> Bundle<'s> {
                 let mut bundle = Self::default();
                 // The first locale that serves a locale is the locale itself.
                 for index in lookup_indices(locale, &normalized) {
+                    bundle.sources.push(index);
                     for (id, definition) in &own[index].messages {
                         bundle.messages.entry(id).or_insert(*definition);
                     }
@@ -88,12 +94,14 @@ impl<'s> Bundle<'s> {
                         .messages
                         .entry(message.id.name)
                         .or_insert(Definition {
+                            entry,
                             value: message.value.as_ref(),
                             attributes: &message.attributes,
                         });
                 }
                 Entry::Term(term) => {
                     bundle.terms.entry(term.id.name).or_insert(Definition {
+                        entry,
                         value: Some(&term.value),
                         attributes: &term.attributes,
                     });
@@ -108,6 +116,46 @@ impl<'s> Bundle<'s> {
     /// `None` when the bundle lacks it.
     fn message(&self, id: &str, attribute: Option<&str>) -> Option<&'s Pattern<&'s str>> {
         self.messages.get(id)?.pattern(attribute)
+    }
+
+    /// Returns whether the bundle uses `entry` for its ID, rather than another
+    /// definition of the ID.
+    fn uses(&self, entry: &Entry<&str>) -> bool {
+        let (definitions, id) = match entry {
+            Entry::Message(message) => (&self.messages, message.id.name),
+            Entry::Term(term) => (&self.terms, term.id.name),
+            _ => return false,
+        };
+        definitions
+            .get(id)
+            .is_some_and(|definition| ptr::eq(definition.entry, entry))
+    }
+
+    /// Returns the name in `expression` and why the bundle cannot format it,
+    /// or `None` when it can or `expression` references nothing.
+    fn broken_reference(
+        &self,
+        expression: &'s InlineExpression<&'s str>,
+    ) -> Option<(&'s str, String)> {
+        let (definitions, prefix, id, attribute) = match expression {
+            InlineExpression::MessageReference { id, attribute } => {
+                (&self.messages, "", id, attribute)
+            }
+            InlineExpression::TermReference { id, attribute, .. } => {
+                (&self.terms, "-", id, attribute)
+            }
+            _ => return None,
+        };
+        let attribute = attribute.as_ref().map(|attribute| attribute.name);
+        let message = match definitions.get(id.name) {
+            None => format!("`{prefix}{}` is not defined", id.name),
+            Some(definition) if definition.pattern(attribute).is_none() => match attribute {
+                Some(attribute) => format!("`{prefix}{}` has no attribute `{attribute}`", id.name),
+                None => format!("`{prefix}{}` has no value", id.name),
+            },
+            Some(_) => return None,
+        };
+        Some((id.name, message))
     }
 
     /// Adds the variables of `pattern` to `variables`, including the ones of
@@ -215,45 +263,45 @@ fn check_calls(
     }
 }
 
-/// Reports the references to messages, terms and attributes that the locale of
-/// the referencing file lacks.
+/// Reports the references to messages, terms and attributes that a locale
+/// lacks.
+///
+/// A locale formats the messages it takes from its parents with its own
+/// messages and terms, so their references are checked against it too. Such
+/// a reference is only reported for the locale when the parent can format it.
 fn check_references(
+    locales: &[&Locale],
     files: &[Vec<ParsedFile<'_>>],
     bundles: &[Bundle<'_>],
     problems: &mut Vec<Problem>,
 ) {
-    for (files, bundle) in files.iter().zip(bundles) {
-        for file in files {
-            for pattern in patterns(file) {
-                visit_expressions(pattern, &mut |expression| {
-                    let (definitions, prefix, id, attribute) = match expression {
-                        InlineExpression::MessageReference { id, attribute } => {
-                            (&bundle.messages, "", id, attribute)
-                        }
-                        InlineExpression::TermReference { id, attribute, .. } => {
-                            (&bundle.terms, "-", id, attribute)
-                        }
-                        _ => return,
-                    };
-                    let attribute = attribute.as_ref().map(|attribute| attribute.name);
-                    let message = match definitions.get(id.name) {
-                        None => format!("`{prefix}{}` is not defined", id.name),
-                        Some(definition) if definition.pattern(attribute).is_none() => {
-                            match attribute {
-                                Some(attribute) => {
-                                    format!("`{prefix}{}` has no attribute `{attribute}`", id.name)
+    for (index, bundle) in bundles.iter().enumerate() {
+        for &owner in &bundle.sources {
+            for file in &files[owner] {
+                for entry in &file.resource.body {
+                    if owner != index && !bundle.uses(entry) {
+                        continue;
+                    }
+                    for pattern in entry_patterns(entry) {
+                        visit_expressions(pattern, &mut |expression| {
+                            let Some((name, mut message)) = bundle.broken_reference(expression)
+                            else {
+                                return;
+                            };
+                            if owner != index {
+                                if bundles[owner].broken_reference(expression).is_some() {
+                                    return;
                                 }
-                                None => format!("`{prefix}{}` has no value", id.name),
+                                message = format!("{message} in {}", locales[index]);
                             }
-                        }
-                        Some(_) => return,
-                    };
-                    problems.push(Problem {
-                        severity: Severity::Error,
-                        location: file.location(id.name),
-                        message,
-                    });
-                });
+                            problems.push(Problem {
+                                severity: Severity::Error,
+                                location: file.location(name),
+                                message,
+                            });
+                        });
+                    }
+                }
             }
         }
     }
@@ -319,16 +367,20 @@ fn coverage(
 
 /// Returns every pattern of the messages and terms of `file`.
 fn patterns<'s>(file: &'s ParsedFile<'s>) -> impl Iterator<Item = &'s Pattern<&'s str>> {
-    file.resource.body.iter().flat_map(|entry| {
-        let (value, attributes) = match entry {
-            Entry::Message(message) => (message.value.as_ref(), &message.attributes[..]),
-            Entry::Term(term) => (Some(&term.value), &term.attributes[..]),
-            _ => (None, &[][..]),
-        };
-        value
-            .into_iter()
-            .chain(attributes.iter().map(|attribute| &attribute.value))
-    })
+    file.resource.body.iter().flat_map(entry_patterns)
+}
+
+/// Returns the value and the attribute patterns of `entry`, if it is a
+/// message or term.
+fn entry_patterns<'s>(entry: &'s Entry<&'s str>) -> impl Iterator<Item = &'s Pattern<&'s str>> {
+    let (value, attributes) = match entry {
+        Entry::Message(message) => (message.value.as_ref(), &message.attributes[..]),
+        Entry::Term(term) => (Some(&term.value), &term.attributes[..]),
+        _ => (None, &[][..]),
+    };
+    value
+        .into_iter()
+        .chain(attributes.iter().map(|attribute| &attribute.value))
 }
 
 /// Returns the key of a message, such as `title` or `search.placeholder`.
