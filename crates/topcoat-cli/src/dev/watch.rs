@@ -1,3 +1,5 @@
+mod new_files;
+
 use std::{
     collections::{BTreeSet, HashSet},
     ffi::OsStr,
@@ -10,6 +12,7 @@ use ignore::{
     WalkBuilder,
     gitignore::{Gitignore, GitignoreBuilder},
 };
+use new_files::{NewFiles, Package};
 use notify::{EventKind, RecursiveMode, Watcher, recommended_watcher};
 use tokio::{
     sync::mpsc,
@@ -35,6 +38,9 @@ pub enum Change {
 ///
 /// Includes workspace members and path dependencies. Ignores hidden paths, gitignored
 /// files, editor temporary files, and Cargo build output.
+///
+/// A file added to a package makes cargo rebuild that package, as described in
+/// [`NewFiles`].
 pub struct SourceWatcher {
     watcher: notify::RecommendedWatcher,
     events: mpsc::UnboundedReceiver<Change>,
@@ -52,6 +58,7 @@ impl SourceWatcher {
     pub async fn start() -> Self {
         let plan = WatchPlan::discover().await;
         let filter = Arc::new(plan.filter);
+        let mut new_files = NewFiles::new(&plan.roots, Arc::clone(&filter), plan.packages);
 
         let (tx, events) = mpsc::unbounded_channel();
         let callback_filter = Arc::clone(&filter);
@@ -65,7 +72,7 @@ impl SourceWatcher {
             // A rescan means events were dropped; assume something changed.
             let mut change = event.need_rescan().then_some(Change::Source);
             for path in &event.paths {
-                if callback_filter.ignores(path) {
+                if callback_filter.ignores(path) || !new_files.observe(path) {
                     continue;
                 }
                 if path.file_name().is_some_and(|name| name == "Cargo.toml") {
@@ -159,6 +166,8 @@ struct WatchPlan {
     /// root, minus roots contained in another root.
     roots: Vec<PathBuf>,
     filter: PathFilter,
+    /// The local packages, whose crate roots are touched when a file is added.
+    packages: Vec<Package>,
 }
 
 impl WatchPlan {
@@ -178,9 +187,18 @@ impl WatchPlan {
                     matchers: Vec::new(),
                 },
                 roots,
+                packages: Vec::new(),
             };
         };
 
+        let packages = metadata
+            .local_crate_roots()
+            .into_iter()
+            .map(|(dir, crate_roots)| Package {
+                dir: canonical(dir),
+                crate_roots: crate_roots.into_iter().map(canonical).collect(),
+            })
+            .collect();
         let mut roots: Vec<PathBuf> = metadata
             .local_package_dirs()
             .into_iter()
@@ -204,6 +222,7 @@ impl WatchPlan {
                 matchers,
             },
             roots,
+            packages,
         }
     }
 }
@@ -259,6 +278,26 @@ impl PathFilter {
                     .is_ignore()
         })
     }
+}
+
+/// The files and directories under `roots`, including the roots, that `filter` does not
+/// ignore.
+fn existing_paths(roots: &[PathBuf], filter: &PathFilter) -> Vec<PathBuf> {
+    let Some((first, rest)) = roots.split_first() else {
+        return Vec::new();
+    };
+    let mut walk = WalkBuilder::new(first);
+    for root in rest {
+        walk.add(root);
+    }
+    // The target directory is skipped as a whole rather than file by file.
+    let target = filter.target_dir.clone();
+    walk.filter_entry(move |entry| Some(entry.path()) != target.as_deref());
+    walk.build()
+        .flatten()
+        .map(ignore::DirEntry::into_path)
+        .filter(|path| !filter.ignores(path))
+        .collect()
 }
 
 /// Editor write patterns that gitignore files rarely cover: backup and

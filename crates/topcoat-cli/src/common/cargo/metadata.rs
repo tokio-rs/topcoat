@@ -66,6 +66,28 @@ impl Metadata {
             .collect()
     }
 
+    /// The manifest directory of every local package, with the root source files of its
+    /// library and binary crates.
+    pub fn local_crate_roots(&self) -> Vec<(PathBuf, Vec<PathBuf>)> {
+        self.0["packages"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|package| package["source"].is_null())
+            .filter_map(|package| {
+                let manifest = Path::new(package["manifest_path"].as_str()?);
+                let roots = package["targets"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter(|target| is_lib_or_bin(target))
+                    .filter_map(|target| target["src_path"].as_str().map(PathBuf::from))
+                    .collect();
+                Some((manifest.parent()?.to_path_buf(), roots))
+            })
+            .collect()
+    }
+
     /// The name of the bin target `[package] default-run` selects, or `None` when the
     /// package declares no default run.
     ///
@@ -128,6 +150,19 @@ fn is_bin(target: &serde_json::Value) -> bool {
     target["kind"]
         .as_array()
         .is_some_and(|kinds| kinds.iter().any(|kind| kind == "bin"))
+}
+
+/// Whether the target builds a library or an executable, as opposed to an example, a
+/// test, a benchmark or a build script.
+fn is_lib_or_bin(target: &serde_json::Value) -> bool {
+    target["kind"].as_array().is_some_and(|kinds| {
+        kinds.iter().any(|kind| {
+            matches!(
+                kind.as_str(),
+                Some("bin" | "lib" | "rlib" | "dylib" | "cdylib" | "staticlib" | "proc-macro")
+            )
+        })
+    })
 }
 
 #[cfg(test)]
@@ -293,6 +328,46 @@ mod tests {
         assert_eq!(
             metadata.package_containing_dir(Path::new("/reg/dep/src")),
             None
+        );
+    }
+
+    /// Only libraries and executables are compiled by a plain build, so only their
+    /// roots are listed, and registry dependencies are never touched.
+    #[test]
+    fn crate_roots_are_the_libraries_and_executables_of_local_packages() {
+        let metadata = Metadata(json!({
+            "packages": [
+                {
+                    "name": "app",
+                    "source": null,
+                    "manifest_path": "/w/app/Cargo.toml",
+                    "targets": [
+                        target("app", &["lib"], "/w/app/src/lib.rs"),
+                        bin("app", "/w/app/src/main.rs"),
+                        target("macros", &["proc-macro"], "/w/app/src/macros.rs"),
+                        target("demo", &["example"], "/w/app/examples/demo.rs"),
+                        target("it", &["test"], "/w/app/tests/it.rs"),
+                        target("build-script-build", &["custom-build"], "/w/app/build.rs"),
+                    ],
+                },
+                {
+                    "name": "dep",
+                    "source": "registry+https://github.com/rust-lang/crates.io-index",
+                    "manifest_path": "/reg/dep/Cargo.toml",
+                    "targets": [target("dep", &["lib"], "/reg/dep/src/lib.rs")],
+                },
+            ],
+        }));
+        assert_eq!(
+            metadata.local_crate_roots(),
+            [(
+                PathBuf::from("/w/app"),
+                vec![
+                    PathBuf::from("/w/app/src/lib.rs"),
+                    PathBuf::from("/w/app/src/main.rs"),
+                    PathBuf::from("/w/app/src/macros.rs"),
+                ]
+            )]
         );
     }
 }
