@@ -5422,6 +5422,7 @@ name = "topcoat-l10n-grammar"
 version = "0.10.0"
 dependencies = [
  "fluent-syntax",
+ "icu_locale",
  "icu_locale_core",
  "proc-macro2",
  "quote",

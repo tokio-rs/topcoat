@@ -7,7 +7,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use icu_locale_core::LanguageIdentifier;
+use icu_locale::{
+    LocaleCanonicalizer,
+    fallback::{LocaleFallbackConfig, LocaleFallbacker},
+};
+use icu_locale_core::{DataLocale, LanguageIdentifier, Locale};
 use proc_macro2::Span;
 
 use crate::fluent::{PathComponent, PathPattern};
@@ -147,6 +151,8 @@ impl PathPattern {
 
         // Keyed by canonical spelling, since language identifiers are not `Ord`.
         let mut locales = BTreeMap::new();
+        // The lookup form of each locale, with its first file.
+        let mut forms: Vec<(DataLocale, PathBuf)> = Vec::new();
         for (spelling, files) in matches {
             let files = Vec::from_iter(files);
             let locale = LanguageIdentifier::try_from_str(&spelling).map_err(|_| {
@@ -155,6 +161,15 @@ impl PathPattern {
                     files[0].display()
                 ))
             })?;
+            let form = lookup_form(&locale);
+            if let Some((_, other)) = forms.iter().find(|(other, _)| *other == form) {
+                return Err(error(format!(
+                    "`{}` and `{}` are the same locale; use one spelling",
+                    other.display(),
+                    files[0].display()
+                )));
+            }
+            forms.push((form, files[0].clone()));
             match locales.entry(locale.to_string()) {
                 Entry::Vacant(entry) => {
                     entry.insert(LocaleFiles { locale, files });
@@ -170,6 +185,18 @@ impl PathPattern {
         }
         Ok(locales.into_values().collect())
     }
+}
+
+/// Returns `locale` in the form that catalogs compare locales in: canonical and with
+/// implied subtags removed, so `iw` and `he`, or `zh` and `zh-Hans`, have the same
+/// form.
+fn lookup_form(locale: &LanguageIdentifier) -> DataLocale {
+    let mut locale = Locale::from(locale.clone());
+    LocaleCanonicalizer::new_common().canonicalize(&mut locale);
+    LocaleFallbacker::new()
+        .for_config(LocaleFallbackConfig::default())
+        .fallback_for(DataLocale::from(&locale.id))
+        .take()
 }
 
 /// Matched files, keyed by the text of the `{locale}` placeholder.
@@ -534,6 +561,29 @@ mod tests {
     fn rejects_two_spellings_of_one_locale() {
         let dir = crate_with(&["l10n/sl-rozaj-biske.ftl", "l10n/sl-biske-rozaj.ftl"]);
         assert!(resolve(&dir, None, "l10n/{locale}.ftl").is_err());
+    }
+
+    /// A catalog cannot hold two locales that only differ by subtags that are
+    /// implied, or by a code that was replaced.
+    #[test]
+    fn rejects_locales_that_catalogs_consider_the_same() {
+        for pair in [["zh", "zh-Hans"], ["iw", "he"], ["en", "en-Latn"]] {
+            let files = pair.map(|locale| format!("l10n/{locale}.ftl"));
+            let dir = crate_with(&files.each_ref().map(String::as_str));
+            assert!(
+                resolve(&dir, None, "l10n/{locale}.ftl").is_err(),
+                "{pair:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn accepts_locales_that_catalogs_keep_apart() {
+        for pair in [["zh-Hans", "zh-Hant"], ["en", "en-US"], ["pt", "pt-PT"]] {
+            let files = pair.map(|locale| format!("l10n/{locale}.ftl"));
+            let dir = crate_with(&files.each_ref().map(String::as_str));
+            assert!(resolve(&dir, None, "l10n/{locale}.ftl").is_ok(), "{pair:?}");
+        }
     }
 
     #[test]

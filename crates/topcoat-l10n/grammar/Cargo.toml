@@ -18,6 +18,7 @@ fluent = [
 	"dep:syn",
 	"dep:topcoat-core-grammar",
 	"dep:fluent-syntax",
+	"dep:icu_locale",
 	"dep:icu_locale_core",
 ]
 
@@ -25,6 +26,7 @@ fluent = [
 topcoat-core-grammar = { workspace = true, optional = true }
 
 fluent-syntax = { workspace = true, optional = true }
+icu_locale = { workspace = true, optional = true }
 icu_locale_core = { workspace = true, optional = true, features = ["alloc"] }
 proc-macro2 = { workspace = true, optional = true }
 quote = { workspace = true, optional = true }
