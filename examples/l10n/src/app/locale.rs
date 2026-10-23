@@ -5,7 +5,7 @@ use topcoat::{
     context::Cx,
     l10n::{Locale, locale},
     router::{
-        Body, Next, Slot, error::not_found, layer, layout, module_param, path_param,
+        Body, Next, Slot, error::not_found, href, layer, layout, module_param, path_param,
         response::Response,
     },
     view::{View, view},
@@ -34,7 +34,25 @@ async fn layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
                 <title>(t!(title))</title>
                 topcoat::dev::script()
             </head>
-            <body>(slot)</body>
+            <body>
+                // Each link names its language in that language, so it is resolved with
+                // the link's locale instead of the page's.
+                <nav>
+                    for link_locale in t::locales() {
+                        <a
+                            href=(href!(_page::page, PathLocale(link_locale.clone())))
+                            lang=(link_locale.id())
+                            if link_locale == locale(cx) {
+                                aria-current="page"
+                            }
+                        >
+                            (t!(language).resolve(&cx.with(link_locale.clone())))
+                        </a>
+                        " "
+                    }
+                </nav>
+                (slot)
+            </body>
         </html>
     })
 }
