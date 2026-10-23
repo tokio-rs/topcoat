@@ -1,90 +1,68 @@
 use std::borrow::Cow;
 
 use fluent_bundle::{FluentArgs, FluentResource, concurrent::FluentBundle};
+use icu_locale_core::DataLocale;
 
-use crate::{Locale, SupportedLocales, format_value};
+use crate::{Locale, format_value, lookup_index, normalize_for_lookup};
 
 /// The Fluent messages of an application or one of its parts, translated into
 /// several locales.
 ///
-/// Each locale has its own messages. A locale does not need to translate every
-/// message: a message it lacks is taken from the fallback locale.
+/// Each locale has its own messages. A message is formatted in the locale that
+/// serves the requested locale, as chosen by [`lookup`](crate::lookup).
 pub struct Catalog {
-    supported: SupportedLocales,
-    bundles: Vec<(Locale, LocaleBundle)>,
+    locales: Vec<Locale>,
+    normalized: Vec<DataLocale>,
+    bundles: Vec<LocaleBundle>,
 }
 
 impl Catalog {
     /// Creates a catalog from the Fluent sources of each locale.
     ///
-    /// The locales become the catalog's
-    /// [supported locales](Self::supported_locales), with `fallback` as their
-    /// fallback.
-    ///
     /// # Panics
     ///
-    /// Panics when `fallback` has no sources, or when a source has syntax
-    /// errors or defines a message or term that the locale already defines.
+    /// Panics when a source has syntax errors or defines a message or term
+    /// that the locale already defines.
     #[must_use]
     #[track_caller]
-    pub fn new<'a>(
-        fallback: Locale,
-        locales: impl IntoIterator<Item = (Locale, &'a [&'a str])>,
-    ) -> Self {
-        let bundles: Vec<_> = locales
-            .into_iter()
-            .map(|(locale, sources)| {
-                let locale = locale.canonicalize();
-                let bundle = LocaleBundle::new(&locale, sources);
-                (locale, bundle)
-            })
-            .collect();
-        let fallback = fallback.canonicalize();
-        assert!(
-            bundles.iter().any(|(locale, _)| *locale == fallback),
-            "the fallback locale `{fallback}` has no Fluent sources"
-        );
-        let supported = SupportedLocales::new(bundles.iter().map(|(locale, _)| locale.clone()))
-            .with_fallback(fallback);
-        Self { supported, bundles }
+    pub fn new<'a>(locales: impl IntoIterator<Item = (Locale, &'a [&'a str])>) -> Self {
+        let mut catalog = Self {
+            locales: Vec::new(),
+            normalized: Vec::new(),
+            bundles: Vec::new(),
+        };
+        for (locale, sources) in locales {
+            let locale = locale.canonicalize();
+            catalog.normalized.push(normalize_for_lookup(locale.id()));
+            catalog.bundles.push(LocaleBundle::new(&locale, sources));
+            catalog.locales.push(locale);
+        }
+        catalog
     }
 
-    /// Returns the locales the catalog translates into, and its fallback.
+    /// Returns the locales the catalog translates into.
     #[must_use]
-    pub const fn supported_locales(&self) -> &SupportedLocales {
-        &self.supported
+    pub fn locales(&self) -> &[Locale] {
+        &self.locales
     }
 
     /// Formats a message, or one of its attributes, with `args`.
     ///
-    /// The message is taken from the supported locale that best matches
-    /// `requested`, as chosen by [`SupportedLocales::negotiate`]. If that
-    /// locale lacks the message, it is taken from the fallback locale. If the
-    /// fallback lacks it too, the result is `id`.
-    pub fn format<'a, 'r>(
+    /// The message is taken from the locale that serves `locale`, as chosen by
+    /// [`lookup`](crate::lookup). When no locale serves it, or that locale
+    /// lacks the message, the result is `id`.
+    #[must_use]
+    pub fn format<'a>(
         &'a self,
-        requested: impl IntoIterator<Item = &'r Locale>,
+        locale: &Locale,
         id: &'a str,
         attribute: Option<&str>,
         args: Option<&FluentArgs<'_>>,
     ) -> Cow<'a, str> {
-        let locale = self.supported.negotiate(requested);
-        for locale in [locale, self.supported.fallback()] {
-            if let Some(bundle) = self.bundle(locale)
-                && let Some(text) = bundle.format(id, attribute, args)
-            {
-                return text;
-            }
-        }
-        Cow::Borrowed(id)
-    }
-
-    /// Returns the bundle of a supported locale.
-    fn bundle(&self, locale: &Locale) -> Option<&LocaleBundle> {
-        self.bundles
-            .iter()
-            .find(|(candidate, _)| candidate == locale)
-            .map(|(_, bundle)| bundle)
+        // TODO: Render the placeholder `key.attr(args)` instead of `id`.
+        lookup_index(locale, &self.normalized)
+            .and_then(|index| self.bundles[index].format(id, attribute, args))
+            .unwrap_or(Cow::Borrowed(id))
     }
 }
 
@@ -162,10 +140,7 @@ login-input = Anmelden
 ";
 
     fn catalog() -> Catalog {
-        Catalog::new(
-            locale!("en"),
-            [(locale!("en"), &[EN][..]), (locale!("de"), &[DE][..])],
-        )
+        Catalog::new([(locale!("en"), &[EN][..]), (locale!("de"), &[DE][..])])
     }
 
     fn count(count: f64) -> FluentArgs<'static> {
@@ -175,42 +150,38 @@ login-input = Anmelden
     }
 
     #[test]
-    fn formats_in_the_best_matching_locale() {
+    fn formats_in_the_locale_that_serves_the_requested_one() {
         let catalog = catalog();
         assert_eq!(
-            catalog.format(&[locale!("de-AT")], "title", None, None),
+            catalog.format(&locale!("de-AT"), "title", None, None),
             "Willkommen"
         );
         assert_eq!(
-            catalog.format(&[locale!("en-US")], "title", None, None),
+            catalog.format(&locale!("en-US"), "title", None, None),
             "Welcome"
-        );
-        assert_eq!(
-            catalog.format(&[locale!("fr"), locale!("de")], "title", None, None),
-            "Willkommen"
         );
     }
 
     #[test]
-    fn uses_the_fallback_when_no_locale_matches() {
+    fn returns_the_id_when_no_locale_serves_the_requested_one() {
         let catalog = catalog();
-        assert_eq!(
-            catalog.format(&[locale!("ja")], "title", None, None),
-            "Welcome"
-        );
-        assert_eq!(catalog.format(&[], "title", None, None), "Welcome");
+        assert_eq!(catalog.format(&locale!("ja"), "title", None, None), "title");
     }
 
     #[test]
-    fn takes_missing_messages_from_the_fallback() {
+    fn returns_the_id_of_a_message_the_locale_lacks() {
         let catalog = catalog();
         assert_eq!(
-            catalog.format(&[locale!("de")], "only-english", None, None),
-            "Only in English"
+            catalog.format(&locale!("de"), "only-english", None, None),
+            "only-english"
         );
         assert_eq!(
-            catalog.format(&[locale!("de")], "login-input", Some("placeholder"), None),
-            "Your name"
+            catalog.format(&locale!("de"), "login-input", Some("placeholder"), None),
+            "login-input"
+        );
+        assert_eq!(
+            catalog.format(&locale!("de"), "missing", None, None),
+            "missing"
         );
     }
 
@@ -218,7 +189,7 @@ login-input = Anmelden
     fn formats_attributes() {
         let catalog = catalog();
         assert_eq!(
-            catalog.format(&[locale!("en")], "login-input", Some("placeholder"), None),
+            catalog.format(&locale!("en"), "login-input", Some("placeholder"), None),
             "Your name"
         );
     }
@@ -227,40 +198,22 @@ login-input = Anmelden
     fn formats_arguments_for_the_locale() {
         let catalog = catalog();
         let args = count(1234.0);
-        let text = catalog.format(&[locale!("de")], "items", None, Some(&args));
+        let text = catalog.format(&locale!("de"), "items", None, Some(&args));
         assert!(
             text.contains("1.234") && text.ends_with(" Artikel"),
             "{text}"
         );
         let args = count(1.0);
         assert_eq!(
-            catalog.format(&[locale!("de")], "items", None, Some(&args)),
+            catalog.format(&locale!("de"), "items", None, Some(&args)),
             "Ein Artikel"
         );
     }
 
     #[test]
-    fn returns_the_id_of_a_message_no_locale_has() {
-        let catalog = catalog();
-        assert_eq!(
-            catalog.format(&[locale!("de")], "missing", None, None),
-            "missing"
-        );
-    }
-
-    #[test]
     fn combines_the_sources_of_a_locale() {
-        let catalog = Catalog::new(
-            locale!("en"),
-            [(locale!("en"), &["a = A\n", "b = B\n"][..])],
-        );
-        assert_eq!(catalog.format(&[], "a", None, None), "A");
-        assert_eq!(catalog.format(&[], "b", None, None), "B");
-    }
-
-    #[test]
-    #[should_panic(expected = "has no Fluent sources")]
-    fn panics_when_the_fallback_has_no_sources() {
-        let _ = Catalog::new(locale!("fr"), [(locale!("en"), &[EN][..])]);
+        let catalog = Catalog::new([(locale!("en"), &["a = A\n", "b = B\n"][..])]);
+        assert_eq!(catalog.format(&locale!("en"), "a", None, None), "A");
+        assert_eq!(catalog.format(&locale!("en"), "b", None, None), "B");
     }
 }

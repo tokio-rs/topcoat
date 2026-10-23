@@ -1,11 +1,11 @@
-use std::{borrow::Cow, slice};
+use std::borrow::Cow;
 
 use fluent_bundle::FluentArgs;
 use topcoat_core::context::Cx;
 #[cfg(feature = "view")]
 use topcoat_view::{AttributeValueViewParts, NodeViewParts, PartsWriter};
 
-use crate::{Catalog, accept_language, try_locale};
+use crate::{Catalog, try_locale};
 
 /// A message of a [`Catalog`], or one of its attributes, with its arguments.
 ///
@@ -38,24 +38,21 @@ impl<'a> Translation<'a> {
         }
     }
 
-    /// Resolves the translation into its text for the locale of `cx`.
-    ///
-    /// When `cx` has a [locale](try_locale), the message is translated into
-    /// it. Otherwise, it is translated into the locale that best matches the
-    /// request's [`Accept-Language`](accept_language) header. Either way, a
-    /// locale the catalog lacks, or a message the locale lacks, falls back as
-    /// described in [`Catalog::format`].
+    /// Resolves the translation into its text for the [locale](try_locale) of
+    /// `cx`, as described in [`Catalog::format`]. When `cx` has no locale, the
+    /// result is the message ID.
     ///
     /// The text is borrowed from the catalog when the message has nothing to
     /// format, such as a message without variables.
     #[must_use]
     pub fn resolve(&self, cx: &Cx) -> Cow<'static, str> {
-        let requested = match try_locale(cx) {
-            Some(locale) => slice::from_ref(locale),
-            None => accept_language(cx),
-        };
-        self.catalog
-            .format(requested, self.id, self.attribute, Some(&self.args))
+        // TODO: Render the placeholder `key.attr(args)` instead of the ID.
+        match try_locale(cx) {
+            Some(locale) => self
+                .catalog
+                .format(locale, self.id, self.attribute, Some(&self.args)),
+            None => Cow::Borrowed(self.id),
+        }
     }
 
     /// Appends the resolved text to the view being built, escaped.
@@ -100,27 +97,24 @@ mod tests {
     use crate::locale;
 
     static CATALOG: LazyLock<Catalog> = LazyLock::new(|| {
-        Catalog::new(
-            locale!("en"),
-            [
-                (
-                    locale!("en"),
-                    &["\
+        Catalog::new([
+            (
+                locale!("en"),
+                &["\
 title = Welcome
 greeting = Hello, { $name }!
 login-input = Log in
     .placeholder = Your name
 "][..],
-                ),
-                (
-                    locale!("de"),
-                    &["\
+            ),
+            (
+                locale!("de"),
+                &["\
 title = Willkommen
 greeting = Hallo, { $name }!
 "][..],
-                ),
-            ],
-        )
+            ),
+        ])
     });
 
     fn title() -> Translation<'static> {
@@ -145,22 +139,17 @@ greeting = Hallo, { $name }!
     }
 
     #[test]
-    fn a_locale_the_catalog_lacks_falls_back_instead_of_using_the_header() {
+    fn a_locale_the_catalog_lacks_resolves_to_the_id_instead_of_using_the_header() {
         // The page is in French, so the German the header asks for would be
         // out of place.
         let cx = request("de").with(locale!("fr"));
-        assert_eq!(title().resolve(&cx), "Welcome");
+        assert_eq!(title().resolve(&cx), "title");
     }
 
     #[test]
-    fn resolves_for_the_header_without_a_locale() {
-        let cx = request("fr, de;q=0.5");
-        assert_eq!(title().resolve(&cx), "Willkommen");
-    }
-
-    #[test]
-    fn resolves_to_the_fallback_outside_a_request() {
-        assert_eq!(title().resolve(&Cx::default()), "Welcome");
+    fn resolves_to_the_id_without_a_locale() {
+        let cx = request("de");
+        assert_eq!(title().resolve(&cx), "title");
     }
 
     #[test]
@@ -176,7 +165,8 @@ greeting = Hallo, { $name }!
 
     #[test]
     fn borrows_text_without_arguments() {
-        assert!(matches!(title().resolve(&Cx::default()), Cow::Borrowed(_)));
+        let cx = Cx::default().with(locale!("en"));
+        assert!(matches!(title().resolve(&cx), Cow::Borrowed(_)));
     }
 
     async fn render(view: impl View, cx: &Cx) -> String {
@@ -188,7 +178,7 @@ greeting = Hallo, { $name }!
         let mut args = FluentArgs::new();
         args.set("name", "<b>");
         let greeting = Translation::new(&CATALOG, "greeting", None, args);
-        let cx = &Cx::default();
+        let cx = &Cx::default().with(locale!("en"));
         let html = render(view! { cx => <p>(greeting)</p> }, cx).await;
         assert_eq!(html, "<p>Hello, \u{2068}&lt;b&gt;\u{2069}!</p>");
     }
@@ -201,7 +191,7 @@ greeting = Hallo, { $name }!
             Some("placeholder"),
             FluentArgs::new(),
         );
-        let cx = &Cx::default();
+        let cx = &Cx::default().with(locale!("en"));
         let html = render(view! { cx => <input placeholder=(placeholder)> }, cx).await;
         assert_eq!(html, r#"<input placeholder="Your name">"#);
     }
