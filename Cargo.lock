@@ -5412,7 +5412,6 @@ dependencies = [
  "tokio",
  "topcoat",
  "topcoat-core",
- "topcoat-router",
  "topcoat-view",
  "unic-langid",
 ]

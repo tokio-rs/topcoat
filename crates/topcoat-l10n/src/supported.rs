@@ -1,4 +1,4 @@
-use crate::{LanguageIdentifier, Locale};
+use crate::Locale;
 
 /// The locales an application serves, and the fallback used when a request
 /// matches none of them.
@@ -65,49 +65,11 @@ impl SupportedLocales {
         &self.fallback
     }
 
-    /// Returns the supported locale that best matches `requested`, or the
-    /// fallback when none matches.
-    ///
-    /// Requested locales are tried most preferred first. Each one matches a
-    /// supported locale with the same language identifier, then one with the
-    /// same language, script, and region after filling in
-    /// [likely subtags](crate::LanguageIdentifier::maximize), then one with the
-    /// same language and script. So `en-GB` matches a supported `en`, and
-    /// `zh-TW` matches `zh-Hant` but not `zh-Hans`.
+    /// Returns the supported locale that best matches `requested`, as chosen
+    /// by [`negotiate`](crate::negotiate), or the fallback when none matches.
     #[must_use]
     pub fn negotiate<'a>(&self, requested: impl IntoIterator<Item = &'a Locale>) -> &Locale {
-        let maximized: Vec<_> = self
-            .locales
-            .iter()
-            .map(|locale| locale.id().clone().maximize())
-            .collect();
-
-        for requested in requested {
-            let id = requested.id().clone().canonicalize();
-            if let Some(locale) = self.locales.iter().find(|locale| locale.id() == &id) {
-                return locale;
-            }
-
-            let id = id.maximize();
-            let tiers: [fn(&LanguageIdentifier, &LanguageIdentifier) -> bool; 2] = [
-                |a, b| {
-                    a.language() == b.language()
-                        && a.script() == b.script()
-                        && a.region() == b.region()
-                },
-                |a, b| a.language() == b.language() && a.script() == b.script(),
-            ];
-            for matches in tiers {
-                if let Some(index) = maximized
-                    .iter()
-                    .position(|supported| matches(supported, &id))
-                {
-                    return &self.locales[index];
-                }
-            }
-        }
-
-        &self.fallback
+        crate::negotiate(requested, &self.locales).unwrap_or(&self.fallback)
     }
 }
 

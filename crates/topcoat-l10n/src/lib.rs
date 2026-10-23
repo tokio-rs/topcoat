@@ -9,10 +9,9 @@ mod extensions;
 mod fluent;
 mod langid;
 mod locale;
+mod negotiate;
 #[cfg(feature = "http")]
 mod request;
-#[cfg(feature = "router")]
-mod router;
 mod supported;
 #[cfg(feature = "view")]
 mod view;
@@ -24,8 +23,7 @@ pub use extensions::*;
 pub use fluent::*;
 pub use langid::*;
 pub use locale::*;
+pub use negotiate::*;
 #[cfg(feature = "http")]
 pub use request::*;
-#[cfg(feature = "router")]
-pub use router::*;
 pub use supported::*;

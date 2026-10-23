@@ -1,7 +1,7 @@
 use http::{header::ACCEPT_LANGUAGE, request::Parts};
-use topcoat_core::context::{Cx, memoize_cache, try_app_context, try_request_context};
+use topcoat_core::context::{Cx, memoize_cache, try_request_context};
 
-use crate::{Locale, SupportedLocales};
+use crate::Locale;
 
 /// Returns the locales listed in the request's `Accept-Language` header, most
 /// preferred first, or none outside a router request.
@@ -20,73 +20,27 @@ pub fn accept_language(cx: &Cx) -> &[Locale] {
     })
 }
 
-/// Returns the locales supported in the current scope, or `None` when none are
-/// registered.
-///
-/// Locales registered on the request context, such as by a layer with
-/// [`Cx::with`], take precedence over those registered on the app context,
-/// such as with
-/// [`supported_locales`](crate::RouterBuilderL10nExt::supported_locales).
-#[must_use]
-pub fn try_supported_locales(cx: &Cx) -> Option<&SupportedLocales> {
-    try_request_context(cx).or_else(|| try_app_context(cx))
-}
-
-/// Returns the locales supported in the current scope.
-///
-/// See [`try_supported_locales`] for where they are registered.
-///
-/// # Panics
-///
-/// Panics if no [`SupportedLocales`] are registered.
-#[must_use]
-#[track_caller]
-pub fn supported_locales(cx: &Cx) -> &SupportedLocales {
-    let Some(supported) = try_supported_locales(cx) else {
-        panic!(
-            "no supported locales: register `SupportedLocales` on the router or the request \
-             context"
-        );
-    };
-    supported
-}
-
 /// Returns the locale of the current scope, or `None` when it has none.
 ///
-/// A [`Locale`] registered on the request context, such as by a layer with
-/// [`Cx::with`], is the locale. Otherwise, it is the
-/// [supported locale](try_supported_locales) that best matches
-/// [`accept_language`], or their fallback. See [`SupportedLocales::negotiate`]
-/// for how locales are matched. The result is computed once per request and
-/// scope.
+/// The locale is the [`Locale`] registered on the request context, such as by
+/// a layer with [`Cx::with`].
 #[must_use]
 pub fn try_locale(cx: &Cx) -> Option<&Locale> {
-    if let Some(locale) = try_request_context(cx) {
-        return Some(locale);
-    }
-    memoize_cache(cx)
-        .memoize(cx, (), (), |cx, ()| {
-            try_supported_locales(&cx)
-                .map(|supported| supported.negotiate(accept_language(&cx)).clone())
-        })
-        .as_ref()
+    try_request_context(cx)
 }
 
 /// Returns the locale of the current scope.
 ///
-/// See [`try_locale`] for how it is chosen.
+/// See [`try_locale`] for where it is registered.
 ///
 /// # Panics
 ///
-/// Panics if neither a [`Locale`] nor [`SupportedLocales`] are registered.
+/// Panics if no [`Locale`] is registered.
 #[must_use]
 #[track_caller]
 pub fn locale(cx: &Cx) -> &Locale {
     let Some(locale) = try_locale(cx) else {
-        panic!(
-            "no locale: register a `Locale` or `SupportedLocales` on the router or the request \
-             context"
-        );
+        panic!("no locale: register a `Locale` on the request context, such as in a layer");
     };
     locale
 }
@@ -144,13 +98,10 @@ fn parse_weight(value: &str) -> Option<u16> {
 
 #[cfg(test)]
 mod tests {
-    use topcoat_router::{
-        Body, Method, Methods, Path, Route, RouteFuture, RouteId, Router, request::Request,
-        response::Response,
-    };
+    use http::Request;
 
     use super::*;
-    use crate::{RouterBuilderL10nExt, locale};
+    use crate::locale;
 
     fn parse(value: &str) -> Vec<Locale> {
         parse_accept_language([value].into_iter())
@@ -209,102 +160,44 @@ mod tests {
         assert_eq!(parse_weight(".5"), None);
     }
 
-    /// A route that responds with the text returned by its function.
-    struct Respond(fn(&Cx) -> String);
-
-    impl Route for Respond {
-        fn id(&self) -> RouteId {
-            static ID: std::sync::LazyLock<RouteId> = std::sync::LazyLock::new(RouteId::new);
-            *ID
-        }
-
-        fn methods(&self) -> Methods<'_> {
-            Methods::Only(&[Method::GET])
-        }
-
-        fn path(&self) -> &Path {
-            Path::ROOT
-        }
-
-        fn handle<'cx>(&'cx self, cx: &'cx Cx, _body: Body) -> RouteFuture<'cx> {
-            Box::pin(async move { Ok(Response::new(Body::from((self.0)(cx)))) })
-        }
-    }
-
-    /// Handles a request with the `Accept-Language` header `header` on a
-    /// router supporting `en` and `de` when `supported` is set.
-    async fn respond(supported: bool, header: Option<&str>, respond: fn(&Cx) -> String) -> String {
-        let mut router = Router::builder().route(Respond(respond));
-        if supported {
-            router = router.supported_locales([locale!("en"), locale!("de")]);
-        }
-        let router = router.build();
-        let mut request = Request::builder().uri("/");
-        if let Some(value) = header {
-            request = request.header(ACCEPT_LANGUAGE, value);
-        }
-        let request = request.body(Body::empty()).expect("request should build");
-
-        let response = router.handle(request).await;
-
-        let body = topcoat_router::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .expect("body should be readable");
-        String::from_utf8(body.to_vec()).expect("body should be text")
-    }
-
-    fn current_locale(cx: &Cx) -> String {
-        locale(cx).to_string()
-    }
-
-    #[tokio::test]
-    async fn locale_negotiates_the_accept_language_header() {
-        assert_eq!(
-            respond(true, Some("fr, de-AT;q=0.8"), current_locale).await,
-            "de"
-        );
-    }
-
-    #[tokio::test]
-    async fn locale_falls_back_without_a_header() {
-        assert_eq!(respond(true, None, current_locale).await, "en");
-    }
-
-    #[tokio::test]
-    async fn a_locale_in_the_request_context_is_the_locale() {
-        let locale = respond(true, Some("de"), |cx| {
-            current_locale(&cx.with(locale!("fr")))
-        });
-        assert_eq!(locale.await, "fr");
-    }
-
-    #[tokio::test]
-    async fn supported_locales_in_the_request_context_take_precedence() {
-        // The outer scope negotiates `de` from the router's locales. The inner
-        // scope supports only `fr` and `it`, so it falls back to `fr`.
-        let locales = respond(true, Some("de"), |cx| {
-            let scoped = cx.with(SupportedLocales::from([locale!("fr"), locale!("it")]));
-            format!("{} {}", current_locale(cx), current_locale(&scoped))
-        });
-        assert_eq!(locales.await, "de fr");
-    }
-
-    #[tokio::test]
-    async fn there_is_no_locale_without_supported_locales() {
-        let locale = respond(false, Some("de"), |cx| format!("{:?}", try_locale(cx)));
-        assert_eq!(locale.await, "None");
+    /// Returns a context for a request with the `Accept-Language` header
+    /// `header`.
+    fn request(header: &str) -> Cx {
+        let (parts, ()) = Request::builder()
+            .header(ACCEPT_LANGUAGE, header)
+            .body(())
+            .expect("request should build")
+            .into_parts();
+        Cx::default().with(parts)
     }
 
     #[test]
-    fn outside_a_request_the_locale_is_the_fallback() {
-        let cx = Cx::default().with(SupportedLocales::from([locale!("de"), locale!("en")]));
-        assert_eq!(accept_language(&cx), []);
-        assert_eq!(locale(&cx), &locale!("de"));
+    fn reads_the_header_of_the_request() {
+        assert_eq!(
+            accept_language(&request("de;q=0.5, en")),
+            [locale!("en"), locale!("de")]
+        );
+    }
+
+    #[test]
+    fn there_is_no_header_outside_a_request() {
+        assert_eq!(accept_language(&Cx::default()), []);
+    }
+
+    #[test]
+    fn the_locale_is_the_one_in_the_scope() {
+        let cx = request("de").with(locale!("fr"));
+        assert_eq!(locale(&cx), &locale!("fr"));
+    }
+
+    #[test]
+    fn the_header_does_not_choose_a_locale() {
+        assert_eq!(try_locale(&request("de")), None);
     }
 
     #[test]
     #[should_panic(expected = "no locale")]
-    fn locale_panics_without_supported_locales() {
+    fn locale_panics_without_a_locale() {
         let _ = locale(&Cx::default());
     }
 }

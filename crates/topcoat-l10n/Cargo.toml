@@ -23,17 +23,12 @@ fluent = [
 http = [
 	"dep:http",
 ]
-router = [
-	"dep:topcoat-router",
-	"http",
-]
 view = [
 	"dep:topcoat-view",
 ]
 
 [dependencies]
 topcoat-core.workspace = true
-topcoat-router = { workspace = true, optional = true }
 topcoat-view = { workspace = true, optional = true }
 
 fixed_decimal = { workspace = true, optional = true, features = ["ryu"] }
@@ -48,7 +43,7 @@ unic-langid = { workspace = true, optional = true }
 
 [dev-dependencies]
 http.workspace = true
-topcoat = { workspace = true, features = ["l10n", "router"] }
+topcoat = { workspace = true, features = ["l10n", "view"] }
 tokio = { workspace = true, features = ["macros", "rt"] }
 
 [lints]

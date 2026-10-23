@@ -142,7 +142,6 @@ router = [
 	"topcoat-asset?/router",
 	"topcoat-cookie?/router",
 	"topcoat-font?/router",
-	"topcoat-l10n?/router",
 	"topcoat-mail?/router",
 	"topcoat-runtime?/router",
 	"topcoat-session?/router",
