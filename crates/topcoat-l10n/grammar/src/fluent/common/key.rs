@@ -143,10 +143,7 @@ mod tests {
         ] {
             assert_eq!(
                 key(input),
-                (
-                    "password-field".to_owned(),
-                    Some("placeholder".to_owned())
-                ),
+                ("password-field".to_owned(), Some("placeholder".to_owned())),
                 "{input}"
             );
         }
