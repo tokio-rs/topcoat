@@ -245,6 +245,7 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 
 **Miscellaneous**
 - [Topcoat UI](https://github.com/tokio-rs/topcoat/blob/main/docs/ui.md): premade components vendored into your project for you to edit.
+- [Localization](https://docs.rs/topcoat/latest/topcoat/l10n/index.html): pick a locale per request and translate messages from Fluent files.
 - [Mail](https://docs.rs/topcoat/latest/topcoat/mail/index.html): declare mail with the `mail!` macro, deliver through SMTP, file, or in-memory transports.
 
 **Third-party integrations**
@@ -262,7 +263,6 @@ Planned features we'd like to bring to Topcoat. Have an idea? [Open an issue](ht
 - [ ] More Topcoat UI components, full "blocks" e.g. sign-in form
 - [ ] Better [Toasty](https://github.com/tokio-rs/toasty) integration (safely create/update records from forms without listing out all the fields)
 - [ ] Validations
-- [ ] Localization support
 - [ ] `OpenAPI` endpoints
 - [ ] Docs for how to deploy Topcoat
 - [ ] Pre-rendering for static pages
