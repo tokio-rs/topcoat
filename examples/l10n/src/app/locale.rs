@@ -1,15 +1,17 @@
+pub mod _page;
+
 use topcoat::{
     Result,
     context::Cx,
     l10n::{Locale, locale},
     router::{
-        Body, Next, Slot, error::not_found, layer, layout, module_param, page, path_param,
+        Body, Next, Slot, error::not_found, layer, layout, module_param, path_param,
         response::Response,
     },
     view::{View, view},
 };
 
-use crate::t;
+use super::t;
 
 module_param!(pub path_locale: Locale, error = not_found);
 
@@ -35,9 +37,4 @@ async fn layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
             <body>(slot)</body>
         </html>
     })
-}
-
-#[page]
-pub async fn page() -> Result<impl View> {
-    Ok(view! { (t!(current_date, date = "kek")) })
 }
