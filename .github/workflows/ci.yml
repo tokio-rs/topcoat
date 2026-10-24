@@ -72,6 +72,11 @@ jobs:
       - uses: actions/checkout@v4
       - run: rustup update stable && rustup default stable
       - uses: Swatinem/rust-cache@v2
+      # The cache drops `target/debug/gn_out`, where the `v8` build script stores the
+      # prebuilt V8 library, but keeps the script's fingerprint. When `v8` has to be
+      # rebuilt, Cargo then skips the script and cannot find the library. Remove the
+      # fingerprint so the script downloads it again.
+      - run: test -e target/debug/gn_out/obj/librusty_v8.a || rm -rf target/debug/build/v8-* target/debug/.fingerprint/v8-*
       - run: cargo test --workspace --all-features
 
   # Compiles a few starter applications created by `topcoat new` against this
