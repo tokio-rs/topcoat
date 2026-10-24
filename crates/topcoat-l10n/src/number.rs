@@ -167,10 +167,7 @@ impl Number {
 
         if self.min_significant_digits.is_some() || self.max_significant_digits.is_some() {
             let min = self.min_significant_digits.unwrap_or(1);
-            let max = self
-                .max_significant_digits
-                .unwrap_or(DIGITS_LIMIT)
-                .max(min);
+            let max = self.max_significant_digits.unwrap_or(DIGITS_LIMIT).max(min);
             let start = decimal.absolute.nonzero_magnitude_start();
             decimal.round_with_mode(start - max + 1, ROUNDING);
             // Rounding pads zeros up to the rounding position.

@@ -159,7 +159,10 @@ impl DateTime {
 
     /// Formats the value with a [`formatter`](Self::formatter) for its
     /// [styles](Self::styles).
-    pub(crate) fn format_with(&self, formatter: &DateTimeFormatter<CompositeDateTimeFieldSet>) -> String {
+    pub(crate) fn format_with(
+        &self,
+        formatter: &DateTimeFormatter<CompositeDateTimeFieldSet>,
+    ) -> String {
         // The formatter only shows the fields of the styles, so the missing half can be
         // any valid value.
         let (date, time) = match self.value {

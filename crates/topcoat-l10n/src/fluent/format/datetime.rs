@@ -135,7 +135,10 @@ not-a-date = { DATETIME($count) }
     fn formats_like_a_date_time_with_the_same_styles() {
         let en = locale!("en");
         assert_eq!(text("plain", date()), date().resolve_in(&en));
-        assert_eq!(text("long", date()), date().date_style(Long).resolve_in(&en));
+        assert_eq!(
+            text("long", date()),
+            date().date_style(Long).resolve_in(&en)
+        );
         assert_eq!(
             text("both", date()),
             date().date_style(Short).time_style(Short).resolve_in(&en)
