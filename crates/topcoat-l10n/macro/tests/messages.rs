@@ -144,7 +144,8 @@ fn each_namespace_has_its_own_messages() {
 async fn renders_as_content_and_attribute_values() {
     let cx = &scope(locale!("de"));
     let name = "<Ada>";
-    let view = view! { cx =>
+    let view = view! {
+        cx =>
         <p>(t!(greeting, name))</p>
         <input placeholder=(t!(login-input.placeholder))>
     };
