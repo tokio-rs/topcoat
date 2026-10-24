@@ -9,6 +9,8 @@ items =
         [one] One item
        *[other] { $count } items
     }
+# `DATETIME` formats a date for the locale. `dateStyle: "full"` includes the weekday.
+today = Today is { DATETIME($date, dateStyle: "full") }.
 # `.placeholder` is an attribute: an extra text that belongs to the message.
 search = Search
     .placeholder = Type to search

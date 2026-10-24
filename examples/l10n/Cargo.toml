@@ -5,8 +5,9 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+jiff.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
-topcoat = { workspace = true, features = ["l10n-fluent"] }
+topcoat = { workspace = true, features = ["jiff", "l10n-datetime", "l10n-fluent"] }
 
 [lints]
 workspace = true

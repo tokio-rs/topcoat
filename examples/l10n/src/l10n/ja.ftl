@@ -5,5 +5,6 @@ intro = このページは Fluent で翻訳されています。
 greeting = こんにちは、{ $name }さん！
 # Japanese has a single plural form, so it needs no variants.
 items = { $count } 個のアイテム
+today = 今日は{ DATETIME($date, dateStyle: "full") }です。
 search = 検索
     .placeholder = 検索ワードを入力

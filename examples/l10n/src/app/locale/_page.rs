@@ -1,3 +1,4 @@
+use jiff::Zoned;
 use topcoat::{
     Result,
     router::page,
@@ -24,6 +25,10 @@ pub async fn page() -> Result<impl View> {
                 <li>(t!(items, count))</li>
             }
         </ul>
+
+        // `jiff` values format as dates. `Zoned::now` is the current date and time in
+        // the server's time zone.
+        <p>(t!(today, date = Zoned::now()))</p>
 
         // `search.placeholder` is the `.placeholder` attribute of the `search` message.
         <input

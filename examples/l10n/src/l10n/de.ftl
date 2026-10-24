@@ -8,5 +8,6 @@ items =
         [one] Ein Artikel
        *[other] { $count } Artikel
     }
+today = Heute ist { DATETIME($date, dateStyle: "full") }.
 search = Suche
     .placeholder = Suchbegriff eingeben
