@@ -150,7 +150,9 @@ fn stylesheet(target: &Path, package: &str) -> PathBuf {
         .filter(|dir| {
             dir.file_name()
                 .and_then(|name| name.to_str())
-                .is_some_and(|name| name.starts_with(&prefix))
+                .and_then(|name| name.strip_prefix(&prefix))
+                // Match `foo-<hash>` but not another package's `foo-bar-<hash>`.
+                .is_some_and(|hash| hash.chars().all(|char| char.is_ascii_hexdigit()))
         })
         .map(|dir| dir.join("out/tailwind.css"))
         .filter_map(|css| {
