@@ -2,7 +2,7 @@
 
 use topcoat::{
     context::Cx,
-    l10n::{Translation, fluent::messages},
+    l10n::{Number, Translation, fluent::messages},
     router::{
         error::{SeeOther, see_other},
         href,
@@ -18,10 +18,13 @@ pub fn money(amount: Money) -> Translation<'static> {
     t!(money, amount = amount.dollars())
 }
 
-/// Formats an amount for a form field in the request's language, such as `1234.50`.
-/// [`Money`] parses the result.
-pub fn money_input(amount: Money) -> Translation<'static> {
-    t!(money_input, amount = amount.dollars())
+/// Formats an amount for a form field, such as `1234.50` in English. It has no currency
+/// symbol or thousands separators, so [`Money`] parses the result.
+pub fn money_input(amount: Money) -> Number {
+    Number::new(amount.dollars())
+        .min_fraction_digits(2)
+        .max_fraction_digits(2)
+        .grouping(false)
 }
 
 pub fn role_label(role: Role) -> Translation<'static> {

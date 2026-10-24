@@ -58,7 +58,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
     let rejected = try_request_context::<Rejected>(cx);
     let form = rejected.map_or_else(
         || ProductForm {
-            price: money_input(product.price).resolve(cx).into_owned(),
+            price: money_input(product.price).resolve(cx),
             ..ProductForm::of(product)
         },
         |rejected| rejected.form.clone(),

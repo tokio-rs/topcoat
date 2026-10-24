@@ -1,91 +1,51 @@
-use fixed_decimal::{Decimal, FloatPrecision, SignedRoundingMode, UnsignedRoundingMode};
 use fluent_bundle::{
     memoizer::MemoizerKind,
     types::{FluentNumber, FluentNumberStyle},
 };
-use icu_decimal::{
-    DecimalFormatter,
-    options::{DecimalFormatterOptions, GroupingStrategy},
-};
+use icu_decimal::DecimalFormatter;
 use intl_memoizer::Memoizable;
 
-/// Rounding mode that sends halfway values away from zero, matching
-/// `Intl.NumberFormat`.
-const ROUNDING: SignedRoundingMode = SignedRoundingMode::Unsigned(UnsignedRoundingMode::HalfExpand);
-
-/// Default maximum number of decimal places, matching `Intl.NumberFormat`.
-const DEFAULT_MAXIMUM_FRACTION_DIGITS: i16 = 3;
-
-/// Maximum decimal places allowed by `Intl.NumberFormat`.
-const FRACTION_DIGITS_LIMIT: i16 = 100;
-
-/// Maximum integer or significant digit setting allowed by `Intl.NumberFormat`.
-const DIGITS_LIMIT: i16 = 21;
+use crate::Number;
 
 /// Formats a number using the locale stored in `intls`.
 ///
-/// Returns `None` for unsupported values, including currency, percentages and infinity.
+/// Returns `None` for unsupported values, including currency and percentages.
 pub(super) fn format_number<M: MemoizerKind>(number: &FluentNumber, intls: &M) -> Option<String> {
-    let options = &number.options;
-    if options.style != FluentNumberStyle::Decimal {
-        return None;
-    }
-    let decimal = to_decimal(number)?;
+    let grouping = number.options.use_grouping;
+    let number = Number::from_fluent(number)?;
     intls
-        .with_try_get_threadsafe::<NumberFormatter, _, _>((options.use_grouping,), |formatter| {
-            formatter.0.format_to_string(&decimal)
+        .with_try_get_threadsafe::<NumberFormatter, _, _>((grouping,), |formatter| {
+            number.format_with(&formatter.0)
         })
         .ok()
 }
 
-/// Converts a Fluent number to a decimal with the requested rounding and padding.
-///
-/// Significant digits start at the first nonzero digit. When specified, they override
-/// decimal-place settings.
-fn to_decimal(number: &FluentNumber) -> Option<Decimal> {
-    let options = &number.options;
-    let mut decimal = Decimal::try_from_f64(number.value, FloatPrecision::RoundTrip).ok()?;
-
-    if options.minimum_significant_digits.is_some() || options.maximum_significant_digits.is_some()
-    {
-        let minimum = options
-            .minimum_significant_digits
-            .map_or(1, |count| digits(count, DIGITS_LIMIT));
-        let maximum = options
-            .maximum_significant_digits
-            .map_or(DIGITS_LIMIT, |count| digits(count, DIGITS_LIMIT))
-            .max(minimum);
-        let start = decimal.absolute.nonzero_magnitude_start();
-        decimal.round_with_mode(start - maximum + 1, ROUNDING);
-        // Rounding pads zeros up to the rounding position.
-        decimal.absolute.trim_end();
-        // Rounding can add a digit, as from 999 to 1000.
-        let start = decimal.absolute.nonzero_magnitude_start();
-        decimal.absolute.pad_end(start - minimum + 1);
-    } else {
-        let minimum = options
-            .minimum_fraction_digits
-            .map_or(0, |count| digits(count, FRACTION_DIGITS_LIMIT));
-        let maximum = options
-            .maximum_fraction_digits
-            .map_or(DEFAULT_MAXIMUM_FRACTION_DIGITS, |count| {
-                digits(count, FRACTION_DIGITS_LIMIT)
-            })
-            .max(minimum);
-        decimal.round_with_mode(-maximum, ROUNDING);
-        decimal.absolute.trim_end();
-        decimal.absolute.pad_end(-minimum);
+impl Number {
+    /// Converts a Fluent number with `NUMBER` options, or returns `None` for styles
+    /// other than decimal.
+    fn from_fluent(number: &FluentNumber) -> Option<Self> {
+        let options = &number.options;
+        if options.style != FluentNumberStyle::Decimal {
+            return None;
+        }
+        let mut result = Self::new(number.value).grouping(options.use_grouping);
+        if let Some(count) = options.minimum_integer_digits {
+            result = result.min_integer_digits(count);
+        }
+        if let Some(count) = options.minimum_fraction_digits {
+            result = result.min_fraction_digits(count);
+        }
+        if let Some(count) = options.maximum_fraction_digits {
+            result = result.max_fraction_digits(count);
+        }
+        if let Some(count) = options.minimum_significant_digits {
+            result = result.min_significant_digits(count);
+        }
+        if let Some(count) = options.maximum_significant_digits {
+            result = result.max_significant_digits(count);
+        }
+        Some(result)
     }
-
-    if let Some(minimum) = options.minimum_integer_digits {
-        decimal.absolute.pad_start(digits(minimum, DIGITS_LIMIT));
-    }
-    Some(decimal)
-}
-
-/// Converts an option's digit count to a position offset, without exceeding `limit`.
-fn digits(count: usize, limit: i16) -> i16 {
-    i16::try_from(count).map_or(limit, |count| count.min(limit))
 }
 
 /// A cached number formatter for one bundle locale.
@@ -98,17 +58,13 @@ impl Memoizable for NumberFormatter {
 
     fn construct(
         lang: unic_langid::LanguageIdentifier,
-        (use_grouping,): Self::Args,
+        (grouping,): Self::Args,
     ) -> Result<Self, Self::Error> {
         let locale =
             icu_locale_core::LanguageIdentifier::try_from_str(&lang.to_string()).map_err(|_| ())?;
-        let mut options = DecimalFormatterOptions::default();
-        if !use_grouping {
-            options.grouping_strategy = Some(GroupingStrategy::Never);
-        }
-        DecimalFormatter::try_new((&locale).into(), options)
+        Number::formatter((&locale).into(), grouping)
             .map(Self)
-            .map_err(|_| ())
+            .ok_or(())
     }
 }
 
@@ -144,44 +100,13 @@ mod tests {
     }
 
     #[test]
-    fn shows_at_most_three_fraction_digits_by_default() {
-        assert_eq!(format("en", "n = { $n }", 1.234_56), "1.235");
-    }
-
-    #[test]
-    fn rounds_halves_away_from_zero() {
+    fn applies_the_options_of_number() {
+        let source = "n = { NUMBER($n, minimumIntegerDigits: 2, minimumFractionDigits: 2) }";
+        assert_eq!(format("en", source, 7.0), "07.00");
         let source = "n = { NUMBER($n, maximumFractionDigits: 0) }";
         assert_eq!(format("en", source, 2.5), "3");
-        assert_eq!(format("en", source, -2.5), "-3");
-    }
-
-    #[test]
-    fn pads_to_the_minimum_digits() {
-        let source = "n = { NUMBER($n, minimumFractionDigits: 2) }";
-        assert_eq!(format("de", source, 1.5), "1,50");
-        let source = "n = { NUMBER($n, minimumIntegerDigits: 3) }";
-        assert_eq!(format("en", source, 7.0), "007");
-    }
-
-    #[test]
-    fn rounds_to_significant_digits() {
-        let source = "n = { NUMBER($n, maximumSignificantDigits: 2) }";
-        assert_eq!(format("en", source, 1234.5), "1,200");
-        assert_eq!(format("en", source, 0.000_123), "0.00012");
-        assert_eq!(format("en", source, 999.0), "1,000");
-    }
-
-    #[test]
-    fn pads_to_significant_digits() {
-        let source = "n = { NUMBER($n, minimumSignificantDigits: 3) }";
-        assert_eq!(format("en", source, 5.0), "5.00");
-        assert_eq!(format("en", source, 0.0), "0.00");
-    }
-
-    #[test]
-    fn prefers_significant_digits_over_fraction_digits() {
-        let source = "n = { NUMBER($n, maximumSignificantDigits: 2, maximumFractionDigits: 5) }";
-        assert_eq!(format("en", source, 1234.5), "1,200");
+        let source = "n = { NUMBER($n, minimumSignificantDigits: 3, maximumSignificantDigits: 3) }";
+        assert_eq!(format("en", source, 1234.5), "1,230");
     }
 
     #[test]

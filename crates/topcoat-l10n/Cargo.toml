@@ -19,17 +19,20 @@ check = [
 	"fluent",
 ]
 fluent = [
-	"dep:fixed_decimal",
 	"dep:fluent-bundle",
-	"dep:icu_decimal",
 	"dep:icu_provider",
 	"dep:intl-memoizer",
 	"dep:inventory",
 	"dep:unic-langid",
 	"http",
+	"number",
 ]
 http = [
 	"dep:http",
+]
+number = [
+	"dep:fixed_decimal",
+	"dep:icu_decimal",
 ]
 serde = [
 	"dep:serde",

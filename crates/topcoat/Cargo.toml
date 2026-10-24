@@ -41,6 +41,7 @@ full = [
 	"icon-iconify",
 	"l10n",
 	"l10n-fluent",
+	"l10n-number",
 	"mail",
 	"mail-smtp",
 	"multipart",
@@ -119,9 +120,14 @@ l10n = [
 ]
 l10n-fluent = [
 	"l10n",
+	"l10n-number",
 	"dep:topcoat-l10n-macro",
 	"topcoat-l10n/fluent",
 	"topcoat-l10n-macro/fluent",
+]
+l10n-number = [
+	"l10n",
+	"topcoat-l10n/number",
 ]
 mail = [
 	"dep:topcoat-mail",

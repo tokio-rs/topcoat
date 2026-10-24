@@ -11,6 +11,8 @@ mod langid;
 mod locale;
 mod lookup;
 mod negotiate;
+#[cfg(feature = "number")]
+mod number;
 #[cfg(feature = "http")]
 mod request;
 #[cfg(feature = "serde")]
@@ -27,5 +29,7 @@ pub use langid::*;
 pub use locale::*;
 pub use lookup::*;
 pub use negotiate::*;
+#[cfg(feature = "number")]
+pub use number::*;
 #[cfg(feature = "http")]
 pub use request::*;
