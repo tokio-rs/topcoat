@@ -6,7 +6,7 @@ use topcoat::{
     Result,
     context::Cx,
     icon::{icon, iconify::iconify_icon},
-    l10n::{Translation, fluent::messages},
+    l10n::{DateTime, DateTimeStyle, Translation, fluent::messages},
     router::{href, page, query_params},
     runtime::{Event, Signal, link, shard, signal},
     view::{StaticClass, View, attributes, class, component, element_id, suspense, view},
@@ -14,7 +14,7 @@ use topcoat::{
 
 use self::order_id::OrderId;
 use crate::{
-    app::_common::money,
+    app::_common::{money, timestamp},
     components::{
         avatar::{AvatarSize, avatar, avatar_fallback},
         badge::{BadgeVariant, badge},
@@ -282,10 +282,7 @@ async fn order_rows(
                             attrs: attributes! { class="text-muted-foreground" },
                             <time
                                 datetime=(order.placed_at.to_string())
-                                title=(order
-                                    .placed_at
-                                    .strftime("%b %-d, %Y at %H:%M UTC")
-                                    .to_string())
+                                title=(timestamp(order.placed_at))
                             >
                                 time_ago(timestamp: order.placed_at)
                             </time>
@@ -399,7 +396,7 @@ pub(super) async fn time_ago(timestamp: Timestamp) -> Result<impl View> {
         } else if minutes < 7 * 24 * 60 {
             (t!(days_ago, count = minutes / (24 * 60)))
         } else {
-            (timestamp.strftime("%b %-d, %Y").to_string())
+            (DateTime::from(timestamp).date_style(DateTimeStyle::Medium))
         }
     })
 }

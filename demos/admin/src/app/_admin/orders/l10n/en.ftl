@@ -56,8 +56,8 @@ status_refunded = Refunded
 
 # `$id` is the order number.
 order_title = Order #{ $id }
-# `$date` is when the order was placed, such as "Oct 12, 2026 at 14:05 UTC".
-placed_on = Placed { $date }
+# `$date` is when the order was placed.
+placed_on = Placed { DATETIME($date, dateStyle: "medium", timeStyle: "short") } UTC
 
 items = Items
 unit_count =

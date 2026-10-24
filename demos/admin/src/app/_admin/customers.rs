@@ -5,7 +5,7 @@ use topcoat::{
     Result,
     context::Cx,
     icon::{icon, iconify::iconify_icon},
-    l10n::{Translation, fluent::messages},
+    l10n::{DateTime, DateTimeStyle, Translation, fluent::messages},
     router::{href, page, query_params},
     runtime::{Event, Signal, link, shard, signal},
     view::{View, attributes, component, element_id, suspense, view},
@@ -237,7 +237,8 @@ async fn customer_rows(
                         table_cell(
                             attrs: attributes! { class="text-muted-foreground" },
                             <time datetime=(customer.joined_at.to_string())>
-                                (customer.joined_at.strftime("%b %-d, %Y").to_string())
+                                (DateTime::from(customer.joined_at)
+                                    .date_style(DateTimeStyle::Medium))
                             </time>
                         )
                         table_cell(

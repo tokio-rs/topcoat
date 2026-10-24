@@ -17,6 +17,8 @@ pub struct Argument<'a>(Value<'a>);
 enum Value<'a> {
     String(Cow<'a, str>),
     Number(f64),
+    #[cfg(feature = "datetime")]
+    DateTime(crate::DateTime),
     Custom(Arc<dyn FluentType + Send + Sync>),
     None,
 }
@@ -35,6 +37,8 @@ impl Argument<'_> {
         match &self.0 {
             Value::String(text) => FluentValue::String(Cow::Borrowed(text)),
             Value::Number(number) => FluentValue::from(*number),
+            #[cfg(feature = "datetime")]
+            Value::DateTime(value) => FluentValue::Custom(Box::new(crate::FluentDateTime(*value))),
             Value::Custom(value) => FluentValue::Custom(Box::new(Shared(Arc::clone(value)))),
             Value::None => FluentValue::None,
         }
@@ -46,11 +50,40 @@ impl Argument<'_> {
         let _ = match &self.0 {
             Value::String(value) => write!(text, "{value:?}"),
             Value::Number(number) => write!(text, "{number}"),
+            #[cfg(feature = "datetime")]
+            Value::DateTime(value) => text.write_str(&value.fallback()),
             Value::Custom(value) => write!(text, "{value:?}"),
             Value::None => text.write_str("None"),
         };
     }
 }
+
+#[cfg(feature = "datetime")]
+impl From<crate::DateTime> for Argument<'_> {
+    fn from(value: crate::DateTime) -> Self {
+        Self(Value::DateTime(value))
+    }
+}
+
+/// Converts `jiff` dates and times through [`DateTime`](crate::DateTime).
+#[cfg(all(feature = "datetime", feature = "jiff"))]
+macro_rules! from_jiff {
+    ($($ty:ty)*) => {
+        $(
+            impl From<$ty> for Argument<'_> {
+                fn from(value: $ty) -> Self {
+                    Self::from(crate::DateTime::from(value))
+                }
+            }
+        )*
+    };
+}
+
+#[cfg(all(feature = "datetime", feature = "jiff"))]
+from_jiff!(
+    jiff::civil::Date jiff::civil::DateTime jiff::civil::Time jiff::Timestamp jiff::Zoned
+    &jiff::Zoned
+);
 
 impl<'a> From<Cow<'a, str>> for Argument<'a> {
     fn from(text: Cow<'a, str>) -> Self {

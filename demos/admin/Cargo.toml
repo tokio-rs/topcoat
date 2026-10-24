@@ -11,7 +11,7 @@ serde = { workspace = true, features = ["derive"] }
 toasty = { workspace = true, features = ["jiff", "migration", "sqlite"] }
 toasty-cli.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
-topcoat = { workspace = true, features = ["font-fontsource", "icon-iconify", "l10n-fluent", "tailwind", "ui"] }
+topcoat = { workspace = true, features = ["font-fontsource", "icon-iconify", "jiff", "l10n-datetime", "l10n-fluent", "tailwind", "ui"] }
 
 [build-dependencies]
 # We cannot use `workspace = true` with `default-features = false`.

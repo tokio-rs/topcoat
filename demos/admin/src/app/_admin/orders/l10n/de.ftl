@@ -54,7 +54,7 @@ status_refunded = Erstattet
 # `$id` ist die Bestellnummer.
 order_title = Bestellung #{ $id }
 # `$date` ist der Zeitpunkt der Bestellung.
-placed_on = Bestellt am { $date }
+placed_on = Bestellt am { DATETIME($date, dateStyle: "medium", timeStyle: "short") } UTC
 
 items = Artikel
 unit_count = { $count } Stück

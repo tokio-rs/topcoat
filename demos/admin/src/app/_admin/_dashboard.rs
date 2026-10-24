@@ -19,7 +19,7 @@ use super::orders::{
     status_badge, time_ago,
 };
 use crate::{
-    app::_common::money,
+    app::_common::{money, timestamp},
     components::{
         avatar::{AvatarSize, avatar, avatar_fallback},
         card::{card, card_description, card_header, card_title},
@@ -291,10 +291,7 @@ async fn open_orders(cx: &Cx) -> Result<impl View> {
                                 attrs: attributes! { class="text-muted-foreground" },
                                 <time
                                     datetime=(order.placed_at.to_string())
-                                    title=(order
-                                        .placed_at
-                                        .strftime("%b %-d, %Y at %H:%M UTC")
-                                        .to_string())
+                                    title=(timestamp(order.placed_at))
                                 >
                                     time_ago(timestamp: order.placed_at)
                                 </time>

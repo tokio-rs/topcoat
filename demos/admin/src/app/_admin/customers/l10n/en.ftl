@@ -20,8 +20,8 @@ column_spent = Spent
 
 ## Customer details
 
-# `$date` is the month the customer joined, such as "Oct 2026".
-customer_since = Customer since { $date }
+# `$date` is the day the customer joined.
+customer_since = Customer since { DATETIME($date, dateStyle: "medium") }
 
 total_spent = Total spent
 average_order = Average order

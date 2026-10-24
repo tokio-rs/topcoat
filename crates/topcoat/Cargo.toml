@@ -39,7 +39,9 @@ full = [
 	"htmx",
 	"icon",
 	"icon-iconify",
+	"jiff",
 	"l10n",
+	"l10n-datetime",
 	"l10n-fluent",
 	"l10n-number",
 	"mail",
@@ -114,9 +116,16 @@ icon-iconify = [
 	"topcoat-icon-macro/iconify",
 	"topcoat-icon/iconify-build",
 ]
+jiff = [
+	"topcoat-l10n?/jiff",
+]
 l10n = [
 	"dep:topcoat-l10n",
 	"topcoat-l10n/serde",
+]
+l10n-datetime = [
+	"l10n",
+	"topcoat-l10n/datetime",
 ]
 l10n-fluent = [
 	"l10n",

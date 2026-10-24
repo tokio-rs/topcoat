@@ -1,5 +1,9 @@
+#[cfg(feature = "datetime")]
+mod datetime;
 mod number;
 
+#[cfg(feature = "datetime")]
+pub(crate) use datetime::*;
 use fluent_bundle::{FluentValue, memoizer::MemoizerKind};
 
 /// Formats Fluent values using the bundle's locale.

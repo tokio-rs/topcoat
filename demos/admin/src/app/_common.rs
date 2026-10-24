@@ -1,5 +1,6 @@
 //! Helpers shared by several pages. The `_common` group has no routes.
 
+use jiff::Timestamp;
 use topcoat::{
     context::Cx,
     l10n::{Number, Translation, fluent::messages},
@@ -25,6 +26,11 @@ pub fn money_input(amount: Money) -> Number {
         .min_fraction_digits(2)
         .max_fraction_digits(2)
         .grouping(false)
+}
+
+/// Formats the date and time of day of `at` in UTC, such as `Oct 12, 2026, 2:05 PM UTC`.
+pub fn timestamp(at: Timestamp) -> Translation<'static> {
+    t!(timestamp, at)
 }
 
 pub fn role_label(role: Role) -> Translation<'static> {

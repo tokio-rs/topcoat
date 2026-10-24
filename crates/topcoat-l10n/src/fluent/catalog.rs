@@ -115,6 +115,10 @@ impl LocaleBundle {
         bundle
             .add_builtins()
             .expect("the builtin functions are added to a new bundle");
+        #[cfg(feature = "datetime")]
+        bundle
+            .add_function("DATETIME", crate::DATETIME)
+            .expect("`DATETIME` is added to a new bundle");
         for resource in sources {
             assert!(
                 bundle.add_resource(Arc::clone(resource)).is_ok(),

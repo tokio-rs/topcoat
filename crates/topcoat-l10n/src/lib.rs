@@ -2,6 +2,8 @@
 
 //! Locale selection and translation support for Topcoat.
 
+#[cfg(feature = "datetime")]
+mod datetime;
 mod direction;
 mod error;
 mod extensions;
@@ -20,6 +22,8 @@ mod serde;
 #[cfg(feature = "view")]
 mod view;
 
+#[cfg(feature = "datetime")]
+pub use datetime::*;
 pub use direction::*;
 pub use error::*;
 pub use extensions::*;

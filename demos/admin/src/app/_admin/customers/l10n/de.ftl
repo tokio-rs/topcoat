@@ -20,8 +20,8 @@ column_spent = Ausgegeben
 
 ## Kundendetails
 
-# `$date` ist der Monat, in dem der Kunde dazukam.
-customer_since = Kunde seit { $date }
+# `$date` ist der Tag, an dem der Kunde dazukam.
+customer_since = Kunde seit { DATETIME($date, dateStyle: "medium") }
 
 total_spent = Insgesamt ausgegeben
 average_order = Durchschnittliche Bestellung

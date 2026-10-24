@@ -2,7 +2,7 @@ use serde::Deserialize;
 use topcoat::{
     Result,
     context::Cx,
-    l10n::Translation,
+    l10n::{DateTime, DateTimeStyle, Translation},
     router::{
         Body, Next,
         content::Form,
@@ -74,13 +74,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                 </div>
                 <p class="text-sm text-muted-foreground">
                     <time datetime=(order.placed_at.to_string())>
-                        (t!(
-                            placed_on,
-                            date = order
-                                .placed_at
-                                .strftime("%b %-d, %Y at %H:%M UTC")
-                                .to_string(),
-                        ))
+                        (t!(placed_on, date = order.placed_at))
                     </time>
                 </p>
             </div>
@@ -266,7 +260,8 @@ async fn customer_details(cx: &Cx, id: u64) -> Result<impl View> {
                     <dt class="text-muted-foreground">(t!(customer_since))</dt>
                     <dd>
                         <time datetime=(customer.joined_at.to_string())>
-                            (customer.joined_at.strftime("%b %Y").to_string())
+                            (DateTime::from(customer.joined_at)
+                                .date_style(DateTimeStyle::Medium))
                         </time>
                     </dd>
                 </div>

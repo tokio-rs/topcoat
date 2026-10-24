@@ -22,7 +22,7 @@ use crate::{
                 status_badge, time_ago,
             },
         },
-        _common::money,
+        _common::{money, timestamp},
     },
     components::{
         avatar::{AvatarSize, avatar, avatar_fallback},
@@ -82,10 +82,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                     detail(
                         data: iconify_icon!("lucide:calendar"),
                         <time datetime=(customer.joined_at.to_string())>
-                            (t!(
-                                customer_since,
-                                date = customer.joined_at.strftime("%b %Y").to_string(),
-                            ))
+                            (t!(customer_since, date = customer.joined_at))
                         </time>
                     )
                 </div>
@@ -159,10 +156,7 @@ async fn customer_orders(cx: &Cx, id: u64) -> Result<impl View> {
                                     attrs: attributes! { class="text-muted-foreground" },
                                     <time
                                         datetime=(order.placed_at.to_string())
-                                        title=(order
-                                            .placed_at
-                                            .strftime("%b %-d, %Y at %H:%M UTC")
-                                            .to_string())
+                                        title=(timestamp(order.placed_at))
                                     >
                                         time_ago(timestamp: order.placed_at)
                                     </time>
