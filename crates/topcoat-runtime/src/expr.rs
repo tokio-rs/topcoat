@@ -15,6 +15,7 @@ pub struct Expr<T> {
     pub(crate) evaluated: T,
     pub(crate) js: Js,
     pub(crate) is_static: bool,
+    pub(crate) synced: bool,
 }
 
 impl<T> Expr<T> {
@@ -30,6 +31,7 @@ impl<T> Expr<T> {
             evaluated,
             js,
             is_static: SIGNAL_READ.get() == Some(false),
+            synced: false,
         }
     }
 
@@ -64,6 +66,39 @@ impl<T> Expr<T> {
     #[must_use]
     pub fn dynamic(mut self) -> Self {
         self.is_static = false;
+        self
+    }
+
+    /// Makes the browser value win over the server's on the first render.
+    ///
+    /// The server renders an expression's value into the HTML. The browser
+    /// evaluates the expression again, but the first evaluation only
+    /// subscribes: the runtime keeps the server's text, because the browser
+    /// is expected to compute the same value. A synced expression says the
+    /// browser value is the authoritative one, so the first evaluation
+    /// writes it.
+    ///
+    /// Use it when the server cannot compute the value the browser should
+    /// show, such as the visitor's language. Being synced implies
+    /// [`dynamic`](Self::dynamic). An attribute binding writes on every
+    /// evaluation, so the flag changes text expressions only.
+    ///
+    /// ```rust
+    /// use topcoat::{Result, context::Cx, runtime::expr, view::*};
+    ///
+    /// #[component]
+    /// async fn greeting(cx: &Cx) -> Result<impl View> {
+    ///     // The server cannot know the visitor's language; the browser can.
+    ///     let language = expr!(raw!("navigator.language", "en")).synced();
+    ///
+    ///     Ok(view! { <p>(language)</p> })
+    /// }
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn synced(mut self) -> Self {
+        self.is_static = false;
+        self.synced = true;
         self
     }
 
@@ -121,7 +156,11 @@ where
         parts.push_comment(|comment| {
             comment.push_promoted_str_unescaped(&"::topcoat::expr::start(\"");
             self.js.write(comment);
-            comment.push_promoted_str_unescaped(&"\")");
+            comment.push_promoted_str_unescaped(&"\"");
+            if self.synced {
+                comment.push_promoted_str_unescaped(&", true");
+            }
+            comment.push_promoted_str_unescaped(&")");
         });
         self.evaluated.into_view_parts(cx, parts);
         parts.push_comment(|comment| {

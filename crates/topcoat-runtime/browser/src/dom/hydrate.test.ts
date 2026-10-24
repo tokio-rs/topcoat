@@ -186,6 +186,25 @@ it("updates bindings and text after events, then stops both on disposal", async 
 	}
 });
 
+it("writes a synced expression's browser value on initial hydration", () => {
+	document.body.innerHTML = `
+		<!--::topcoat::signal({"t":"signal","id":"a","v":1})-->
+		<p><!--::topcoat::expr::start("cx.signal('a').get()", true)-->server<!--::topcoat::expr::end--></p>
+	`;
+	const paragraph = document.querySelector("p");
+	const runtime = new Runtime();
+	try {
+		runtime.start(document);
+		expect(paragraph?.textContent).toBe("1");
+
+		runtime.context.signal("a").set(new F64(7));
+		flushEffects();
+		expect(paragraph?.textContent).toBe("7");
+	} finally {
+		runtime.page.dispose();
+	}
+});
+
 it("keeps the server's text node on initial hydration", () => {
 	document.body.innerHTML = `
 		<!--::topcoat::signal({"t":"signal","id":"a","v":1})-->
