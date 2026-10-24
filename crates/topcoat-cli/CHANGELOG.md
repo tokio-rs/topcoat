@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cli-v0.10.0...topcoat-cli-v0.11.0) - 2026-10-24
+
+### Added
+
+- *(demo)* admin demo localizations ([#557](https://github.com/tokio-rs/topcoat/pull/557))
+- *(l10n)* localization support with fluent ([#556](https://github.com/tokio-rs/topcoat/pull/556))
+- *(cli)* [**breaking**] add `topcoat new` command ([#501](https://github.com/tokio-rs/topcoat/pull/501))
+
+### Fixed
+
+- *(cli)* keep hot reload active after same-document navigation ([#530](https://github.com/tokio-rs/topcoat/pull/530))
+- *(cli)* restart dev server when bundled assets change ([#524](https://github.com/tokio-rs/topcoat/pull/524))
+- *(cli)* [**breaking**] fix gitignore handling for fmt and dev
+- *(runtime)* preserve edited form controls on rerender ([#513](https://github.com/tokio-rs/topcoat/pull/513))
+
+### Other
+
+- *(cli)* match starter stylesheets by exact package name ([#558](https://github.com/tokio-rs/topcoat/pull/558))
+- fix the failing test job on main ([#522](https://github.com/tokio-rs/topcoat/pull/522))
+
 ## [0.10.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cli-v0.9.0...topcoat-cli-v0.10.0) - 2026-10-03
 
 ### Added

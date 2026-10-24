@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0](https://github.com/tokio-rs/topcoat/compare/topcoat-view-v0.10.0...topcoat-view-v0.11.0) - 2026-10-24
+
+### Added
+
+- *(ui)* [**breaking**] add popover component and reusable floating utilities, add `element_id(cx)` ([#516](https://github.com/tokio-rs/topcoat/pull/516))
+
+### Fixed
+
+- *(view)* recursion limit checking Send bound on big views ([#515](https://github.com/tokio-rs/topcoat/pull/515))
+- *(view)* improve component go-to-definition ([#502](https://github.com/tokio-rs/topcoat/pull/502))
+
+### Other
+
+- format
+
 ## [0.10.0](https://github.com/tokio-rs/topcoat/compare/topcoat-view-v0.9.0...topcoat-view-v0.10.0) - 2026-10-03
 
 ### Fixed
