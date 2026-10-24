@@ -31,6 +31,9 @@ fluent = [
 http = [
 	"dep:http",
 ]
+serde = [
+	"dep:serde",
+]
 view = [
 	"dep:topcoat-view",
 ]
@@ -50,6 +53,7 @@ icu_provider = { workspace = true, optional = true, features = ["sync"] }
 intl-memoizer = { workspace = true, optional = true }
 inventory = { workspace = true, optional = true }
 memchr = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
 strsim = { workspace = true, optional = true }
 unic-langid = { workspace = true, optional = true }
 

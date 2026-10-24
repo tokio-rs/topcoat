@@ -115,6 +115,7 @@ icon-iconify = [
 ]
 l10n = [
 	"dep:topcoat-l10n",
+	"topcoat-l10n/serde",
 ]
 l10n-fluent = [
 	"l10n",

@@ -13,6 +13,8 @@ mod lookup;
 mod negotiate;
 #[cfg(feature = "http")]
 mod request;
+#[cfg(feature = "serde")]
+mod serde;
 #[cfg(feature = "view")]
 mod view;
 

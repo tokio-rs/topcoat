@@ -13,21 +13,17 @@ pub static LOCALES: [Locale; 2] = [locale!("en"), locale!("de")];
 /// Returns the language chosen with [`choose_locale`]. Without a choice, returns
 /// the best match for the browser's languages.
 pub fn preferred_locale(cx: &Cx) -> &'static Locale {
-    let chosen = store(cx)
-        .parse()
-        .ok()
-        .flatten()
-        .and_then(|store| store.read().parse::<Locale>().ok());
+    let chosen = store(cx).parse().ok().flatten().map(|store| store.get());
     negotiate(chosen.iter().chain(accept_language(cx)), &LOCALES).unwrap_or(&LOCALES[0])
 }
 
 /// Remembers `locale` as this browser's language.
-pub fn choose_locale(cx: &Cx, locale: &Locale) -> Result<()> {
-    store(cx).set(locale.to_string()).commit()?;
+pub fn choose_locale(cx: &Cx, locale: Locale) -> Result<()> {
+    store(cx).set(locale).commit()?;
     Ok(())
 }
 
-fn store(cx: &Cx) -> UnparsedCookieStore<String, impl Cookies> {
+fn store(cx: &Cx) -> UnparsedCookieStore<Locale, impl Cookies> {
     let jar = cookies(cx)
         .default_path("/")
         .default_http_only(true)

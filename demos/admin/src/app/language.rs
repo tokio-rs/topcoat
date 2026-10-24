@@ -5,10 +5,10 @@ use topcoat::{
     Result,
     context::Cx,
     icon::{icon, iconify::iconify_icon},
-    l10n::{fluent::messages, locale},
+    l10n::{Locale, fluent::messages, locale},
     router::{
         content::Form,
-        error::{RouterErrorExt, SeeOther},
+        error::{SeeOther, bad_request},
         href,
         request::uri,
         route,
@@ -32,19 +32,16 @@ messages!("{mod}/l10n/{locale}.ftl");
 
 #[derive(Deserialize)]
 pub struct Choice {
-    locale: String,
+    locale: Locale,
     return_to: String,
 }
 
 #[route(POST)]
 pub async fn choose(cx: &Cx, Form(form): Form<Choice>) -> Result<SeeOther> {
-    let locale = form
-        .locale
-        .parse()
-        .ok()
-        .filter(|locale| LOCALES.contains(locale))
-        .ok_or_bad_request("unsupported language")?;
-    choose_locale(cx, &locale)?;
+    if !LOCALES.contains(&form.locale) {
+        return Err(bad_request("unsupported language").into());
+    }
+    choose_locale(cx, form.locale)?;
     Ok(see_back(cx, &form.return_to))
 }
 
