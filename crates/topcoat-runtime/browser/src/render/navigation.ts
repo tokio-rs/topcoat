@@ -285,11 +285,8 @@ export class NavigationController {
 			if (!committed && isCurrent()) load(destination, mode);
 		} catch (error) {
 			if (!isCurrent()) return;
-			if (!committed) {
-				load(destination, mode);
-				return;
-			}
 			this.runtime.reportError(error);
+			if (!committed) load(destination, mode);
 		}
 	}
 
