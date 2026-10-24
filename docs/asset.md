@@ -49,7 +49,7 @@ Assets with unused handles may be removed during compilation. Only declarations 
 
 # Loading the bundle
 
-Load the generated asset bundle while building the router, before `.build()`. Use [`AssetBundle::load`] for the default bundle location:
+Load the generated asset bundle while building the router, before `.build()`. Use [`AssetBundle::load`] to load the bundle scoped to the current executable:
 
 ```rust,no_run
 use topcoat::{
@@ -81,10 +81,10 @@ topcoat dev
 cargo topcoat dev
 ```
 
-By default, the bundle is written to an `assets` directory next to the executable it was scanned from:
+By default, the bundle is written to a directory named for the executable file under `assets`, including its platform extension when present:
 
 ```text
-<cargo-target>/<profile>/assets
+<cargo-target>/<profile>/assets/<binary-file-name>
 ```
 
 The download/cache directory for remote assets is:
@@ -131,7 +131,7 @@ let router = module_router!()
     .build();
 ```
 
-[`AssetBundle::load`] only looks next to the executable, so any `--out` outside that location has to be loaded with [`AssetBundle::load_dir`].
+[`AssetBundle::load`] looks in the executable-scoped default directory, so any `--out` outside that location has to be loaded with [`AssetBundle::load_dir`].
 
 # Path resolution
 
