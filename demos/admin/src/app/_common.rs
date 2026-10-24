@@ -18,6 +18,12 @@ pub fn money(amount: Money) -> Translation<'static> {
     t!(money, amount = amount.dollars())
 }
 
+/// Formats an amount for a form field in the request's language, such as `1234.50`.
+/// [`Money`] parses the result.
+pub fn money_input(amount: Money) -> Translation<'static> {
+    t!(money_input, amount = amount.dollars())
+}
+
 pub fn role_label(role: Role) -> Translation<'static> {
     match role {
         Role::Admin => t!(role_admin),
@@ -36,5 +42,21 @@ pub fn see_back(cx: &Cx, path: &str) -> SeeOther {
         see_other(path)
     } else {
         see_other(href!(super::_admin::_dashboard::page).resolve(cx))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::features::locale::LOCALES;
+
+    #[test]
+    fn money_input_reads_back_in_every_language() {
+        for locale in &LOCALES {
+            for cents in [5, 2_499, 123_456_789] {
+                let text = money_input(Money(cents)).resolve_in(locale);
+                assert_eq!(text.parse(), Ok(Money(cents)), "{locale}: {text}");
+            }
+        }
     }
 }

@@ -374,20 +374,23 @@ impl fmt::Display for Money {
 impl FromStr for Money {
     type Err = InvalidMoney;
 
-    /// Parses dollar amounts such as `$1,234.50` or `1234.5`.
-    /// The dollar sign, commas, and fractional part are optional.
+    /// Parses dollar amounts such as `$1234.50`, `1234,5` or `1234`.
+    ///
+    /// Accepts `.` or `,` as the decimal separator so the input works in every
+    /// language. Rejects thousands separators, because `1,234` could mean either
+    /// amount. The dollar sign and fractional part are optional.
     fn from_str(text: &str) -> Result<Self, Self::Err> {
         let (negative, text) = match text.strip_prefix('-') {
             Some(text) => (true, text),
             None => (false, text),
         };
         let text = text.strip_prefix('$').unwrap_or(text);
-        let (dollars, cents) = match text.split_once('.') {
+        let (dollars, cents) = match text.split_once(['.', ',']) {
             Some((dollars, cents)) if (1..=2).contains(&cents.len()) => (dollars, cents),
             Some(_) => return Err(InvalidMoney),
             None => (text, ""),
         };
-        if !dollars.chars().any(|char| char.is_ascii_digit()) {
+        if dollars.is_empty() {
             return Err(InvalidMoney);
         }
 
@@ -400,7 +403,7 @@ impl FromStr for Money {
                 .ok_or(InvalidMoney)?;
             Ok(())
         };
-        for char in dollars.chars().filter(|&char| char != ',') {
+        for char in dollars.chars() {
             push(char)?;
         }
         let mut cents = cents.chars();
@@ -443,9 +446,8 @@ mod tests {
     }
 
     #[test]
-    fn reads_back_what_it_shows() {
+    fn reads_back_decimal_amounts() {
         for cents in [0, 5, 2_499, 99_999, 123_456_789, -150_000] {
-            assert_eq!(Money(cents).to_string().parse(), Ok(Money(cents)));
             assert_eq!(Money(cents).decimal().parse(), Ok(Money(cents)));
         }
     }
@@ -457,6 +459,12 @@ mod tests {
     }
 
     #[test]
+    fn reads_a_decimal_comma_like_a_decimal_point() {
+        assert_eq!("24,99".parse::<Money>(), "24.99".parse());
+        assert_eq!("$24,5".parse::<Money>(), "$24.5".parse());
+    }
+
+    #[test]
     fn rejects_text_that_is_not_an_amount() {
         for text in [
             "",
@@ -465,6 +473,9 @@ mod tests {
             "1.",
             "1.999",
             "1.2.3",
+            "1,234",
+            "1.234,50",
+            "$1,234.50",
             "12a",
             "99999999999999999999",
         ] {

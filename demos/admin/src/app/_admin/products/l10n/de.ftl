@@ -47,6 +47,6 @@ error_sku_too_long = Die Artikelnummer darf höchstens { $max } Zeichen lang sei
 error_sku_taken = Ein anderes Produkt verwendet diese Artikelnummer bereits.
 error_price_missing = Gib einen Preis ein.
 error_price_not_positive = Gib einen Preis über null ein.
-error_price_invalid = Gib einen Preis in Dollar ein, zum Beispiel 24.99.
+error_price_invalid = Gib einen Preis in Dollar ein, zum Beispiel 24,99.
 error_stock_missing = Gib an, wie viele Stück auf Lager sind.
 error_stock_invalid = Gib eine ganze Zahl ein, mindestens 0.

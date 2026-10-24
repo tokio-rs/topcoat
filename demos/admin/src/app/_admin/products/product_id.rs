@@ -16,7 +16,7 @@ use topcoat::{
 
 use super::{stock_badge, t};
 use crate::{
-    app::_admin::Crumb,
+    app::{_admin::Crumb, _common::money_input},
     components::{
         button::{ButtonSize, ButtonVariant, button, button_variants},
         card::{card, card_content, card_description, card_footer, card_header, card_title},
@@ -57,7 +57,10 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
 
     let rejected = try_request_context::<Rejected>(cx);
     let form = rejected.map_or_else(
-        || ProductForm::of(product),
+        || ProductForm {
+            price: money_input(product.price).resolve(cx).into_owned(),
+            ..ProductForm::of(product)
+        },
         |rejected| rejected.form.clone(),
     );
     let errors = rejected.map(|rejected| rejected.errors).unwrap_or_default();
