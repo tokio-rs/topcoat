@@ -10,7 +10,7 @@ Pass a file path with `{locale}` where the locale name belongs. You can put a vi
 
 To translate a message, pass its ID to `t!`, as in `t!(login-input)`. To translate an attribute, add its name after a dot, as in `t!(login-input.placeholder)`. Use a string literal if Rust cannot read the ID as tokens, as in `t!("item-1e")`.
 
-Supply message variables after the ID with `name = value`. If the Rust variable has the same name, you can write just `name`. Values can be strings (`&str` or `String`) or primitive numbers. Borrowed values stay borrowed.
+Supply message variables after the ID with `name = value`. If the Rust variable has the same name, you can write just `name`. Values can be strings (`&str` or `String`) or primitive numbers. Borrowed values stay borrowed. For other types, implement [`FluentType`] and pass [`Argument::custom`].
 
 rustfmt reads a hyphen as a minus sign, so it formats `t!(login-input)` as `t!(login - input)`. The macro still finds the right message. To keep the hyphens together, write the key and the argument names as string literals, as in `t!("login-input.placeholder")` and `t!(greeting, "user-name" = name)`. You can also avoid hyphens by using snake case IDs such as `login_input` in your Fluent files.
 
@@ -68,3 +68,5 @@ Changes to matched files trigger a rebuild. Newly added files do not trigger Car
 [`resolve`]: ../struct.Translation.html#method.resolve
 [`resolve_in`]: ../struct.Translation.html#method.resolve_in
 [`negotiate`]: ../fn.negotiate.html
+[`FluentType`]: ../trait.FluentType.html
+[`Argument::custom`]: ../struct.Argument.html#method.custom

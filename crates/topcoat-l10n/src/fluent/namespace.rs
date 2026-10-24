@@ -113,7 +113,7 @@ mod tests {
         let catalog = Namespace::catalog("test").expect("the namespace is registered");
         assert_eq!(
             catalog
-                .format(&locale!("de"), "greeting", None, None)
+                .format(&locale!("de"), "greeting", None, &[])
                 .as_deref(),
             Some("Hallo")
         );

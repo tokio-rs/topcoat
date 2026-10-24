@@ -311,9 +311,9 @@ async fn page_breadcrumb(cx: &Cx) -> Result<impl View> {
 async fn theme_toggle(cx: &Cx) -> Result<impl View> {
     let dark = theme(cx) == Theme::Dark;
     let label = if dark {
-        t!(light_theme).resolve(cx)
+        t!(light_theme)
     } else {
-        t!(dark_theme).resolve(cx)
+        t!(dark_theme)
     };
     let return_to = uri(cx).path_and_query().map_or("/", |path| path.as_str());
 
@@ -323,7 +323,7 @@ async fn theme_toggle(cx: &Cx) -> Result<impl View> {
             button(
                 variant: ButtonVariant::Ghost,
                 size: ButtonSize::Icon,
-                attrs: attributes! { type="submit" aria-label=(&*label) title=(&*label) },
+                attrs: attributes! { type="submit" aria-label=(label.clone()) title=(label) },
                 if dark {
                     icon(data: iconify_icon!("lucide:sun"))
                 } else {

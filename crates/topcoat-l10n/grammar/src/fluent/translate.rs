@@ -1,7 +1,7 @@
 mod argument;
 
 pub use argument::*;
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
     Ident, Token,
@@ -81,22 +81,20 @@ impl ToTokens for TranslateCall {
             |attribute| quote! { ::core::option::Option::Some(#attribute) },
         );
         let arguments = &self.translate.arguments.arguments;
-        let count = arguments.len();
         let names: Vec<_> = arguments
             .iter()
             .map(|argument| argument.name.value())
             .collect();
-        let values = arguments.iter().map(TranslateArgument::value);
+        let pairs = arguments.iter().map(|argument| {
+            let name = argument.name.value();
+            let value = argument.value();
+            quote! { (#name, #topcoat_l10n::Argument::from(#value)) }
+        });
         let start = key.span().start();
         let line = u32::try_from(start.line).unwrap_or(0);
         let column = u32::try_from(start.column + 1).unwrap_or(0);
-        // The values are the caller's expressions, which must not see this
-        // local.
-        let args = Ident::new("args", Span::mixed_site());
         tokens.extend(quote! {
             {
-                let mut #args = #topcoat_l10n::FluentArgs::with_capacity(#count);
-                #(#args.set(#names, #values);)*
                 #topcoat_l10n::Translation::new(
                     {
                         const LEN: usize = #topcoat_l10n::RawTranslation::encoded_len(
@@ -117,7 +115,7 @@ impl ToTokens for TranslateCall {
                         );
                         &RECORD
                     },
-                    #args,
+                    ::std::boxed::Box::new([#(#pairs),*]),
                 )
             }
         });

@@ -87,8 +87,6 @@ pub async fn list_pagination(
     let pages = page.pages();
     let previous = current.saturating_sub(1).max(1);
     let next = (current + 1).min(pages);
-    let previous_label = t!(pagination_previous).resolve(cx);
-    let next_label = t!(pagination_next).resolve(cx);
 
     Ok(view! {
         <div class="flex flex-col items-center gap-3 px-6 py-3 sm:flex-row">
@@ -106,7 +104,7 @@ pub async fn list_pagination(
                 pagination_content(
                     pagination_item(
                         pagination_previous(
-                            label: previous_label,
+                            label: t!(pagination_previous).resolve(cx).into_owned(),
                             attrs: attributes! {
                                 href=(href(previous))
                                 aria-disabled=((current == 1).then_some("true"))
@@ -140,7 +138,7 @@ pub async fn list_pagination(
                     }
                     pagination_item(
                         pagination_next(
-                            label: next_label,
+                            label: t!(pagination_next).resolve(cx).into_owned(),
                             attrs: attributes! {
                                 href=(href(next))
                                 aria-disabled=((current == pages).then_some("true"))
