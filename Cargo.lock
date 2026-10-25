@@ -5245,6 +5245,8 @@ dependencies = [
  "topcoat-l10n-macro",
  "topcoat-mail",
  "topcoat-mail-macro",
+ "topcoat-markdown",
+ "topcoat-markdown-macro",
  "topcoat-router",
  "topcoat-router-macro",
  "topcoat-runtime",
@@ -5568,6 +5570,18 @@ dependencies = [
  "topcoat",
  "topcoat-mail-grammar",
 ]
+
+[[package]]
+name = "topcoat-markdown"
+version = "0.11.0"
+
+[[package]]
+name = "topcoat-markdown-grammar"
+version = "0.11.0"
+
+[[package]]
+name = "topcoat-markdown-macro"
+version = "0.11.0"
 
 [[package]]
 name = "topcoat-router"

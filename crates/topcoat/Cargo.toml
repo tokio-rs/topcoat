@@ -46,6 +46,7 @@ full = [
 	"l10n-number",
 	"mail",
 	"mail-smtp",
+	"markdown",
 	"multipart",
 	"router",
 	"runtime",
@@ -147,6 +148,11 @@ mail-smtp = [
 	"mail",
 	"topcoat-mail/smtp",
 ]
+markdown = [
+	"dep:topcoat-markdown",
+	"dep:topcoat-markdown-macro",
+	"view",
+]
 multipart = [
 	"router",
 	"topcoat-router/multipart",
@@ -223,6 +229,8 @@ topcoat-l10n = { workspace = true, optional = true }
 topcoat-l10n-macro = { workspace = true, optional = true }
 topcoat-mail = { workspace = true, optional = true }
 topcoat-mail-macro = { workspace = true, optional = true }
+topcoat-markdown = { workspace = true, optional = true }
+topcoat-markdown-macro = { workspace = true, optional = true }
 topcoat-router = { workspace = true, optional = true }
 topcoat-router-macro = { workspace = true, optional = true }
 topcoat-runtime = { workspace = true, optional = true }

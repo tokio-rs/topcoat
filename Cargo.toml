@@ -23,6 +23,9 @@ members = [
     "crates/topcoat-mail",
     "crates/topcoat-mail/grammar",
     "crates/topcoat-mail/macro",
+    "crates/topcoat-markdown",
+    "crates/topcoat-markdown/grammar",
+    "crates/topcoat-markdown/macro",
     "crates/topcoat-router",
     "crates/topcoat-router/grammar",
     "crates/topcoat-router/macro",
@@ -140,6 +143,9 @@ topcoat-l10n-macro = { version = "0.11.0", path = "crates/topcoat-l10n/macro" }
 topcoat-mail = { version = "0.11.0", path = "crates/topcoat-mail" }
 topcoat-mail-grammar = { version = "0.11.0", path = "crates/topcoat-mail/grammar" }
 topcoat-mail-macro = { version = "0.11.0", path = "crates/topcoat-mail/macro" }
+topcoat-markdown = { version = "0.11.0", path = "crates/topcoat-markdown" }
+topcoat-markdown-grammar = { version = "0.11.0", path = "crates/topcoat-markdown/grammar" }
+topcoat-markdown-macro = { version = "0.11.0", path = "crates/topcoat-markdown/macro" }
 topcoat-router = { version = "0.11.0", path = "crates/topcoat-router" }
 topcoat-router-grammar = { version = "0.11.0", path = "crates/topcoat-router/grammar" }
 topcoat-router-macro = { version = "0.11.0", path = "crates/topcoat-router/macro" }
