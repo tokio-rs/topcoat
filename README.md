@@ -224,8 +224,7 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 - [Linking to handlers](https://github.com/tokio-rs/topcoat/blob/main/docs/router/href.md): use `href!` for navigation links, form actions, and redirects.
 
 **Working with requests**
-- [Request context (`Cx`)](https://docs.rs/topcoat/latest/topcoat/context/index.html): the value pages, layouts, and components read from.
-- [App context](https://github.com/tokio-rs/topcoat/blob/main/docs/context/app_context.md): share long-lived values across requests, keyed by type.
+- [Context (`Cx`)](https://docs.rs/topcoat/latest/topcoat/context/index.html): read request data and values keyed by type, share values across requests with `.with` on the router, and scope values to part of a request with `cx.with`.
 - [Memoization](https://docs.rs/topcoat/latest/topcoat/context/attr.memoize.html): `#[memoize]` for per-request caching and fan-out dedup.
 - [Functions, not middlewares](https://docs.rs/topcoat/latest/topcoat/context/index.html#functions-not-middlewares): the recommended way to model auth and other request-scoped concerns.
 - [Cookies](https://docs.rs/topcoat/latest/topcoat/cookie/index.html): read and write the request cookie jar, with signed, encrypted, and prefixed cookies.

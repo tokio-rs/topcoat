@@ -117,7 +117,7 @@ The rewritten request keeps the method and headers, uses the supplied body, and 
 
 Use [`method`](RewriteError::method) to change the HTTP method and [`headers`](RewriteError::headers) to replace the request headers. To change only a few headers, clone the current [`headers`](crate::request::headers) and edit that copy. For example, a rewrite with an empty body can remove the headers that described the original body.
 
-Use [`with`](RewriteError::with) to carry a value into the next dispatch and every later dispatch in the chain. Read it through [`request_context`](topcoat_core::context::request_context). Calling `with` again with the same type replaces that value while keeping the other carried values. A form handler can use `method` and `with` to render its page as a `GET` with a value telling the page what happened:
+Use [`with`](RewriteError::with) to carry a value into the next dispatch and every later dispatch in the chain. Read it through [`context`](topcoat_core::context::context). Calling `with` again with the same type replaces that value while keeping the other carried values. A form handler can use `method` and `with` to render its page as a `GET` with a value telling the page what happened:
 
 ```rust
 use topcoat::{Result, context::{Cx, try_context}, router::{Body, Method, error::rewrite, href, page, route}, view::{View, view}};

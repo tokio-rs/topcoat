@@ -1,4 +1,4 @@
-`#[memoize]` shares a function's result across calls in one request. A later call reuses the result when its arguments and observed request context bindings match.
+`#[memoize]` shares a function's result across calls in one request. A later call reuses the result when its arguments and observed context bindings match.
 
 Each request starts with an empty cache. Results are not shared across requests.
 
@@ -20,7 +20,7 @@ async fn get_user(cx: &Cx, id: i64) -> User {
 }
 ```
 
-The first call to `get_user(cx, 42).await` computes the user. Later calls with the same ID reuse it if their request context dependencies match. The macro changes the return type from `T` to `&T`, borrowed for the lifetime of `cx`. Use [`as_ref`](#borrowing-option-and-result-contents) to borrow the contents of an `Option` or `Result` instead.
+The first call to `get_user(cx, 42).await` computes the user. Later calls with the same ID reuse it if their context dependencies match. The macro changes the return type from `T` to `&T`, borrowed for the lifetime of `cx`. Use [`as_ref`](#borrowing-option-and-result-contents) to borrow the contents of an `Option` or `Result` instead.
 
 # Sync and async
 
@@ -86,7 +86,7 @@ fn main() {
 
 # What gets cached
 
-Every argument except `cx` is hashed into the cache key. The function's request context dependencies also determine whether a cached result can be reused.
+Every argument except `cx` is hashed into the cache key. The function's context dependencies also determine whether a cached result can be reused.
 
 ```rust
 # use topcoat::context::{Cx, memoize};
@@ -105,11 +105,11 @@ add(cx, 1, 3); // prints "computing", returns 4 (different args)
 
 Each memoized function has a separate cache.
 
-See [request context dependencies](#request-context-dependencies) for how scoped values affect reuse.
+See [context dependencies](#context-dependencies) for how scoped values affect reuse.
 
-# Request context dependencies
+# Context dependencies
 
-The macro tracks request context lookups made while the function runs. A cached result can be reused only when those lookups resolve to the same registered bindings in the caller's scope.
+The macro tracks the context lookups made while the function runs. A cached result can be reused only when those lookups resolve to the same registered bindings in the caller's scope.
 
 This matters because `Cx::with` derives a child scope holding additional values, so the same function can see a different value depending on the `cx` it is called with:
 
@@ -125,7 +125,7 @@ fn greeting(cx: &Cx) -> String {
 }
 
 # fn example(cx: &Cx) {
-greeting(cx); // computes, reading the Locale registered for the request
+greeting(cx); // computes, reading the Locale visible to `cx`
 
 let scoped = cx.with(Locale("de"));
 greeting(&scoped); // a different Locale, so the body runs again
@@ -170,7 +170,7 @@ fn greeting(cx: &Cx) -> String {
 
 `greeting` never reads `Locale` itself, but it depends on it through `locale`, so a caller that scopes a different `Locale` recomputes both. This holds whether the nested call computed or hit the cache.
 
-App context is not tracked. It is registered once for the application and cannot be scoped per request, so reading it never constrains reuse.
+Values registered on the router are tracked like any other value. A result that read one stays valid for every caller until a scope replaces that type with `Cx::with`, which makes the function run again for callers in that scope.
 
 # Borrowing Option and Result contents
 

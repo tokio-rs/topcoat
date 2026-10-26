@@ -125,7 +125,7 @@ let from_url = SmtpTransport::from_url("smtps://user:pass@smtp.example.com:465")
 
 ```rust
 use topcoat::{
-    context::CxTestBuilder,
+    context::Cx,
     mail::{MailConfig, MemoryTransport, Mailbox, mail, send},
 };
 

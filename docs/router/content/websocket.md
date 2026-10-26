@@ -35,7 +35,7 @@ The extractor rejects non-`GET` requests with `405 Method Not Allowed` and inval
 
 # Reading the request context
 
-The callback outlives the handler that upgraded the connection, so it cannot borrow the `Cx` the handler was called with. Clone the `Cx` and move the owned handle into the callback instead; it reads the same app and request context.
+The callback outlives the handler that upgraded the connection, so it cannot borrow the `Cx` the handler was called with. Clone the `Cx` and move the owned handle into the callback instead. It sees the same values as the original.
 
 ```rust
 // src/app/greet.rs

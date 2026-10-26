@@ -95,7 +95,7 @@ fn reports_nav(cx: &Cx) -> impl View {
 }
 ```
 
-A link's `prefetch` argument takes precedence over the request context, then the app context, then `Intent`. [`prefetch_mode`] returns the default for a context.
+A link's `prefetch` argument takes precedence over a `PrefetchMode` in the context, then `Intent`. The context value can come from the router or from `Cx::with`, and the one added last wins. [`prefetch_mode`] returns the default for a context.
 
 # Custom Anchors
 

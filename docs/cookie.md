@@ -234,9 +234,9 @@ let session = jar.get("session"); // None if missing or it fails to decrypt
 
 Signed and private jars can be combined with prefixes and attribute defaults.
 
-# Keys from app context
+# Keys from the router
 
-Share a [`Key`] across requests by registering it as [app context](crate::context::app_context):
+Share a [`Key`] across requests by registering it on the router with [`with`](crate::router::RouterBuilder::with):
 
 ```rust,standalone_crate
 use topcoat::{

@@ -51,7 +51,7 @@ use topcoat::{Result, context::Cx, runtime::procedure};
 
 #[procedure]
 async fn search(cx: &Cx, query: String) -> Result<String> {
-    // Query the database, read app context, check the session, ...
+    // Query the database, read context, check the session, ...
 #   let _ = cx;
     Ok(query)
 }
