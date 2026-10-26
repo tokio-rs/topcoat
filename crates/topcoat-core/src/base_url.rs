@@ -3,7 +3,7 @@
 use core::fmt;
 use std::str::FromStr;
 
-use crate::context::{Cx, try_app_context};
+use crate::context::{Cx, try_context};
 
 /// The absolute URL an application is publicly reachable at, like
 /// `https://example.com`.
@@ -208,13 +208,12 @@ pub fn base_url(cx: &Cx) -> &BaseUrl {
 /// been registered.
 #[must_use]
 pub fn try_base_url(cx: &Cx) -> Option<&BaseUrl> {
-    try_app_context(cx)
+    try_context(cx)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::context::CxTestBuilder;
 
     #[test]
     fn accepts_and_normalizes_absolute_http_urls() -> Result<(), BaseUrlError> {
@@ -299,9 +298,7 @@ mod tests {
 
     #[test]
     fn reads_the_registered_base_url_from_context() -> Result<(), BaseUrlError> {
-        let cx = CxTestBuilder::new()
-            .app_context(BaseUrl::new("https://example.com")?)
-            .build();
+        let cx = Cx::default().with(BaseUrl::new("https://example.com")?);
 
         assert_eq!(base_url(&cx).as_str(), "https://example.com");
         assert_eq!(

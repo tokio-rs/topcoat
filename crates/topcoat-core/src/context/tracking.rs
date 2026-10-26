@@ -1,5 +1,4 @@
-//! Tracking of request context reads, backing `#[memoize]`'s dependency
-//! checks.
+//! Tracking of context reads, backing `#[memoize]`'s dependency checks.
 
 use std::{
     any::{Any, TypeId},
@@ -8,7 +7,7 @@ use std::{
 
 use crate::context::{BindingId, Scope};
 
-/// One observed request context read: the type that was looked up and the
+/// One observed context read: the type that was looked up and the
 /// identity of the binding it resolved to, or `None` if no value was
 /// registered.
 ///
@@ -41,7 +40,7 @@ impl ContextRead {
     }
 }
 
-/// Records the request context reads made through one tracked call.
+/// Records the context reads made through one tracked call.
 ///
 /// A tracker is installed on a [`Cx`] handle with [`Cx::track`] and travels
 /// with every handle derived from it, including clones moved to other
@@ -83,7 +82,7 @@ impl ContextTracker {
     /// call created itself, so it is not a dependency and is dropped, even
     /// where it was a genuine dependency of the nested call.
     pub(crate) fn merge(&self, reads: &[ContextRead]) {
-        // A body that read no request context has nothing to contribute, and is
+        // A body that read no context has nothing to contribute, and is
         // common enough to be worth keeping off the lock.
         if reads.is_empty() {
             return;
@@ -109,7 +108,7 @@ impl ContextTracker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::context::{Cx, request_context, try_request_context};
+    use crate::context::{Cx, context, try_context};
 
     struct Session;
     struct Theme;
@@ -172,7 +171,7 @@ mod tests {
         let cx = Cx::default().with(Session);
         let (child, tracker) = cx.track();
 
-        let _: &Session = request_context(&child);
+        let _: &Session = context(&child);
 
         assert_eq!(tracker.take_reads(), [expected::<Session>(&cx)]);
     }
@@ -182,7 +181,7 @@ mod tests {
         let cx = Cx::default();
         let (child, tracker) = cx.track();
 
-        assert!(try_request_context::<Session>(&child).is_none());
+        assert!(try_context::<Session>(&child).is_none());
         assert_eq!(tracker.take_reads(), [expected::<Session>(&cx)]);
     }
 
@@ -191,8 +190,8 @@ mod tests {
         let cx = Cx::default().with(Session);
         let (child, tracker) = cx.track();
 
-        let _ = try_request_context::<Session>(&child);
-        let _ = try_request_context::<Session>(&child);
+        let _ = try_context::<Session>(&child);
+        let _ = try_context::<Session>(&child);
 
         assert_eq!(tracker.take_reads(), [expected::<Session>(&cx)]);
     }
@@ -202,8 +201,8 @@ mod tests {
         let cx = Cx::default().with(Session);
         let (child, tracker) = cx.track();
 
-        let _ = try_request_context::<Session>(&child);
-        let _ = try_request_context::<Theme>(&child);
+        let _ = try_context::<Session>(&child);
+        let _ = try_context::<Theme>(&child);
 
         assert_eq!(
             tracker.take_reads(),
@@ -217,7 +216,7 @@ mod tests {
         let (child, tracker) = cx.track();
         let derived = child.with(Theme);
 
-        let _ = try_request_context::<Session>(&derived);
+        let _ = try_context::<Session>(&derived);
 
         assert_eq!(tracker.take_reads(), [expected::<Session>(&cx)]);
     }
@@ -228,7 +227,7 @@ mod tests {
         let (child, tracker) = cx.track();
         let derived = child.with(Theme);
 
-        let _ = try_request_context::<Theme>(&derived);
+        let _ = try_context::<Theme>(&derived);
 
         assert_eq!(tracker.take_reads(), []);
     }
@@ -239,7 +238,7 @@ mod tests {
         let (child, tracker) = cx.track();
         let derived = child.with(Session);
 
-        let _ = try_request_context::<Session>(&derived);
+        let _ = try_context::<Session>(&derived);
 
         assert_eq!(tracker.take_reads(), []);
     }
@@ -249,7 +248,7 @@ mod tests {
         let cx = Cx::default().with(Session);
         let (_child, tracker) = cx.track();
 
-        let _ = try_request_context::<Session>(&cx);
+        let _ = try_context::<Session>(&cx);
 
         assert_eq!(tracker.take_reads(), []);
     }
@@ -259,7 +258,7 @@ mod tests {
         let cx = Cx::default().with(Session);
         let (child, tracker) = cx.track();
 
-        let _ = try_request_context::<Session>(&child.clone());
+        let _ = try_context::<Session>(&child.clone());
 
         assert_eq!(tracker.take_reads(), [expected::<Session>(&cx)]);
     }
@@ -270,7 +269,7 @@ mod tests {
         let (child, tracker) = cx.track();
 
         std::thread::spawn(move || {
-            let _ = try_request_context::<Session>(&child);
+            let _ = try_context::<Session>(&child);
         })
         .join()
         .expect("tracked thread panicked");
@@ -297,7 +296,7 @@ mod tests {
         let (child, outer) = cx.track();
         let (nested, inner) = child.track();
 
-        let _ = try_request_context::<Session>(&nested);
+        let _ = try_context::<Session>(&nested);
 
         assert_eq!(outer.take_reads(), []);
         assert_eq!(inner.take_reads(), [expected::<Session>(&cx)]);

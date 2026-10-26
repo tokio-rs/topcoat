@@ -20,7 +20,7 @@ use crate::context::Cx;
 /// Argument hashes must include every part of the value that affects the result.
 /// Distinct values with identical hashes share an entry.
 ///
-/// Each entry can hold results for different request context bindings. A lookup
+/// Each entry can hold results for different context bindings. A lookup
 /// reuses a result only if its observed bindings match the caller's scope.
 #[derive(Default)]
 #[doc(hidden)]
@@ -73,7 +73,7 @@ impl MemoizeCache {
     /// returning a reference to the cached result. `key` is the borrowed lookup key (e.g.
     /// `(&str,)`); `params` is what gets passed to `f` on a miss.
     ///
-    /// The body runs with its request context reads tracked. A cached result is reused only
+    /// The body runs with its context reads tracked. A cached result is reused only
     /// by callers whose scope still resolves every read the body made to the binding it
     /// observed; a caller whose scope disagrees (a value shadowed or added via `Cx::with`)
     /// computes its own variant. Bindings the body registers itself are not dependencies.
@@ -167,7 +167,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::context::{request_context, try_request_context};
+    use crate::context::{context, try_context};
 
     struct Setting(i32);
     struct Unrelated;
@@ -320,7 +320,7 @@ mod tests {
     fn get_observes_memoized_value() {
         let cache = MemoizeCache::new();
         let cx = Cx::default();
-        let f = move |cx: Cx, (x,): (i32,)| x * request_context::<Setting>(&cx).0;
+        let f = move |cx: Cx, (x,): (i32,)| x * context::<Setting>(&cx).0;
 
         let cx = cx.with(Setting(2));
         assert_eq!(cache.get::<_, i32, _>(&cx, f, (&3i32,)), None);
@@ -341,7 +341,7 @@ mod tests {
         let n = counter();
         let f = move |cx: Cx, (): ()| {
             n.fetch_add(1, Ordering::SeqCst);
-            request_context::<Setting>(&cx).0
+            context::<Setting>(&cx).0
         };
 
         let original = cache.memoize(&cx, (), (), f);
@@ -361,7 +361,7 @@ mod tests {
         let n = counter();
         let f = move |cx: Cx, (): ()| {
             n.fetch_add(1, Ordering::SeqCst);
-            try_request_context::<Setting>(&cx).map_or(-1, |setting| setting.0)
+            try_context::<Setting>(&cx).map_or(-1, |setting| setting.0)
         };
 
         assert_eq!(*cache.memoize(&cx, (), (), f), -1);
@@ -377,7 +377,7 @@ mod tests {
         let n = counter();
         let f = move |cx: Cx, (): ()| {
             n.fetch_add(1, Ordering::SeqCst);
-            request_context::<Setting>(&cx).0
+            context::<Setting>(&cx).0
         };
 
         assert_eq!(*cache.memoize(&cx, (), (), f), 1);
@@ -407,7 +407,7 @@ mod tests {
         let n_inner = counter();
         let inner = move |cx: Cx, (): ()| {
             n_inner.fetch_add(1, Ordering::SeqCst);
-            request_context::<Setting>(&cx).0
+            context::<Setting>(&cx).0
         };
         let outer = move |cx: Cx, (): ()| {
             n_outer.fetch_add(1, Ordering::SeqCst);
@@ -427,7 +427,7 @@ mod tests {
     fn sync_nested_hit_propagates_reads() {
         let cache: &'static MemoizeCache = Box::leak(Box::new(MemoizeCache::new()));
         let n_outer = counter();
-        let inner = move |cx: Cx, (): ()| request_context::<Setting>(&cx).0;
+        let inner = move |cx: Cx, (): ()| context::<Setting>(&cx).0;
         let outer = move |cx: Cx, (): ()| {
             n_outer.fetch_add(1, Ordering::SeqCst);
             *cache.memoize(&cx, (), (), inner) * 10
@@ -446,7 +446,7 @@ mod tests {
     fn sync_nested_internal_scope_is_not_a_dependency() {
         let cache: &'static MemoizeCache = Box::leak(Box::new(MemoizeCache::new()));
         let n_outer = counter();
-        let inner = move |cx: Cx, (): ()| request_context::<Setting>(&cx).0;
+        let inner = move |cx: Cx, (): ()| context::<Setting>(&cx).0;
         let outer = move |cx: Cx, (): ()| {
             n_outer.fetch_add(1, Ordering::SeqCst);
             let scoped = cx.with(Setting(7));
@@ -470,7 +470,7 @@ mod tests {
         let f = move |cx: Cx, (): ()| {
             n.fetch_add(1, Ordering::SeqCst);
             let scoped = cx.with(Setting(7));
-            request_context::<Setting>(&scoped).0
+            context::<Setting>(&scoped).0
         };
 
         assert_eq!(*cache.memoize(&cx, (), (), f), 7);
@@ -526,7 +526,7 @@ mod tests {
         let f = async move |cx: Cx, (): ()| {
             n.fetch_add(1, Ordering::SeqCst);
             tokio::task::yield_now().await;
-            request_context::<Setting>(&cx).0
+            context::<Setting>(&cx).0
         };
 
         let shadowed = cx.with(Setting(2));
@@ -540,7 +540,7 @@ mod tests {
     async fn async_nested_hit_propagates_reads() {
         let cache: &'static MemoizeCache = Box::leak(Box::new(MemoizeCache::new()));
         let n_outer = counter();
-        let inner = async move |cx: Cx, (): ()| request_context::<Setting>(&cx).0;
+        let inner = async move |cx: Cx, (): ()| context::<Setting>(&cx).0;
         let outer = async move |cx: Cx, (): ()| {
             n_outer.fetch_add(1, Ordering::SeqCst);
             *cache.memoize_async(&cx, (), (), inner).await * 10

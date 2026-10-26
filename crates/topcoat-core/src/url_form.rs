@@ -1,6 +1,6 @@
 //! The form URLs render in: relative to the site root or absolute.
 
-use crate::context::{Cx, try_request_context};
+use crate::context::{Cx, try_context};
 
 /// The form a URL renders in when the code writing it does not choose one.
 ///
@@ -29,12 +29,12 @@ pub enum UrlForm {
 
 /// Returns the [`UrlForm`] in effect for this context.
 ///
-/// URLs render [`Relative`](UrlForm::Relative) unless an enclosing scope
-/// registered another form on the request context.
+/// URLs render [`Relative`](UrlForm::Relative) unless the context holds
+/// another form.
 #[inline]
 #[must_use]
 pub fn url_form(cx: &Cx) -> UrlForm {
-    try_request_context::<UrlForm>(cx)
+    try_context::<UrlForm>(cx)
         .copied()
         .unwrap_or_default()
 }

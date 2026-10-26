@@ -27,10 +27,11 @@ impl Default for CxId {
     }
 }
 
-/// The identity of one request context binding.
+/// The identity of one context binding.
 ///
-/// A fresh `BindingId` is issued whenever a value is registered on a request
-/// context, so equal ids always refer to the same value.
+/// A fresh `BindingId` is issued whenever a value is registered on a
+/// [`ContextMap`](crate::context::ContextMap), so equal ids always refer to
+/// the same value.
 ///
 /// Ids start at one so that `Option<BindingId>`, the shape a recorded read
 /// stores, is the size of a bare id.
