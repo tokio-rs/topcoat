@@ -4,7 +4,7 @@ use topcoat_router::RouterBuilder;
 #[cfg(feature = "router")]
 use crate::{MaxRunsPerConnection, PrefetchMode, RuntimeLayer};
 
-/// Marks a router's app context as configured for the browser runtime.
+/// Marks a router's context as configured for the browser runtime.
 #[derive(Debug, Clone, Copy)]
 pub struct RuntimeSetup;
 
@@ -25,10 +25,10 @@ pub trait RouterBuilderRuntimeExt {
 
     /// Sets when links in this router load their pages ahead of time.
     ///
-    /// This sets the app context value read by
-    /// [`prefetch_mode`](crate::prefetch_mode). You can override it with a
-    /// `PrefetchMode` in the request context or with a link's `prefetch`
-    /// argument.
+    /// This registers the value read by
+    /// [`prefetch_mode`](crate::prefetch_mode) on the router. You can override
+    /// it with a `PrefetchMode` added with `Cx::with` or with a link's
+    /// `prefetch` argument.
     ///
     /// ```rust
     /// use topcoat_router::Router;
@@ -42,7 +42,7 @@ pub trait RouterBuilderRuntimeExt {
     ///
     /// # Panics
     ///
-    /// Panics if the app context already contains a `PrefetchMode`.
+    /// Panics if a `PrefetchMode` is already registered on the router.
     #[must_use]
     #[track_caller]
     fn prefetch(self, mode: PrefetchMode) -> Self;

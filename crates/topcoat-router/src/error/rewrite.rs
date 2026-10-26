@@ -104,7 +104,7 @@ impl RewriteError {
 
     /// Carries `value` into the rewritten dispatch and every dispatch after
     /// it in the same chain, available through
-    /// [`request_context`](topcoat_core::context::request_context).
+    /// [`context`](topcoat_core::context::context).
     ///
     /// Each dispatch starts with a fresh context and memoization cache.
     /// Only explicitly carried values survive a rewrite. Calling this

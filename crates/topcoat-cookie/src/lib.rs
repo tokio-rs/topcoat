@@ -309,11 +309,11 @@ pub fn cookies(cx: &Cx) -> &CookieJar {
 }
 
 /// Returns the root jar wrapped in a [`SignedJar`], using the [`Key`]
-/// registered as app context.
+/// registered in the context.
 ///
 /// # Panics
 ///
-/// Panics if no [`Key`] was registered as app context.
+/// Panics if no [`Key`] was registered.
 #[must_use]
 #[track_caller]
 pub fn signed_cookies(cx: &Cx) -> SignedJar<'_, &CookieJar> {
@@ -321,11 +321,11 @@ pub fn signed_cookies(cx: &Cx) -> SignedJar<'_, &CookieJar> {
 }
 
 /// Returns the root jar wrapped in a [`PrivateJar`], using the [`Key`]
-/// registered as app context.
+/// registered in the context.
 ///
 /// # Panics
 ///
-/// Panics if no [`Key`] was registered as app context.
+/// Panics if no [`Key`] was registered.
 #[must_use]
 #[track_caller]
 pub fn private_cookies(cx: &Cx) -> PrivateJar<'_, &CookieJar> {
@@ -698,7 +698,7 @@ mod tests {
     }
 
     #[test]
-    fn signed_cookies_helper_uses_app_context_key() {
+    fn signed_cookies_helper_uses_context_key() {
         let key = Key::generate();
 
         let writer = cx_with_key(&[], key.clone());

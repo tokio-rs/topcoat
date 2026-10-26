@@ -7,7 +7,7 @@ use topcoat::{
     view::{View, view},
 };
 
-// Registered as app context below, so every request shares this counter.
+// Registered on the router below, so every request shares this counter.
 struct PageViews(AtomicU64);
 
 #[tokio::main]

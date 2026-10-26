@@ -29,7 +29,7 @@ impl Layer for SessionLayer {
 
 /// Installs session support on a [`RouterBuilder`].
 pub trait RouterBuilderSessionExt {
-    /// Registers the session `config` on the app context and the root session
+    /// Registers the session `config` on the router and the root session
     /// layer.
     ///
     /// The default cookie token store also needs the cookie layer, registered

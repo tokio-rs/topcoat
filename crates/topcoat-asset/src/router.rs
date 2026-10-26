@@ -17,7 +17,7 @@ use crate::{AssetConfig, config::Host};
 pub trait RouterBuilderAssetExt {
     /// Registers an [`AssetConfig`] on the router.
     ///
-    /// Makes the configuration available in app context so views can resolve
+    /// Makes the configuration available in the context so views can resolve
     /// [`Asset`](crate::Asset) values to URLs.
     ///
     /// [`AssetConfig::serve`] adds a route for each distinct bundled file.

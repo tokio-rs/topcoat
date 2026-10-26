@@ -7,7 +7,7 @@ pub type ResolveFontRouteFn = dyn Fn(Font, &mut dyn Write) -> std::fmt::Result +
 
 /// Resolves fonts to their hosted stylesheet URLs.
 ///
-/// Register in app context to control the URLs rendered for [`Font`] values.
+/// Register in the context to control the URLs rendered for [`Font`] values.
 pub struct FontResolver {
     resolve_fn: Box<ResolveFontRouteFn>,
 }

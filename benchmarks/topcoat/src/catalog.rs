@@ -70,7 +70,7 @@ pub fn filled_stars(tenths: u32) -> u32 {
 }
 
 /// The product catalog, deserialized once at startup from the shared
-/// `benchmarks/data/products.json` and registered as app context.
+/// `benchmarks/data/products.json` and registered on the router.
 pub struct Catalog {
     categories: Vec<Category>,
     products: Vec<Product>,

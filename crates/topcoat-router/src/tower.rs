@@ -498,7 +498,7 @@ fn recover(error: BoxError) -> Error {
 ///
 /// The service is `Clone`, `Send`, `Sync`, and infallible, satisfying the
 /// bounds tower servers commonly require. Clones are cheap and share the
-/// router's routing tables and app context.
+/// router's routing tables and context.
 ///
 /// The router matches the URI exactly as the service receives it, and
 /// generates its URLs from its own absolute

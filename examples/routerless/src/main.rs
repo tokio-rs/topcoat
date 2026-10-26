@@ -16,17 +16,17 @@ struct Reader {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
-    // App context can be assembled and shared without a router.
-    let mut app = ContextMap::new();
-    app.insert(Site {
+    // Shared values can be assembled without a router.
+    let mut shared = ContextMap::new();
+    shared.insert(Site {
         title: "Routerless Topcoat",
     });
-    let app = Arc::new(app);
+    let shared = Arc::new(shared);
 
     for name in ["Ada & Grace", "World"] {
-        // Each render gets its own request context, but shares the app context.
-        // `Cx::default()` also works when no app values are needed.
-        let cx = Cx::new(Arc::clone(&app)).with(Reader { name });
+        // Each render gets its own context over the shared values.
+        // `Cx::default()` also works when no shared values are needed.
+        let cx = Cx::new(Arc::clone(&shared)).with(Reader { name });
         let html = render(&cx).await?;
         println!("{html}");
     }

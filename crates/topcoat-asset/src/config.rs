@@ -154,7 +154,7 @@ impl From<AssetBundle> for AssetConfig {
     }
 }
 
-/// Returns the [`AssetConfig`] registered as app context for this context.
+/// Returns the [`AssetConfig`] registered in this context.
 ///
 /// # Panics
 ///
@@ -177,7 +177,7 @@ pub fn asset_config(cx: &Cx) -> &AssetConfig {
 pub fn bundled_asset(cx: &Cx, asset: Asset) -> &BundledAsset {
     match asset_config(cx).get(asset) {
         Some(asset) => asset,
-        None => panic!("failed to resolve asset {asset:?} in app context's asset config"),
+        None => panic!("failed to resolve asset {asset:?} in the context's asset config"),
     }
 }
 

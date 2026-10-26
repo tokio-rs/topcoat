@@ -10,7 +10,7 @@ use crate::{Mail, Receipt, Transport};
 /// The transport used to send application mail.
 ///
 /// Choose a [`Transport`] with [`MailConfig::builder`] and register the
-/// configuration in app context. Handlers can then call [`send`] without
+/// configuration in the context. Handlers can then call [`send`] without
 /// choosing a transport:
 ///
 /// ```
@@ -81,7 +81,7 @@ impl MailConfigBuilder {
 ///
 /// # Panics
 ///
-/// Panics when no [`MailConfig`] is registered on the app context.
+/// Panics when no [`MailConfig`] is registered in the context.
 ///
 /// # Errors
 ///
@@ -137,7 +137,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[should_panic(expected = "app context")]
+    #[should_panic(expected = "attempted to access context")]
     async fn send_panics_without_a_registered_config() {
         let cx = Cx::default();
         let _ = send(&cx, Mail::builder().build()).await;
