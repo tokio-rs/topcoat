@@ -471,7 +471,7 @@ mod tests {
         Box::pin(async move { format!("{:?}", route(cx).id()).into_response(cx) })
     }
 
-    /// Reads a registered app-context greeting and returns it as the body.
+    /// Reads the greeting registered on the router and returns it as the body.
     struct Greeting(&'static str);
 
     fn say_greeting(cx: &Cx, _body: Body) -> RouteFuture<'_> {
