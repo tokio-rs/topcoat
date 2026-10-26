@@ -39,7 +39,6 @@ members = [
     "crates/topcoat-view/macro",
 
     "examples/alpine-ajax",
-    "examples/app-context",
     "examples/asset",
     "examples/cloudflare-worker",
     "examples/context",
