@@ -39,12 +39,7 @@ pub trait RouterBuilderRuntimeExt {
     ///     .prefetch(PrefetchMode::Viewport)
     ///     .build();
     /// ```
-    ///
-    /// # Panics
-    ///
-    /// Panics if a `PrefetchMode` is already registered on the router.
     #[must_use]
-    #[track_caller]
     fn prefetch(self, mode: PrefetchMode) -> Self;
 
     /// Sets how many connected renders one runtime connection may have at
@@ -64,12 +59,7 @@ pub trait RouterBuilderRuntimeExt {
     ///     .max_runs_per_connection(128)
     ///     .build();
     /// ```
-    ///
-    /// # Panics
-    ///
-    /// Panics if the limit was already set.
     #[must_use]
-    #[track_caller]
     fn max_runs_per_connection(self, max: usize) -> Self;
 }
 
@@ -79,12 +69,10 @@ impl RouterBuilderRuntimeExt for RouterBuilder {
         self.layer(RuntimeLayer).with(RuntimeSetup)
     }
 
-    #[track_caller]
     fn prefetch(self, mode: PrefetchMode) -> Self {
         self.with(mode)
     }
 
-    #[track_caller]
     fn max_runs_per_connection(self, max: usize) -> Self {
         self.with(MaxRunsPerConnection(max))
     }

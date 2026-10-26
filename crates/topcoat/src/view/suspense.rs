@@ -145,18 +145,12 @@ pub trait RouterSuspenseExt {
     ///
     /// let router = Router::builder().suspense(SuspenseMode::Wait).build();
     /// ```
-    ///
-    /// # Panics
-    ///
-    /// Panics if a `SuspenseMode` is already registered on the router.
     #[must_use]
-    #[track_caller]
     fn suspense(self, mode: SuspenseMode) -> Self;
 }
 
 #[cfg(feature = "router")]
 impl RouterSuspenseExt for crate::router::RouterBuilder {
-    #[track_caller]
     fn suspense(self, mode: SuspenseMode) -> Self {
         self.with(mode)
     }

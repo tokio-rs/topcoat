@@ -6,7 +6,10 @@ use std::{
     sync::Arc,
 };
 
-use topcoat_core::{base_url::BaseUrl, context::ContextMap};
+use topcoat_core::{
+    base_url::BaseUrl,
+    context::{ContextMap, ContextValues},
+};
 
 use crate::{
     Endpoint, EndpointIndex, Endpoints, Layer, Layout, Methods, OriginLayer, OriginPolicy, Page,
@@ -296,8 +299,7 @@ impl RouterBuilder {
     ///
     /// # Panics
     ///
-    /// Panics if the value is not a valid base URL, or if a base URL has
-    /// already been registered.
+    /// Panics if the value is not a valid base URL.
     ///
     /// # Examples
     ///
@@ -319,11 +321,8 @@ impl RouterBuilder {
     ///
     /// Borrow it with [`context`](topcoat_core::context::context). A request
     /// can shadow it for part of its handling with
-    /// [`Cx::with`](topcoat_core::context::Cx::with).
-    ///
-    /// # Panics
-    ///
-    /// Panics if a value has already been registered for the same type.
+    /// [`Cx::with`](topcoat_core::context::Cx::with). Registering another value
+    /// of the same type replaces this one.
     ///
     /// # Examples
     ///
@@ -350,40 +349,56 @@ impl RouterBuilder {
     /// }
     /// ```
     #[must_use]
-    #[track_caller]
     pub fn with<T>(mut self, value: T) -> Self
     where
         T: Any + Send + Sync,
     {
-        assert!(
-            !self.context.contains::<T>(),
-            "duplicate context entry for type `{:?}`",
-            type_name::<T>()
-        );
         self.context.insert(value);
         self
     }
 
+    /// Shares every value in `values`, a tuple of values or a [`ContextMap`],
+    /// across this router's requests.
+    ///
+    /// Behaves like chained [`with`](Self::with) calls.
+    #[must_use]
+    pub fn with_many<V>(mut self, values: V) -> Self
+    where
+        V: ContextValues,
+    {
+        values.install(&mut self.context);
+        self
+    }
+
+    /// Returns a reference to the value of type `T` registered with
+    /// [`with`](Self::with).
+    ///
+    /// # Panics
+    ///
+    /// Panics if no value of type `T` has been registered.
+    #[must_use]
+    #[track_caller]
+    pub fn context<T>(&self) -> &T
+    where
+        T: Any + Send + Sync,
+    {
+        match self.try_context() {
+            Some(value) => value,
+            None => panic!(
+                "attempted to access context of type `{:?}`, but this type was not registered on the router",
+                type_name::<T>()
+            ),
+        }
+    }
+
     /// Returns a reference to the value of type `T` registered with
     /// [`with`](Self::with), or `None` if none has been registered.
-    ///
-    /// Use this to check for an existing value before registering one.
     #[must_use]
-    pub fn get_context<T>(&self) -> Option<&T>
+    pub fn try_context<T>(&self) -> Option<&T>
     where
         T: Any + Send + Sync,
     {
         self.context.get::<T>()
-    }
-
-    /// Returns a mutable reference to the value of type `T` registered with
-    /// [`with`](Self::with), or `None` if none has been registered.
-    #[must_use]
-    pub fn get_context_mut<T>(&mut self) -> Option<&mut T>
-    where
-        T: Any + Send + Sync,
-    {
-        self.context.get_mut::<T>()
     }
 
     /// Finalizes the registered routes, pages, and layouts into a [`Router`].
@@ -701,11 +716,12 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "duplicate context entry")]
-    fn duplicate_context_type_panics() {
-        let _ = RouterBuilder::new()
-            .with(Greeting)
-            .with(Greeting);
+    fn a_later_value_replaces_an_earlier_one() {
+        let builder = RouterBuilder::new().with(1u32).with_many((2u32, Greeting));
+
+        assert_eq!(*builder.context::<u32>(), 2);
+        assert!(builder.try_context::<Greeting>().is_some());
+        assert!(builder.try_context::<u64>().is_none());
     }
 
     #[test]

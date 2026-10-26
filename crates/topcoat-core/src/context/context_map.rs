@@ -63,20 +63,6 @@ impl ContextMap {
         Some(self.lookup::<T>()?.1)
     }
 
-    /// Returns a mutable reference to the registered value of type `T`, or
-    /// `None` if no such value has been registered.
-    ///
-    /// Also returns `None` while a clone of this map shares the value, since
-    /// the value cannot be changed without changing it for the clone too.
-    #[must_use]
-    pub fn get_mut<T>(&mut self) -> Option<&mut T>
-    where
-        T: Any + Send + Sync,
-    {
-        let binding = self.entries.get_mut(&TypeId::of::<T>())?;
-        Arc::get_mut(&mut binding.value)?.downcast_mut()
-    }
-
     /// Returns the registered value of type `T` together with the id of the
     /// binding holding it, or `None` if no such value has been registered.
     ///
@@ -245,29 +231,6 @@ mod tests {
         context.insert(Database("primary"));
         assert!(context.contains::<Database>());
         assert!(!context.contains::<Config>());
-    }
-
-    #[test]
-    fn get_mut_allows_mutation_in_place() {
-        let mut context = ContextMap::new();
-        context.insert(Config(1));
-        let id = binding_id::<Config>(&context);
-        context.get_mut::<Config>().unwrap().0 = 42;
-
-        assert_eq!(context.get::<Config>(), Some(&Config(42)));
-        assert_eq!(binding_id::<Config>(&context), id);
-        assert_eq!(context.get_mut::<Database>(), None);
-    }
-
-    #[test]
-    fn get_mut_returns_none_while_a_clone_shares_the_value() {
-        let mut context = ContextMap::new();
-        context.insert(Config(1));
-        let clone = context.clone();
-
-        assert_eq!(context.get_mut::<Config>(), None);
-        drop(clone);
-        assert_eq!(context.get_mut::<Config>(), Some(&mut Config(1)));
     }
 
     #[test]
