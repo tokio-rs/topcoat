@@ -8,7 +8,7 @@ use std::{
 pub use bytes::{Bytes, BytesMut};
 use http::request::Parts;
 use topcoat_core::{
-    context::{Cx, context, try_context},
+    context::{Cx, try_context},
     error::Result,
     identity::Identity,
 };
@@ -152,10 +152,32 @@ where
     }
 }
 
+/// Unwraps the result of a `try_*` request accessor.
+///
+/// # Panics
+///
+/// Panics if `value` is `None`, which means `cx` does not belong to a router
+/// request.
+#[inline]
+#[track_caller]
+fn in_request<T>(value: Option<T>) -> T {
+    match value {
+        Some(value) => value,
+        None => panic!(
+            "attempted to access the request, but this context does not belong to a router request"
+        ),
+    }
+}
+
 /// Returns the [`Parts`] of the current request.
 ///
 /// Use this to read several request fields at once. For one field, use its
 /// accessor, such as [`method`] or [`headers`].
+///
+/// # Panics
+///
+/// Panics if `cx` does not belong to a router request. Use [`try_parts`] to
+/// handle that case.
 ///
 /// # Examples
 ///
@@ -171,12 +193,25 @@ where
 #[must_use]
 #[track_caller]
 pub fn parts(cx: &Cx) -> &Parts {
-    context(cx)
+    in_request(try_parts(cx))
+}
+
+/// Returns the [`Parts`] of the current request, or `None` if `cx` does not
+/// belong to a router request.
+#[inline]
+#[must_use]
+pub fn try_parts(cx: &Cx) -> Option<&Parts> {
+    try_context(cx)
 }
 
 /// Returns the HTTP [`Method`] of the current request.
 ///
 /// [`Method`]: http::Method
+///
+/// # Panics
+///
+/// Panics if `cx` does not belong to a router request. Use [`try_method`] to
+/// handle that case.
 ///
 /// # Examples
 ///
@@ -191,12 +226,27 @@ pub fn parts(cx: &Cx) -> &Parts {
 #[must_use]
 #[track_caller]
 pub fn method(cx: &Cx) -> &http::Method {
-    &parts(cx).method
+    in_request(try_method(cx))
+}
+
+/// Returns the HTTP [`Method`] of the current request, or `None` if `cx` does
+/// not belong to a router request.
+///
+/// [`Method`]: http::Method
+#[inline]
+#[must_use]
+pub fn try_method(cx: &Cx) -> Option<&http::Method> {
+    Some(&try_parts(cx)?.method)
 }
 
 /// Returns the [`Uri`] of the current request.
 ///
 /// [`Uri`]: http::Uri
+///
+/// # Panics
+///
+/// Panics if `cx` does not belong to a router request. Use [`try_uri`] to
+/// handle that case.
 ///
 /// # Examples
 ///
@@ -211,12 +261,27 @@ pub fn method(cx: &Cx) -> &http::Method {
 #[must_use]
 #[track_caller]
 pub fn uri(cx: &Cx) -> &http::Uri {
-    &parts(cx).uri
+    in_request(try_uri(cx))
+}
+
+/// Returns the [`Uri`] of the current request, or `None` if `cx` does not
+/// belong to a router request.
+///
+/// [`Uri`]: http::Uri
+#[inline]
+#[must_use]
+pub fn try_uri(cx: &Cx) -> Option<&http::Uri> {
+    Some(&try_parts(cx)?.uri)
 }
 
 /// Returns the HTTP [`Version`] of the current request.
 ///
 /// [`Version`]: http::Version
+///
+/// # Panics
+///
+/// Panics if `cx` does not belong to a router request. Use [`try_version`]
+/// to handle that case.
 ///
 /// # Examples
 ///
@@ -231,12 +296,27 @@ pub fn uri(cx: &Cx) -> &http::Uri {
 #[must_use]
 #[track_caller]
 pub fn version(cx: &Cx) -> &http::Version {
-    &parts(cx).version
+    in_request(try_version(cx))
+}
+
+/// Returns the HTTP [`Version`] of the current request, or `None` if `cx`
+/// does not belong to a router request.
+///
+/// [`Version`]: http::Version
+#[inline]
+#[must_use]
+pub fn try_version(cx: &Cx) -> Option<&http::Version> {
+    Some(&try_parts(cx)?.version)
 }
 
 /// Returns the [`HeaderMap`] of the current request.
 ///
 /// [`HeaderMap`]: http::HeaderMap
+///
+/// # Panics
+///
+/// Panics if `cx` does not belong to a router request. Use [`try_headers`]
+/// to handle that case.
 ///
 /// # Examples
 ///
@@ -251,11 +331,23 @@ pub fn version(cx: &Cx) -> &http::Version {
 #[must_use]
 #[track_caller]
 pub fn headers(cx: &Cx) -> &http::HeaderMap {
-    &parts(cx).headers
+    in_request(try_headers(cx))
+}
+
+/// Returns the [`HeaderMap`] of the current request, or `None` if `cx` does
+/// not belong to a router request.
+///
+/// [`HeaderMap`]: http::HeaderMap
+#[inline]
+#[must_use]
+pub fn try_headers(cx: &Cx) -> Option<&http::HeaderMap> {
+    Some(&try_parts(cx)?.headers)
 }
 
 /// Returns the `Content-Type` header of the current request as a string slice,
 /// or [`None`] when it is absent or not valid UTF-8.
+///
+/// Also returns `None` if `cx` does not belong to a router request.
 ///
 /// # Examples
 ///
@@ -268,9 +360,11 @@ pub fn headers(cx: &Cx) -> &http::HeaderMap {
 /// ```
 #[inline]
 #[must_use]
-#[track_caller]
 pub fn content_type(cx: &Cx) -> Option<&str> {
-    headers(cx).get(http::header::CONTENT_TYPE)?.to_str().ok()
+    try_headers(cx)?
+        .get(http::header::CONTENT_TYPE)?
+        .to_str()
+        .ok()
 }
 
 /// Returns the [`Extensions`] of the current request.
@@ -279,6 +373,11 @@ pub fn content_type(cx: &Cx) -> Option<&str> {
 /// middleware running before the handler.
 ///
 /// [`Extensions`]: http::Extensions
+///
+/// # Panics
+///
+/// Panics if `cx` does not belong to a router request. Use
+/// [`try_extensions`] to handle that case.
 ///
 /// # Examples
 ///
@@ -295,7 +394,17 @@ pub fn content_type(cx: &Cx) -> Option<&str> {
 #[must_use]
 #[track_caller]
 pub fn extensions(cx: &Cx) -> &http::Extensions {
-    &parts(cx).extensions
+    in_request(try_extensions(cx))
+}
+
+/// Returns the [`Extensions`] of the current request, or `None` if `cx` does
+/// not belong to a router request.
+///
+/// [`Extensions`]: http::Extensions
+#[inline]
+#[must_use]
+pub fn try_extensions(cx: &Cx) -> Option<&http::Extensions> {
+    Some(&try_parts(cx)?.extensions)
 }
 
 /// Returns the IP address and port of the direct connection for this request,
@@ -319,8 +428,9 @@ pub fn extensions(cx: &Cx) -> &http::Extensions {
 #[inline]
 #[must_use]
 pub fn remote_addr(cx: &Cx) -> Option<SocketAddr> {
-    let parts = try_context::<Parts>(cx)?;
-    parts.extensions.get::<RemoteAddr>().map(|remote| remote.0)
+    try_extensions(cx)?
+        .get::<RemoteAddr>()
+        .map(|remote| remote.0)
 }
 
 /// Returns the client's IP address for this request, or `None`
@@ -385,6 +495,11 @@ pub(crate) struct OriginalParts(pub(crate) Arc<Parts>);
 /// [`StripPrefixLayer`](crate::StripPrefixLayer) changes the current URI
 /// while leaving the original URI intact.
 ///
+/// # Panics
+///
+/// Panics if `cx` does not belong to a router request. Use
+/// [`try_original_parts`] to handle that case.
+///
 /// # Examples
 ///
 /// ```rust
@@ -398,9 +513,20 @@ pub(crate) struct OriginalParts(pub(crate) Arc<Parts>);
 #[must_use]
 #[track_caller]
 pub fn original_parts(cx: &Cx) -> &Parts {
+    in_request(try_original_parts(cx))
+}
+
+/// Returns the [`Parts`] of the request as the client sent it, or `None` if
+/// `cx` does not belong to a router request.
+///
+/// See [`original_parts`] for how a rewritten request differs from the one
+/// that arrived.
+#[inline]
+#[must_use]
+pub fn try_original_parts(cx: &Cx) -> Option<&Parts> {
     match try_context::<OriginalParts>(cx) {
-        Some(original) => &original.0,
-        None => parts(cx),
+        Some(original) => Some(&original.0),
+        None => try_parts(cx),
     }
 }
 
@@ -412,6 +538,11 @@ pub fn original_parts(cx: &Cx) -> &Parts {
 /// rewritten it is the same as [`method`].
 ///
 /// [`Method`]: http::Method
+///
+/// # Panics
+///
+/// Panics if `cx` does not belong to a router request. Use
+/// [`try_original_method`] to handle that case.
 ///
 /// # Examples
 ///
@@ -426,7 +557,17 @@ pub fn original_parts(cx: &Cx) -> &Parts {
 #[must_use]
 #[track_caller]
 pub fn original_method(cx: &Cx) -> &http::Method {
-    &original_parts(cx).method
+    in_request(try_original_method(cx))
+}
+
+/// Returns the HTTP [`Method`] the client actually requested with, or `None`
+/// if `cx` does not belong to a router request.
+///
+/// [`Method`]: http::Method
+#[inline]
+#[must_use]
+pub fn try_original_method(cx: &Cx) -> Option<&http::Method> {
+    Some(&try_original_parts(cx)?.method)
 }
 
 /// Returns the [`Uri`] the client actually requested, before any rewrite.
@@ -438,6 +579,11 @@ pub fn original_method(cx: &Cx) -> &http::Method {
 /// also change the current URI without changing this original URI.
 ///
 /// [`Uri`]: http::Uri
+///
+/// # Panics
+///
+/// Panics if `cx` does not belong to a router request. Use
+/// [`try_original_uri`] to handle that case.
 ///
 /// # Examples
 ///
@@ -452,7 +598,17 @@ pub fn original_method(cx: &Cx) -> &http::Method {
 #[must_use]
 #[track_caller]
 pub fn original_uri(cx: &Cx) -> &http::Uri {
-    &original_parts(cx).uri
+    in_request(try_original_uri(cx))
+}
+
+/// Returns the [`Uri`] the client actually requested, or `None` if `cx` does
+/// not belong to a router request.
+///
+/// [`Uri`]: http::Uri
+#[inline]
+#[must_use]
+pub fn try_original_uri(cx: &Cx) -> Option<&http::Uri> {
+    Some(&try_original_parts(cx)?.uri)
 }
 
 /// Returns the HTTP [`Version`] of the request as the client sent it, before
@@ -462,11 +618,26 @@ pub fn original_uri(cx: &Cx) -> &http::Uri {
 /// that arrived.
 ///
 /// [`Version`]: http::Version
+///
+/// # Panics
+///
+/// Panics if `cx` does not belong to a router request. Use
+/// [`try_original_version`] to handle that case.
 #[inline]
 #[must_use]
 #[track_caller]
 pub fn original_version(cx: &Cx) -> &http::Version {
-    &original_parts(cx).version
+    in_request(try_original_version(cx))
+}
+
+/// Returns the HTTP [`Version`] of the request as the client sent it, or
+/// `None` if `cx` does not belong to a router request.
+///
+/// [`Version`]: http::Version
+#[inline]
+#[must_use]
+pub fn try_original_version(cx: &Cx) -> Option<&http::Version> {
+    Some(&try_original_parts(cx)?.version)
 }
 
 /// Returns the [`HeaderMap`] of the request as the client sent it, before
@@ -476,24 +647,39 @@ pub fn original_version(cx: &Cx) -> &http::Version {
 /// that arrived.
 ///
 /// [`HeaderMap`]: http::HeaderMap
+///
+/// # Panics
+///
+/// Panics if `cx` does not belong to a router request. Use
+/// [`try_original_headers`] to handle that case.
 #[inline]
 #[must_use]
 #[track_caller]
 pub fn original_headers(cx: &Cx) -> &http::HeaderMap {
-    &original_parts(cx).headers
+    in_request(try_original_headers(cx))
+}
+
+/// Returns the [`HeaderMap`] of the request as the client sent it, or `None`
+/// if `cx` does not belong to a router request.
+///
+/// [`HeaderMap`]: http::HeaderMap
+#[inline]
+#[must_use]
+pub fn try_original_headers(cx: &Cx) -> Option<&http::HeaderMap> {
+    Some(&try_original_parts(cx)?.headers)
 }
 
 /// Returns the `Content-Type` header of the request as the client sent it,
 /// before any rewrite, as a string slice, or [`None`] when it is absent or
 /// not valid UTF-8.
 ///
-/// See [`original_parts`] for how a rewritten request differs from the one
-/// that arrived.
+/// Also returns `None` if `cx` does not belong to a router request. See
+/// [`original_parts`] for how a rewritten request differs from the one that
+/// arrived.
 #[inline]
 #[must_use]
-#[track_caller]
 pub fn original_content_type(cx: &Cx) -> Option<&str> {
-    original_headers(cx)
+    try_original_headers(cx)?
         .get(http::header::CONTENT_TYPE)?
         .to_str()
         .ok()
@@ -506,11 +692,26 @@ pub fn original_content_type(cx: &Cx) -> Option<&str> {
 /// that arrived.
 ///
 /// [`Extensions`]: http::Extensions
+///
+/// # Panics
+///
+/// Panics if `cx` does not belong to a router request. Use
+/// [`try_original_extensions`] to handle that case.
 #[inline]
 #[must_use]
 #[track_caller]
 pub fn original_extensions(cx: &Cx) -> &http::Extensions {
-    &original_parts(cx).extensions
+    in_request(try_original_extensions(cx))
+}
+
+/// Returns the [`Extensions`] of the request as the client sent it, or
+/// `None` if `cx` does not belong to a router request.
+///
+/// [`Extensions`]: http::Extensions
+#[inline]
+#[must_use]
+pub fn try_original_extensions(cx: &Cx) -> Option<&http::Extensions> {
+    Some(&try_original_parts(cx)?.extensions)
 }
 
 /// The header naming the identity the router installs on a request's context.
@@ -551,4 +752,46 @@ pub fn initial_identity(cx: &Cx) -> Result<Identity> {
         .ok_or_else(|| {
             bad_request(format!("expected `{IDENTITY_HEADER}` to be an identity")).into()
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn request_cx() -> Cx {
+        let (parts, ()) = Request::builder()
+            .uri("/path")
+            .header(http::header::CONTENT_TYPE, "text/plain")
+            .body(())
+            .unwrap()
+            .into_parts();
+        Cx::default().with(parts)
+    }
+
+    #[test]
+    fn try_accessors_read_the_request() {
+        let cx = request_cx();
+
+        assert_eq!(try_uri(&cx).map(http::Uri::path), Some("/path"));
+        assert_eq!(try_original_uri(&cx).map(http::Uri::path), Some("/path"));
+        assert_eq!(content_type(&cx), Some("text/plain"));
+        assert_eq!(original_content_type(&cx), Some("text/plain"));
+    }
+
+    #[test]
+    fn try_accessors_return_none_outside_a_request() {
+        let cx = Cx::default();
+
+        assert!(try_parts(&cx).is_none());
+        assert!(try_original_parts(&cx).is_none());
+        assert_eq!(content_type(&cx), None);
+        assert_eq!(original_content_type(&cx), None);
+        assert_eq!(remote_addr(&cx), None);
+    }
+
+    #[test]
+    #[should_panic(expected = "does not belong to a router request")]
+    fn accessors_panic_outside_a_request() {
+        let _ = uri(&Cx::default());
+    }
 }

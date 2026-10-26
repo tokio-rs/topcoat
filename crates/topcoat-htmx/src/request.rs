@@ -1,113 +1,72 @@
 use http::{HeaderName, request::Parts};
-use topcoat_core::context::{Cx, context};
+use topcoat_core::context::{Cx, try_context};
 
 use crate::header;
 
-/// Borrows the header value, or returns [`None`] if it is missing or cannot
-/// be represented as text.
-#[track_caller]
+/// Borrows the header value, or returns [`None`] if it is missing, cannot be
+/// represented as text, or `cx` does not belong to a router request.
 fn header<'cx>(cx: &'cx Cx, name: &HeaderName) -> Option<&'cx str> {
-    context::<Parts>(cx).headers.get(name)?.to_str().ok()
+    try_context::<Parts>(cx)?.headers.get(name)?.to_str().ok()
 }
 
 /// Returns whether the request carries `HX-Request: true`.
-///
-/// # Panics
-///
-/// Panics if called outside a router request (no request [`Parts`] in context).
 #[inline]
 #[must_use]
-#[track_caller]
 pub fn hx_request(cx: &Cx) -> bool {
     header(cx, &header::HX_REQUEST) == Some("true")
 }
 
 /// Returns whether `HX-Boosted` is `true`, indicating an `hx-boost` request.
-///
-/// # Panics
-///
-/// Panics if called outside a router request (no request [`Parts`] in context).
 #[inline]
 #[must_use]
-#[track_caller]
 pub fn hx_boosted(cx: &Cx) -> bool {
     header(cx, &header::HX_BOOSTED) == Some("true")
 }
 
 /// Returns whether `HX-History-Restore-Request` is `true`, indicating that htmx
 /// is restoring a page missing from its history cache.
-///
-/// # Panics
-///
-/// Panics if called outside a router request (no request [`Parts`] in context).
 #[inline]
 #[must_use]
-#[track_caller]
 pub fn hx_history_restore_request(cx: &Cx) -> bool {
     header(cx, &header::HX_HISTORY_RESTORE_REQUEST) == Some("true")
 }
 
 /// Returns the current browser URL from the `HX-Current-URL` header, or [`None`]
 /// when it is absent.
-///
-/// # Panics
-///
-/// Panics if called outside a router request (no request [`Parts`] in context).
 #[inline]
 #[must_use]
-#[track_caller]
 pub fn hx_current_url(cx: &Cx) -> Option<&str> {
     header(cx, &header::HX_CURRENT_URL)
 }
 
 /// Returns the user's response to an `hx-prompt` from the `HX-Prompt` header,
 /// or [`None`] when there was no prompt.
-///
-/// # Panics
-///
-/// Panics if called outside a router request (no request [`Parts`] in context).
 #[inline]
 #[must_use]
-#[track_caller]
 pub fn hx_prompt(cx: &Cx) -> Option<&str> {
     header(cx, &header::HX_PROMPT)
 }
 
 /// Returns the `id` of the target element from the `HX-Target` header, or
 /// [`None`] when the request has no target.
-///
-/// # Panics
-///
-/// Panics if called outside a router request (no request [`Parts`] in context).
 #[inline]
 #[must_use]
-#[track_caller]
 pub fn hx_target(cx: &Cx) -> Option<&str> {
     header(cx, &header::HX_TARGET)
 }
 
 /// Returns the `id` of the triggering element from the `HX-Trigger` header, or
 /// [`None`] when it has none.
-///
-/// # Panics
-///
-/// Panics if called outside a router request (no request [`Parts`] in context).
 #[inline]
 #[must_use]
-#[track_caller]
 pub fn hx_trigger(cx: &Cx) -> Option<&str> {
     header(cx, &header::HX_TRIGGER)
 }
 
 /// Returns the `name` of the triggering element from the `HX-Trigger-Name`
 /// header, or [`None`] when it has none.
-///
-/// # Panics
-///
-/// Panics if called outside a router request (no request [`Parts`] in context).
 #[inline]
 #[must_use]
-#[track_caller]
 pub fn hx_trigger_name(cx: &Cx) -> Option<&str> {
     header(cx, &header::HX_TRIGGER_NAME)
 }
@@ -168,5 +127,12 @@ mod tests {
         let cx = cx_with(&[]);
         assert_eq!(hx_current_url(&cx), None);
         assert_eq!(hx_prompt(&cx), None);
+    }
+
+    #[test]
+    fn headers_are_absent_outside_a_request() {
+        let cx = Cx::default();
+        assert!(!hx_request(&cx));
+        assert_eq!(hx_target(&cx), None);
     }
 }

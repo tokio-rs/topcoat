@@ -6,7 +6,7 @@ use std::fmt;
 #[cfg(feature = "serve")]
 use std::path::PathBuf;
 
-use topcoat_core::context::{Cx, context};
+use topcoat_core::context::{Cx, try_context};
 
 #[cfg(feature = "serve")]
 use crate::AssetBundle;
@@ -158,11 +158,25 @@ impl From<AssetBundle> for AssetConfig {
 ///
 /// # Panics
 ///
-/// Panics if no [`AssetConfig`] was registered.
+/// Panics if no [`AssetConfig`] was registered. Use [`try_asset_config`] to
+/// handle that case.
 #[must_use]
 #[track_caller]
 pub fn asset_config(cx: &Cx) -> &AssetConfig {
-    context(cx)
+    match try_asset_config(cx) {
+        Some(config) => config,
+        None => panic!(
+            "attempted to access the asset config, but none was registered; \
+             register one on the router builder with `.assets(...)`"
+        ),
+    }
+}
+
+/// Borrows the asset configuration stored in the context, or returns `None`
+/// if none was registered.
+#[must_use]
+pub fn try_asset_config(cx: &Cx) -> Option<&AssetConfig> {
+    try_context(cx)
 }
 
 /// Resolves an [`Asset`] to its [`BundledAsset`] in the context's
@@ -171,7 +185,7 @@ pub fn asset_config(cx: &Cx) -> &AssetConfig {
 /// # Panics
 ///
 /// Panics if no [`AssetConfig`] was registered, or if its catalog does not
-/// contain the given asset.
+/// contain the given asset. Use [`try_bundled_asset`] to handle those cases.
 #[must_use]
 #[track_caller]
 pub fn bundled_asset(cx: &Cx, asset: Asset) -> &BundledAsset {
@@ -179,6 +193,14 @@ pub fn bundled_asset(cx: &Cx, asset: Asset) -> &BundledAsset {
         Some(asset) => asset,
         None => panic!("failed to resolve asset {asset:?} in the context's asset config"),
     }
+}
+
+/// Resolves an [`Asset`] to its [`BundledAsset`] in the context's
+/// registered [`AssetConfig`], or returns `None` if no config was registered
+/// or its catalog does not contain the given asset.
+#[must_use]
+pub fn try_bundled_asset(cx: &Cx, asset: Asset) -> Option<&BundledAsset> {
+    try_asset_config(cx)?.get(asset)
 }
 
 #[cfg(test)]

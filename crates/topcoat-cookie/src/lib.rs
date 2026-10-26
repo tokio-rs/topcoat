@@ -25,7 +25,7 @@ pub use private::*;
 pub use router::*;
 pub use signed::*;
 pub use store::*;
-use topcoat_core::context::{Cx, context};
+use topcoat_core::context::{Cx, context, try_context};
 
 /// A request-scoped cookie jar.
 ///
@@ -302,32 +302,82 @@ impl CookieJarCell {
 /// # Panics
 ///
 /// Panics if the cookie router layer has not been installed for this request.
+/// Use [`try_cookies`] to handle that case.
 #[must_use]
 #[track_caller]
 pub fn cookies(cx: &Cx) -> &CookieJar {
-    context::<CookieJarCell>(cx).get_or_init(cx)
+    match try_cookies(cx) {
+        Some(jar) => jar,
+        None => panic!(
+            "attempted to access cookies, but the cookie layer is not installed; \
+             install it on the router builder with `.cookies()`"
+        ),
+    }
+}
+
+/// Returns the request's root [`CookieJar`], or `None` if the cookie router
+/// layer has not been installed for this request.
+///
+/// See [`cookies`] for how the jar is built.
+#[must_use]
+pub fn try_cookies(cx: &Cx) -> Option<&CookieJar> {
+    Some(try_context::<CookieJarCell>(cx)?.get_or_init(cx))
 }
 
 /// Wraps the root cookie jar in a [`SignedJar`] with the context's [`Key`].
 ///
 /// # Panics
 ///
-/// Panics if the context has no [`Key`].
+/// Panics if the cookie router layer has not been installed or the context
+/// has no [`Key`]. Use [`try_signed_cookies`] to handle those cases.
 #[must_use]
 #[track_caller]
 pub fn signed_cookies(cx: &Cx) -> SignedJar<'_, &CookieJar> {
-    cookies(cx).signed(context::<Key>(cx))
+    cookies(cx).signed(key(cx))
+}
+
+/// Wraps the root cookie jar in a [`SignedJar`] with the context's [`Key`],
+/// or returns `None` if the cookie router layer has not been installed or the
+/// context has no [`Key`].
+#[must_use]
+pub fn try_signed_cookies(cx: &Cx) -> Option<SignedJar<'_, &CookieJar>> {
+    Some(try_cookies(cx)?.signed(try_context::<Key>(cx)?))
 }
 
 /// Wraps the root cookie jar in a [`PrivateJar`] with the context's [`Key`].
 ///
 /// # Panics
 ///
-/// Panics if the context has no [`Key`].
+/// Panics if the cookie router layer has not been installed or the context
+/// has no [`Key`]. Use [`try_private_cookies`] to handle those cases.
 #[must_use]
 #[track_caller]
 pub fn private_cookies(cx: &Cx) -> PrivateJar<'_, &CookieJar> {
-    cookies(cx).private(context::<Key>(cx))
+    cookies(cx).private(key(cx))
+}
+
+/// Wraps the root cookie jar in a [`PrivateJar`] with the context's [`Key`],
+/// or returns `None` if the cookie router layer has not been installed or the
+/// context has no [`Key`].
+#[must_use]
+pub fn try_private_cookies(cx: &Cx) -> Option<PrivateJar<'_, &CookieJar>> {
+    Some(try_cookies(cx)?.private(try_context::<Key>(cx)?))
+}
+
+/// Borrows the context's [`Key`] for signed and private cookies.
+///
+/// # Panics
+///
+/// Panics if the context has no [`Key`].
+#[track_caller]
+fn key(cx: &Cx) -> &Key {
+    match try_context::<Key>(cx) {
+        Some(key) => key,
+        None => panic!(
+            "attempted to use signed or private cookies, but no `Key` was registered; \
+             register one on the router builder with `.with(key)`"
+        ),
+    }
 }
 
 /// Appends the request's pending cookie changes to `headers` as `Set-Cookie`
@@ -356,9 +406,8 @@ mod tests {
 
     use super::*;
 
-    /// Builds a `Cx` whose request carries the given `Cookie` header values (one
-    /// per entry, so multi-header parsing can be exercised). No `Parts` are
-    /// registered when `cookie_headers` is empty *and* `with_parts` is false.
+    /// Builds a `Cx` whose request carries the given `Cookie` header values,
+    /// one header per entry, so multi-header parsing can be exercised.
     fn cx_with(cookie_headers: &[&str]) -> Cx {
         let mut builder = Request::builder();
         for value in cookie_headers {
@@ -372,13 +421,31 @@ mod tests {
     /// Builds the context used by [`cx_with`] and adds the key read by
     /// `signed_cookies` and `private_cookies`.
     fn cx_with_key(cookie_headers: &[&str], key: Key) -> Cx {
-        let mut builder = Request::builder();
-        for value in cookie_headers {
-            builder = builder.header(header::COOKIE, *value);
-        }
-        let (parts, ()) = builder.body(()).unwrap().into_parts();
+        cx_with(cookie_headers).with(key)
+    }
 
-        Cx::default().with_many((key, parts, CookieJarCell::new()))
+    #[test]
+    fn try_accessors_return_none_without_the_cookie_layer() {
+        let cx = Cx::default().with(Key::generate());
+
+        assert!(try_cookies(&cx).is_none());
+        assert!(try_signed_cookies(&cx).is_none());
+        assert!(try_private_cookies(&cx).is_none());
+    }
+
+    #[test]
+    fn try_keyed_accessors_return_none_without_a_key() {
+        let cx = cx_with(&["theme=dark"]);
+
+        assert!(try_cookies(&cx).is_some());
+        assert!(try_signed_cookies(&cx).is_none());
+        assert!(try_private_cookies(&cx).is_none());
+    }
+
+    #[test]
+    #[should_panic(expected = "no `Key` was registered")]
+    fn signed_cookies_panic_without_a_key() {
+        let _ = signed_cookies(&cx_with(&[]));
     }
 
     /// The `Set-Cookie` header values the request would emit.

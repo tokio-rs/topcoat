@@ -1,34 +1,23 @@
 use http::{HeaderName, request::Parts};
-use topcoat_core::context::{Cx, context};
+use topcoat_core::context::{Cx, try_context};
 
 use crate::header;
 
-/// Borrows the header value, or returns [`None`] if it is missing or cannot
-/// be represented as text.
-#[track_caller]
+/// Borrows the header value, or returns [`None`] if it is missing, cannot be
+/// represented as text, or `cx` does not belong to a router request.
 fn header<'cx>(cx: &'cx Cx, name: &HeaderName) -> Option<&'cx str> {
-    context::<Parts>(cx).headers.get(name)?.to_str().ok()
+    try_context::<Parts>(cx)?.headers.get(name)?.to_str().ok()
 }
 
 /// Returns whether the request carries `X-Alpine-Request: true`.
-///
-/// # Panics
-///
-/// Panics if called outside a router request (no request [`Parts`] in context).
 #[inline]
 #[must_use]
-#[track_caller]
 pub fn ajax_request(cx: &Cx) -> bool {
     header(cx, &header::X_ALPINE_REQUEST) == Some("true")
 }
 
 /// Returns the target element `id`s from the `X-Alpine-Target` header, or an
 /// empty iterator when the header is absent.
-///
-/// # Panics
-///
-/// Panics if called outside a router request (no request [`Parts`] in context).
-#[track_caller]
 pub fn ajax_targets(cx: &Cx) -> impl Iterator<Item = &str> {
     header(cx, &header::X_ALPINE_TARGET)
         .unwrap_or_default()
@@ -36,12 +25,7 @@ pub fn ajax_targets(cx: &Cx) -> impl Iterator<Item = &str> {
 }
 
 /// Returns whether `id` appears in the `X-Alpine-Target` header.
-///
-/// # Panics
-///
-/// Panics if called outside a router request (no request [`Parts`] in context).
 #[must_use]
-#[track_caller]
 pub fn ajax_target(cx: &Cx, id: &str) -> bool {
     ajax_targets(cx).any(|target| target == id)
 }
@@ -129,5 +113,12 @@ mod tests {
     fn ajax_target_false_when_header_missing() {
         let cx = cx_with(&[]);
         assert!(!ajax_target(&cx, "comments"));
+    }
+
+    #[test]
+    fn headers_are_absent_outside_a_request() {
+        let cx = Cx::default();
+        assert!(!ajax_request(&cx));
+        assert_eq!(ajax_targets(&cx).count(), 0);
     }
 }

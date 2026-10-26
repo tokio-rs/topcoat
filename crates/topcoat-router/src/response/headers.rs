@@ -1,7 +1,7 @@
 use std::sync::{Mutex, PoisonError};
 
 use http::{HeaderMap, HeaderName, HeaderValue};
-use topcoat_core::context::{Cx, context};
+use topcoat_core::context::{Cx, try_context};
 
 /// Headers to append to the current request's final response.
 ///
@@ -96,11 +96,24 @@ fn append_all(into: &mut HeaderMap, from: HeaderMap) {
 ///
 /// # Panics
 ///
-/// Panics if the request is not being dispatched by the router.
+/// Panics if the request is not being dispatched by the router. Use
+/// [`try_response_headers`] to handle that case.
 #[must_use]
 #[track_caller]
 pub fn response_headers(cx: &Cx) -> &ResponseHeaders {
-    context::<ResponseHeaders>(cx)
+    match try_response_headers(cx) {
+        Some(headers) => headers,
+        None => panic!(
+            "attempted to access the response headers, but this context does not belong to a router request"
+        ),
+    }
+}
+
+/// Returns the [`ResponseHeaders`] slot of the current request, or `None` if
+/// the request is not being dispatched by the router.
+#[must_use]
+pub fn try_response_headers(cx: &Cx) -> Option<&ResponseHeaders> {
+    try_context(cx)
 }
 
 #[cfg(test)]
