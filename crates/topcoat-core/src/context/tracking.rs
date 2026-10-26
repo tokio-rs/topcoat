@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::context::{BindingId, ContextMap};
+use crate::context::{BindingId, Scope};
 
 /// One observed request context read: the type that was looked up and the
 /// identity of the binding it resolved to, or `None` if no value was
@@ -34,10 +34,10 @@ impl ContextRead {
         }
     }
 
-    /// Returns whether `context` still resolves this read's type to the
+    /// Returns whether `scope` still resolves this read's type to the
     /// binding that was observed.
-    pub(crate) fn matches(&self, context: &ContextMap) -> bool {
-        context.binding_id(self.type_id) == self.binding_id
+    pub(crate) fn matches(&self, scope: &Scope) -> bool {
+        scope.binding_id(self.type_id) == self.binding_id
     }
 }
 
@@ -55,13 +55,13 @@ impl ContextRead {
 #[derive(Debug)]
 pub(crate) struct ContextTracker {
     /// The scope the tracked call was entered with.
-    entry: Arc<ContextMap>,
+    entry: Arc<Scope>,
     reads: Mutex<Vec<ContextRead>>,
 }
 
 impl ContextTracker {
     /// Creates a tracker for a call entered with the scope `entry`.
-    pub(crate) fn new(entry: Arc<ContextMap>) -> Self {
+    pub(crate) fn new(entry: Arc<Scope>) -> Self {
         Self {
             entry,
             reads: Mutex::new(Vec::new()),
@@ -114,77 +114,57 @@ mod tests {
     struct Session;
     struct Theme;
 
-    /// Records what `context` currently resolves `T` to.
-    fn observe<T: Any>(context: &ContextMap) -> ContextRead {
-        ContextRead::new::<T>(context.binding_id(TypeId::of::<T>()))
-    }
-
     /// Observes what `cx`'s scope currently resolves `T` to, for building
     /// expected reads.
     fn expected<T: Any>(cx: &Cx) -> ContextRead {
-        observe::<T>(&cx.state.request_context)
+        ContextRead::new::<T>(cx.scope().binding_id(TypeId::of::<T>()))
     }
 
     #[test]
-    fn a_present_read_matches_its_own_context() {
-        let mut context = ContextMap::new();
-        context.insert(Session);
+    fn a_present_read_matches_its_own_scope() {
+        let cx = Cx::default().with(Session);
 
-        let read = observe::<Session>(&context);
-        assert!(read.matches(&context));
+        let read = expected::<Session>(&cx);
+        assert!(read.matches(cx.scope()));
     }
 
     #[test]
     fn shadowing_invalidates_a_present_read() {
-        let mut context = ContextMap::new();
-        context.insert(Session);
-        let read = observe::<Session>(&context);
+        let cx = Cx::default().with(Session);
+        let read = expected::<Session>(&cx);
 
-        let mut shadowed = context.clone();
-        shadowed.insert(Session);
+        let shadowed = cx.with(Session);
 
-        assert!(read.matches(&context));
-        assert!(!read.matches(&shadowed));
+        assert!(read.matches(cx.scope()));
+        assert!(!read.matches(shadowed.scope()));
     }
 
     #[test]
     fn an_absence_read_matches_while_the_type_is_absent() {
-        let context = ContextMap::new();
-        let read = observe::<Session>(&context);
-        assert!(read.matches(&context));
+        let cx = Cx::default();
+        let read = expected::<Session>(&cx);
+        assert!(read.matches(cx.scope()));
     }
 
     #[test]
     fn registering_the_type_invalidates_an_absence_read() {
-        let context = ContextMap::new();
-        let read = observe::<Session>(&context);
+        let cx = Cx::default();
+        let read = expected::<Session>(&cx);
 
-        let mut extended = context.clone();
-        extended.insert(Session);
+        let extended = cx.with(Session);
 
-        assert!(read.matches(&context));
-        assert!(!read.matches(&extended));
+        assert!(read.matches(cx.scope()));
+        assert!(!read.matches(extended.scope()));
     }
 
     #[test]
     fn an_unrelated_binding_leaves_a_read_valid() {
-        let mut context = ContextMap::new();
-        context.insert(Session);
-        let read = observe::<Session>(&context);
+        let cx = Cx::default().with(Session);
+        let read = expected::<Session>(&cx);
 
-        let mut extended = context.clone();
-        extended.insert(Theme);
+        let extended = cx.with(Theme);
 
-        assert!(read.matches(&extended));
-    }
-
-    #[test]
-    fn a_cloned_context_keeps_reads_valid() {
-        let mut context = ContextMap::new();
-        context.insert(Session);
-        let read = observe::<Session>(&context);
-
-        assert!(read.matches(&context.clone()));
+        assert!(read.matches(extended.scope()));
     }
 
     #[test]

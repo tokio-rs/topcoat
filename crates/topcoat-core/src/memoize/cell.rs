@@ -7,7 +7,7 @@ use std::{
 use elsa::sync::FrozenVec;
 
 use super::recursion;
-use crate::context::{ContextRead, Cx, ContextMap};
+use crate::context::{ContextRead, Cx, Scope};
 
 /// One cached result together with the request context reads that produced
 /// it.
@@ -22,10 +22,10 @@ struct Variant<V> {
 }
 
 impl<V> Variant<V> {
-    /// Returns whether the scope `context` still resolves every recorded
-    /// read to the binding that was observed.
-    fn matches(&self, context: &ContextMap) -> bool {
-        self.reads.iter().all(|read| read.matches(context))
+    /// Returns whether `scope` still resolves every recorded read to the
+    /// binding that was observed.
+    fn matches(&self, scope: &Scope) -> bool {
+        self.reads.iter().all(|read| read.matches(scope))
     }
 
     /// Hands out the cached value, replaying the variant's reads into the
@@ -55,12 +55,12 @@ impl<V> Variants<V> {
     /// Returns the value of the first variant reusable from `cx`'s scope.
     fn reuse(&self, cx: &Cx) -> Option<&V> {
         let first = self.first.get()?;
-        if first.matches(cx.request_context()) {
+        if first.matches(cx.scope()) {
             return Some(first.reuse(cx));
         }
         self.rest
             .iter()
-            .find(|variant| variant.matches(cx.request_context()))
+            .find(|variant| variant.matches(cx.scope()))
             .map(|variant| variant.reuse(cx))
     }
 
