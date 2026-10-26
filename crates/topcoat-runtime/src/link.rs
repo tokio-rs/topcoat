@@ -54,9 +54,7 @@ impl PrefetchMode {
 /// particular scope.
 #[must_use]
 pub fn prefetch_mode(cx: &Cx) -> PrefetchMode {
-    try_context::<PrefetchMode>(cx)
-        .copied()
-        .unwrap_or_default()
+    try_context::<PrefetchMode>(cx).copied().unwrap_or_default()
 }
 
 /// Creates attributes that let an `<a>` element use runtime navigation.

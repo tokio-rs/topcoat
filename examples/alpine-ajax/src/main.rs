@@ -12,13 +12,9 @@ use topcoat::{
 
 #[tokio::main]
 async fn main() {
-    topcoat::start(
-        module_router!()
-            .with(Counter(AtomicU64::new(0)))
-            .build(),
-    )
-    .await
-    .unwrap();
+    topcoat::start(module_router!().with(Counter(AtomicU64::new(0))).build())
+        .await
+        .unwrap();
 }
 
 #[layout]

@@ -124,9 +124,7 @@ pub enum SuspenseMode {
 /// there is none.
 #[must_use]
 pub fn suspense_mode(cx: &Cx) -> SuspenseMode {
-    try_context::<SuspenseMode>(cx)
-        .copied()
-        .unwrap_or_default()
+    try_context::<SuspenseMode>(cx).copied().unwrap_or_default()
 }
 
 /// Configures the default suspense mode on a [`RouterBuilder`](crate::router::RouterBuilder).

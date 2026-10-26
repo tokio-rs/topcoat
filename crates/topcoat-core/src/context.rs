@@ -465,7 +465,10 @@ mod tests {
         let cx = shared(Other("app"));
         let child = cx.with(Marker(1)).with_many((Marker(2),));
 
-        assert!(std::ptr::eq(context::<Other>(&child), context::<Other>(&cx)));
+        assert!(std::ptr::eq(
+            context::<Other>(&child),
+            context::<Other>(&cx)
+        ));
     }
 
     #[test]

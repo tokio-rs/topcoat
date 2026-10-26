@@ -2,7 +2,7 @@ use std::{any::Any, sync::Mutex};
 
 use http::{HeaderMap, Method, request::Parts, uri::PathAndQuery};
 use topcoat_core::{
-    context::{ContextValues, ContextMap},
+    context::{ContextMap, ContextValues},
     error::Result,
 };
 

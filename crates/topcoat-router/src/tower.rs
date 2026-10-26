@@ -934,11 +934,7 @@ mod tests {
         // child scope; the caller's own context still holds the original
         // request.
         assert_eq!(&body_bytes(response)[..], b"marked");
-        assert!(
-            !context::<Parts>(&cx)
-                .headers
-                .contains_key("x-tower")
-        );
+        assert!(!context::<Parts>(&cx).headers.contains_key("x-tower"));
     }
 
     #[test]

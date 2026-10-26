@@ -7,11 +7,7 @@ use crate::header;
 /// be represented as text.
 #[track_caller]
 fn header<'cx>(cx: &'cx Cx, name: &HeaderName) -> Option<&'cx str> {
-    context::<Parts>(cx)
-        .headers
-        .get(name)?
-        .to_str()
-        .ok()
+    context::<Parts>(cx).headers.get(name)?.to_str().ok()
 }
 
 /// Returns whether the request carries `X-Alpine-Request: true`.
