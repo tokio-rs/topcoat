@@ -41,7 +41,7 @@ The callback outlives the handler that upgraded the connection, so it cannot bor
 // src/app/greet.rs
 use topcoat::{
     Result,
-    context::{Cx, request_context},
+    context::{Cx, context},
     router::{
         content::websocket::{Message, WebSocketUpgrade},
         response::Response,
@@ -57,7 +57,7 @@ struct Customer {
 async fn greet(cx: &Cx, upgrade: WebSocketUpgrade) -> Result<Response> {
     let cx = cx.clone();
     upgrade.on_upgrade(move |mut socket| async move {
-        let customer: &Customer = request_context(&cx);
+        let customer: &Customer = context(&cx);
         let _ = socket.send(Message::text(customer.name.as_str())).await;
     })
 }

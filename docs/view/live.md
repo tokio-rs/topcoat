@@ -84,7 +84,7 @@ The same live body runs from the top on both renders. Emit the current content d
 ```rust
 use topcoat::{
     Result,
-    context::{Cx, app_context},
+    context::{Cx, context},
     router::page,
     runtime::connected,
     view::{View, emit, live, view},
@@ -100,7 +100,7 @@ async fn chat(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>"Chat"</h1>
         (live! {
-            let chat = app_context::<Chat>(cx);
+            let chat = context::<Chat>(cx);
             let mut changed = chat.subscribe();
             loop {
                 let token = emit! {

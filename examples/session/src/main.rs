@@ -12,7 +12,7 @@ use std::{
 use serde::Deserialize;
 use topcoat::{
     Result,
-    context::{Cx, app_context},
+    context::{Cx, context},
     router::{Slot, href, layout, module_router, page},
     session::{self, SessionConfig, TokenHash},
     view::{View, view},
@@ -26,7 +26,7 @@ async fn main() {
         module_router!()
             .cookies()
             .sessions(SessionConfig::default())
-            .app_context(Database::default())
+            .with(Database::default())
             .build(),
     )
     .await
@@ -85,7 +85,7 @@ struct User {
 }
 
 fn db(cx: &Cx) -> &Database {
-    app_context(cx)
+    context(cx)
 }
 
 // The session itself only carries a token hash; the user comes from the store.

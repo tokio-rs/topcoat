@@ -67,7 +67,7 @@ use crate::{
 /// // src/app/greet.rs
 /// use topcoat::{
 ///     Result,
-///     context::{Cx, request_context},
+///     context::{Cx, context},
 ///     router::{
 ///         content::websocket::{Message, WebSocketUpgrade},
 ///         response::Response,
@@ -83,7 +83,7 @@ use crate::{
 /// async fn greet(cx: &Cx, upgrade: WebSocketUpgrade) -> Result<Response> {
 ///     let cx = cx.clone();
 ///     upgrade.on_upgrade(move |mut socket| async move {
-///         let customer: &Customer = request_context(&cx);
+///         let customer: &Customer = context(&cx);
 ///         let _ = socket.send(Message::text(customer.name.as_str())).await;
 ///     })
 /// }
@@ -331,7 +331,7 @@ mod tests {
     use http::Request;
     use tokio::{net::TcpListener, sync::oneshot, task::JoinHandle};
     use tokio_tungstenite::tungstenite;
-    use topcoat_core::context::CxTestBuilder;
+    use topcoat_core::context::Cx;
 
     use super::*;
     use crate::{
@@ -351,7 +351,7 @@ mod tests {
             builder = builder.header(*name, *value);
         }
         let (parts, ()) = builder.body(()).expect("request should build").into_parts();
-        CxTestBuilder::new().request_context(parts).build()
+        Cx::default().with(parts)
     }
 
     /// The headers of a conforming handshake request.

@@ -297,16 +297,14 @@ fn is_absolute(location: &str) -> bool {
 mod tests {
     use std::time::Duration;
 
-    use topcoat_core::{base_url::BaseUrl, context::CxTestBuilder};
+    use topcoat_core::{base_url::BaseUrl, context::Cx};
 
     use super::*;
     use crate::to_bytes;
 
     /// Builds a `Cx` with `https://example.com` registered as the base URL.
     fn cx() -> Cx {
-        CxTestBuilder::new()
-            .app_context(BaseUrl::new("https://example.com").expect("a valid base URL"))
-            .build()
+        Cx::default().with(BaseUrl::new("https://example.com").expect("a valid base URL"))
     }
 
     #[test]

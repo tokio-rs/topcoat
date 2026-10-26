@@ -2,7 +2,7 @@ use std::{any::Any, sync::Mutex};
 
 use http::{HeaderMap, Method, request::Parts, uri::PathAndQuery};
 use topcoat_core::{
-    context::{ContextValues, RequestContext},
+    context::{ContextValues, ContextMap},
     error::Result,
 };
 
@@ -62,7 +62,7 @@ pub fn rewrite(path: impl AsRef<str>, body: impl Into<Body>) -> RewriteError {
         body: Mutex::new(body.into()),
         method: None,
         headers: None,
-        context: RequestContext::new(),
+        context: ContextMap::new(),
     }
 }
 
@@ -79,7 +79,7 @@ pub struct RewriteError {
     body: Mutex<Body>,
     method: Option<Method>,
     headers: Option<HeaderMap>,
-    context: RequestContext,
+    context: ContextMap,
 }
 
 impl RewriteError {
@@ -142,7 +142,7 @@ struct RewriteParts {
     body: Body,
     method: Option<Method>,
     headers: Option<HeaderMap>,
-    context: RequestContext,
+    context: ContextMap,
 }
 
 impl std::fmt::Display for RewriteError {
@@ -162,14 +162,14 @@ pub(crate) struct RewriteChain {
     /// Previous dispatches in the order they ran.
     visited: Vec<Dispatch>,
     /// Context values carried forward by rewrites.
-    context: RequestContext,
+    context: ContextMap,
 }
 
 impl RewriteChain {
     /// Starts a rewrite chain with context values for the first request
     /// and any rewrites that follow.
     pub(crate) fn carrying(values: impl ContextValues) -> Self {
-        let mut context = RequestContext::new();
+        let mut context = ContextMap::new();
         values.install(&mut context);
         Self {
             visited: Vec::new(),
@@ -178,7 +178,7 @@ impl RewriteChain {
     }
 
     /// Returns the context values accumulated by earlier rewrites.
-    pub(crate) fn context(&self) -> &RequestContext {
+    pub(crate) fn context(&self) -> &ContextMap {
         &self.context
     }
 

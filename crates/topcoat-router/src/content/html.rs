@@ -79,7 +79,7 @@ fn html_content_type(content_type: Option<&str>) -> bool {
 #[cfg(test)]
 mod tests {
     use http::{Request, header::CONTENT_TYPE};
-    use topcoat_core::context::{Cx, CxTestBuilder};
+    use topcoat_core::context::Cx;
 
     use super::*;
     use crate::{error::BadRequestError, to_bytes};
@@ -94,7 +94,7 @@ mod tests {
 
         let (parts, ()) = builder.body(()).expect("request should build").into_parts();
 
-        CxTestBuilder::new().request_context(parts).build()
+        Cx::default().with(parts)
     }
 
     #[tokio::test]

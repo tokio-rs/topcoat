@@ -82,7 +82,7 @@ impl RouterBuilderAssetExt for RouterBuilder {
             Host::External { .. } => self,
         };
 
-        builder.app_context(config)
+        builder.with(config)
     }
 }
 

@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    context::{Cx, memoize, try_request_context},
+    context::{Cx, memoize, try_context},
     l10n::Translation,
     router::{
         Body, Method, Next, StatusCode,
@@ -55,7 +55,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
     let product = product(cx).await?;
     let can_edit = user.role.can_edit();
 
-    let rejected = try_request_context::<Rejected>(cx);
+    let rejected = try_context::<Rejected>(cx);
     let form = rejected.map_or_else(
         || ProductForm {
             price: money_input(product.price).resolve(cx),

@@ -215,7 +215,7 @@ fn lines(value: &str) -> impl Iterator<Item = &str> {
 #[cfg(test)]
 mod tests {
     use http::Request;
-    use topcoat_core::context::CxTestBuilder;
+    use topcoat_core::context::Cx;
 
     use super::*;
 
@@ -299,7 +299,7 @@ mod tests {
             .body(())
             .unwrap();
         let (parts, ()) = request.into_parts();
-        let cx = CxTestBuilder::new().request_context(parts).build();
+        let cx = Cx::default().with(parts);
         assert_eq!(last_event_id(&cx), Some("42"));
     }
 
@@ -315,7 +315,7 @@ mod tests {
             .body(())
             .unwrap();
         let (parts, ()) = request.into_parts();
-        let cx = CxTestBuilder::new().request_context(parts).build();
+        let cx = Cx::default().with(parts);
         assert_eq!(last_event_id(&cx), Some(id));
     }
 
@@ -330,7 +330,7 @@ mod tests {
             .body(())
             .unwrap();
         let (parts, ()) = request.into_parts();
-        let cx = CxTestBuilder::new().request_context(parts).build();
+        let cx = Cx::default().with(parts);
         assert_eq!(last_event_id(&cx), None);
     }
 
@@ -341,7 +341,7 @@ mod tests {
             .body(())
             .unwrap()
             .into_parts();
-        let cx = CxTestBuilder::new().request_context(parts).build();
+        let cx = Cx::default().with(parts);
         assert_eq!(last_event_id(&cx), None);
     }
 }

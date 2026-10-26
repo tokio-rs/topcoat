@@ -3,7 +3,7 @@
 
 use crate::{
     Result,
-    context::{Cx, identity, try_app_context, try_request_context},
+    context::{Cx, identity, try_context},
     core::identity::SiteKey,
     view::{Child, RegionId, View, component, internal::SuspenseView},
 };
@@ -120,15 +120,11 @@ pub enum SuspenseMode {
 
 /// Returns the default mode for [`suspense`] in this context.
 ///
-/// Checks these sources in order and uses the first value it finds:
-///
-/// 1. A `SuspenseMode` in the request context.
-/// 2. A `SuspenseMode` in the app context.
-/// 3. [`SuspenseMode::Stream`].
+/// Uses the `SuspenseMode` in the context, or [`SuspenseMode::Stream`] if
+/// there is none.
 #[must_use]
 pub fn suspense_mode(cx: &Cx) -> SuspenseMode {
-    try_request_context::<SuspenseMode>(cx)
-        .or_else(|| try_app_context::<SuspenseMode>(cx))
+    try_context::<SuspenseMode>(cx)
         .copied()
         .unwrap_or_default()
 }
@@ -138,8 +134,8 @@ pub fn suspense_mode(cx: &Cx) -> SuspenseMode {
 pub trait RouterSuspenseExt {
     /// Sets the default mode for the router's [`suspense`] boundaries.
     ///
-    /// Stores `mode` in the app context. A boundary's `mode` argument or a
-    /// `SuspenseMode` in the request context overrides this default.
+    /// Stores `mode` in the router's context. A boundary's `mode` argument or
+    /// a `SuspenseMode` added with [`Cx::with`] overrides this default.
     ///
     /// ```rust
     /// use topcoat::{
@@ -152,7 +148,7 @@ pub trait RouterSuspenseExt {
     ///
     /// # Panics
     ///
-    /// Panics if a `SuspenseMode` is already registered in the app context.
+    /// Panics if a `SuspenseMode` is already registered on the router.
     #[must_use]
     #[track_caller]
     fn suspense(self, mode: SuspenseMode) -> Self;
@@ -162,7 +158,7 @@ pub trait RouterSuspenseExt {
 impl RouterSuspenseExt for crate::router::RouterBuilder {
     #[track_caller]
     fn suspense(self, mode: SuspenseMode) -> Self {
-        self.app_context(mode)
+        self.with(mode)
     }
 }
 

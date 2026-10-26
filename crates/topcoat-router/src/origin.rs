@@ -246,7 +246,7 @@ impl Layer for OriginLayer {
 #[cfg(test)]
 mod tests {
     use http::Request;
-    use topcoat_core::context::CxTestBuilder;
+    use topcoat_core::context::Cx;
 
     use super::*;
 
@@ -257,7 +257,7 @@ mod tests {
             builder = builder.header(*name, *value);
         }
         let (parts, ()) = builder.body(()).expect("request should build").into_parts();
-        CxTestBuilder::new().request_context(parts).build()
+        Cx::default().with(parts)
     }
 
     fn check(policy: &OriginPolicy, method: Method, headers: &[(&str, &str)]) -> OriginVerdict {

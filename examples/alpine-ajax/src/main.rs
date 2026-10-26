@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use topcoat::{
     Result,
     alpine_ajax::ajax_request,
-    context::{Cx, app_context},
+    context::{Cx, context},
     router::{Slot, href, layout, module_router, page},
     view::{View, view},
 };
@@ -14,7 +14,7 @@ use topcoat::{
 async fn main() {
     topcoat::start(
         module_router!()
-            .app_context(Counter(AtomicU64::new(0)))
+            .with(Counter(AtomicU64::new(0)))
             .build(),
     )
     .await
@@ -52,7 +52,7 @@ async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
 
 #[page]
 async fn home(cx: &Cx) -> Result<impl View> {
-    let count = app_context::<Counter>(cx).0.load(Ordering::Relaxed);
+    let count = context::<Counter>(cx).0.load(Ordering::Relaxed);
 
     Ok(view! {
         <h1>

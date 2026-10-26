@@ -196,7 +196,7 @@ fn form_content_type(content_type: Option<&str>) -> bool {
 #[cfg(test)]
 mod tests {
     use http::{Method, Request, header::CONTENT_TYPE};
-    use topcoat_core::context::{Cx, CxTestBuilder};
+    use topcoat_core::context::Cx;
 
     use super::*;
     use crate::{
@@ -218,7 +218,7 @@ mod tests {
 
         let (parts, ()) = builder.body(()).expect("request should build").into_parts();
 
-        CxTestBuilder::new().request_context(parts).build()
+        Cx::default().with(parts)
     }
 
     #[tokio::test]

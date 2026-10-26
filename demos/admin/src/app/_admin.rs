@@ -7,7 +7,7 @@ mod products;
 
 use topcoat::{
     Result,
-    context::{Cx, try_request_context},
+    context::{Cx, try_context},
     icon::{IconData, icon, iconify::iconify_icon},
     l10n::{Translation, fluent::messages},
     router::{HrefTarget, Slot, href, layout, request::uri},
@@ -279,7 +279,7 @@ async fn page_breadcrumb(cx: &Cx) -> Result<impl View> {
         .iter()
         .map(|item| (item, href!(item.target)))
         .find(|(_, href)| in_section(cx, &href.resolve(cx)));
-    let crumb = try_request_context::<Crumb>(cx);
+    let crumb = try_context::<Crumb>(cx);
 
     Ok(view! {
         breadcrumb(

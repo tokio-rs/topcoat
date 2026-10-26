@@ -8,7 +8,7 @@ use std::{
 pub use bytes::{Bytes, BytesMut};
 use http::request::Parts;
 use topcoat_core::{
-    context::{Cx, request_context, try_request_context},
+    context::{Cx, context, try_context},
     error::Result,
     identity::Identity,
 };
@@ -171,7 +171,7 @@ where
 #[must_use]
 #[track_caller]
 pub fn parts(cx: &Cx) -> &Parts {
-    request_context(cx)
+    context(cx)
 }
 
 /// Returns the HTTP [`Method`] of the current request.
@@ -319,7 +319,7 @@ pub fn extensions(cx: &Cx) -> &http::Extensions {
 #[inline]
 #[must_use]
 pub fn remote_addr(cx: &Cx) -> Option<SocketAddr> {
-    let parts = try_request_context::<Parts>(cx)?;
+    let parts = try_context::<Parts>(cx)?;
     parts.extensions.get::<RemoteAddr>().map(|remote| remote.0)
 }
 
@@ -368,7 +368,7 @@ pub fn remote_addr(cx: &Cx) -> Option<SocketAddr> {
 #[must_use]
 #[track_caller]
 pub fn client_ip(cx: &Cx) -> Option<IpAddr> {
-    try_request_context::<ClientIp>(cx)?.0
+    try_context::<ClientIp>(cx)?.0
 }
 
 /// The parts the request arrived with, shared by every dispatch.
@@ -398,7 +398,7 @@ pub(crate) struct OriginalParts(pub(crate) Arc<Parts>);
 #[must_use]
 #[track_caller]
 pub fn original_parts(cx: &Cx) -> &Parts {
-    match try_request_context::<OriginalParts>(cx) {
+    match try_context::<OriginalParts>(cx) {
         Some(original) => &original.0,
         None => parts(cx),
     }

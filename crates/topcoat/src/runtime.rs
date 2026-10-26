@@ -13,7 +13,7 @@ pub use topcoat_runtime_macro::*;
 #[topcoat::view::component]
 pub async fn script(cx: &topcoat::context::Cx) -> topcoat::Result<impl topcoat::view::View> {
     assert!(
-        topcoat::context::try_app_context::<RuntimeSetup>(cx).is_some(),
+        topcoat::context::try_context::<RuntimeSetup>(cx).is_some(),
         "the browser runtime is not set up on this router; call `.runtime()` on the router builder",
     );
     Ok(topcoat::view::view! {

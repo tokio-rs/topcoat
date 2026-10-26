@@ -111,7 +111,7 @@ where
 mod tests {
     use http::{Request, header::CONTENT_TYPE};
     use serde_json::{Value, json};
-    use topcoat_core::context::CxTestBuilder;
+    use topcoat_core::context::Cx;
     use topcoat_router::error::BadRequestError;
 
     use super::*;
@@ -119,7 +119,7 @@ mod tests {
 
     fn cx_for(request: Request<()>) -> Cx {
         let (parts, ()) = request.into_parts();
-        CxTestBuilder::new().request_context(parts).build()
+        Cx::default().with(parts)
     }
 
     #[tokio::test]

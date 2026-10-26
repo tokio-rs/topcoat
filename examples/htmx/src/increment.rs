@@ -2,7 +2,7 @@ use std::sync::atomic::Ordering;
 
 use topcoat::{
     Result,
-    context::{Cx, app_context},
+    context::{Cx, context},
     htmx::HxResponseTrigger,
     router::route,
     view::{ViewExt, ViewHandle, view},
@@ -12,7 +12,7 @@ use crate::Counter;
 
 #[route(POST)]
 pub(crate) async fn increment(cx: &Cx) -> Result<(HxResponseTrigger, ViewHandle)> {
-    let count = app_context::<Counter>(cx).0.fetch_add(1, Ordering::Relaxed) + 1;
+    let count = context::<Counter>(cx).0.fetch_add(1, Ordering::Relaxed) + 1;
     let fragment = view! { cx => <span id="count">(count)</span> }
         .single()
         .await?;

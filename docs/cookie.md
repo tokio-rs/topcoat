@@ -248,7 +248,7 @@ pub fn router() -> Router {
     module_router!()
         .discover()
         .cookies()
-        .app_context(Key::generate())
+        .with(Key::generate())
         .build()
 }
 ```

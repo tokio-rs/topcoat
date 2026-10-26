@@ -71,7 +71,7 @@ impl QueryParamsSealed {
 #[cfg(test)]
 mod tests {
     use http::Request;
-    use topcoat_core::context::CxTestBuilder;
+    use topcoat_core::context::Cx;
 
     use super::*;
 
@@ -88,7 +88,7 @@ mod tests {
             .expect("request should build")
             .into_parts();
 
-        CxTestBuilder::new().request_context(parts).build()
+        Cx::default().with(parts)
     }
 
     #[test]

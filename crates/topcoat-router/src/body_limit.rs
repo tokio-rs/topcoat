@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use topcoat_core::context::{Cx, try_request_context};
+use topcoat_core::context::{Cx, try_context};
 
 use crate::{Body, IntoPath, Layer, LayerFuture, Next, Path};
 
@@ -126,7 +126,7 @@ enum BodyLimitKind {
 /// ```
 #[must_use]
 pub fn body_limit(cx: &Cx) -> usize {
-    match try_request_context(cx) {
+    match try_context(cx) {
         Some(BodyLimitKind::Limit(limit)) => *limit,
         Some(BodyLimitKind::Disable) => usize::MAX,
         None => DEFAULT_BODY_LIMIT,
@@ -136,7 +136,7 @@ pub fn body_limit(cx: &Cx) -> usize {
 #[cfg(test)]
 mod tests {
     use http::{Method, Request, StatusCode};
-    use topcoat_core::context::CxTestBuilder;
+    use topcoat_core::context::Cx;
 
     use super::*;
     use crate::{
@@ -155,17 +155,13 @@ mod tests {
 
     #[test]
     fn body_limit_reads_the_registered_limit() {
-        let cx = CxTestBuilder::new()
-            .request_context(BodyLimitKind::Limit(16))
-            .build();
+        let cx = Cx::default().with(BodyLimitKind::Limit(16));
         assert_eq!(body_limit(&cx), 16);
     }
 
     #[test]
     fn body_limit_disabled_is_unlimited() {
-        let cx = CxTestBuilder::new()
-            .request_context(BodyLimitKind::Disable)
-            .build();
+        let cx = Cx::default().with(BodyLimitKind::Disable);
         assert_eq!(body_limit(&cx), usize::MAX);
     }
 

@@ -14,7 +14,7 @@ use topcoat::{
 async fn main() {
     topcoat::start(
         module_router!()
-            .app_context(Counter(AtomicU64::new(0)))
+            .with(Counter(AtomicU64::new(0)))
             .build(),
     )
     .await

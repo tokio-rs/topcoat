@@ -2,7 +2,7 @@ use std::{any::TypeId, collections::HashMap, panic::Location, sync::Arc};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
 use topcoat_core::{
-    context::{Cx, identity, try_request_context},
+    context::{Cx, identity, try_context},
     identity::{Identity, SiteKey},
 };
 use topcoat_view::{HoistKey, hoist, hoist_once};
@@ -302,7 +302,7 @@ where
     T: SignalValue,
 {
     let id = SignalId::derive(identity(cx), Location::caller());
-    let value = try_request_context::<SignalValues>(cx)
+    let value = try_context::<SignalValues>(cx)
         .and_then(|values| values.get(id))
         .and_then(T::from_value)
         .unwrap_or_else(init);

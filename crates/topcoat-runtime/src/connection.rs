@@ -1,6 +1,6 @@
 use std::any::TypeId;
 
-use topcoat_core::context::{Cx, try_request_context};
+use topcoat_core::context::{Cx, try_context};
 use topcoat_view::{HoistKey, hoist_once};
 
 /// Identifies a render requested through a browser connection.
@@ -49,7 +49,7 @@ pub fn connected(cx: &Cx) -> bool {
 /// It works outside rendering scopes too and adds nothing to the output.
 #[must_use]
 pub fn connected_untracked(cx: &Cx) -> bool {
-    try_request_context::<ConnectedRender>(cx).is_some()
+    try_context::<ConnectedRender>(cx).is_some()
 }
 
 #[cfg(test)]

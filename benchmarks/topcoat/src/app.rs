@@ -4,7 +4,7 @@ mod products;
 use topcoat::{
     Result,
     asset::{Asset, AssetBundle, RouterBuilderAssetExt, asset},
-    context::{Cx, app_context},
+    context::{Cx, context},
     router::{Compression, Router, Slot, layout, page},
     view::{View, view},
 };
@@ -18,7 +18,7 @@ const TAILWIND_CSS: Asset = asset!("assets/tailwind.css");
 
 pub fn router() -> Router {
     topcoat::router::module_router!()
-        .app_context(Catalog::load())
+        .with(Catalog::load())
         .assets(AssetBundle::load().expect("asset bundle loads; run `topcoat asset bundle`"))
         // Off in every benchmarked framework: the benchmark measures the
         // frameworks, not a compression codec (see the fairness notes).
@@ -74,7 +74,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                 </a>
             </div>
             <div class="mt-6 grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4">
-                for product in app_context::<Catalog>(cx).featured() {
+                for product in context::<Catalog>(cx).featured() {
                     product_card(product: product)
                 }
             </div>

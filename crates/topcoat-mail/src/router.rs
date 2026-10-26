@@ -12,7 +12,7 @@ pub trait RouterBuilderMailExt {
 
 impl RouterBuilderMailExt for RouterBuilder {
     fn mail(self, config: MailConfig) -> Self {
-        self.app_context(config)
+        self.with(config)
     }
 }
 

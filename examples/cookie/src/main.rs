@@ -15,7 +15,7 @@ async fn main() {
     topcoat::start(
         module_router!()
             .cookies()
-            .app_context(Key::generate())
+            .with(Key::generate())
             .build(),
     )
     .await

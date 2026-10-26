@@ -22,7 +22,7 @@ pub fn datastar_request(cx: &Cx) -> bool {
 #[cfg(test)]
 mod tests {
     use http::Request;
-    use topcoat_core::context::CxTestBuilder;
+    use topcoat_core::context::Cx;
 
     use super::*;
 
@@ -33,7 +33,7 @@ mod tests {
         }
 
         let (parts, ()) = builder.body(()).unwrap().into_parts();
-        CxTestBuilder::new().request_context(parts).build()
+        Cx::default().with(parts)
     }
 
     #[test]

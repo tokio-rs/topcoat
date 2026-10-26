@@ -1,12 +1,12 @@
 # App context
 
-App context shares values across requests. Register a value on the router, then borrow it with `app_context(cx)` wherever you have a request context. A database pool is a typical app context value.
+App context shares values across requests. Register a value on the router, then borrow it with `context(cx)` wherever you have a request context. A database pool is a typical app context value.
 
 Values are identified by their Rust type. The router accepts one value of each type.
 
 ## Registering values
 
-Build the router and chain `.app_context(value)` for every value you want to share:
+Build the router and chain `.with(value)` for every value you want to share:
 
 ```rust,standalone_crate
 use topcoat::router::{Router, RouterBuilderDiscoverExt, module_router};
@@ -14,8 +14,8 @@ use topcoat::router::{Router, RouterBuilderDiscoverExt, module_router};
 pub fn router() -> Router {
     module_router!()
         .discover()
-        .app_context(Database::connect())
-        .app_context(HttpClient::new())
+        .with(Database::connect())
+        .with(HttpClient::new())
         .build()
 }
 ```
@@ -28,18 +28,18 @@ struct PrimaryDb(Database);
 struct ReplicaDb(Database);
 
 module_router!()
-    .app_context(PrimaryDb(Database::connect_primary()))
-    .app_context(ReplicaDb(Database::connect_replica()))
+    .with(PrimaryDb(Database::connect_primary()))
+    .with(ReplicaDb(Database::connect_replica()))
     .build();
 ```
 
 ## Reading values
 
-Inside any handler that has access to a `Cx`, call `app_context::<T>(cx)` to borrow the registered value:
+Inside any handler that has access to a `Cx`, call `context::<T>(cx)` to borrow the registered value:
 
 ```rust
 use topcoat::{
-    context::{Cx, app_context},
+    context::{Cx, context},
     Result,
     router::page,
     view::{View, view},
@@ -47,7 +47,7 @@ use topcoat::{
 
 #[page]
 async fn user_profile(cx: &Cx) -> Result<impl View> {
-    let db: &Database = app_context(cx);
+    let db: &Database = context(cx);
     let user = db.fetch_user(42).await;
     Ok(view! { <h1>"Hello, " (user.name) </h1> })
 }
@@ -55,15 +55,15 @@ async fn user_profile(cx: &Cx) -> Result<impl View> {
 
 The requested type must exactly match the registered type. `app_context` panics if that type was not registered.
 
-When an app context value is intentionally optional, use `try_app_context::<T>(cx)` instead. It returns `None` when the type was not registered:
+When an app context value is intentionally optional, use `try_context::<T>(cx)` instead. It returns `None` when the type was not registered:
 
 ```rust
-use topcoat::context::{Cx, try_app_context};
+use topcoat::context::{Cx, try_context};
 #
 # struct FeatureConfig;
 
 fn feature_config(cx: &Cx) -> Option<&FeatureConfig> {
-    try_app_context(cx)
+    try_context(cx)
 }
 ```
 

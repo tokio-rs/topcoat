@@ -5,7 +5,7 @@ use std::{
 
 use icu_locale::LocaleCanonicalizer;
 use icu_locale_core::extensions::unicode::{Attributes, Keywords, Unicode, Value};
-use topcoat_core::context::{Cx, try_request_context};
+use topcoat_core::context::{Cx, try_context};
 
 use crate::{Extensions, LanguageIdentifier, LocaleParseError};
 
@@ -206,7 +206,7 @@ macro_rules! locale {
 /// Set it with [`Cx::with`], usually in a layer.
 #[must_use]
 pub fn try_locale(cx: &Cx) -> Option<&Locale> {
-    try_request_context(cx)
+    try_context(cx)
 }
 
 /// Reads the locale from the current request context. See [`try_locale`] for how to set

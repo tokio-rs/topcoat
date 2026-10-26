@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use tokio::sync::broadcast;
 use topcoat::{
     Result,
-    context::{Cx, app_context},
+    context::{Cx, context},
     router::page,
     runtime::{Event, connected, procedure, shard, signal},
     view::{View, emit, live, view},
@@ -37,7 +37,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
 #[shard]
 async fn chat_box(cx: &Cx) -> Result<impl View> {
     Ok(live! {
-        let chat = app_context::<Chat>(cx);
+        let chat = context::<Chat>(cx);
         let mut changed = chat.subscribe();
         loop {
             let token = emit! {
@@ -57,7 +57,7 @@ async fn chat_box(cx: &Cx) -> Result<impl View> {
 
 #[procedure]
 pub async fn send(cx: &Cx, message: String) -> Result<bool> {
-    app_context::<Chat>(cx).send(message);
+    context::<Chat>(cx).send(message);
     Ok(true)
 }
 

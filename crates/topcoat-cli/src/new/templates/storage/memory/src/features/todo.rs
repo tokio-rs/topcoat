@@ -4,7 +4,7 @@ use std::sync::{Mutex, MutexGuard};
 
 use topcoat::{
     Result,
-    context::{Cx, app_context},
+    context::{Cx, context},
 };
 
 /// A todo item.
@@ -60,5 +60,5 @@ struct TodoList {
 }
 
 fn todos(cx: &Cx) -> MutexGuard<'_, TodoList> {
-    app_context::<Todos>(cx).0.lock().unwrap()
+    context::<Todos>(cx).0.lock().unwrap()
 }

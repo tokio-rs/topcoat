@@ -293,7 +293,7 @@ mod tests {
 
     use http::{HeaderMap, Request, header};
     use serde::{Deserialize, Serialize};
-    use topcoat_core::context::{Cx, CxTestBuilder};
+    use topcoat_core::context::Cx;
 
     use super::*;
     use crate::{CookieJarCell, Key, cookies, write_cookies};
@@ -498,10 +498,7 @@ mod tests {
         }
         let (parts, ()) = builder.body(()).unwrap().into_parts();
 
-        CxTestBuilder::new()
-            .request_context(parts)
-            .request_context(CookieJarCell::new())
-            .build()
+        Cx::default().with_many((parts, CookieJarCell::new()))
     }
 
     /// The leading `name=value` pair of the request's first `Set-Cookie` value.

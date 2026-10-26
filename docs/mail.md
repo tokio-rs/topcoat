@@ -132,7 +132,7 @@ use topcoat::{
 # async fn test() -> topcoat::Result<()> {
 let transport = MemoryTransport::new();
 let config = MailConfig::builder().transport(transport.clone()).build();
-let cx = CxTestBuilder::new().app_context(config).build();
+let cx = Cx::default().with(config);
 
 send(&cx, mail! { from: "ada@example.com", to: "bob@example.com", text: "Hi" }?).await?;
 

@@ -1,6 +1,6 @@
 use topcoat::{
     Result,
-    context::{Cx, app_context},
+    context::{Cx, context},
     router::{error::RouterErrorExt, module_param, page, path_param},
     view::{View, view},
 };
@@ -14,7 +14,7 @@ module_param!(product_id: u32, error = not_found);
 
 #[page]
 async fn product_detail(cx: &Cx) -> Result<impl View> {
-    let catalog = app_context::<Catalog>(cx);
+    let catalog = context::<Catalog>(cx);
     let product = catalog
         .get(*path_param::<ProductId>(cx)?)
         .ok_or_not_found()?;

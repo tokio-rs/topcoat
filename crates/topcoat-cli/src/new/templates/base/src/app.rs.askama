@@ -102,7 +102,7 @@ pub fn router() -> Router {
 {%- endif %}
 {%- endif %}
 {%- if example && !toasty %}
-        .app_context(crate::features::todo::Todos::default())
+        .with(crate::features::todo::Todos::default())
 {%- endif %}
         .assets(AssetBundle::load().unwrap())
 {%- if interaction == Interaction::Topcoat %}

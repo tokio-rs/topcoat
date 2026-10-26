@@ -1,5 +1,5 @@
 use http::{HeaderName, request::Parts};
-use topcoat_core::context::{Cx, request_context};
+use topcoat_core::context::{Cx, context};
 
 use crate::header;
 
@@ -7,7 +7,7 @@ use crate::header;
 /// be represented as text.
 #[track_caller]
 fn header<'cx>(cx: &'cx Cx, name: &HeaderName) -> Option<&'cx str> {
-    request_context::<Parts>(cx)
+    context::<Parts>(cx)
         .headers
         .get(name)?
         .to_str()
@@ -53,7 +53,7 @@ pub fn ajax_target(cx: &Cx, id: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use http::Request;
-    use topcoat_core::context::CxTestBuilder;
+    use topcoat_core::context::Cx;
 
     use super::*;
 
@@ -65,7 +65,7 @@ mod tests {
         }
         let (parts, ()) = builder.body(()).unwrap().into_parts();
 
-        CxTestBuilder::new().request_context(parts).build()
+        Cx::default().with(parts)
     }
 
     #[test]

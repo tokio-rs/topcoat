@@ -8,7 +8,7 @@ use std::{
 use console::style;
 use futures_util::{SinkExt, StreamExt};
 use tokio::{net::TcpListener, sync::broadcast};
-use topcoat_core::context::{Cx, app_context};
+use topcoat_core::context::{Cx, context};
 use topcoat_router::{
     Body, HeaderValue, Method, OriginPolicy, Path, RouteFn, RouteFuture, Router, RouterService,
     content::websocket::{Message, WebSocket, WebSocketUpgrade},
@@ -106,7 +106,7 @@ pub async fn bind() -> TcpListener {
 /// publishes a reload event.
 pub async fn run(listener: TcpListener, events: EventBus) {
     let router = Router::builder()
-        .app_context(events)
+        .with(events)
         .origin_policy(OriginPolicy::new().exempt_paths(["/ws"]))
         .route(RouteFn::new(
             Method::GET,
@@ -137,7 +137,7 @@ fn serve_dev_js(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
 fn ws_route(cx: &Cx, body: Body) -> RouteFuture<'_> {
     Box::pin(async move {
         let upgrade = WebSocketUpgrade::from_request(cx, body).await?;
-        let events = app_context::<EventBus>(cx).clone();
+        let events = context::<EventBus>(cx).clone();
         upgrade.on_upgrade(move |socket| handle_socket(socket, events))
     })
 }

@@ -3,7 +3,7 @@ use std::sync::atomic::Ordering;
 use topcoat::{
     Result,
     alpine_ajax::ajax_request,
-    context::{Cx, app_context},
+    context::{Cx, context},
     router::{
         error::see_other,
         href,
@@ -17,7 +17,7 @@ use crate::{Counter, home};
 
 #[route(POST)]
 pub(crate) async fn increment(cx: &Cx) -> Result<Response> {
-    let count = app_context::<Counter>(cx).0.fetch_add(1, Ordering::Relaxed) + 1;
+    let count = context::<Counter>(cx).0.fetch_add(1, Ordering::Relaxed) + 1;
 
     // An Alpine AJAX request only receives the targeted element.
     if ajax_request(cx) {

@@ -707,7 +707,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use topcoat_core::{base_url::BaseUrl, context::CxTestBuilder};
+    use topcoat_core::{base_url::BaseUrl, context::Cx};
 
     use super::*;
 
@@ -745,9 +745,7 @@ mod tests {
 
     /// Builds a context carrying `https://example.com` as its base URL.
     fn cx_with_base_url() -> Cx {
-        CxTestBuilder::new()
-            .app_context(BaseUrl::new("https://example.com").expect("a valid base URL"))
-            .build()
+        Cx::default().with(BaseUrl::new("https://example.com").expect("a valid base URL"))
     }
 
     /// Builds a context whose request URI is `uri`.
@@ -758,7 +756,7 @@ mod tests {
             .expect("a valid request URI")
             .into_parts();
 
-        CxTestBuilder::new().request_context(parts).build()
+        Cx::default().with(parts)
     }
 
     /// Assigns `params` to `path` and returns the URL it produces.

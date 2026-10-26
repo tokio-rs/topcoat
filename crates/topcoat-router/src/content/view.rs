@@ -11,7 +11,7 @@ use http_body::Frame;
 use pin_project_lite::pin_project;
 use serde::Serialize;
 use topcoat_core::{
-    context::{Cx, try_request_context},
+    context::{Cx, try_context},
     error::Result,
 };
 use topcoat_view::{
@@ -62,10 +62,10 @@ pub enum ViewResponseDelivery {
 /// not or there is no request.
 #[must_use]
 pub fn view_response_delivery(cx: &Cx) -> ViewResponseDelivery {
-    if let Some(delivery) = try_request_context::<ViewResponseDelivery>(cx) {
+    if let Some(delivery) = try_context::<ViewResponseDelivery>(cx) {
         return *delivery;
     }
-    let accepts_frames = try_request_context::<http::request::Parts>(cx)
+    let accepts_frames = try_context::<http::request::Parts>(cx)
         .and_then(|parts| parts.headers.get(http::header::ACCEPT))
         .and_then(|accept| accept.to_str().ok())
         .is_some_and(|accept| {
@@ -262,7 +262,7 @@ fn view_response(
         *response.status_mut() = status_code;
     }
     response.headers_mut().extend(headers);
-    if try_request_context::<ViewResponseDelivery>(cx).is_none() {
+    if try_context::<ViewResponseDelivery>(cx).is_none() {
         response
             .headers_mut()
             .append(http::header::VARY, HeaderValue::from_static("Accept"));

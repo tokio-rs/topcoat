@@ -1,7 +1,7 @@
 //! Mail configuration and sending through the configured transport.
 
 use topcoat_core::{
-    context::{Cx, app_context},
+    context::{Cx, context},
     error::Result,
 };
 
@@ -14,14 +14,14 @@ use crate::{Mail, Receipt, Transport};
 /// choosing a transport:
 ///
 /// ```
-/// use topcoat_core::context::CxTestBuilder;
+/// use topcoat_core::context::Cx;
 /// use topcoat_mail::{Mail, MailConfig, Mailbox, MemoryTransport, send};
 ///
 /// # async fn example() -> topcoat_core::error::Result<()> {
 /// let config = MailConfig::builder()
 ///     .transport(MemoryTransport::new())
 ///     .build();
-/// let cx = CxTestBuilder::new().app_context(config).build();
+/// let cx = Cx::default().with(config);
 ///
 /// let mail = Mail::builder()
 ///     .from(Mailbox::new("ada@example.com")?)
@@ -88,13 +88,13 @@ impl MailConfigBuilder {
 /// Returns an error if the message cannot be formatted or delivered.
 /// See [`SendError`](crate::SendError).
 pub async fn send(cx: &Cx, mail: Mail) -> Result<Receipt> {
-    let config: &MailConfig = app_context(cx);
+    let config: &MailConfig = context(cx);
     config.transport.send(cx, mail).await
 }
 
 #[cfg(test)]
 mod tests {
-    use topcoat_core::context::CxTestBuilder;
+    use topcoat_core::context::Cx;
 
     use super::*;
     use crate::{AddressError, Mailbox, MemoryTransport};
@@ -109,9 +109,7 @@ mod tests {
     }
 
     fn cx_with(transport: MemoryTransport) -> Cx {
-        CxTestBuilder::new()
-            .app_context(MailConfig::builder().transport(transport).build())
-            .build()
+        Cx::default().with(MailConfig::builder().transport(transport).build())
     }
 
     #[tokio::test]

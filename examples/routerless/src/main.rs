@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use topcoat::{
     Result,
-    context::{AppContext, Cx, app_context, request_context},
+    context::{ContextMap, Cx, context},
     view::{Child, View, ViewExt, component, view},
 };
 
@@ -17,7 +17,7 @@ struct Reader {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     // App context can be assembled and shared without a router.
-    let mut app = AppContext::new();
+    let mut app = ContextMap::new();
     app.insert(Site {
         title: "Routerless Topcoat",
     });
@@ -50,7 +50,7 @@ async fn render(cx: &Cx) -> Result<String> {
 
 #[component]
 async fn document(cx: &Cx, child: Child<'_>) -> Result<impl View> {
-    let site = app_context::<Site>(cx);
+    let site = context::<Site>(cx);
 
     Ok(view! {
         <!DOCTYPE html>
@@ -70,7 +70,7 @@ async fn document(cx: &Cx, child: Child<'_>) -> Result<impl View> {
 #[component]
 async fn greeting(cx: &Cx) -> Result<impl View> {
     // Nested components receive the context automatically.
-    let reader = request_context::<Reader>(cx);
+    let reader = context::<Reader>(cx);
 
     Ok(view! {
         <p>

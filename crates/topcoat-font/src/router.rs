@@ -100,8 +100,8 @@ impl RouterBuilderFontExt for RouterBuilder {
         self = self.route(FontRoute::new(font));
         // Every font shares the same resolver, so register it only for the
         // first one; a second `app_context` of the same type would panic.
-        if self.get_app_context::<FontResolver>().is_none() {
-            self = self.app_context(FontResolver::new(Box::new(font_route_path)));
+        if self.get_context::<FontResolver>().is_none() {
+            self = self.with(FontResolver::new(Box::new(font_route_path)));
         }
         self
     }

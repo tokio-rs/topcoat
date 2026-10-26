@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use topcoat::{
     Result,
-    context::{Cx, try_request_context},
+    context::{Cx, try_context},
     icon::{icon, iconify::iconify_icon},
     l10n::{Translation, fluent::messages},
     router::{
@@ -60,7 +60,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
         return Err(redirect(href!(super::_admin::_dashboard::page).resolve(cx)).into());
     }
 
-    let failed = try_request_context::<SignInFailed>(cx);
+    let failed = try_context::<SignInFailed>(cx);
     let email = failed.map(|failed| failed.email.as_str());
     let email_error = failed.and_then(|failed| failed.email_error);
     let password_error = failed.and_then(|failed| failed.password_error);

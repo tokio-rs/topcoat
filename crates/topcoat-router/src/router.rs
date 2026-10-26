@@ -7,7 +7,7 @@ use std::{
 };
 
 use topcoat_core::{
-    context::{AppContext, ContextValues, Cx, RequestContext, try_request_context, with_identity},
+    context::{ContextMap, ContextValues, Cx, try_context, with_identity},
     error::Result,
 };
 
@@ -71,14 +71,15 @@ impl Router {
     /// while processing the request becomes a `500 Internal Server Error`
     /// response.
     pub async fn handle(&self, request: Request) -> Response {
-        self.handle_with(request, RequestContext::new()).await
+        self.handle_with(request, ContextMap::new()).await
     }
 
-    /// Handles a request with additional values in its request context.
+    /// Handles a request with additional values in its context.
     ///
     /// Works like [`handle`](Self::handle). Pass a tuple of values or a
-    /// [`RequestContext`]. Routes and layers can read these values with
-    /// [`request_context`](topcoat_core::context::request_context).
+    /// [`ContextMap`]. Routes and layers can read these values with
+    /// [`context`](topcoat_core::context::context). They shadow values of the
+    /// same type registered on the router.
     ///
     /// Each request and internal rewrite gets a fresh context containing
     /// these values. A rewrite can replace a value by supplying another
@@ -120,7 +121,7 @@ impl Router {
             // Rewrites start with a fresh context. Keep only the values
             // passed by the caller or a rewrite, and discard any other
             // request state. Add the router's values last so they win.
-            let cx = Cx::new(Arc::clone(&inner.app_context))
+            let cx = Cx::new(Arc::clone(&inner.context))
                 .with_many(chain.context().clone())
                 .with_many((
                     Arc::clone(&self.inner),
@@ -213,8 +214,8 @@ pub(crate) struct RouterInner {
     /// this stack wraps requests that matched no route.
     pub(crate) always_layers: Box<[Arc<dyn Layer>]>,
     /// The values shared by every request, read back via
-    /// [`app_context`](topcoat_core::context::app_context).
-    pub(crate) app_context: Arc<AppContext>,
+    /// [`context`](topcoat_core::context::context).
+    pub(crate) context: Arc<ContextMap>,
     /// The origin policy wrapping every request as the outermost layer.
     pub(crate) origin: OriginLayer,
     /// The proxies trusted to report the client's address.
@@ -256,7 +257,7 @@ pub fn router(cx: &Cx) -> Router {
 /// not belong to a router request.
 #[must_use]
 pub fn try_router(cx: &Cx) -> Option<Router> {
-    let inner = try_request_context::<Arc<RouterInner>>(cx)?;
+    let inner = try_context::<Arc<RouterInner>>(cx)?;
     Some(Router {
         inner: Arc::clone(inner),
     })
@@ -264,8 +265,8 @@ pub fn try_router(cx: &Cx) -> Option<Router> {
 
 /// Reads the router and dispatch record off a matched request's context.
 fn try_matched(cx: &Cx) -> Option<(&RouterInner, Matched)> {
-    let router = try_request_context::<Arc<RouterInner>>(cx)?;
-    let matched = try_request_context::<Matched>(cx)?;
+    let router = try_context::<Arc<RouterInner>>(cx)?;
+    let matched = try_context::<Matched>(cx)?;
     Some((router, *matched))
 }
 
@@ -339,7 +340,7 @@ pub fn try_route(cx: &Cx) -> Option<&dyn Route> {
 #[doc(hidden)]
 #[must_use]
 pub fn route_endpoint(cx: &Cx, id: RouteId) -> Option<&Endpoint> {
-    let router = try_request_context::<Arc<RouterInner>>(cx)?;
+    let router = try_context::<Arc<RouterInner>>(cx)?;
     let index = router.routes.endpoint(id)?;
     Some(&router.endpoints[index])
 }
@@ -358,13 +359,13 @@ pub(crate) fn test_matched_cx(path: &crate::Path) -> Cx {
         routes: Routes::default(),
         endpoints,
         always_layers: Box::new([]),
-        app_context: Arc::new(AppContext::new()),
+        context: Arc::new(ContextMap::new()),
         origin: OriginLayer::new(OriginPolicy::new()),
         trusted_proxies: TrustedProxies::new(),
         #[cfg(feature = "compression")]
         compression: crate::Compression::new(),
     };
-    Cx::new(Arc::clone(&inner.app_context)).with_many((
+    Cx::new(Arc::clone(&inner.context)).with_many((
         Arc::new(inner),
         Matched {
             endpoint,
@@ -384,7 +385,7 @@ mod tests {
     use http::{HeaderMap, StatusCode};
     use topcoat::view::{DynViewPart, HtmlWriter, NodeViewParts, PartsWriter, view};
     use topcoat_core::{
-        context::{Cx, app_context, request_context},
+        context::{Cx, context},
         error::Result,
     };
     use topcoat_view::{BoxView, ViewExt, internal::MoveView};
@@ -474,7 +475,7 @@ mod tests {
     struct Greeting(&'static str);
 
     fn say_greeting(cx: &Cx, _body: Body) -> RouteFuture<'_> {
-        Box::pin(async move { app_context::<Greeting>(cx).0.into_response(cx) })
+        Box::pin(async move { context::<Greeting>(cx).0.into_response(cx) })
     }
 
     /// Reads the registered base URL and returns it as the body.
@@ -493,28 +494,28 @@ mod tests {
 
     fn trace_always<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
-            app_context::<Arc<Trace>>(cx).lock().unwrap().push("always");
+            context::<Arc<Trace>>(cx).lock().unwrap().push("always");
             next.run(cx, body).await
         })
     }
 
     fn trace_root<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
-            app_context::<Arc<Trace>>(cx).lock().unwrap().push("root");
+            context::<Arc<Trace>>(cx).lock().unwrap().push("root");
             next.run(cx, body).await
         })
     }
 
     fn trace_admin<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
-            app_context::<Arc<Trace>>(cx).lock().unwrap().push("admin");
+            context::<Arc<Trace>>(cx).lock().unwrap().push("admin");
             next.run(cx, body).await
         })
     }
 
     fn trace_auth<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
-            app_context::<Arc<Trace>>(cx).lock().unwrap().push("auth");
+            context::<Arc<Trace>>(cx).lock().unwrap().push("auth");
             next.run(cx, body).await
         })
     }
@@ -856,7 +857,7 @@ mod tests {
     /// Echoes the carried value, or `none` when the context holds none.
     fn echo_carried(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move {
-            try_request_context::<Carried>(cx)
+            try_context::<Carried>(cx)
                 .map_or("none", |carried| carried.0)
                 .into_response(cx)
         })
@@ -985,7 +986,7 @@ mod tests {
 
         fn replace(cx: &Cx, _body: Body) -> RouteFuture<'_> {
             Box::pin(async move {
-                assert_eq!(request_context::<Carried>(cx).0, "first");
+                assert_eq!(context::<Carried>(cx).0, "first");
                 Err(rewrite("/inspect", Body::empty())
                     .with(Carried("second"))
                     .into())
@@ -994,8 +995,8 @@ mod tests {
 
         fn inspect(cx: &Cx, _body: Body) -> RouteFuture<'_> {
             Box::pin(async move {
-                assert_eq!(*request_context::<u32>(cx), 42);
-                request_context::<Carried>(cx).0.into_response(cx)
+                assert_eq!(*context::<u32>(cx), 42);
+                context::<Carried>(cx).0.into_response(cx)
             })
         }
 
@@ -1090,7 +1091,7 @@ mod tests {
                     .handle_with(request(Method::GET, "/carried-again"), (Carried("nested"),))
                     .await;
                 let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-                assert!(try_request_context::<Carried>(cx).is_none());
+                assert!(try_context::<Carried>(cx).is_none());
                 String::from_utf8(body.to_vec()).unwrap().into_response(cx)
             })
         }
@@ -1137,9 +1138,9 @@ mod tests {
 
         fn inspect(cx: &Cx, _body: Body) -> RouteFuture<'_> {
             Box::pin(async move {
-                assert_ne!(*request_context::<CxId>(cx), cx.id());
+                assert_ne!(*context::<CxId>(cx), cx.id());
                 assert_eq!(cached_id(cx), cx.id());
-                assert!(try_request_context::<Carried>(cx).is_none());
+                assert!(try_context::<Carried>(cx).is_none());
                 assert_eq!(identity(cx), crate::request::initial_identity(cx)?);
                 "fresh".into_response(cx)
             })
@@ -1486,7 +1487,7 @@ mod tests {
     /// A pathless layer that hands the chain the request without its
     /// forwarding header, as middleware rewriting headers would.
     fn strip_forwarded<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
-        let mut parts = request_context::<http::request::Parts>(cx).clone();
+        let mut parts = context::<http::request::Parts>(cx).clone();
         parts.headers.remove("x-forwarded-for");
         let cx = cx.with(parts);
         Box::pin(async move { next.run(&cx, body).await })
@@ -1582,10 +1583,10 @@ mod tests {
     }
 
     #[test]
-    fn app_context_is_available_to_handlers() {
+    fn router_values_are_available_to_handlers() {
         let router = RouterBuilder::new()
             .route(RouteFn::new(Method::GET, path("/hi"), say_greeting))
-            .app_context(Greeting("hello"))
+            .with(Greeting("hello"))
             .build();
         let (status, _, body) = send(&router, Method::GET, "/hi");
         assert_eq!(status, StatusCode::OK);
@@ -1607,7 +1608,7 @@ mod tests {
 
     fn trace_router(builder: RouterBuilder) -> (Router, Arc<Trace>) {
         let trace: Arc<Trace> = Arc::new(Mutex::new(Vec::new()));
-        let router = builder.app_context(trace.clone()).build();
+        let router = builder.with(trace.clone()).build();
         (router, trace)
     }
 
@@ -2090,7 +2091,7 @@ mod tests {
         Box::pin(async move {
             let handle = cx.clone();
             let events = futures_util::stream::once(async move {
-                Result::<Event>::Ok(Event::new().data(request_context::<Greeting>(&handle).0))
+                Result::<Event>::Ok(Event::new().data(context::<Greeting>(&handle).0))
             });
             Sse::new(events).into_response(cx)
         })

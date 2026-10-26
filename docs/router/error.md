@@ -120,7 +120,7 @@ Use [`method`](RewriteError::method) to change the HTTP method and [`headers`](R
 Use [`with`](RewriteError::with) to carry a value into the next dispatch and every later dispatch in the chain. Read it through [`request_context`](topcoat_core::context::request_context). Calling `with` again with the same type replaces that value while keeping the other carried values. A form handler can use `method` and `with` to render its page as a `GET` with a value telling the page what happened:
 
 ```rust
-use topcoat::{Result, context::{Cx, try_request_context}, router::{Body, Method, error::rewrite, href, page, route}, view::{View, view}};
+use topcoat::{Result, context::{Cx, try_context}, router::{Body, Method, error::rewrite, href, page, route}, view::{View, view}};
 
 struct Saved;
 
@@ -141,7 +141,7 @@ mod settings {
     
     #[page]
     async fn settings(cx: &Cx) -> Result<impl View> {
-        let saved = try_request_context::<Saved>(cx).is_some();
+        let saved = try_context::<Saved>(cx).is_some();
         Ok(view! {
             if saved {
                 <p>"Settings saved."</p>

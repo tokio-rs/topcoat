@@ -115,13 +115,13 @@ This matters because `Cx::with` derives a child scope holding additional values,
 
 ```rust
 # fn main() {}
-use topcoat::context::{Cx, memoize, request_context};
+use topcoat::context::{Cx, memoize, context};
 
 struct Locale(&'static str);
 
 #[memoize]
 fn greeting(cx: &Cx) -> String {
-    format!("hello in {}", request_context::<Locale>(cx).0)
+    format!("hello in {}", context::<Locale>(cx).0)
 }
 
 # fn example(cx: &Cx) {
@@ -140,12 +140,12 @@ Values the body registers itself are not dependencies:
 
 ```rust
 # fn main() {}
-# use topcoat::context::{Cx, memoize, request_context};
+# use topcoat::context::{Cx, memoize, context};
 # struct Locale(&'static str);
 #[memoize]
 fn banner(cx: &Cx) -> String {
     let scoped = cx.with(Locale("en"));
-    format!("banner in {}", request_context::<Locale>(&scoped).0)
+    format!("banner in {}", context::<Locale>(&scoped).0)
 }
 ```
 
@@ -155,11 +155,11 @@ Dependencies also propagate through nested memoized calls:
 
 ```rust
 # fn main() {}
-# use topcoat::context::{Cx, memoize, request_context};
+# use topcoat::context::{Cx, memoize, context};
 # struct Locale(&'static str);
 #[memoize]
 fn locale(cx: &Cx) -> String {
-    request_context::<Locale>(cx).0.to_owned()
+    context::<Locale>(cx).0.to_owned()
 }
 
 #[memoize]

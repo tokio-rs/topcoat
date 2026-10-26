@@ -1,5 +1,5 @@
 use http::{header::ACCEPT_LANGUAGE, request::Parts};
-use topcoat_core::context::{Cx, memoize_cache, try_request_context};
+use topcoat_core::context::{Cx, memoize_cache, try_context};
 
 use crate::Locale;
 
@@ -11,7 +11,7 @@ use crate::Locale;
 #[must_use]
 pub fn accept_language(cx: &Cx) -> &[Locale] {
     memoize_cache(cx).memoize(cx, (), (), |cx, ()| {
-        let Some(parts) = try_request_context::<Parts>(&cx) else {
+        let Some(parts) = try_context::<Parts>(&cx) else {
             return Vec::new();
         };
         let headers = parts.headers.get_all(ACCEPT_LANGUAGE);

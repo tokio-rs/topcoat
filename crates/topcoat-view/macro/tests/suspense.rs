@@ -2,13 +2,14 @@ use std::{
     future::poll_fn,
     io,
     pin::{Pin, pin},
+    sync::Arc,
     task::Poll,
 };
 
 use tokio::sync::oneshot;
 use topcoat::{
     Result,
-    context::{Cx, CxTestBuilder},
+    context::{ContextMap, Cx},
     view::{SuspenseMode, View, ViewFirst, ViewSwap, component, emit, live, suspense, view},
 };
 
@@ -290,16 +291,15 @@ async fn an_explicit_mode_overrides_the_request_context() {
 }
 
 #[tokio::test]
-async fn suspense_takes_its_mode_from_the_app_context() {
-    let cx = &CxTestBuilder::new().app_context(SuspenseMode::Wait).build();
+async fn suspense_takes_its_mode_from_the_context() {
+    let cx = &Cx::default().with(SuspenseMode::Wait);
     assert!(!streams_fallback(cx, None).await);
 }
 
 #[tokio::test]
-async fn the_request_context_mode_overrides_the_app_context() {
-    let cx = &CxTestBuilder::new()
-        .app_context(SuspenseMode::Wait)
-        .request_context(SuspenseMode::Stream)
-        .build();
+async fn a_scoped_mode_overrides_the_router_mode() {
+    let mut router = ContextMap::new();
+    router.insert(SuspenseMode::Wait);
+    let cx = &Cx::new(Arc::new(router)).with(SuspenseMode::Stream);
     assert!(streams_fallback(cx, None).await);
 }

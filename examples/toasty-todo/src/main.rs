@@ -4,7 +4,7 @@ use serde::Deserialize;
 use toasty::Db;
 use topcoat::{
     Result,
-    context::{Cx, app_context},
+    context::{Cx, context},
     router::{Slot, href, layout, module_router, page},
     view::{View, component, view},
 };
@@ -21,7 +21,7 @@ async fn main() {
 
     db.push_schema().await.unwrap();
 
-    topcoat::start(module_router!().app_context(db).build())
+    topcoat::start(module_router!().with(db).build())
         .await
         .unwrap();
 }
@@ -29,7 +29,7 @@ async fn main() {
 // Toasty statements require a mutable database handle.
 // Cloning `Db` is inexpensive because it is a handle to the underlying pool.
 fn db(cx: &Cx) -> Db {
-    app_context::<Db>(cx).clone()
+    context::<Db>(cx).clone()
 }
 
 #[derive(Debug, toasty::Model)]

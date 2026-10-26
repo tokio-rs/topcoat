@@ -189,7 +189,7 @@ fn json_deserialization_error(error: serde_path_to_error::Error<serde_json::Erro
 mod tests {
     use http::{Request, header::CONTENT_TYPE};
     use serde_json::{Value, json};
-    use topcoat_core::context::{Cx, CxTestBuilder};
+    use topcoat_core::context::Cx;
 
     use super::*;
     use crate::{
@@ -210,7 +210,7 @@ mod tests {
 
         let (parts, ()) = builder.body(()).expect("request should build").into_parts();
 
-        CxTestBuilder::new().request_context(parts).build()
+        Cx::default().with(parts)
     }
 
     #[tokio::test]

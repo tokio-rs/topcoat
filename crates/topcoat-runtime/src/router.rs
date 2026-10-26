@@ -76,16 +76,16 @@ pub trait RouterBuilderRuntimeExt {
 #[cfg(feature = "router")]
 impl RouterBuilderRuntimeExt for RouterBuilder {
     fn runtime(self) -> Self {
-        self.layer(RuntimeLayer).app_context(RuntimeSetup)
+        self.layer(RuntimeLayer).with(RuntimeSetup)
     }
 
     #[track_caller]
     fn prefetch(self, mode: PrefetchMode) -> Self {
-        self.app_context(mode)
+        self.with(mode)
     }
 
     #[track_caller]
     fn max_runs_per_connection(self, max: usize) -> Self {
-        self.app_context(MaxRunsPerConnection(max))
+        self.with(MaxRunsPerConnection(max))
     }
 }

@@ -22,7 +22,7 @@ async fn main() {
     db::migrate(&db).await.unwrap();
     seed::seed(&db).await.unwrap();
 
-    topcoat::start(app::router().app_context(db).build())
+    topcoat::start(app::router().with(db).build())
         .await
         .unwrap();
 }

@@ -216,7 +216,7 @@ mod tests {
     };
 
     use http::StatusCode;
-    use topcoat_core::context::{AppContext, Cx, app_context};
+    use topcoat_core::context::{ContextMap, Cx, context};
 
     use super::*;
     use crate::{
@@ -276,21 +276,21 @@ mod tests {
     type Trace = Mutex<Vec<&'static str>>;
 
     fn cx_with_trace(trace: Arc<Trace>) -> Cx {
-        let mut app = AppContext::new();
+        let mut app = ContextMap::new();
         app.insert(trace);
         Cx::new(Arc::new(app))
     }
 
     fn record_a<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
-            app_context::<Arc<Trace>>(cx).lock().unwrap().push("a");
+            context::<Arc<Trace>>(cx).lock().unwrap().push("a");
             next.run(cx, body).await
         })
     }
 
     fn record_b<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
-            app_context::<Arc<Trace>>(cx).lock().unwrap().push("b");
+            context::<Arc<Trace>>(cx).lock().unwrap().push("b");
             next.run(cx, body).await
         })
     }
@@ -306,7 +306,7 @@ mod tests {
 
     fn record_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
         Box::pin(async move {
-            app_context::<Arc<Trace>>(cx).lock().unwrap().push("route");
+            context::<Arc<Trace>>(cx).lock().unwrap().push("route");
             "route".into_response(cx)
         })
     }

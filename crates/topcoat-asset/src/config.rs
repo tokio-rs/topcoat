@@ -6,7 +6,7 @@ use std::fmt;
 #[cfg(feature = "serve")]
 use std::path::PathBuf;
 
-use topcoat_core::context::{Cx, app_context};
+use topcoat_core::context::{Cx, context};
 
 #[cfg(feature = "serve")]
 use crate::AssetBundle;
@@ -162,7 +162,7 @@ impl From<AssetBundle> for AssetConfig {
 #[must_use]
 #[track_caller]
 pub fn asset_config(cx: &Cx) -> &AssetConfig {
-    app_context(cx)
+    context(cx)
 }
 
 /// Resolves an [`Asset`] to its [`BundledAsset`] in the context's

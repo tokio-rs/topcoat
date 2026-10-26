@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use toasty::{Db, migration::MigrationSet};
 use toasty_cli::{Config, MigrationConfig, ToastyCli};
-use topcoat::context::{Cx, app_context};
+use topcoat::context::{Cx, context};
 
 /// Use the package directory so the database path does not depend on where the app starts.
 const DATABASE_URL: &str = concat!("sqlite:", env!("CARGO_MANIFEST_DIR"), "/data.db");
@@ -31,7 +31,7 @@ pub fn cli(db: Db) -> ToastyCli {
 }
 
 pub fn db(cx: &Cx) -> Db {
-    app_context::<Db>(cx).clone()
+    context::<Db>(cx).clone()
 }
 
 /// Adds a short delay so the demo's loading placeholders stay visible.

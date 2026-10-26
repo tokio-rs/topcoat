@@ -1,7 +1,7 @@
 use std::{iter::FusedIterator, slice};
 
 use percent_encoding::percent_decode_str;
-use topcoat_core::context::{Cx, request_context};
+use topcoat_core::context::{Cx, context};
 
 use crate::{Path, PathSegment, PathSegments, endpoint};
 
@@ -53,7 +53,7 @@ pub fn path_param<T: PathParam + ?Sized>(cx: &Cx) -> T::Output<'_> {
 #[inline]
 #[track_caller]
 pub fn raw_path_params(cx: &Cx) -> RawPathParamsIter<'_> {
-    let params = request_context::<RawPathParams>(cx);
+    let params = context::<RawPathParams>(cx);
     RawPathParamsIter {
         segments: ParamSegments::new(endpoint(cx).path()),
         values: params.values.iter(),

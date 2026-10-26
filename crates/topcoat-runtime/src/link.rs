@@ -2,7 +2,7 @@
 #![cfg_attr(not(feature = "router"), allow(rustdoc::broken_intra_doc_links))]
 
 use topcoat_core::{
-    context::{Cx, try_app_context, try_request_context},
+    context::{Cx, try_context},
     error::Result,
 };
 use topcoat_view::{AttributeValueViewParts, Attributes, Child, View};
@@ -45,11 +45,8 @@ impl PrefetchMode {
 
 /// Returns the default prefetch mode for links in this context.
 ///
-/// Checks these sources in order and uses the first value it finds:
-///
-/// 1. A `PrefetchMode` in the request context.
-/// 2. A `PrefetchMode` in the app context.
-/// 3. [`PrefetchMode::Intent`].
+/// Uses the `PrefetchMode` in the context, or [`PrefetchMode::Intent`] if
+/// there is none.
 ///
 /// Set the default for the app with
 /// [`RouterBuilderRuntimeExt::prefetch`](crate::RouterBuilderRuntimeExt::prefetch),
@@ -57,8 +54,7 @@ impl PrefetchMode {
 /// particular scope.
 #[must_use]
 pub fn prefetch_mode(cx: &Cx) -> PrefetchMode {
-    try_request_context::<PrefetchMode>(cx)
-        .or_else(|| try_app_context::<PrefetchMode>(cx))
+    try_context::<PrefetchMode>(cx)
         .copied()
         .unwrap_or_default()
 }
@@ -121,7 +117,7 @@ mod tests {
     };
 
     use topcoat::view::{ViewExt, attributes, view};
-    use topcoat_core::context::CxTestBuilder;
+    use topcoat_core::context::Cx;
 
     use super::*;
 
@@ -196,21 +192,17 @@ mod tests {
     }
 
     #[test]
-    fn prefetch_mode_prefers_the_request_context_over_the_app_context() {
-        let app = CxTestBuilder::new()
-            .app_context(PrefetchMode::Viewport)
-            .build();
-        assert_eq!(prefetch_mode(&app), PrefetchMode::Viewport);
+    fn prefetch_mode_uses_the_innermost_value() {
+        let outer = Cx::default().with(PrefetchMode::Viewport);
+        assert_eq!(prefetch_mode(&outer), PrefetchMode::Viewport);
 
-        let scoped = app.with(PrefetchMode::Never);
+        let scoped = outer.with(PrefetchMode::Never);
         assert_eq!(prefetch_mode(&scoped), PrefetchMode::Never);
     }
 
     #[test]
     fn link_uses_the_context_mode_unless_given_one() {
-        let cx = &CxTestBuilder::new()
-            .app_context(PrefetchMode::Viewport)
-            .build();
+        let cx = &Cx::default().with(PrefetchMode::Viewport);
         let html = render(view! { cx => link(href: "/", "Home") });
         assert!(html.contains(r#"data-topcoat-link="viewport""#), "{html}");
 

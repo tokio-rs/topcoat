@@ -1,7 +1,7 @@
 use std::sync::{Mutex, PoisonError};
 
 use http::{HeaderMap, HeaderName, HeaderValue};
-use topcoat_core::context::{Cx, request_context};
+use topcoat_core::context::{Cx, context};
 
 /// Headers to append to the current request's final response.
 ///
@@ -100,7 +100,7 @@ fn append_all(into: &mut HeaderMap, from: HeaderMap) {
 #[must_use]
 #[track_caller]
 pub fn response_headers(cx: &Cx) -> &ResponseHeaders {
-    request_context::<ResponseHeaders>(cx)
+    context::<ResponseHeaders>(cx)
 }
 
 #[cfg(test)]

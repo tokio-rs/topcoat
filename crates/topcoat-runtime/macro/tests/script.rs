@@ -4,7 +4,7 @@
 
 use topcoat::{
     asset::{AssetConfig, Manifest, ManifestEntry},
-    context::{Cx, CxTestBuilder},
+    context::Cx,
     runtime::{RuntimeSetup, SCRIPT},
     view::{ViewExt, view},
 };
@@ -26,10 +26,7 @@ fn asset_config() -> AssetConfig {
 
 #[tokio::test]
 async fn the_script_renders_on_a_router_set_up_for_the_runtime() {
-    let cx = &CxTestBuilder::new()
-        .app_context(asset_config())
-        .app_context(RuntimeSetup)
-        .build();
+    let cx = &Cx::default().with_many((asset_config(), RuntimeSetup));
     let html = view! { cx => topcoat::runtime::script() }
         .single()
         .await
@@ -41,7 +38,7 @@ async fn the_script_renders_on_a_router_set_up_for_the_runtime() {
 #[tokio::test]
 #[should_panic(expected = "call `.runtime()` on the router builder")]
 async fn the_script_panics_on_a_router_without_the_runtime() {
-    let cx = &CxTestBuilder::new().app_context(asset_config()).build();
+    let cx = &Cx::default().with(asset_config());
     let _ = view! { cx => topcoat::runtime::script() }.single().await;
 }
 

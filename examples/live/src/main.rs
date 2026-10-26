@@ -19,7 +19,7 @@ async fn main() {
     topcoat::start(
         module_router!()
             .assets(AssetBundle::load().unwrap())
-            .app_context(Chat::default())
+            .with(Chat::default())
             .discover()
             .runtime()
             .build(),

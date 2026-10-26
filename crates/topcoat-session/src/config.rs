@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use topcoat_core::context::{Cx, app_context};
+use topcoat_core::context::{Cx, context};
 
 use crate::TokenStore;
 
@@ -100,5 +100,5 @@ fn default_token_store() -> Box<dyn TokenStore> {
 
 #[track_caller]
 pub(crate) fn config(cx: &Cx) -> &SessionConfig {
-    app_context(cx)
+    context(cx)
 }

@@ -13,7 +13,7 @@ use std::{
 use bytes::Bytes;
 use tokio::sync::{mpsc, oneshot};
 use topcoat_core::{
-    context::{Cx, try_request_context},
+    context::{Cx, try_context},
     error::{Error, Result},
 };
 use tower::ServiceExt;
@@ -240,7 +240,7 @@ where
             // Reassemble the http request the middleware operates on from the
             // parts stored on the context, and slip it the relay over which
             // `TowerNext` calls back into this chain.
-            let parts = try_request_context::<http::request::Parts>(cx)
+            let parts = try_context::<http::request::Parts>(cx)
                 .expect("router context contains parts")
                 .clone();
             let mut request = Request::from_parts(parts, body);
@@ -572,7 +572,7 @@ mod tests {
     };
 
     use http::{HeaderValue, StatusCode, request::Parts};
-    use topcoat_core::context::{Cx, request_context, try_request_context};
+    use topcoat_core::context::{Cx, context, try_context};
 
     use super::*;
     use crate::{
@@ -935,7 +935,7 @@ mod tests {
         // request.
         assert_eq!(&body_bytes(response)[..], b"marked");
         assert!(
-            !request_context::<Parts>(&cx)
+            !context::<Parts>(&cx)
                 .headers
                 .contains_key("x-tower")
         );
@@ -964,7 +964,7 @@ mod tests {
         assert_eq!(&body_bytes(response)[..], b"short");
         // The chain never ran, so the parts stay on the context for outer
         // layers and error rendering.
-        assert!(try_request_context::<Parts>(&cx).is_some());
+        assert!(try_context::<Parts>(&cx).is_some());
     }
 
     #[test]

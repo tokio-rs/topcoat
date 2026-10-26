@@ -1,6 +1,6 @@
 use tokio::sync::Mutex;
 use topcoat_core::{
-    context::{Cx, request_context},
+    context::{Cx, context},
     error::Result,
 };
 
@@ -48,5 +48,5 @@ impl SessionState {
 }
 
 pub(crate) fn state(cx: &Cx) -> &SessionState {
-    request_context(cx)
+    context(cx)
 }

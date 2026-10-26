@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 
 use topcoat::{
     Result,
-    context::{Cx, app_context},
+    context::{Cx, context},
     router::{
         Body, Layer, LayerFuture, Next, Path, Router, RouterBuilder, Slot, layout, page,
         request::{headers, method, original_method, original_uri, uri},
@@ -86,7 +86,7 @@ impl Layer for Recorder {
 
     fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
-            app_context::<Arc<Seen>>(cx)
+            context::<Arc<Seen>>(cx)
                 .lock()
                 .unwrap()
                 .push(method(cx).to_string());
@@ -276,7 +276,7 @@ async fn application_layers_registered_before_the_runtime_see_only_the_rewritten
     let seen = Arc::new(Seen::default());
     let router = builder()
         .layer(Recorder)
-        .app_context(Arc::clone(&seen))
+        .with(Arc::clone(&seen))
         .runtime()
         .build();
 

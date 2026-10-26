@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use topcoat::{
     Result,
-    context::{Cx, app_context},
+    context::{Cx, context},
     router::{module_router, page},
     view::{View, view},
 };
@@ -14,7 +14,7 @@ struct PageViews(AtomicU64);
 async fn main() {
     topcoat::start(
         module_router!()
-            .app_context(PageViews(AtomicU64::new(0)))
+            .with(PageViews(AtomicU64::new(0)))
             .build(),
     )
     .await
@@ -23,7 +23,7 @@ async fn main() {
 
 #[page]
 async fn home(cx: &Cx) -> Result<impl View> {
-    let views = app_context::<PageViews>(cx);
+    let views = context::<PageViews>(cx);
     let current = views.0.fetch_add(1, Ordering::Relaxed) + 1;
 
     Ok(view! {

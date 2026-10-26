@@ -17,7 +17,7 @@ pub struct RemoteAddr(pub SocketAddr);
 #[cfg(test)]
 mod tests {
     use http::Request;
-    use topcoat_core::context::{Cx, CxTestBuilder};
+    use topcoat_core::context::Cx;
 
     use super::*;
     use crate::request::remote_addr;
@@ -29,7 +29,7 @@ mod tests {
             builder = builder.extension(RemoteAddr(addr));
         }
         let (parts, ()) = builder.body(()).expect("request should build").into_parts();
-        CxTestBuilder::new().request_context(parts).build()
+        Cx::default().with(parts)
     }
 
     #[test]
@@ -45,6 +45,6 @@ mod tests {
 
     #[test]
     fn a_context_without_a_request_has_none() {
-        assert_eq!(remote_addr(&CxTestBuilder::new().build()), None);
+        assert_eq!(remote_addr(&Cx::default()), None);
     }
 }

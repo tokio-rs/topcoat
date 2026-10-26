@@ -37,7 +37,7 @@ A stream outlives the handler that returned it, so it cannot borrow the `Cx` the
 use futures_core::Stream;
 use topcoat::{
     Result,
-    context::{Cx, request_context},
+    context::{Cx, context},
     router::{
         content::sse::{Event, Sse},
         route,
@@ -52,7 +52,7 @@ struct Customer {
 async fn greetings(cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
     let cx = cx.clone();
     let events = futures_util::stream::once(async move {
-        let customer: &Customer = request_context(&cx);
+        let customer: &Customer = context(&cx);
         Ok(Event::new().data(customer.name.as_str()))
     });
     Ok(Sse::new(events))

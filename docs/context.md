@@ -88,18 +88,18 @@ Any function with `&Cx` can read these values.
 
 This module exposes typed context accessors:
 
-- [`app_context::<T>(cx)`](app_context) reads a required value registered on the router with `.app_context(value)`.
-- [`try_app_context::<T>(cx)`](try_app_context) reads an optional value registered on the router.
-- [`request_context::<T>(cx)`](request_context) reads a required typed value attached to the current request.
-- [`try_request_context::<T>(cx)`](try_request_context) reads an optional typed value attached to the current request.
+- [`context::<T>(cx)`](app_context) reads a required value registered on the router with `.with(value)`.
+- [`try_context::<T>(cx)`](try_app_context) reads an optional value registered on the router.
+- [`context::<T>(cx)`](request_context) reads a required typed value attached to the current request.
+- [`try_context::<T>(cx)`](try_request_context) reads an optional typed value attached to the current request.
 
 ```rust
-use topcoat::context::{Cx, app_context};
+use topcoat::context::{Cx, context};
 #
 # struct Database;
 
 fn db(cx: &Cx) -> &Database {
-    app_context::<Database>(cx)
+    context::<Database>(cx)
 }
 ```
 
@@ -108,12 +108,12 @@ Values are keyed by Rust type. The required helpers panic when the requested typ
 Use the `try_` helpers when a value is intentionally optional on some requests:
 
 ```rust
-use topcoat::context::{Cx, try_request_context};
+use topcoat::context::{Cx, try_context};
 #
 # struct Customer;
 
 fn current_customer(cx: &Cx) -> Option<&Customer> {
-    try_request_context(cx)
+    try_context(cx)
 }
 ```
 
@@ -122,7 +122,7 @@ fn current_customer(cx: &Cx) -> Option<&Customer> {
 [`Cx::with`] creates a child context with an additional value. [`Cx::with_many`] adds several values at once. The child inherits other context values and shares the request's state with its parent.
 
 ```rust
-use topcoat::context::{Cx, request_context};
+use topcoat::context::{Cx, context};
 
 struct Customer {
     name: String,
@@ -133,7 +133,7 @@ fn greet(cx: &Cx) -> String {
         name: "Ada".to_owned(),
     });
 
-    let customer: &Customer = request_context(&cx);
+    let customer: &Customer = context(&cx);
     format!("Hello, {}", customer.name)
 }
 ```
@@ -149,7 +149,7 @@ A [`Cx`] is a handle to state shared by everything serving one request. The rout
 # async fn record(name: &str) {}
 use topcoat::{
     Result,
-    context::{Cx, request_context},
+    context::{Cx, context},
     router::route,
 };
 
@@ -161,7 +161,7 @@ struct Customer {
 async fn place_order(cx: &Cx) -> Result<&'static str> {
     let cx = cx.clone();
     tokio::spawn(async move {
-        let customer: &Customer = request_context(&cx);
+        let customer: &Customer = context(&cx);
         record(&customer.name).await;
     });
     Ok("queued")

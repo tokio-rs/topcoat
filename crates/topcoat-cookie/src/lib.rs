@@ -25,7 +25,7 @@ pub use private::*;
 pub use router::*;
 pub use signed::*;
 pub use store::*;
-use topcoat_core::context::{Cx, app_context, request_context};
+use topcoat_core::context::{Cx, context};
 
 /// A request-scoped cookie jar.
 ///
@@ -305,7 +305,7 @@ impl CookieJarCell {
 #[must_use]
 #[track_caller]
 pub fn cookies(cx: &Cx) -> &CookieJar {
-    request_context::<CookieJarCell>(cx).get_or_init(cx)
+    context::<CookieJarCell>(cx).get_or_init(cx)
 }
 
 /// Returns the root jar wrapped in a [`SignedJar`], using the [`Key`]
@@ -317,7 +317,7 @@ pub fn cookies(cx: &Cx) -> &CookieJar {
 #[must_use]
 #[track_caller]
 pub fn signed_cookies(cx: &Cx) -> SignedJar<'_, &CookieJar> {
-    cookies(cx).signed(app_context::<Key>(cx))
+    cookies(cx).signed(context::<Key>(cx))
 }
 
 /// Returns the root jar wrapped in a [`PrivateJar`], using the [`Key`]
@@ -329,7 +329,7 @@ pub fn signed_cookies(cx: &Cx) -> SignedJar<'_, &CookieJar> {
 #[must_use]
 #[track_caller]
 pub fn private_cookies(cx: &Cx) -> PrivateJar<'_, &CookieJar> {
-    cookies(cx).private(app_context::<Key>(cx))
+    cookies(cx).private(context::<Key>(cx))
 }
 
 /// Appends the request's pending cookie changes to `headers` as `Set-Cookie`
@@ -343,7 +343,7 @@ pub fn private_cookies(cx: &Cx) -> PrivateJar<'_, &CookieJar> {
 /// framework's hands, so a write would go nowhere and panics instead.
 #[doc(hidden)]
 pub fn write_cookies(cx: &Cx, headers: &mut http::HeaderMap) {
-    let cell = request_context::<CookieJarCell>(cx);
+    let cell = context::<CookieJarCell>(cx);
     if let Some(jar) = cell.get() {
         for value in jar.delta_headers() {
             headers.append(http::header::SET_COOKIE, value);
@@ -355,7 +355,6 @@ pub fn write_cookies(cx: &Cx, headers: &mut http::HeaderMap) {
 #[cfg(test)]
 mod tests {
     use http::{HeaderMap, Request, header};
-    use topcoat_core::context::CxTestBuilder;
 
     use super::*;
 
@@ -369,13 +368,10 @@ mod tests {
         }
         let (parts, ()) = builder.body(()).unwrap().into_parts();
 
-        CxTestBuilder::new()
-            .request_context(parts)
-            .request_context(CookieJarCell::new())
-            .build()
+        Cx::default().with_many((parts, CookieJarCell::new()))
     }
 
-    /// Like [`cx_with`], but also registers `key` as app context so the
+    /// Like [`cx_with`], but also registers `key` in the context so the
     /// `signed_cookies`/`private_cookies` helpers can find it.
     fn cx_with_key(cookie_headers: &[&str], key: Key) -> Cx {
         let mut builder = Request::builder();
@@ -384,11 +380,7 @@ mod tests {
         }
         let (parts, ()) = builder.body(()).unwrap().into_parts();
 
-        CxTestBuilder::new()
-            .app_context(key)
-            .request_context(parts)
-            .request_context(CookieJarCell::new())
-            .build()
+        Cx::default().with_many((key, parts, CookieJarCell::new()))
     }
 
     /// The `Set-Cookie` header values the request would emit.
@@ -491,9 +483,7 @@ mod tests {
         // The jar is never accessed, so nothing should be written. Crucially,
         // we register no `Parts`: if `write_cookies` parsed the request anyway
         // it would panic looking them up, proving it short-circuits.
-        let cx = CxTestBuilder::new()
-            .request_context(CookieJarCell::new())
-            .build();
+        let cx = Cx::default().with(CookieJarCell::new());
         let mut headers = HeaderMap::new();
         write_cookies(&cx, &mut headers);
 

@@ -40,7 +40,7 @@ pub trait RouterBuilderSessionExt {
 
 impl RouterBuilderSessionExt for RouterBuilder {
     fn sessions(mut self, config: SessionConfig) -> Self {
-        self = self.app_context(config);
+        self = self.with(config);
         self = self.layer(SessionLayer::new());
         self
     }
