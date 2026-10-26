@@ -7,7 +7,7 @@ use std::{
 use elsa::sync::FrozenVec;
 
 use super::recursion;
-use crate::context::{ContextRead, Cx, RequestContext};
+use crate::context::{ContextRead, Cx, ContextMap};
 
 /// One cached result together with the request context reads that produced
 /// it.
@@ -24,7 +24,7 @@ struct Variant<V> {
 impl<V> Variant<V> {
     /// Returns whether the scope `context` still resolves every recorded
     /// read to the binding that was observed.
-    fn matches(&self, context: &RequestContext) -> bool {
+    fn matches(&self, context: &ContextMap) -> bool {
         self.reads.iter().all(|read| read.matches(context))
     }
 

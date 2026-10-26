@@ -1,4 +1,5 @@
 mod app_context;
+mod context_map;
 mod id;
 mod request_context;
 mod tracking;
@@ -6,6 +7,7 @@ mod tracking;
 use std::{any::Any, panic::Location, sync::Arc};
 
 pub use app_context::*;
+pub use context_map::*;
 pub use id::*;
 pub use request_context::*;
 pub(crate) use tracking::*;
@@ -39,12 +41,12 @@ impl Cx {
     /// Creates the context for one request over the shared app context, with an
     /// empty request context.
     #[must_use]
-    pub fn new(app_context: Arc<AppContext>) -> Self {
-        Self::from_parts(app_context, RequestContext::new())
+    pub fn new(app_context: Arc<ContextMap>) -> Self {
+        Self::from_parts(app_context, ContextMap::new())
     }
 
     /// Creates a `Cx` from the given app and request contexts.
-    fn from_parts(app_context: Arc<AppContext>, request_context: RequestContext) -> Self {
+    fn from_parts(app_context: Arc<ContextMap>, request_context: ContextMap) -> Self {
         Self {
             state: Arc::new(CxState {
                 shared: Arc::new(RequestShared {
@@ -99,7 +101,7 @@ impl Cx {
 
     /// Returns the request context visible to this handle's scope.
     #[inline]
-    pub(crate) fn request_context(&self) -> &RequestContext {
+    pub(crate) fn request_context(&self) -> &ContextMap {
         &self.state.request_context
     }
 
@@ -126,7 +128,7 @@ impl Cx {
     }
 
     /// Returns a child handle whose request context also holds every value in
-    /// `values`, a tuple of context values or a [`RequestContext`].
+    /// `values`, a tuple of context values or a [`ContextMap`].
     ///
     /// Behaves like chained [`with`](Self::with) calls, but builds the child's
     /// request context in one step.
@@ -142,7 +144,7 @@ impl Cx {
 
     /// Wraps a derived request context into a child handle sharing this
     /// request's state.
-    fn scope(&self, request_context: RequestContext) -> Cx {
+    fn scope(&self, request_context: ContextMap) -> Cx {
         Cx {
             state: Arc::new(CxState {
                 shared: Arc::clone(&self.state.shared),
@@ -178,7 +180,7 @@ impl Cx {
 #[derive(Debug, Default)]
 struct CxState {
     shared: Arc<RequestShared>,
-    request_context: Arc<RequestContext>,
+    request_context: Arc<ContextMap>,
     tracker: Option<Arc<ContextTracker>>,
 }
 
@@ -186,7 +188,7 @@ struct CxState {
 #[derive(Debug, Default)]
 struct RequestShared {
     id: CxId,
-    app_context: Arc<AppContext>,
+    app_context: Arc<ContextMap>,
     memoize_cache: MemoizeCache,
     abort_store: AbortStore,
 }
@@ -196,8 +198,8 @@ struct RequestShared {
 /// Use this when a test needs context without handling an HTTP request.
 #[derive(Debug, Default)]
 pub struct CxTestBuilder {
-    app_context: AppContext,
-    request_context: RequestContext,
+    app_context: ContextMap,
+    request_context: ContextMap,
 }
 
 impl CxTestBuilder {
@@ -308,8 +310,8 @@ mod tests {
 
     #[test]
     fn a_fresh_context_has_a_unique_id() {
-        let first = Cx::new(Arc::new(AppContext::new()));
-        let second = Cx::new(Arc::new(AppContext::new()));
+        let first = Cx::new(Arc::new(ContextMap::new()));
+        let second = Cx::new(Arc::new(ContextMap::new()));
         assert_ne!(first.id(), second.id());
     }
 

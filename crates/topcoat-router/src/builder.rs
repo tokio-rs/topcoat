@@ -357,10 +357,11 @@ impl RouterBuilder {
         T: Any + Send + Sync,
     {
         assert!(
-            self.context.insert(value).is_none(),
+            !self.context.contains::<T>(),
             "duplicate context entry for type `{:?}`",
             type_name::<T>()
         );
+        self.context.insert(value);
         self
     }
 

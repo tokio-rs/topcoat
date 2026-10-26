@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::context::{BindingId, RequestContext};
+use crate::context::{BindingId, ContextMap};
 
 /// One observed request context read: the type that was looked up and the
 /// identity of the binding it resolved to, or `None` if no value was
@@ -36,7 +36,7 @@ impl ContextRead {
 
     /// Returns whether `context` still resolves this read's type to the
     /// binding that was observed.
-    pub(crate) fn matches(&self, context: &RequestContext) -> bool {
+    pub(crate) fn matches(&self, context: &ContextMap) -> bool {
         context.binding_id(self.type_id) == self.binding_id
     }
 }
@@ -55,13 +55,13 @@ impl ContextRead {
 #[derive(Debug)]
 pub(crate) struct ContextTracker {
     /// The scope the tracked call was entered with.
-    entry: Arc<RequestContext>,
+    entry: Arc<ContextMap>,
     reads: Mutex<Vec<ContextRead>>,
 }
 
 impl ContextTracker {
     /// Creates a tracker for a call entered with the scope `entry`.
-    pub(crate) fn new(entry: Arc<RequestContext>) -> Self {
+    pub(crate) fn new(entry: Arc<ContextMap>) -> Self {
         Self {
             entry,
             reads: Mutex::new(Vec::new()),
@@ -115,7 +115,7 @@ mod tests {
     struct Theme;
 
     /// Records what `context` currently resolves `T` to.
-    fn observe<T: Any>(context: &RequestContext) -> ContextRead {
+    fn observe<T: Any>(context: &ContextMap) -> ContextRead {
         ContextRead::new::<T>(context.binding_id(TypeId::of::<T>()))
     }
 
@@ -127,7 +127,7 @@ mod tests {
 
     #[test]
     fn a_present_read_matches_its_own_context() {
-        let mut context = RequestContext::new();
+        let mut context = ContextMap::new();
         context.insert(Session);
 
         let read = observe::<Session>(&context);
@@ -136,7 +136,7 @@ mod tests {
 
     #[test]
     fn shadowing_invalidates_a_present_read() {
-        let mut context = RequestContext::new();
+        let mut context = ContextMap::new();
         context.insert(Session);
         let read = observe::<Session>(&context);
 
@@ -149,14 +149,14 @@ mod tests {
 
     #[test]
     fn an_absence_read_matches_while_the_type_is_absent() {
-        let context = RequestContext::new();
+        let context = ContextMap::new();
         let read = observe::<Session>(&context);
         assert!(read.matches(&context));
     }
 
     #[test]
     fn registering_the_type_invalidates_an_absence_read() {
-        let context = RequestContext::new();
+        let context = ContextMap::new();
         let read = observe::<Session>(&context);
 
         let mut extended = context.clone();
@@ -168,7 +168,7 @@ mod tests {
 
     #[test]
     fn an_unrelated_binding_leaves_a_read_valid() {
-        let mut context = RequestContext::new();
+        let mut context = ContextMap::new();
         context.insert(Session);
         let read = observe::<Session>(&context);
 
@@ -180,7 +180,7 @@ mod tests {
 
     #[test]
     fn a_cloned_context_keeps_reads_valid() {
-        let mut context = RequestContext::new();
+        let mut context = ContextMap::new();
         context.insert(Session);
         let read = observe::<Session>(&context);
 
