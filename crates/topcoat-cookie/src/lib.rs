@@ -60,6 +60,13 @@ pub trait Cookies {
     /// WebSocket task.
     fn remove<C: Into<Cookie<'static>>>(&self, cookie: C);
 
+    /// Changes only the name to the one returned by `get` after adding this
+    /// cookie. This must not read or write the jar or change other attributes.
+    /// Wrappers that preserve names should forward this to their inner jar.
+    /// The default leaves the name unchanged.
+    #[doc(hidden)]
+    fn normalize_name(&self, _cookie: &mut Cookie<'static>) {}
+
     /// Wraps this jar so signed cookies are written and verified with `key`.
     fn signed(self, key: &Key) -> SignedJar<'_, Self>
     where
@@ -744,6 +751,38 @@ mod tests {
     }
 
     #[test]
+    fn prefixed_private_cookies_round_trip_with_bare_and_prefixed_names() {
+        let key = Key::generate();
+
+        for (prefix, prefixed_name) in [
+            (Prefix::Host, "__Host-session"),
+            (Prefix::Secure, "__Secure-session"),
+        ] {
+            for conform in [Conform::Default, Conform::Override] {
+                for name in ["session", prefixed_name] {
+                    let writer = cx_with(&[]);
+                    let jar = Prefixed::new(cookies(&writer), prefix, conform).private(&key);
+                    jar.add((name, "secret-token"));
+                    assert_eq!(jar.get(name).unwrap().value(), "secret-token");
+
+                    let set = set_cookies(&writer);
+                    let echoed = pair(&set[0]);
+                    assert!(echoed.starts_with(&format!("{prefixed_name}=")));
+                    assert!(!echoed.contains("secret-token"));
+
+                    let reader = cx_with(&[echoed]);
+                    let jar = Prefixed::new(cookies(&reader), prefix, conform).private(&key);
+                    for lookup in ["session", prefixed_name] {
+                        let cookie = jar.get(lookup).expect("private cookie should round trip");
+                        assert_eq!(cookie.name(), "session");
+                        assert_eq!(cookie.value(), "secret-token");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn private_cookie_rejects_wrong_key() {
         let key = Key::generate();
 
@@ -802,5 +841,200 @@ mod tests {
             .get("session")
             .expect("composed layers should round-trip");
         assert_eq!(cookie.value(), "abc");
+    }
+
+    #[test]
+    fn private_cookies_round_trip_with_outer_prefixes() {
+        let key = Key::generate();
+        for (prefix, prefixed_name) in [
+            (Prefix::Host, "__Host-session"),
+            (Prefix::Secure, "__Secure-session"),
+        ] {
+            for conform in [Conform::Default, Conform::Override] {
+                for name in ["session", prefixed_name] {
+                    let writer = cx_with(&[]);
+                    Prefixed::new(cookies(&writer).private(&key), prefix, conform)
+                        .add((name, "secret-token"));
+                    let set = set_cookies(&writer);
+                    let reader = cx_with(&[pair(&set[0])]);
+                    let jar = Prefixed::new(cookies(&reader).private(&key), prefix, conform);
+                    for lookup in ["session", prefixed_name] {
+                        let cookie = jar.get(lookup).unwrap();
+                        assert_eq!(cookie.name(), "session");
+                        assert_eq!(cookie.value(), "secret-token");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn private_cookies_read_existing_ciphertext() {
+        let key = Key::generate();
+        for (prefix, prefixed_name) in [
+            (Prefix::Host, "__Host-session"),
+            (Prefix::Secure, "__Secure-session"),
+        ] {
+            for name in ["session", prefixed_name] {
+                // Build the ciphertext independently with the authenticated
+                // names used before normalization was added.
+                let mut raw = cookie::CookieJar::new();
+                raw.private_mut(&key).add((name, "secret-token"));
+                let mut sealed = raw.get(name).unwrap().clone();
+                sealed.set_name(prefixed_name);
+                let header = sealed.encoded().to_string();
+                let reader = cx_with(&[&header]);
+                let cookie = if name == "session" {
+                    Prefixed::new(cookies(&reader), prefix, Conform::Override)
+                        .private(&key)
+                        .get("session")
+                } else {
+                    assert_eq!(
+                        cookies(&reader)
+                            .private(&key)
+                            .get(prefixed_name)
+                            .unwrap()
+                            .value(),
+                        "secret-token"
+                    );
+                    Prefixed::new(cookies(&reader).private(&key), prefix, Conform::Override)
+                        .get("session")
+                };
+                assert_eq!(cookie.unwrap().value(), "secret-token");
+
+                let writer = cx_with(&[]);
+                cookies(&writer).private(&key).add((name, "secret-token"));
+                let sealed = cookies(&writer).get(name).unwrap();
+                assert_eq!(
+                    raw.private(&key).decrypt(sealed).unwrap().value(),
+                    "secret-token"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn private_cookies_preserve_nested_prefix_names() {
+        let key = Key::generate();
+        for (inner, outer, name, wire_name, returned_name) in [
+            (
+                Prefix::Host,
+                Prefix::Host,
+                "__Host-__Host-session",
+                "__Host-__Host-session",
+                "session",
+            ),
+            (
+                Prefix::Host,
+                Prefix::Secure,
+                "__Secure-session",
+                "__Host-__Secure-session",
+                "session",
+            ),
+            (
+                Prefix::Host,
+                Prefix::Secure,
+                "__Secure-__Host-session",
+                "__Host-__Secure-__Host-session",
+                "__Host-session",
+            ),
+        ] {
+            let writer = cx_with(&[]);
+            Prefixed::new(
+                Prefixed::new(cookies(&writer), inner, Conform::Override),
+                outer,
+                Conform::Override,
+            )
+            .private(&key)
+            .add((name, "secret-token"));
+            let set = set_cookies(&writer);
+            assert!(pair(&set[0]).starts_with(&format!("{wire_name}=")));
+            let reader = cx_with(&[pair(&set[0])]);
+            let cookie = Prefixed::new(
+                Prefixed::new(cookies(&reader), inner, Conform::Override),
+                outer,
+                Conform::Override,
+            )
+            .private(&key)
+            .get(name)
+            .unwrap();
+            assert_eq!(cookie.name(), returned_name);
+            assert_eq!(cookie.value(), "secret-token");
+        }
+    }
+
+    #[test]
+    fn private_cookie_names_pass_through_other_adapters() {
+        let key = Key::generate();
+        let outer_key = Key::generate();
+        let writer = cx_with(&[]);
+        cookies(&writer)
+            .override_prefix_host()
+            .signed(&key)
+            .default_http_only(true)
+            .private(&key)
+            .private(&outer_key)
+            .add(("__Host-session", "secret-token"));
+        let set = set_cookies(&writer);
+        assert!(set[0].contains("HttpOnly"));
+        let reader = cx_with(&[pair(&set[0])]);
+        let cookie = cookies(&reader)
+            .override_prefix_host()
+            .signed(&key)
+            .default_http_only(true)
+            .private(&key)
+            .private(&outer_key)
+            .get("session")
+            .unwrap();
+        assert_eq!(cookie.name(), "session");
+        assert_eq!(cookie.value(), "secret-token");
+    }
+
+    #[test]
+    fn prefixed_private_cookies_reject_changed_names_values_and_keys() {
+        let key = Key::generate();
+        let writer = cx_with(&[]);
+        cookies(&writer)
+            .override_prefix_host()
+            .private(&key)
+            .add(("__Host-session", "secret-token"));
+        let sealed = cookies(&writer).get("__Host-session").unwrap();
+        for name in ["__Host-other", "__Host-__Host-session"] {
+            let mut renamed = sealed.clone();
+            renamed.set_name(name);
+            let header = renamed.encoded().to_string();
+            let reader = cx_with(&[&header]);
+            assert!(
+                cookies(&reader)
+                    .override_prefix_host()
+                    .private(&key)
+                    .get(name)
+                    .is_none()
+            );
+        }
+
+        let header = sealed.encoded().to_string();
+        let reader = cx_with(&[&header]);
+        assert!(
+            cookies(&reader)
+                .override_prefix_host()
+                .private(&Key::generate())
+                .get("session")
+                .is_none()
+        );
+
+        let mut tampered = sealed;
+        let mut value = tampered.value().to_owned();
+        value.replace_range(..1, if value.starts_with('A') { "B" } else { "A" });
+        tampered.set_value(value);
+        let header = tampered.encoded().to_string();
+        let reader = cx_with(&[&header]);
+        assert!(
+            cookies(&reader)
+                .override_prefix_host()
+                .private(&key)
+                .get("session")
+                .is_none()
+        );
     }
 }
