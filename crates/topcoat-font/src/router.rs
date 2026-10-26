@@ -98,8 +98,7 @@ pub trait RouterBuilderFontExt {
 impl RouterBuilderFontExt for RouterBuilder {
     fn font(mut self, font: Font) -> Self {
         self = self.route(FontRoute::new(font));
-        // Every font shares the same resolver. Register the default only if
-        // none exists, so a custom resolver registered earlier is kept.
+        // Add the shared default resolver unless one was already registered.
         if self.try_context::<FontResolver>().is_none() {
             self = self.with(FontResolver::new(Box::new(font_route_path)));
         }

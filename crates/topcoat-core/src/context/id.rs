@@ -27,14 +27,13 @@ impl Default for CxId {
     }
 }
 
-/// The identity of one context binding.
+/// An ID for a value registered in a context map.
 ///
-/// A fresh `BindingId` is issued whenever a value is registered on a
-/// [`ContextMap`](crate::context::ContextMap), so equal ids always refer to
-/// the same value.
+/// Each insertion into a [`ContextMap`](crate::context::ContextMap) gets
+/// a new ID. Matching IDs therefore refer to the same registered value.
 ///
-/// Ids start at one so that `Option<BindingId>`, the shape a recorded read
-/// stores, is the size of a bare id.
+/// IDs start at one. This lets `Option<BindingId>` use the same amount of
+/// space as `BindingId`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct BindingId(NonZeroU64);
 

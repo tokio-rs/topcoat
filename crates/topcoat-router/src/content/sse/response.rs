@@ -54,9 +54,9 @@ use crate::{
 /// }
 /// ```
 ///
-/// The `use<>` bound keeps the stream from borrowing the request context,
-/// which a route's response must not do. A stream that needs the context
-/// clones the [`Cx`] and moves the owned handle in:
+/// The response must not borrow the handler's context. The `use<>` bound
+/// prevents the stream from capturing that borrow. If the stream needs
+/// context values, move a clone of [`Cx`] into it:
 ///
 /// ```rust
 /// // src/app/greetings.rs

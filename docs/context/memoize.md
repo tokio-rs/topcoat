@@ -1,10 +1,10 @@
-`#[memoize]` shares a function's result across calls in one request. A later call reuses the result when its arguments and observed context bindings match.
+`#[memoize]` saves a function's result so other calls in the same request can reuse it. Calls share a result when their arguments match and the context values read by the function have not been replaced.
 
-Each request starts with an empty cache. Results are not shared across requests.
+The cache belongs to one request. Every new request starts with an empty cache.
 
 # Setup
 
-Annotate any function that takes a `cx: &Cx` parameter:
+Add the attribute to a function with a `cx: &Cx` parameter:
 
 ```rust
 # fn main() {}
@@ -20,11 +20,11 @@ async fn get_user(cx: &Cx, id: i64) -> User {
 }
 ```
 
-The first call to `get_user(cx, 42).await` computes the user. Later calls with the same ID reuse it if their context dependencies match. The macro changes the return type from `T` to `&T`, borrowed for the lifetime of `cx`. Use [`as_ref`](#borrowing-option-and-result-contents) to borrow the contents of an `Option` or `Result` instead.
+The first call to `get_user(cx, 42).await` loads the user. Later calls with the same ID can borrow that result if the context values it depends on still match. The macro turns the return type `T` into `&T`. The reference lives as long as the borrowed `cx`. For an `Option` or `Result`, [`as_ref`](#borrowing-option-and-result-contents) lets callers borrow the value inside it instead.
 
 # Sync and async
 
-The attribute works on synchronous and `async` functions.
+You can memoize both synchronous and `async` functions:
 
 ```rust
 # fn main() {}
@@ -46,13 +46,13 @@ async fn fetch_post(cx: &Cx, slug: &str) -> Post {
 }
 ```
 
-For async functions, concurrent callers that resolve to the same cache entry share a single in-flight future. If two parts of your page render in parallel and both call `fetch_post(cx, "hello")`, the database is queried once and both callers await the same result.
+Concurrent async calls share the work when they can use the same cached result. If two parts of a page call `fetch_post(cx, "hello")` with matching context values, both wait for one database query.
 
 # Recursion
 
-Memoized functions can recurse if and only if recursive calls use different arguments. Recursion with identical arguments panics.
+Memoized functions can call themselves with different arguments. Calling back into the same unfinished computation with the same arguments panics.
 
-Recursion with different arguments uses a different cache entry for each call:
+Each set of arguments gets its own cache entry, so this recursion works:
 
 ```rust
 # use topcoat::context::{Cx, memoize};
@@ -69,7 +69,7 @@ assert_eq!(*factorial(cx, 5), 120);
 # }
 ```
 
-A nested call with the same arguments panics because it would otherwise deadlock:
+A recursive call with the same arguments would wait for itself to finish. Topcoat panics instead:
 
 ```should_panic
 use topcoat::context::{Cx, memoize};
@@ -86,7 +86,7 @@ fn main() {
 
 # What gets cached
 
-Every argument except `cx` is hashed into the cache key. The function's context dependencies also determine whether a cached result can be reused.
+The cache key includes a hash of every argument except `cx`. Before reusing a result, the cache also checks the context values that the function read.
 
 ```rust
 # use topcoat::context::{Cx, memoize};
@@ -103,15 +103,15 @@ add(cx, 1, 3); // prints "computing", returns 4 (different args)
 # }
 ```
 
-Each memoized function has a separate cache.
+Results from one memoized function are kept separate from those of another.
 
-See [context dependencies](#context-dependencies) for how scoped values affect reuse.
+The [context rules below](#context-dependencies) explain when adding a value makes a call run again.
 
 # Context dependencies
 
-The macro tracks the context lookups made while the function runs. A cached result can be reused only when those lookups resolve to the same registered bindings in the caller's scope.
+While the function runs, Topcoat records which context values it reads. A later call can reuse the result only if those reads would find the same registered values in its context. Registering a value again counts as a replacement, even if the new value is equal to the old one.
 
-This matters because `Cx::with` derives a child scope holding additional values, so the same function can see a different value depending on the `cx` it is called with:
+`Cx::with` can override a value in a child context. A memoized function called with that child may therefore need to run again:
 
 ```rust
 # fn main() {}
@@ -132,11 +132,11 @@ greeting(&scoped); // a different Locale, so the body runs again
 # }
 ```
 
-The two calls read different `Locale` bindings, so each computes a result. Both results stay cached for later calls through their respective scopes.
+These calls read different registered `Locale` values, so the function runs for each one. The cache keeps both results. Later calls use the one that matches their context.
 
-Only observed lookups affect reuse. Adding an unrelated value does not invalidate the result. A lookup that returned `None` is also tracked. If a later caller has a value for that type, the function runs again.
+Only types the function looked up matter. Adding a value of another type does not change which result is reused. A lookup that found nothing also matters. If a later call has a value of that type, the function runs again.
 
-Values the body registers itself are not dependencies:
+Values added by the function itself do not make the result depend on the caller's context:
 
 ```rust
 # fn main() {}
@@ -149,9 +149,9 @@ fn banner(cx: &Cx) -> String {
 }
 ```
 
-The function creates this binding itself, so it does not depend on the caller's value of that type.
+Here, `banner` always supplies its own `Locale`. Changing the caller's `Locale` does not change the result.
 
-Dependencies also propagate through nested memoized calls:
+A function also depends on the context values read by memoized functions it calls:
 
 ```rust
 # fn main() {}
@@ -168,13 +168,13 @@ fn greeting(cx: &Cx) -> String {
 }
 ```
 
-`greeting` never reads `Locale` itself, but it depends on it through `locale`, so a caller that scopes a different `Locale` recomputes both. This holds whether the nested call computed or hit the cache.
+`greeting` reads `Locale` indirectly through `locale`. Overriding `Locale` makes both functions run again for that context. Topcoat records this dependency even when `locale` returns a cached result.
 
-Values registered on the router are tracked like any other value. A result that read one stays valid for every caller until a scope replaces that type with `Cx::with`, which makes the function run again for callers in that scope.
+Router values follow the same rules. Calls in a request can share a result that reads a router value. If a child context overrides that type with `Cx::with`, calls using the child need a result for the replacement value.
 
 # Borrowing Option and Result contents
 
-By default the macro returns a reference to the cached value itself: a function returning `Option<User>` hands out `&Option<User>`. Pass `as_ref` to the attribute to borrow the cached value's contents instead:
+By default, callers borrow the entire cached result. For example, `Option<User>` becomes `&Option<User>`. Add `as_ref` to return `Option<&User>` instead:
 
 ```rust
 # fn main() {}
@@ -195,13 +195,13 @@ let user: Option<&User> = find_user(cx, 42).await;
 # }
 ```
 
-With `as_ref`, the macro rewrites the return type through the `MemoizeAsRef` trait: `Option<T>` comes back as `Option<&T>` and `Result<T, E>` as `Result<&T, &E>`. Implement the trait for your own return types to use them with `as_ref`.
+`as_ref` uses the `MemoizeAsRef` trait to choose the borrowed return type. It changes `Option<T>` to `Option<&T>` and `Result<T, E>` to `Result<&T, &E>`. You can implement the trait for your own types too.
 
-A borrowed `&topcoat::Error` converts into `topcoat::Error` with `?`, so memoized functions returning `topcoat::Result` can propagate errors directly. Other borrowed error types need an explicit conversion, such as `.map_err(Clone::clone)`.
+You can use `?` on a borrowed `&topcoat::Error` because it converts to an owned `topcoat::Error` by cloning. For other error types, you may need to convert the reference yourself, for example with `.map_err(Clone::clone)`.
 
 # Borrowed and owned arguments
 
-Arguments can be passed by value or by reference. The cache never stores a copy of the arguments: an entry is identified by a hash of them, so borrowed arguments are only hashed, never cloned.
+Arguments may be owned or borrowed. The cache stores their hash rather than the arguments themselves. Borrowed arguments do not need to be cloned:
 
 ```rust
 # fn main() {}
@@ -225,18 +225,18 @@ let record = lookup(cx, "alice").await?; // cache hit, no allocation
 
 # Requirements
 
-The macro enforces these at compile time:
+These requirements are checked at compile time:
 
-- The function must take a parameter literally named `cx` of type `&Cx`.
-- The function cannot take a `self` receiver.
-- Every argument except `cx` must implement `Hash`, whether passed by value or by reference.
-- The return type `T` must be `Send + Sync + 'static`.
+- Include a parameter named `cx` with type `&Cx`.
+- Use a function without a `self` parameter.
+- Make every argument other than `cx` hashable with `Hash`.
+- Return a value that is `Send + Sync + 'static`.
 
-The cache identifies arguments by their hash without an equality check. A custom `Hash` implementation must include every part of the value that affects the result. Omitting such a field can make distinct calls reuse the wrong value. Prefer deriving `Hash` when possible.
+The cache compares argument hashes, not the arguments themselves. If you write a `Hash` implementation, include every field that can affect the result. Otherwise, different calls may receive the same cached result. Prefer deriving `Hash` when you can.
 
 # When to reach for it
 
-Use `#[memoize]` when several callers need the same expensive result during one request. A shared user lookup is a typical example. Add a separate cache in your data access code if results should persist across requests.
+Use `#[memoize]` for expensive work needed in several places during a request, such as looking up the current user. To keep results between requests, use a separate cache in the code that loads the data.
 
 # Example: shared user lookup
 
@@ -281,4 +281,4 @@ async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
 }
 ```
 
-Whichever caller runs first loads the user. Later callers reuse the cached result, so the database is queried at most once per request.
+The first caller loads the user. Other callers with the same context dependencies borrow the saved result, so they do not repeat the database query.

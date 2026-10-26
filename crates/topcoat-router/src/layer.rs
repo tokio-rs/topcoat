@@ -216,7 +216,7 @@ mod tests {
     };
 
     use http::StatusCode;
-    use topcoat_core::context::{ContextMap, Cx, context};
+    use topcoat_core::context::{Cx, context};
 
     use super::*;
     use crate::{
@@ -274,12 +274,6 @@ mod tests {
     /// A shared log of the labels layers and routes record as they run, so a
     /// test can observe the order the chain executes in.
     type Trace = Mutex<Vec<&'static str>>;
-
-    fn cx_with_trace(trace: Arc<Trace>) -> Cx {
-        let mut app = ContextMap::new();
-        app.insert(trace);
-        Cx::new(Arc::new(app))
-    }
 
     fn record_a<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move {
@@ -425,7 +419,7 @@ mod tests {
         let route = RouteFn::new(Method::GET, path("/x"), record_route);
 
         let trace: Arc<Trace> = Arc::new(Mutex::new(Vec::new()));
-        let cx = cx_with_trace(trace.clone());
+        let cx = Cx::default().with(trace.clone());
 
         let next = Next::new(&layers, Terminal::Route(&route));
         block_on(next.run(&cx, Body::empty())).unwrap();

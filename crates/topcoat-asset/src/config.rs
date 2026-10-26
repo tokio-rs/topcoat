@@ -154,7 +154,7 @@ impl From<AssetBundle> for AssetConfig {
     }
 }
 
-/// Returns the [`AssetConfig`] registered in this context.
+/// Borrows the asset configuration stored in the context.
 ///
 /// # Panics
 ///

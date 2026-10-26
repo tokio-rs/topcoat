@@ -16,7 +16,7 @@ struct Reader {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
-    // Shared values can be assembled without a router.
+    // Put values in a shared map when rendering without a router.
     let mut shared = ContextMap::new();
     shared.insert(Site {
         title: "Routerless Topcoat",
@@ -24,8 +24,8 @@ async fn main() -> Result<()> {
     let shared = Arc::new(shared);
 
     for name in ["Ada & Grace", "World"] {
-        // Each render gets its own context over the shared values.
-        // `Cx::default()` also works when no shared values are needed.
+        // Start a context for this render using the shared map.
+        // Use Cx::default() when there are no shared values.
         let cx = Cx::new(Arc::clone(&shared)).with(Reader { name });
         let html = render(&cx).await?;
         println!("{html}");

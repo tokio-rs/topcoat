@@ -27,10 +27,9 @@ pub enum UrlForm {
     Absolute,
 }
 
-/// Returns the [`UrlForm`] in effect for this context.
+/// Reads the URL form selected for this context.
 ///
-/// URLs render [`Relative`](UrlForm::Relative) unless the context holds
-/// another form.
+/// Returns [`Relative`](UrlForm::Relative) when the context has no [`UrlForm`].
 #[inline]
 #[must_use]
 pub fn url_form(cx: &Cx) -> UrlForm {

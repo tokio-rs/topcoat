@@ -5,9 +5,9 @@ use crate::Font;
 /// A callback that writes a [`Font`]'s stylesheet URL.
 pub type ResolveFontRouteFn = dyn Fn(Font, &mut dyn Write) -> std::fmt::Result + Send + Sync;
 
-/// Resolves fonts to their hosted stylesheet URLs.
+/// Finds the stylesheet URL for a font.
 ///
-/// Register in the context to control the URLs rendered for [`Font`] values.
+/// Add a resolver to the context to choose the URLs used for [`Font`] values.
 pub struct FontResolver {
     resolve_fn: Box<ResolveFontRouteFn>,
 }

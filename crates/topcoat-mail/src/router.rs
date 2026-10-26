@@ -4,8 +4,8 @@ use crate::MailConfig;
 
 /// Installs mail support on a [`RouterBuilder`].
 pub trait RouterBuilderMailExt {
-    /// Registers the mail `config` on the router, so every handler can
-    /// deliver mail with [`send`](crate::send).
+    /// Shares the mail configuration with requests so handlers can use
+    /// [`send`](crate::send) to deliver messages.
     #[must_use]
     fn mail(self, config: MailConfig) -> Self;
 }

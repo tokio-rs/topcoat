@@ -35,7 +35,7 @@ The extractor rejects non-`GET` requests with `405 Method Not Allowed` and inval
 
 # Reading the request context
 
-The callback outlives the handler that upgraded the connection, so it cannot borrow the `Cx` the handler was called with. Clone the `Cx` and move the owned handle into the callback instead. It sees the same values as the original.
+The WebSocket callback runs after the handler returns. To read context values there, clone `Cx` and move the clone into the callback. It keeps access to the same values without borrowing the handler's context:
 
 ```rust
 // src/app/greet.rs

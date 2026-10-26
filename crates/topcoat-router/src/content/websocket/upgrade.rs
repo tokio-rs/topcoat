@@ -60,8 +60,8 @@ use crate::{
 /// }
 /// ```
 ///
-/// The callback outlives the handler, so it cannot borrow the request context.
-/// Clone [`Cx`] and move it into the callback to read context there:
+/// The callback runs after the handler returns. Move a clone of [`Cx`] into
+/// it to keep access to context values without borrowing from the handler:
 ///
 /// ```rust
 /// // src/app/greet.rs

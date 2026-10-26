@@ -1,14 +1,14 @@
 # Functions, not middlewares
 
-Use functions that take `cx: &Cx` to read request data and check application rules. A function can fetch the current user, require authentication, or build on another helper.
+Put request checks in functions that take `cx: &Cx`. A helper can read request data, load the current user, or check whether that user is allowed to continue.
 
-Call each helper where its result is needed. Use `#[memoize]` to share expensive results across calls in the same request.
+Call the helper from the code that needs the check or its result. Add `#[memoize]` when several callers should share expensive work within a request.
 
 # What not to do
 
 ## Middleware
 
-Middleware often pushes authentication away from the code that needs the authenticated user. The middleware authenticates the request and stores the user somewhere the page can find it later, while the page assumes the middleware has already run.
+With authentication middleware, the check and the code using the user often live in different places. The middleware stores a user on the request. The page then reads that value and assumes the check has already happened:
 
 ```rust
 # struct Request { extensions: Extensions }
@@ -33,11 +33,11 @@ async fn account_page(request: &Request) -> Html {
 }
 ```
 
-The page depends on middleware configured elsewhere. Missing or incorrectly ordered middleware can cause a panic or leave a route without its intended authentication check.
+For this page to work, the right middleware must run first. Missing it or setting the wrong order can cause a panic or leave a route without its authentication check.
 
 ## Extractors
 
-Extractors avoid that hidden setup by putting the auth requirement in the handler signature:
+An extractor puts the authentication requirement in the handler's parameters:
 
 ```rust
 # struct Auth(User);
@@ -49,7 +49,7 @@ async fn account_page(Auth(user): Auth) -> Html {
 }
 ```
 
-This is more robust than middleware because the auth requirement is visible. The tradeoff is that every component below the page now needs to receive the user explicitly:
+The handler now states that it needs an authenticated user. Components below it still need the user passed to them:
 
 ```rust
 # struct Auth(User);
@@ -74,11 +74,11 @@ async fn user_avatar(user: User) -> Html {
 }
 ```
 
-Passing data explicitly works well when it belongs to the caller. For request-wide data, intermediate components may have to accept a value only to pass it on.
+Passing values this way is useful for data chosen by the caller. For data shared across a request, it can mean passing a value through components that never use it themselves.
 
 # What to do in Topcoat
 
-Write composable request functions instead. Each function adds one small piece of logic, accepts `&Cx`, and can be called from any page, layout, or component.
+Write small helpers that take `&Cx` and call one another. Any page, layout, or component can use them:
 
 ```rust
 use topcoat::{
@@ -93,39 +93,39 @@ use topcoat::{
 # impl User { fn fetch_by_id(_: &str) -> FetchBuilder { FetchBuilder } }
 # impl FetchBuilder { async fn exec(self, _: Db) -> Option<User> { None } }
 #
-/// Returns the application database handle.
+/// Clones the database handle stored in the context.
 fn db(cx: &Cx) -> Db {
     context::<Db>(cx).clone()
 }
 
-/// Fetches a user by ID, deduplicated for the duration of the request.
+/// Loads a user by ID and caches the result for this request.
 #[memoize(as_ref)]
 async fn fetch_user(cx: &Cx, user_id: &str) -> Option<User> {
     User::fetch_by_id(user_id).exec(db(cx)).await
 }
 
-/// Reads the session ID from the request cookies.
+/// Finds the session cookie in the request.
 fn session_cookie(cx: &Cx) -> Option<&str> {
     let headers = headers(cx);
     // ... extract session cookie from HTTP headers
     None
 }
 
-/// Resolves the current user from the session, if one exists.
+/// Looks up the user named by the session, if present.
 async fn fetch_current_user(cx: &Cx) -> Option<&User> {
     let user_id = session_cookie(cx)?;
     fetch_user(cx, user_id).await
 }
 
-/// Returns the current user or falls through to Topcoat's unauthorized response.
+/// Returns the user, or an unauthorized error if there is none.
 async fn require_auth(cx: &Cx) -> Result<&User, UnauthorizedError> {
     fetch_current_user(cx).await.ok_or_unauthorized()
 }
 ```
 
-`#[memoize]` stores the owned `Option<User>` for the request, but exposes it to callers as `Option<&User>`. That lets downstream helpers borrow the current user without cloning it or threading ownership through the component tree.
+`#[memoize(as_ref)]` stores the `Option<User>` for the request and gives callers an `Option<&User>`. Helpers can borrow the user without cloning it or passing ownership from one component to the next.
 
-Now the component that needs authentication declares it by calling `require_auth(cx)`:
+A component that needs an authenticated user calls `require_auth(cx)` itself:
 
 ```rust
 use topcoat::{
@@ -138,7 +138,7 @@ use topcoat::{
 # struct User { avatar_url: &'static str, name: &'static str }
 # async fn require_auth(_: &Cx) -> Result<&User, UnauthorizedError> { Err(topcoat::router::error::unauthorized()) }
 #
-/// Renders the current user's avatar and requires authentication wherever it is used.
+/// Checks authentication and renders the user's avatar.
 #[component]
 async fn user_avatar(cx: &Cx) -> Result<impl View> {
     let user = require_auth(cx).await?;
@@ -152,20 +152,20 @@ async fn user_avatar(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-`user_avatar` checks authentication whenever it renders. Without a valid session, it returns an unauthorized error. Each component or handler that needs protection calls the helper itself.
+Every render of `user_avatar` checks authentication. If the request has no valid session, the component returns an unauthorized error. Other components and handlers that need protection must also call the helper.
 
-The database lookup runs once for the same user ID during a request. Callers can independently request the user and share the cached result.
+Calls with the same user ID and context dependencies share the database lookup. Each caller can ask for the user without knowing whether another caller has already loaded it.
 
 ## Shape the functions by meaning
 
-Use several focused helpers instead of one large auth function:
+Give each helper one job:
 
-- `session_cookie(cx)` reads the HTTP headers.
-- `fetch_user(cx, user_id)` performs the database lookup and memoizes it.
-- `fetch_current_user(cx)` turns the session into optional user data.
-- `require_auth(cx)` returns the user or an unauthorized error.
+- `session_cookie(cx)` finds the session cookie in the headers.
+- `fetch_user(cx, user_id)` loads and caches the user.
+- `fetch_current_user(cx)` finds the user for the session, if there is one.
+- `require_auth(cx)` requires that user to be present.
 
-That keeps each function reusable. Public UI can call `fetch_current_user(cx)` and render a signed-out state. Private UI can call `require_auth(cx).await?` and fail closed. Admin UI can build on the same pattern:
+Choose the helper that fits the caller. A public page can use `fetch_current_user(cx)` and show a signed-out view when there is no user. A private page can use `require_auth(cx).await?` to stop with an error. An admin check can build on that helper:
 
 ```rust
 use topcoat::{context::Cx, router::error::RouterErrorExt, Result};
@@ -175,11 +175,11 @@ use topcoat::{context::Cx, router::error::RouterErrorExt, Result};
 # impl User { fn is_admin(&self) -> bool { false } }
 # async fn require_auth(_: &Cx) -> Result<&User, UnauthorizedError> { Err(topcoat::router::error::unauthorized()) }
 #
-/// Returns the current user if they have admin permissions.
+/// Requires the current user to be an admin.
 async fn require_admin(cx: &Cx) -> Result<&User> {
     let user = require_auth(cx).await?;
     Ok(user.is_admin().then_some(user).ok_or_forbidden()?)
 }
 ```
 
-Use the same pattern for other application data that depends on the request. Use a router layer when work must wrap request handling, such as compressing a response.
+This approach also works for other data and rules tied to a request. Use a router layer for work that needs to wrap request handling, such as response compression.

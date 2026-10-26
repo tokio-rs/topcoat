@@ -15,10 +15,10 @@ use crate::{AssetConfig, config::Host};
 ///
 /// Import this trait to call [`assets`](Self::assets).
 pub trait RouterBuilderAssetExt {
-    /// Registers an [`AssetConfig`] on the router.
+    /// Sets the router's asset configuration.
     ///
-    /// Makes the configuration available in the context so views can resolve
-    /// [`Asset`](crate::Asset) values to URLs.
+    /// Views read this configuration from the context to turn
+    /// [`Asset`](crate::Asset) values into URLs.
     ///
     /// [`AssetConfig::serve`] adds a route for each distinct bundled file.
     /// [`AssetConfig::hosted_at`] adds no routes. Upload those files to the

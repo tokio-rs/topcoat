@@ -1,10 +1,10 @@
-[`Cx`] gives handlers, components, and plain functions access to the values of the current request: the HTTP request itself, values your application shares across requests, and values added while the request is handled.
+[`Cx`] holds the values your code needs while handling a request. These include HTTP request data, shared application values such as a database connection, and values added for part of the request.
 
-Add `cx: &Cx` to a function's parameters when it needs context. Topcoat passes it to pages, layouts, routes, layers, and components automatically. Plain functions receive it from their caller.
+Add a `cx: &Cx` parameter when a function needs these values. Topcoat supplies it to pages, layouts, routes, layers, and components. When you call a plain function, pass `cx` yourself.
 
 # How context works
 
-A context holds values identified by their Rust type. Read one with [`context::<T>(cx)`](fn@context):
+Each value in a context is stored under its Rust type. Use [`context::<T>(cx)`](fn@context) to borrow the value stored under `T`:
 
 ```rust
 use topcoat::context::{Cx, context};
@@ -16,19 +16,19 @@ fn db(cx: &Cx) -> &Database {
 }
 ```
 
-Values get into the context in three ways:
+There are three ways to add values:
 
-1. Values registered on the router with [`with`](crate::router::RouterBuilder::with) are shared by every request. See [sharing values across requests](#sharing-values-across-requests).
-2. The router adds values for each request, such as the HTTP request and its path parameters. Topcoat reads them for you through [built-in accessors](#built-in-accessors).
-3. Layers, layouts, components, and plain functions add values for the code they call with [`Cx::with`]. See [adding values during a request](#adding-values-during-a-request).
+1. Call [`with`](crate::router::RouterBuilder::with) on the router builder to [share a value across requests](#sharing-values-across-requests).
+2. The router supplies each request's HTTP data and path parameters. Read these through Topcoat's [built-in accessors](#built-in-accessors).
+3. Call [`Cx::with`] while handling a request to [add a value for the code you call next](#adding-values-during-a-request).
 
-All three are read the same way, so code reading a value does not need to know where it came from.
+Read all of these values with the same functions. The code reading a value does not need to know how it was added.
 
 ## Scopes
 
-[`Cx::with`] does not change the context it is called on. It returns a new context that holds the added value and every value its parent can see. Code that receives the new context sees the value. The caller keeps its own context and does not.
+[`Cx::with`] creates a child context. The child can read the new value and the values in its parent. The parent stays unchanged. Pass the child to any code that should see the new value.
 
-When a context can see several values of the same type, the one added last wins. A layer can replace a value registered on the router for the requests it wraps, and a component can replace it again for the views it renders:
+Adding another value of the same type replaces that value in the child. For example, a layer can override a router default, and a component can override it again for its own content:
 
 ```rust
 use topcoat::context::{Cx, context};
@@ -46,11 +46,11 @@ assert_eq!(theme(&inner), "dark");
 assert_eq!(theme(&cx), "light");
 ```
 
-Values therefore flow down to the code that receives a scope, never back up to its caller or across to its siblings.
+Only code given the child context sees its changes. The caller and other children keep their own values.
 
 ## Reading values
 
-[`context`](fn@context) panics when no value of the requested type is visible. Use [`try_context`] when a value is intentionally optional:
+[`context`](fn@context) panics if the context has no value of that type. When a value may be missing, use [`try_context`] to get an `Option`:
 
 ```rust
 use topcoat::context::{Cx, try_context};
@@ -62,15 +62,15 @@ fn current_customer(cx: &Cx) -> Option<&Customer> {
 }
 ```
 
-The requested type must exactly match the registered type. A value registered as `Arc<Database>` is not found when reading `Database`.
+Use the exact type you registered. If you added an `Arc<Database>`, ask for `Arc<Database>`, not `Database`.
 
-Wrap reads in small functions named after what they return, such as `db(cx)`, `config(cx)`, or `current_tenant(cx)`. Callers then depend on the function instead of the type, and a missing value panics in one place.
+Small helper functions such as `db(cx)`, `config(cx)`, and `current_tenant(cx)` give these reads clear names. They also keep the choice of stored type and the handling of missing values in one place.
 
 # Sharing values across requests
 
 ## Registering values
 
-Register values that every request needs, such as a database pool or configuration, on the router builder with [`with`](crate::router::RouterBuilder::with):
+Use [`with`](crate::router::RouterBuilder::with) on the router builder for values that requests should share, such as configuration or a database pool:
 
 ```rust
 use topcoat::router::Router;
@@ -88,7 +88,7 @@ fn router() -> Router {
 }
 ```
 
-[`with_many`](crate::router::RouterBuilder::with_many) registers a tuple of values in one call. Registering a value of a type that is already registered replaces the earlier value. To share two values of the same type, wrap them in distinct types:
+Use [`with_many`](crate::router::RouterBuilder::with_many) to add a tuple of values at once. Adding a type again replaces its earlier value. To keep two values of the same underlying type, give each one a different wrapper type:
 
 ```rust
 use topcoat::router::Router;
@@ -111,9 +111,9 @@ fn router() -> Router {
 
 ## Shared state
 
-Every request borrows the same registered value, so the value does not need to implement `Clone`. It must be `Send + Sync + 'static`, so it cannot borrow temporary data.
+Requests borrow the same value rather than receiving a copy, so `Clone` is not required. The value must be `Send + Sync + 'static`. It cannot borrow data that will be dropped while the router still needs it.
 
-Requests only get shared references. For state that requests change, register a type that can be changed through a shared reference, such as an atomic or a [`Mutex`](std::sync::Mutex):
+To let requests update shared state, store a value that supports changes through a shared reference. An atomic or a [`Mutex`](std::sync::Mutex) can do this:
 
 ```rust
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -136,7 +136,7 @@ fn count_view(cx: &Cx) -> u64 {
 
 ## Reading values while building
 
-Code that configures a router, such as an extension trait, can read the values registered so far with [`RouterBuilder::context`](crate::router::RouterBuilder::context) and [`RouterBuilder::try_context`](crate::router::RouterBuilder::try_context). For example, it can register a default only if the application has not registered its own value:
+While building a router, read values already added with [`RouterBuilder::context`](crate::router::RouterBuilder::context) or [`RouterBuilder::try_context`](crate::router::RouterBuilder::try_context). This is useful in setup helpers that should supply a default only when the application has not supplied a value:
 
 ```rust
 use topcoat::router::RouterBuilder;
@@ -154,7 +154,7 @@ fn with_default_resolver(builder: RouterBuilder) -> RouterBuilder {
 
 ## Without a router
 
-Code that renders views without a router can build the shared values itself. Collect them in a [`ContextMap`] and create a context for each render with [`Cx::new`]:
+You can also create a context without a router. Put the shared values in a [`ContextMap`], wrap it in an `Arc`, and call [`Cx::new`] for each render:
 
 ```rust
 use std::sync::Arc;
@@ -173,13 +173,13 @@ let cx = Cx::new(Arc::clone(&shared));
 assert_eq!(context::<Site>(&cx).title, "Topcoat");
 ```
 
-Tests can start from `Cx::default()`, an empty context, and add the values the code under test reads with [`Cx::with`] or [`Cx::with_many`].
+For tests, start with an empty `Cx::default()`. Add the values the test needs with [`Cx::with`] or [`Cx::with_many`].
 
 # Adding values during a request
 
 ## In a layer
 
-A layer usually adds values that the rest of the request needs, such as the current tenant or locale. It passes the new context to [`next.run`](crate::router::Next::run), so every layer, layout, and handler inside it sees the value:
+A layer can set values such as the current tenant or locale before calling the rest of the request. Pass its child context to [`next.run`](crate::router::Next::run) so the inner layers, layouts, and handler can read those values:
 
 ```rust
 use topcoat::{
@@ -201,11 +201,11 @@ async fn tenant(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
 }
 ```
 
-Layers apply by path, so a layer under `/admin` can add or replace values for those pages only. See [layers](crate::router#layers) for how they match and nest.
+A layer's path determines which requests it wraps. For example, a layer under `/admin` can override values just for that part of the app. See [layers](crate::router#layers) for the matching and ordering rules.
 
 ## In plain code
 
-Any function holding a `cx` can derive a child context and pass it on:
+Plain functions can create and pass child contexts too:
 
 ```rust
 use topcoat::context::{Cx, context};
@@ -226,11 +226,11 @@ fn greeting_name(cx: &Cx) -> &str {
 }
 ```
 
-[`Cx::with_many`] adds several values in one step. It behaves like chained `with` calls but builds the child context once.
+To add several values together, use [`Cx::with_many`]. It has the same result as calling `with` for each value, but creates the child context in one step.
 
 ## Replacing a router value
 
-A value added with `with` replaces a router value of the same type, but only for the code that receives the new context. This lets the router set a default that parts of a request change. For example, URLs render relative to the site root unless the context holds another [`UrlForm`]. Register `UrlForm::Absolute` on the router to make every URL absolute, or add it with `with` only around content that needs complete URLs, such as an email body:
+Router values can serve as defaults that a child context overrides. For example, [`UrlForm`] controls whether URLs are relative to the site root or absolute. The default is relative. Add `UrlForm::Absolute` to the router to use absolute URLs throughout the app, or to a child context for content such as an email body:
 
 ```rust
 use topcoat::context::{Cx, UrlForm, url_form};
@@ -246,15 +246,15 @@ assert_eq!(url_form(&email_context(&cx)), UrlForm::Absolute);
 
 ## Values from outside a request
 
-[`Router::handle_with`](crate::router::Router::handle_with) handles a request with extra values in its context, for example when a Tower service or a test calls the router. A [rewrite](crate::router::error#rewrites) starts with a fresh context and can carry values into the next dispatch with [`RewriteError::with`](crate::router::error::RewriteError::with).
+When calling the router yourself, use [`Router::handle_with`](crate::router::Router::handle_with) to supply extra context values. A [rewrite](crate::router::error#rewrites) creates a fresh context. Use [`RewriteError::with`](crate::router::error::RewriteError::with) for values that should reach the rewritten request.
 
 # Built-in accessors
 
-Topcoat's own features keep their values in the same context and provide functions to read them, so you rarely call [`context`](fn@context) for them yourself.
+Topcoat stores its own values in the context too. It provides helper functions to read them, so you usually do not need to call [`context`](fn@context) directly for these values.
 
 ## Request data
 
-The [`router::request`](crate::router::request) module exposes small functions for reading HTTP request data from `cx`.
+Read HTTP request data with the functions in [`router::request`](crate::router::request):
 
 ```rust
 use topcoat::{
@@ -272,9 +272,9 @@ fn request_summary(cx: &Cx) -> String {
 }
 ```
 
-Use a field helper such as [`headers(cx)`](crate::router::request::headers) for one part of the request. See [`router::request`](crate::router::request) for the available helpers.
+For a single part of the request, use a helper such as [`headers(cx)`](crate::router::request::headers). The [`router::request`](crate::router::request) module lists the others.
 
-Use [`parts(cx)`](crate::router::request::parts) when you need several fields at once:
+Use [`parts(cx)`](crate::router::request::parts) to read several request fields together:
 
 ```rust
 use topcoat::{context::Cx, router::request::parts};
@@ -285,7 +285,7 @@ fn cache_key(cx: &Cx) -> String {
 }
 ```
 
-Use [`extensions(cx)`](crate::router::request::extensions) for typed request values attached by a lower-level request layer or service integration:
+Use [`extensions(cx)`](crate::router::request::extensions) to read values attached to the HTTP request by a service or request layer:
 
 ```rust
 use topcoat::{context::Cx, router::request::extensions};
@@ -297,11 +297,11 @@ fn request_id(cx: &Cx) -> Option<&str> {
 }
 ```
 
-A handler reached through a [rewrite](crate::router::error#rewrites) sees the rewritten request in the HTTP field helpers. Those helpers have `original_` counterparts returning the request as the client sent it, from [`original_parts(cx)`](crate::router::request::original_parts) down to [`original_uri(cx)`](crate::router::request::original_uri). Layers can also change the current request without a rewrite. For example, [`StripPrefixLayer`](crate::router::StripPrefixLayer) changes `uri(cx)` while `original_uri(cx)` keeps the incoming URI. The client's IP address is resolved when the request arrives and stays the same across rewrites.
+The HTTP helpers read the current request, including changes made by a [rewrite](crate::router::error#rewrites) or a layer. Use the `original_` helpers, such as [`original_parts(cx)`](crate::router::request::original_parts) and [`original_uri(cx)`](crate::router::request::original_uri), to read what the client sent. For example, [`StripPrefixLayer`](crate::router::StripPrefixLayer) changes `uri(cx)` but leaves `original_uri(cx)` unchanged. Topcoat determines the client IP address when the request arrives and keeps it across rewrites.
 
 ## Path and query parameters
 
-The [`module_param!`](macro@crate::router::module_param) macro and [`#[query_params]`](macro@crate::router::query_params) attribute declare typed values that you read with the [`path_param::<T>(cx)`](fn@crate::router::path_param) and [`query_params::<T>(cx)`](fn@crate::router::query_params) functions. Topcoat parses typed path parameters and query structs lazily and memoizes them for the request.
+Declare path parameters with [`module_param!`](macro@crate::router::module_param) and query fields with [`#[query_params]`](macro@crate::router::query_params). Read them with [`path_param::<T>(cx)`](fn@crate::router::path_param) and [`query_params::<T>(cx)`](fn@crate::router::query_params). Topcoat parses them when first needed and caches the results for the request.
 
 ```rust
 // src/app/posts/post_id.rs
@@ -332,15 +332,15 @@ async fn post(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-Any function with `&Cx` can read these values.
+These helpers work in any function that receives `&Cx`.
 
 ## Other features
 
-Other features follow the same pattern. For example, [`base_url`] reads the base URL registered with [`RouterBuilder::base_url`](crate::router::RouterBuilder::base_url), and [`url_form`] reads the current [`UrlForm`]. Each feature's documentation lists its accessors.
+Other features provide similar helpers. For example, [`base_url`] reads the URL set with [`RouterBuilder::base_url`](crate::router::RouterBuilder::base_url), and [`url_form`] reads the context's [`UrlForm`]. Look in each feature's documentation for its helpers.
 
 # Work that outlives the handler
 
-A [`Cx`] is a handle to state shared by everything serving one request. The router drops its own handle once the response is sent, so a streaming response body or a spawned task cannot borrow the `cx` the handler was called with. Clone the `Cx` and move the owned handle into the work instead. It sees the same values as the original.
+A stream or spawned task may keep running after its handler returns. It cannot keep borrowing the handler's `cx`. Clone the [`Cx`] and move that clone into the stream or task. The clone keeps the request state alive and reads the same values:
 
 ```rust
 // src/app/orders.rs
@@ -366,15 +366,15 @@ async fn place_order(cx: &Cx) -> Result<&'static str> {
 }
 ```
 
-A cloned handle can still read context after the handler returns. It cannot change response headers that have already been sent. Cookie writes after the jar is sealed panic.
+The clone remains usable after the handler returns, but it cannot change headers already sent to the client. Writing cookies after the jar is sealed panics.
 
 # Memoization
 
-[`#[memoize]`](macro@memoize) caches a function's result for one request. Repeated calls with the same arguments share the result when they see the same values for the context types the function read. Use it for expensive work needed in several places. See the macro's documentation for requirements and scoping rules.
+Use [`#[memoize]`](macro@memoize) when several parts of a request need the result of the same expensive work. It caches a function's result for that request. Calls can reuse a result when their arguments match and the context values the function read have not been replaced. The macro's documentation explains the requirements and how child contexts affect reuse.
 
 # Composing helpers
 
-Any helper can accept `cx: &`[`Cx`], call other helpers, and return a domain-specific result:
+Give your own helpers a `cx: &`[`Cx`] parameter to read request data or call other helpers:
 
 ```rust
 use topcoat::{
@@ -395,4 +395,4 @@ fn canonical_url(cx: &Cx) -> String {
 }
 ```
 
-That keeps pages, layouts, components, and routes focused on rendering or responding while shared request reads stay in ordinary Rust functions. The next section explains why Topcoat prefers these functions over middleware.
+Put common request logic in these functions and call them from pages, layouts, components, or routes. The next section shows how to use this approach for authentication and other request checks.

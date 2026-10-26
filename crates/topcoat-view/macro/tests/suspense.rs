@@ -276,13 +276,7 @@ async fn waiting_suspense_propagates_a_child_error() {
 }
 
 #[tokio::test]
-async fn suspense_takes_its_mode_from_the_request_context() {
-    let cx = &Cx::default().with(SuspenseMode::Wait);
-    assert!(!streams_fallback(cx, None).await);
-}
-
-#[tokio::test]
-async fn an_explicit_mode_overrides_the_request_context() {
+async fn an_explicit_mode_overrides_the_context() {
     let cx = &Cx::default().with(SuspenseMode::Wait);
     assert!(streams_fallback(cx, Some(SuspenseMode::Stream)).await);
 

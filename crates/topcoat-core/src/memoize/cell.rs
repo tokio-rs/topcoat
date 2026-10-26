@@ -9,20 +9,18 @@ use elsa::sync::FrozenVec;
 use super::recursion;
 use crate::context::{ContextRead, Cx, Scope};
 
-/// One cached result together with the context reads that produced it.
+/// A cached result and the context reads made while computing it.
 ///
-/// A variant is reusable for a caller whose scope still resolves every
-/// recorded read to the binding that was observed. A body that read no
-/// context has an empty read list, so its variant is reusable from every
-/// scope.
+/// A caller can reuse this result if its context would return the same
+/// bindings for all the saved reads. If the function read no context,
+/// any scope can reuse the result.
 struct Variant<V> {
     value: V,
     reads: Vec<ContextRead>,
 }
 
 impl<V> Variant<V> {
-    /// Returns whether `scope` still resolves every recorded read to the
-    /// binding that was observed.
+    /// Checks whether every saved read still matches `scope`.
     fn matches(&self, scope: &Scope) -> bool {
         self.reads.iter().all(|read| read.matches(scope))
     }

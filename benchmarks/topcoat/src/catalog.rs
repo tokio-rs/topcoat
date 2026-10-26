@@ -69,8 +69,8 @@ pub fn filled_stars(tenths: u32) -> u32 {
     (tenths + 5) / 10
 }
 
-/// The product catalog, deserialized once at startup from the shared
-/// `benchmarks/data/products.json` and registered on the router.
+/// Product data loaded from `benchmarks/data/products.json` at startup
+/// and shared with requests through the router.
 pub struct Catalog {
     categories: Vec<Category>,
     products: Vec<Product>,

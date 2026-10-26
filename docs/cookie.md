@@ -236,7 +236,7 @@ Signed and private jars can be combined with prefixes and attribute defaults.
 
 # Keys from the router
 
-Share a [`Key`] across requests by registering it on the router with [`with`](crate::router::RouterBuilder::with):
+Add a [`Key`] to the router with [`with`](crate::router::RouterBuilder::with) so requests can use the same key:
 
 ```rust,standalone_crate
 use topcoat::{
@@ -253,7 +253,7 @@ pub fn router() -> Router {
 }
 ```
 
-Then `signed_cookies(cx)` and `private_cookies(cx)` use the registered key:
+Read and write cookies with that key through `signed_cookies(cx)` or `private_cookies(cx)`:
 
 ```rust
 // src/app/api/login.rs
@@ -271,7 +271,7 @@ async fn login(cx: &Cx) -> Result<&'static str> {
 }
 ```
 
-Both functions panic if no [`Key`] was registered. The example generates a new key at startup. To keep existing cookies valid across restarts and server instances, load the same persisted key instead.
+These helpers panic if the context has no [`Key`]. This example creates a key when the app starts. In an app that must keep cookies valid after a restart or across several servers, load the same saved key on every instance.
 
 # Typed cookie stores
 

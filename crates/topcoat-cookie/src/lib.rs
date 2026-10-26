@@ -308,24 +308,22 @@ pub fn cookies(cx: &Cx) -> &CookieJar {
     context::<CookieJarCell>(cx).get_or_init(cx)
 }
 
-/// Returns the root jar wrapped in a [`SignedJar`], using the [`Key`]
-/// registered in the context.
+/// Wraps the root cookie jar in a [`SignedJar`] with the context's [`Key`].
 ///
 /// # Panics
 ///
-/// Panics if no [`Key`] was registered.
+/// Panics if the context has no [`Key`].
 #[must_use]
 #[track_caller]
 pub fn signed_cookies(cx: &Cx) -> SignedJar<'_, &CookieJar> {
     cookies(cx).signed(context::<Key>(cx))
 }
 
-/// Returns the root jar wrapped in a [`PrivateJar`], using the [`Key`]
-/// registered in the context.
+/// Wraps the root cookie jar in a [`PrivateJar`] with the context's [`Key`].
 ///
 /// # Panics
 ///
-/// Panics if no [`Key`] was registered.
+/// Panics if the context has no [`Key`].
 #[must_use]
 #[track_caller]
 pub fn private_cookies(cx: &Cx) -> PrivateJar<'_, &CookieJar> {
@@ -371,8 +369,8 @@ mod tests {
         Cx::default().with_many((parts, CookieJarCell::new()))
     }
 
-    /// Like [`cx_with`], but also registers `key` in the context so the
-    /// `signed_cookies`/`private_cookies` helpers can find it.
+    /// Builds the context used by [`cx_with`] and adds the key read by
+    /// `signed_cookies` and `private_cookies`.
     fn cx_with_key(cookie_headers: &[&str], key: Key) -> Cx {
         let mut builder = Request::builder();
         for value in cookie_headers {

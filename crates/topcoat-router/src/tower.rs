@@ -496,9 +496,9 @@ fn recover(error: BoxError) -> Error {
 /// It accepts compatible request bodies yielding [`Bytes`]. Routing failures
 /// and handler panics become HTTP responses rather than service errors.
 ///
-/// The service is `Clone`, `Send`, `Sync`, and infallible, satisfying the
-/// bounds tower servers commonly require. Clones are cheap and share the
-/// router's routing tables and context.
+/// The service implements `Clone`, `Send`, and `Sync` and has an infallible
+/// error type, as Tower servers commonly require. Clones share the routing
+/// tables and context values, so they are cheap to create.
 ///
 /// The router matches the URI exactly as the service receives it, and
 /// generates its URLs from its own absolute

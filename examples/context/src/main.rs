@@ -7,11 +7,10 @@ use topcoat::{
     view::{View, component, view},
 };
 
-// Registered on the router, so every request shares this counter.
+// Requests use the same counter stored on the router.
 struct PageViews(AtomicU64);
 
-// The router registers a default greeting. The layer in `formal` replaces it
-// for every page under /formal.
+// The router supplies the greeting unless the layer in `formal` overrides it.
 struct Greeting(&'static str);
 
 #[tokio::main]
@@ -41,8 +40,7 @@ mod formal {
 
     use super::{Greeting, greeting_page};
 
-    // Runs before every page under /formal. Handlers below it see the
-    // greeting it adds instead of the router's.
+    // Give handlers under /formal a child context with a different greeting.
     #[layer]
     async fn layer(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
         let cx = cx.with(Greeting("Good day"));
@@ -55,13 +53,12 @@ mod formal {
     }
 }
 
-// A plain function can read the request through `Cx`.
+// Plain helpers can use Cx to read request data too.
 fn current_path(cx: &Cx) -> &str {
     uri(cx).path()
 }
 
-// Both pages render this component. It reads whichever greeting is in its
-// context, so it needs no arguments.
+// Both pages use this component. It gets its greeting from the context.
 #[component]
 async fn greeting_page(cx: &Cx) -> Result<impl View> {
     let views = context::<PageViews>(cx).0.fetch_add(1, Ordering::Relaxed) + 1;

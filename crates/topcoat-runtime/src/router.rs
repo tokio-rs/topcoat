@@ -4,7 +4,7 @@ use topcoat_router::RouterBuilder;
 #[cfg(feature = "router")]
 use crate::{MaxRunsPerConnection, PrefetchMode, RuntimeLayer};
 
-/// Marks a router's context as configured for the browser runtime.
+/// A context marker indicating that the browser runtime has been set up.
 #[derive(Debug, Clone, Copy)]
 pub struct RuntimeSetup;
 
@@ -23,12 +23,11 @@ pub trait RouterBuilderRuntimeExt {
     #[must_use]
     fn runtime(self) -> Self;
 
-    /// Sets when links in this router load their pages ahead of time.
+    /// Chooses when links start loading a page before the user opens it.
     ///
-    /// This registers the value read by
-    /// [`prefetch_mode`](crate::prefetch_mode) on the router. You can override
-    /// it with a `PrefetchMode` added with `Cx::with` or with a link's
-    /// `prefetch` argument.
+    /// Stores the router default returned by [`prefetch_mode`](crate::prefetch_mode).
+    /// Override it in a child context with `Cx::with(PrefetchMode::...)`,
+    /// or for one link with its `prefetch` argument.
     ///
     /// ```rust
     /// use topcoat_router::Router;
@@ -42,13 +41,13 @@ pub trait RouterBuilderRuntimeExt {
     #[must_use]
     fn prefetch(self, mode: PrefetchMode) -> Self;
 
-    /// Sets how many connected renders one runtime connection may have at
-    /// once. The default is 64.
+    /// Limits the number of renders running at once on a runtime connection.
+    /// The default limit is 64.
     ///
-    /// The browser keeps one connected render for each live page or shard
-    /// that is not inside another one. Once a connection reaches the limit,
-    /// the server answers further render requests with
-    /// `429 Too Many Requests` until a render finishes or is stopped.
+    /// Each connected page or shard has a render, unless it is inside another
+    /// connected page or shard. At the limit, new render requests receive
+    /// `429 Too Many Requests`. They can be accepted again once a render
+    /// finishes or stops.
     ///
     /// ```rust
     /// use topcoat_router::Router;

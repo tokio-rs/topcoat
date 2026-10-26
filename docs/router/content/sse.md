@@ -30,7 +30,7 @@ The `use<>` bound prevents the returned stream from borrowing the request contex
 
 # Reading the request context
 
-A stream outlives the handler that returned it, so it cannot borrow the `Cx` the route was called with. Clone the `Cx` and move the owned handle into the stream instead. It sees the same values as the original.
+The stream keeps running after the route returns. To read context values from the stream, clone `Cx` and move the clone into it. The clone keeps those values available without borrowing the handler's context:
 
 ```rust
 // src/app/greetings.rs

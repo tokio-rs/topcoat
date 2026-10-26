@@ -102,15 +102,14 @@ impl RewriteError {
         self
     }
 
-    /// Carries `value` into the rewritten dispatch and every dispatch after
-    /// it in the same chain, available through
-    /// [`context`](topcoat_core::context::context).
+    /// Adds `value` to the rewritten request and keeps it through later
+    /// rewrites. Read it with [`context`](topcoat_core::context::context).
     ///
-    /// Each dispatch starts with a fresh context and memoization cache.
-    /// Only explicitly carried values survive a rewrite. Calling this
-    /// again, or on a later rewrite, replaces a carried value of the same
-    /// type. Values installed by the router, such as the request parts and
-    /// path parameters, take precedence over carried values.
+    /// Each rewrite creates a fresh context and memoization cache. Values
+    /// added during request handling are lost unless explicitly carried
+    /// forward. Calling `with` again with the same type replaces its value,
+    /// including on a later rewrite. Request data supplied by the router,
+    /// such as request parts and path parameters, takes priority.
     #[must_use]
     pub fn with<T>(mut self, value: T) -> Self
     where

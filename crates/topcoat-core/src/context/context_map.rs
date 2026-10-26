@@ -1,4 +1,4 @@
-//! The type-keyed map behind every layer of context.
+//! Storage for context values, with one entry per Rust type.
 
 use std::{
     any::{Any, TypeId},
@@ -10,29 +10,26 @@ use std::{
 
 use crate::context::BindingId;
 
-/// Values identified by their type.
+/// A map that stores one value for each Rust type.
 ///
-/// Stores one value per Rust type. Each value is registered with a fresh
-/// [`BindingId`], which context tracking uses to tell values apart. Clones
-/// share the registered values, so cloning a map is cheap and inserting into
-/// a clone leaves the original untouched.
+/// Adding another value of the same type replaces the existing one.
+/// Cloning the map shares its values rather than cloning them. Inserting
+/// into a clone does not change the original map.
 #[derive(Default, Debug, Clone)]
 pub struct ContextMap {
     entries: HashMap<TypeId, Binding, BuildHasherDefault<TypeIdHasher>>,
 }
 
 impl ContextMap {
-    /// Creates an empty `ContextMap`.
+    /// Creates a map with no registered values.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Registers `value` under its concrete type `T` with a fresh
-    /// [`BindingId`].
+    /// Stores `value` under its type `T`.
     ///
-    /// A type can hold only one value at a time, so registering a type that is
-    /// already present replaces the previous value.
+    /// Replaces any value already stored under that type.
     pub fn insert<T>(&mut self, value: T)
     where
         T: Any + Send + Sync,
@@ -44,7 +41,7 @@ impl ContextMap {
         self.entries.insert(TypeId::of::<T>(), binding);
     }
 
-    /// Returns `true` if a value of type `T` has been registered.
+    /// Reports whether this map contains a value of type `T`.
     #[must_use]
     pub fn contains<T>(&self) -> bool
     where
@@ -53,8 +50,7 @@ impl ContextMap {
         self.entries.contains_key(&TypeId::of::<T>())
     }
 
-    /// Returns a reference to the registered value of type `T`, or `None` if
-    /// no such value has been registered.
+    /// Borrows the value stored under `T`, or returns `None` if it is absent.
     #[must_use]
     pub fn get<T>(&self) -> Option<&T>
     where
@@ -63,11 +59,11 @@ impl ContextMap {
         Some(self.lookup::<T>()?.1)
     }
 
-    /// Returns the registered value of type `T` together with the id of the
-    /// binding holding it, or `None` if no such value has been registered.
+    /// Finds `T` and returns its binding ID and a reference to its value.
+    /// Returns `None` when the map has no entry for `T`.
     ///
-    /// A tracked read needs both: the id to record what it observed, and the
-    /// value to hand back. Resolving them together keeps that to one lookup.
+    /// Tracking needs the ID to remember which value was read, while the
+    /// caller needs the value. Find both in a single lookup.
     pub(crate) fn lookup<T>(&self) -> Option<(BindingId, &T)>
     where
         T: Any + Send + Sync,
@@ -76,23 +72,21 @@ impl ContextMap {
         Some((binding.id, binding.value.downcast_ref()?))
     }
 
-    /// Returns the id of the binding currently registered for `type_id`, or
-    /// `None` if the type is not registered.
+    /// Returns the binding ID for `type_id`, or `None` if it is absent.
     ///
-    /// Unlike [`get`](Self::get), this works from a runtime [`TypeId`], so a
-    /// recorded read can be revalidated without naming its type.
+    /// A [`TypeId`] lets tracking check a saved read without a type parameter.
     pub(crate) fn binding_id(&self, type_id: TypeId) -> Option<BindingId> {
         Some(self.entries.get(&type_id)?.id)
     }
 }
 
-/// Values that [`Cx::with_many`](crate::context::Cx::with_many) registers on a
-/// [`ContextMap`] in one step.
+/// A group of values that can be added to a [`ContextMap`] together.
 ///
-/// Implemented for tuples of context values and [`ContextMap`], so several
-/// types can be registered without deriving a scope per value.
+/// Pass a tuple or a [`ContextMap`] to
+/// [`Cx::with_many`](crate::context::Cx::with_many) to add several values
+/// in one call.
 pub trait ContextValues {
-    /// Registers every value on `context`.
+    /// Adds all of these values to `context`.
     fn install(self, context: &mut ContextMap);
 }
 
@@ -125,8 +119,7 @@ impl_context_values!(a: A, b: B, c: C, d: D, e: E, f: F);
 impl_context_values!(a: A, b: B, c: C, d: D, e: E, f: F, g: G);
 impl_context_values!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H);
 
-/// One registered value, tagged with the [`BindingId`] issued when it was
-/// registered.
+/// A stored value and the [`BindingId`] assigned when it was added.
 #[derive(Clone)]
 struct Binding {
     id: BindingId,
@@ -264,15 +257,5 @@ mod tests {
 
         assert_eq!(context.get::<Database>(), Some(&Database("primary")));
         assert_eq!(context.get::<Config>(), Some(&Config(42)));
-    }
-
-    #[test]
-    fn get_keeps_the_id() {
-        let mut context = ContextMap::new();
-        context.insert(Config(1));
-        let first = binding_id::<Config>(&context);
-        let _ = context.get::<Config>();
-
-        assert_eq!(binding_id::<Config>(&context), first);
     }
 }

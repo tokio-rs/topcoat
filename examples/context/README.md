@@ -1,6 +1,6 @@
 # Context
 
-Pages that read values through `Cx`. A page view counter and a greeting are registered on the router. A layer replaces the greeting under `/formal` with `cx.with`, and a plain function reads the request path.
+This example reads shared and local values through `Cx`. The router gives every request the same page view counter and a default greeting. A layer uses `cx.with` to change the greeting for `/formal`. A plain function reads the current request path.
 
 Clone the Topcoat repository:
 

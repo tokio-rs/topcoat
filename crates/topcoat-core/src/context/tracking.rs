@@ -1,4 +1,4 @@
-//! Tracking of context reads, backing `#[memoize]`'s dependency checks.
+//! Records context reads so `#[memoize]` can decide when to reuse a result.
 
 use std::{
     any::{Any, TypeId},
@@ -7,14 +7,12 @@ use std::{
 
 use crate::context::{BindingId, Scope};
 
-/// One observed context read: the type that was looked up and the
-/// identity of the binding it resolved to, or `None` if no value was
-/// registered.
+/// A saved context lookup, including its type and the binding ID it found.
+/// A missing value is recorded as `None`.
 ///
-/// A read stays valid for a context as long as that context resolves the same
-/// type to the same binding. Scopes only ever add or shadow bindings, so a
-/// read is invalidated in exactly one of two ways: a present read by
-/// shadowing the type, an absence read by registering it.
+/// A saved read matches a context if looking up its type finds the same
+/// binding ID. Replacing the value breaks that match. If the read found
+/// nothing, adding a value of that type breaks the match too.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ContextRead {
     type_id: TypeId,
@@ -33,21 +31,18 @@ impl ContextRead {
         }
     }
 
-    /// Returns whether `scope` still resolves this read's type to the
-    /// binding that was observed.
+    /// Checks whether `scope` would return the same binding as this read.
     pub(crate) fn matches(&self, scope: &Scope) -> bool {
         scope.binding_id(self.type_id) == self.binding_id
     }
 }
 
-/// Records the context reads made through one tracked call.
+/// Collects context reads for one function call.
 ///
-/// A tracker is installed on a [`Cx`] handle with [`Cx::track`] and travels
-/// with every handle derived from it, including clones moved to other
-/// threads. Each read is checked against the scope the tracked call was
-/// entered with: a read that resolves differently there went through a
-/// binding the tracked body created itself, which its caller cannot see, so
-/// it is not a dependency and is dropped.
+/// [`Cx::track`] attaches the tracker to a handle. Children and clones keep
+/// it, including clones sent to other threads. The tracker compares reads
+/// with the context at the start of the call. It ignores reads of values
+/// added by the function itself, since those do not depend on the caller.
 ///
 /// [`Cx`]: crate::context::Cx
 /// [`Cx::track`]: crate::context::Cx::track
@@ -82,8 +77,7 @@ impl ContextTracker {
     /// call created itself, so it is not a dependency and is dropped, even
     /// where it was a genuine dependency of the nested call.
     pub(crate) fn merge(&self, reads: &[ContextRead]) {
-        // A body that read no context has nothing to contribute, and is
-        // common enough to be worth keeping off the lock.
+        // Skip the lock when the function read no context values.
         if reads.is_empty() {
             return;
         }

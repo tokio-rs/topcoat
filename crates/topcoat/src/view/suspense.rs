@@ -118,10 +118,10 @@ pub enum SuspenseMode {
     Wait,
 }
 
-/// Returns the default mode for [`suspense`] in this context.
+/// Reads the default [`suspense`] mode for this context.
 ///
-/// Uses the `SuspenseMode` in the context, or [`SuspenseMode::Stream`] if
-/// there is none.
+/// Returns the context's `SuspenseMode`, falling back to
+/// [`SuspenseMode::Stream`] when no value is set.
 #[must_use]
 pub fn suspense_mode(cx: &Cx) -> SuspenseMode {
     try_context::<SuspenseMode>(cx).copied().unwrap_or_default()
@@ -130,10 +130,10 @@ pub fn suspense_mode(cx: &Cx) -> SuspenseMode {
 /// Configures the default suspense mode on a [`RouterBuilder`](crate::router::RouterBuilder).
 #[cfg(feature = "router")]
 pub trait RouterSuspenseExt {
-    /// Sets the default mode for the router's [`suspense`] boundaries.
+    /// Chooses the default mode for [`suspense`] boundaries on this router.
     ///
-    /// Stores `mode` in the router's context. A boundary's `mode` argument or
-    /// a `SuspenseMode` added with [`Cx::with`] overrides this default.
+    /// Adds `mode` to the router's context. Override it with [`Cx::with`]
+    /// for a child context or with the `mode` argument on one boundary.
     ///
     /// ```rust
     /// use topcoat::{

@@ -61,7 +61,7 @@ Ok(view! {
 
 Prefetching renders the destination on the server even if the user never opens it. Keep mutations in form submissions or procedures rather than page rendering.
 
-Set the default for the app with [`RouterBuilderRuntimeExt::prefetch`](crate::RouterBuilderRuntimeExt::prefetch):
+Choose the app's default with [`RouterBuilderRuntimeExt::prefetch`](crate::RouterBuilderRuntimeExt::prefetch):
 
 ```rust
 use topcoat::{
@@ -75,7 +75,7 @@ let router = Router::builder()
     .build();
 ```
 
-To choose a default for part of a page, add a `PrefetchMode` to its context:
+For a different default in part of a page, give that part a child context containing a `PrefetchMode`:
 
 ```rust
 use topcoat::{
@@ -95,7 +95,7 @@ fn reports_nav(cx: &Cx) -> impl View {
 }
 ```
 
-A link's `prefetch` argument takes precedence over a `PrefetchMode` in the context, then `Intent`. The context value can come from the router or from `Cx::with`, and the one added last wins. [`prefetch_mode`] returns the default for a context.
+A link uses its `prefetch` argument when one is given. Otherwise, it uses the `PrefetchMode` in its context, or `Intent` if there is none. A value added with `Cx::with` overrides the router's default for that child context. Use [`prefetch_mode`] to read the context's default.
 
 # Custom Anchors
 

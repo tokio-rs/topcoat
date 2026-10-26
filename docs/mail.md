@@ -121,7 +121,7 @@ let from_url = SmtpTransport::from_url("smtps://user:pass@smtp.example.com:465")
 
 ## Memory in tests
 
-[`MemoryTransport`] captures messages for tests. Clones share the captured messages, so the test can inspect what the application sent:
+Use [`MemoryTransport`] in tests to collect outgoing messages. Add a `MailConfig` to an empty `Cx`, then call `send` with that context. Keep a clone of the transport to inspect the messages:
 
 ```rust
 use topcoat::{
@@ -142,7 +142,7 @@ assert_eq!(transport.sent()[0].to(), [Mailbox::new("bob@example.com")?]);
 # }
 ```
 
-The memory transport validates message content before recording it. It does not check whether an external service would accept the message.
+The transport checks message content before saving it. A passing test does not mean a real mail service will accept the message.
 
 ## Custom transports
 

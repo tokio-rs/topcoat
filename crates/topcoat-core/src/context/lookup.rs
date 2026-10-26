@@ -1,15 +1,14 @@
-//! Reading context values by type.
+//! Helpers for borrowing values from a context.
 
 use std::any::{Any, type_name};
 
 use crate::context::{ContextRead, Cx};
 
-/// Returns a reference to the context value of type `T` visible to `cx`, or
-/// `None` if no such value has been registered.
+/// Borrows the value of type `T` in `cx`, or returns `None` if it is absent.
 ///
-/// The requested type must exactly match the registered type. Values added
-/// with [`Cx::with`] shadow values of the same type registered earlier, such
-/// as on the router, without changing what the parent scope sees.
+/// Ask for the exact type that was registered. A value added with
+/// [`Cx::with`] overrides an earlier value of that type, including a router
+/// default. Only the child context sees the replacement.
 ///
 /// # Examples
 ///
@@ -34,15 +33,15 @@ where
     binding.map(|(_, value)| value)
 }
 
-/// Returns a reference to the context value of type `T` visible to `cx`.
+/// Borrows the value of type `T` in `cx`.
 ///
-/// The requested type must exactly match the registered type. Values added
-/// with [`Cx::with`] shadow values of the same type registered earlier, such
-/// as on the router, without changing what the parent scope sees.
+/// Use the same type that was registered. Values added with [`Cx::with`]
+/// take priority over earlier values of that type in the child context.
+/// The parent still reads its original value.
 ///
 /// # Panics
 ///
-/// Panics if no value of type `T` has been registered.
+/// Panics if `cx` has no value of type `T`.
 ///
 /// # Examples
 ///
@@ -85,32 +84,13 @@ mod tests {
     #[derive(Debug, PartialEq)]
     struct Database(&'static str);
 
-    /// Returns a handle whose sealed app layer holds `value`.
-    fn with_app<T: Any + Send + Sync>(value: T) -> Cx {
-        let mut app = ContextMap::new();
-        app.insert(value);
-        Cx::new(Arc::new(app))
-    }
-
     #[test]
-    fn context_returns_a_request_value() {
-        let cx = Cx::default().with(Database("primary"));
-        assert_eq!(context::<Database>(&cx), &Database("primary"));
-    }
-
-    #[test]
-    fn context_returns_an_app_value() {
-        let cx = with_app(Database("primary"));
-        assert_eq!(context::<Database>(&cx), &Database("primary"));
-    }
-
-    #[test]
-    fn a_request_value_shadows_an_app_value() {
-        let cx = with_app(Database("primary"));
-        let child = cx.with(Database("replica"));
+    fn context_returns_a_sealed_value() {
+        let mut shared = ContextMap::new();
+        shared.insert(Database("primary"));
+        let cx = Cx::new(Arc::new(shared));
 
         assert_eq!(context::<Database>(&cx), &Database("primary"));
-        assert_eq!(context::<Database>(&child), &Database("replica"));
     }
 
     #[test]

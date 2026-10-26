@@ -20,8 +20,9 @@ use crate::context::Cx;
 /// Argument hashes must include every part of the value that affects the result.
 /// Distinct values with identical hashes share an entry.
 ///
-/// Each entry can hold results for different context bindings. A lookup
-/// reuses a result only if its observed bindings match the caller's scope.
+/// An entry can store several results for different context values. Reuse
+/// requires that the caller can still read the same registered values that
+/// produced the result.
 #[derive(Default)]
 #[doc(hidden)]
 pub struct MemoizeCache {
@@ -69,16 +70,16 @@ impl MemoizeCache {
             .expect("entries of distinct types collided on a 128 bit memoize hash")
     }
 
-    /// Runs `f(cx, params)` at most once per `(F, key)` and set of observed context bindings,
-    /// returning a reference to the cached result. `key` is the borrowed lookup key (e.g.
-    /// `(&str,)`); `params` is what gets passed to `f` on a miss.
+    /// Returns a cached result for `f`, or calls `f(cx, params)` to compute it.
+    /// The cache uses `(F, key)` and the context reads to identify a result.
+    /// `key` borrows the arguments, for example `(&str,)`. `params` supplies
+    /// the arguments passed to `f` when it must run.
     ///
-    /// The body runs with its context reads tracked. A cached result is reused only
-    /// by callers whose scope still resolves every read the body made to the binding it
-    /// observed; a caller whose scope disagrees (a value shadowed or added via `Cx::with`)
-    /// computes its own variant. Bindings the body registers itself are not dependencies.
-    /// A reused or freshly computed variant replays its reads into an enclosing tracked
-    /// call, so nested memoized calls propagate their dependencies outward.
+    /// Reads are tracked while `f` runs. A caller can reuse the result only
+    /// if its context still has the same bindings for those reads. Otherwise,
+    /// it computes another result. Values added by `f` itself do not count
+    /// as dependencies. Both new and reused results pass their saved reads
+    /// to the enclosing tracker, so a calling function depends on them too.
     pub fn memoize<'a, K, P, V, F>(&'a self, cx: &'a Cx, key: K, params: P, f: F) -> &'a V
     where
         K: Hash,

@@ -49,7 +49,7 @@ impl Todo {
     }
 }
 
-/// The todo items, shared through the router's context.
+/// Todo items stored on the router for requests to share.
 #[derive(Default)]
 pub struct Todos(Mutex<TodoList>);
 

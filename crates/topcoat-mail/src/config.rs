@@ -7,11 +7,10 @@ use topcoat_core::{
 
 use crate::{Mail, Receipt, Transport};
 
-/// The transport used to send application mail.
+/// Configuration for sending mail.
 ///
-/// Choose a [`Transport`] with [`MailConfig::builder`] and register the
-/// configuration in the context. Handlers can then call [`send`] without
-/// choosing a transport:
+/// Select a [`Transport`] with [`MailConfig::builder`] and add the resulting
+/// configuration to the context. Calls to [`send`] then use that transport:
 ///
 /// ```
 /// use topcoat_core::context::Cx;
@@ -81,7 +80,7 @@ impl MailConfigBuilder {
 ///
 /// # Panics
 ///
-/// Panics when no [`MailConfig`] is registered in the context.
+/// Panics if the context has no [`MailConfig`].
 ///
 /// # Errors
 ///

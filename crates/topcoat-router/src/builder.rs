@@ -299,7 +299,7 @@ impl RouterBuilder {
     ///
     /// # Panics
     ///
-    /// Panics if the value is not a valid base URL.
+    /// Panics if `base_url` cannot be parsed as a valid base URL.
     ///
     /// # Examples
     ///
@@ -317,12 +317,12 @@ impl RouterBuilder {
         }
     }
 
-    /// Shares a value of type `T` across this router's requests.
+    /// Adds a value that all requests to this router can share.
     ///
-    /// Borrow it with [`context`](topcoat_core::context::context). A request
-    /// can shadow it for part of its handling with
-    /// [`Cx::with`](topcoat_core::context::Cx::with). Registering another value
-    /// of the same type replaces this one.
+    /// Read it with [`context`](topcoat_core::context::context). Adding the
+    /// same type again on the builder replaces its value. During a request,
+    /// [`Cx::with`](topcoat_core::context::Cx::with) can override it in a child
+    /// context without changing the router's value.
     ///
     /// # Examples
     ///
@@ -357,10 +357,10 @@ impl RouterBuilder {
         self
     }
 
-    /// Shares every value in `values`, a tuple of values or a [`ContextMap`],
-    /// across this router's requests.
+    /// Adds several values for requests to share.
     ///
-    /// Behaves like chained [`with`](Self::with) calls.
+    /// Pass a tuple or a [`ContextMap`]. Each value is registered as if it
+    /// had been passed to [`with`](Self::with).
     #[must_use]
     pub fn with_many<V>(mut self, values: V) -> Self
     where
@@ -370,12 +370,11 @@ impl RouterBuilder {
         self
     }
 
-    /// Returns a reference to the value of type `T` registered with
-    /// [`with`](Self::with).
+    /// Borrows the value of type `T` already added to this builder.
     ///
     /// # Panics
     ///
-    /// Panics if no value of type `T` has been registered.
+    /// Panics if the builder has no value of type `T`.
     #[must_use]
     #[track_caller]
     pub fn context<T>(&self) -> &T
@@ -391,8 +390,8 @@ impl RouterBuilder {
         }
     }
 
-    /// Returns a reference to the value of type `T` registered with
-    /// [`with`](Self::with), or `None` if none has been registered.
+    /// Borrows the value of type `T` already added to this builder, or returns
+    /// `None` if it is absent.
     #[must_use]
     pub fn try_context<T>(&self) -> Option<&T>
     where

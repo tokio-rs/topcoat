@@ -79,7 +79,7 @@ Call [`connected(cx)`] to keep a live region updating after the HTTP response fi
 
 One WebSocket carries the connected renders of a whole browser tab: one for each connected page or shard that is not inside another one. The server limits how many run at once on each WebSocket and refuses more with `429 Too Many Requests`. The limit is 64 by default; change it with `.max_runs_per_connection(n)` on the router.
 
-The same live body runs from the top on both renders. Emit the current content during the HTTP render, then finish. During the connected render, emit fresh content and keep listening for changes. For example, a chat can subscribe to message notifications and reload the list each time one arrives:
+The live body starts from the beginning for each render. On the HTTP request, emit the current content and return. On the connected render, emit the latest content and then wait for updates. This chat example listens for message notifications and renders the list again after each one:
 
 ```rust
 use topcoat::{
@@ -120,9 +120,9 @@ async fn chat(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-Here, `Chat` is application state registered on the router. It stores the messages and broadcasts a notification when a message is added. Subscribe before reading the list so a change between the read and the next wait is not missed. The subscription buffers notifications while the list renders. See the [chat example] for the full implementation.
+The router shares a `Chat` value with requests, and the live body reads it with `context::<Chat>(cx)`. `Chat` holds the messages and notifies subscribers when a message is added. Subscribe before reading the list so notifications are queued while it renders. This avoids missing a change between reading the list and waiting for the next notification. See the [chat example] for the full code.
 
-The HTTP render emits the list once and returns its emit token. The connected render emits a fresh list before waiting for notifications, catching changes that happened between the HTTP render and the connection. Each later emission replaces the list. Calling `connected(cx)` only requests a connection. It does not end the HTTP response or interrupt an await, so keep indefinite waits behind the connection check.
+On HTTP, the loop emits the list once and returns the token. When connected, it first emits the current list, including any messages added since the HTTP render. It then waits for notifications and replaces the list after each update. `connected(cx)` asks for a connection but does not finish the HTTP response or stop an await. Only wait indefinitely after it returns `true`.
 
 When a connection closes, its render and subscriptions are dropped. The browser reconnects and starts a fresh render with its current inputs and signal values. Local variables and subscriptions are created again, so the live body should read the current state on every run. Start long-running jobs separately and observe their progress here to avoid starting them again on reconnect.
 

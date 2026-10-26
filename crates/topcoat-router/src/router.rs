@@ -74,21 +74,22 @@ impl Router {
         self.handle_with(request, ContextMap::new()).await
     }
 
-    /// Handles a request with additional values in its context.
+    /// Handles a request with extra context values supplied by the caller.
     ///
-    /// Works like [`handle`](Self::handle). Pass a tuple of values or a
-    /// [`ContextMap`]. Routes and layers can read these values with
-    /// [`context`](topcoat_core::context::context). They shadow values of the
-    /// same type registered on the router.
+    /// Pass a tuple or a [`ContextMap`]. Handling follows [`handle`](Self::handle),
+    /// with these values available through
+    /// [`context`](topcoat_core::context::context). They override values of
+    /// the same type registered on the router builder.
     ///
-    /// Each request and internal rewrite gets a fresh context containing
-    /// these values. A rewrite can replace a value by supplying another
-    /// of the same type. The router's own values, such as request parts
-    /// and path parameters, always take precedence.
+    /// Every rewrite starts with a fresh context and keeps these values.
+    /// A rewrite can replace one by supplying the same type again. The
+    /// router's request data, such as request parts and path parameters,
+    /// takes priority over supplied values.
     ///
-    /// A route or layer can call this to handle another request. The new
-    /// request has its own context, with only the values explicitly passed
-    /// here. Its response is returned to the caller.
+    /// A route or layer can use this method to make another request to the
+    /// router and receive its response. That request gets its own context.
+    /// It sees the router's values and those passed here, but does not inherit
+    /// other values from the calling request.
     pub async fn handle_with<V>(&self, request: Request, values: V) -> Response
     where
         V: ContextValues,
@@ -213,7 +214,7 @@ pub(crate) struct RouterInner {
     /// request matched to a route runs them as part of the route's own stack;
     /// this stack wraps requests that matched no route.
     pub(crate) always_layers: Box<[Arc<dyn Layer>]>,
-    /// The values shared by every request, read back via
+    /// Shared values registered on the router builder and read with
     /// [`context`](topcoat_core::context::context).
     pub(crate) context: Arc<ContextMap>,
     /// The origin policy wrapping every request as the outermost layer.
@@ -471,7 +472,7 @@ mod tests {
         Box::pin(async move { format!("{:?}", route(cx).id()).into_response(cx) })
     }
 
-    /// Reads the greeting registered on the router and returns it as the body.
+    /// Returns the router's greeting as the response body.
     struct Greeting(&'static str);
 
     fn say_greeting(cx: &Cx, _body: Body) -> RouteFuture<'_> {

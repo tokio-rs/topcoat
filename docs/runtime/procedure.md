@@ -42,16 +42,16 @@ A procedure call in a runtime expression must run only in the browser. The serve
 
 # Arguments And Return Type
 
-Argument types and the `Ok` type of the returned [`Result`] must belong to the shared vocabulary of [`expr!`], since their values cross between Rust and JavaScript.
+Arguments and the `Ok` value of the returned [`Result`] must use types supported by [`expr!`]. These values travel between the Rust server and JavaScript in the browser.
 
-A parameter named `cx` of type `&Cx` receives the server request context. Callers omit this argument:
+Add `cx: &Cx` to read the server's context for this request. Topcoat supplies it, so browser code leaves it out of the call:
 
 ```rust
 use topcoat::{Result, context::Cx, runtime::procedure};
 
 #[procedure]
 async fn search(cx: &Cx, query: String) -> Result<String> {
-    // Query the database, read context, check the session, ...
+    // Use cx to read shared values or check who made the request.
 #   let _ = cx;
     Ok(query)
 }

@@ -98,7 +98,7 @@ This registers a page resolving every otherwise unmatched URL under its path to 
 
 # Rewrites
 
-A rewrite handles the request again at another path. It runs the layers and handler for that path without changing the browser URL or making another client request. Return [`rewrite(path, body)`](rewrite) as an error:
+Use a rewrite to handle the request at another path on the server. The router runs that path's layers and handler. The browser URL stays the same, and the client does not send another request. Return [`rewrite(path, body)`](rewrite) as an error:
 
 ```rust
 // src/app/dashboard.rs
@@ -113,11 +113,11 @@ async fn dashboard(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-The rewritten request keeps the method and headers, uses the supplied body, and may include a new query string. It gets a fresh request context and memoization cache. Pending response changes from the abandoned dispatch are discarded. All matching layers run again, including pathless layers.
+By default, the rewritten request keeps its method and headers. It uses the body you supply, and its target can include a different query string. The router creates a fresh context and memoization cache, drops pending changes to the previous response, and runs all matching layers again. Layers without a path run again too.
 
-Use [`method`](RewriteError::method) to change the HTTP method and [`headers`](RewriteError::headers) to replace the request headers. To change only a few headers, clone the current [`headers`](crate::request::headers) and edit that copy. For example, a rewrite with an empty body can remove the headers that described the original body.
+Set [`method`](RewriteError::method) to change the HTTP method, or [`headers`](RewriteError::headers) to replace the headers. If you only need to edit a few headers, copy the current [`headers`](crate::request::headers) first. For example, when replacing the body with an empty one, you can remove headers describing the old body.
 
-Use [`with`](RewriteError::with) to carry a value into the next dispatch and every later dispatch in the chain. Read it through [`context`](topcoat_core::context::context). Calling `with` again with the same type replaces that value while keeping the other carried values. A form handler can use `method` and `with` to render its page as a `GET` with a value telling the page what happened:
+Pass a value to [`with`](RewriteError::with) to keep it in the rewritten request and any rewrites that follow. The handler reads it with [`context`](topcoat_core::context::context). Passing the same type again replaces its value without removing the others. In this example, a form handler rewrites to its page with method `GET` and a `Saved` value so the page can show a confirmation:
 
 ```rust
 use topcoat::{Result, context::{Cx, try_context}, router::{Body, Method, error::rewrite, href, page, route}, view::{View, view}};
@@ -153,9 +153,9 @@ mod settings {
 # fn main() {}
 ```
 
-A handler reached through a rewrite sees the rewritten request in [`parts`](crate::request::parts) and its field accessors. To read the request as the client actually sent it, for example the URL a form should post back to, use [`original_parts`](crate::request::original_parts) or a field accessor like [`original_uri`](crate::request::original_uri) and [`original_method`](crate::request::original_method).
+After a rewrite, [`parts`](crate::request::parts) and the other request helpers read the rewritten request. To read what the client sent, use [`original_parts`](crate::request::original_parts), [`original_uri`](crate::request::original_uri), or [`original_method`](crate::request::original_method). The original URI is useful when a form should submit back to the URL the client opened.
 
-The router detects a cycle when a rewrite repeats a combination of method, path, and query already handled in the chain. Changing the method from `POST` to `GET` at the same URL is allowed. A cycle or a chain exceeding 8 rewrites produces a 500 response without exposing the dispatch history to the client.
+The router stops a rewrite chain if it reaches the same method, path, and query twice. Rewriting from `POST` to `GET` at the same URL is allowed because the method differs. A repeated request or more than 8 rewrites produces a 500 response. The response does not reveal the rewrite history.
 
 # Unexpected errors
 
