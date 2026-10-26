@@ -486,6 +486,39 @@ mod tests {
     }
 
     #[test]
+    fn with_shares_app_values_instead_of_copying_them() {
+        let cx = CxTestBuilder::new().app_context(Other("app")).build();
+        let child = cx.with(Marker(1)).with_many((Marker(2),));
+
+        assert!(std::ptr::eq(
+            app_context::<Other>(&child),
+            app_context::<Other>(&cx)
+        ));
+    }
+
+    #[test]
+    fn track_shares_the_scope() {
+        let cx = Cx::default().with(Marker(1));
+        let (child, _tracker) = cx.track();
+
+        assert!(Arc::ptr_eq(&child.scope, &cx.scope));
+        assert!(cx.tracker.is_none());
+        assert!(child.tracker.is_some());
+    }
+
+    #[test]
+    fn derived_handles_keep_the_tracker() {
+        let cx = Cx::default();
+        let (child, tracker) = cx.track();
+        let derived = child.with(Marker(1)).keyed(());
+
+        assert!(std::ptr::eq(
+            derived.tracker().expect("tracker is kept"),
+            &*tracker
+        ));
+    }
+
+    #[test]
     fn handles_are_send_and_sync() {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<Cx>();
