@@ -81,10 +81,6 @@ where
 /// function starts at that value and walks back through every value it
 /// shadows, in the reverse of the order they were added.
 ///
-/// # Panics
-///
-/// Panics if `cx` belongs to a memoized call.
-///
 /// # Examples
 ///
 /// ```rust
@@ -97,15 +93,13 @@ where
 ///
 /// assert_eq!(crumbs, ["Posts", "Home"]);
 /// ```
-#[track_caller]
 pub fn iter_context<T>(cx: &Cx) -> impl Iterator<Item = &T>
 where
     T: Any + Send + Sync,
 {
-    assert!(
-        cx.tracker.is_none(),
-        "iter_context cannot be used inside memoized functions"
-    );
+    if let Some(tracker) = &cx.tracker {
+        tracker.record(ContextRead::all::<T>(&cx.scope));
+    }
     cx.scope.iter::<T>()
 }
 
@@ -114,7 +108,7 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use crate::context::ContextMap;
+    use crate::context::{ContextMap, memoize_cache};
 
     #[derive(Debug, PartialEq)]
     struct Database(&'static str);
@@ -160,10 +154,29 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "iter_context cannot be used inside memoized functions")]
-    fn iter_context_panics_inside_memoized_functions() {
-        let cx = Cx::default();
-        let (tracked, _tracker) = cx.track();
-        let _ = iter_context::<Database>(&tracked).count();
+    fn memoized_iterations_rerun_when_a_value_is_added() {
+        fn count(cx: Cx, (): ()) -> usize {
+            iter_context::<Database>(&cx).count()
+        }
+
+        let cx = Cx::default().with(Database("primary"));
+        let child = cx.with(Database("replica"));
+
+        assert_eq!(*memoize_cache(&cx).memoize(&cx, (), (), count), 1);
+        assert_eq!(*memoize_cache(&child).memoize(&child, (), (), count), 2);
+        assert_eq!(*memoize_cache(&cx).memoize(&cx, (), (), count), 1);
+    }
+
+    #[test]
+    fn memoized_iterations_through_own_values_depend_on_the_caller() {
+        fn count(cx: Cx, (): ()) -> usize {
+            iter_context::<Database>(&cx.with(Database("own"))).count()
+        }
+
+        let cx = Cx::default().with(Database("primary"));
+        let child = cx.with(Database("replica"));
+
+        assert_eq!(*memoize_cache(&cx).memoize(&cx, (), (), count), 2);
+        assert_eq!(*memoize_cache(&child).memoize(&child, (), (), count), 3);
     }
 }

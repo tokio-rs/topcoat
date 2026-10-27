@@ -7,16 +7,31 @@ use std::{
 
 use crate::context::{BindingId, Scope};
 
-/// A saved context lookup, including its type and the binding ID it found.
-/// A missing value is recorded as `None`.
+/// A saved context read, including its type and what it found.
 ///
-/// A saved read matches a context if looking up its type finds the same
-/// binding ID. Replacing the value breaks that match. If the read found
-/// nothing, adding a value of that type breaks the match too.
+/// A saved read matches a context if reading its type there finds the same
+/// thing. Shadowing the value breaks that match. If the read found nothing,
+/// adding a value of that type breaks the match too.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ContextRead {
     type_id: TypeId,
-    binding_id: Option<BindingId>,
+    found: Found,
+}
+
+/// What a saved read found.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Found {
+    /// The closest value of the type, or `None` if there was none.
+    Closest(Option<BindingId>),
+    /// Every value of the type.
+    ///
+    /// `request` is the newest request value, whose ID identifies all
+    /// request values of the type. `sealed` is the newest sealed layer,
+    /// whose ID identifies all sealed layers.
+    All {
+        request: Option<BindingId>,
+        sealed: Option<BindingId>,
+    },
 }
 
 impl ContextRead {
@@ -27,13 +42,50 @@ impl ContextRead {
     {
         Self {
             type_id: TypeId::of::<T>(),
-            binding_id,
+            found: Found::Closest(binding_id),
         }
     }
 
-    /// Checks whether `scope` would return the same binding as this read.
+    /// Records that every value of `T` in `scope` was read.
+    pub(crate) fn all<T>(scope: &Scope) -> Self
+    where
+        T: Any,
+    {
+        Self::all_of(TypeId::of::<T>(), scope)
+    }
+
+    /// Records that every value of `type_id` in `scope` was read.
+    fn all_of(type_id: TypeId, scope: &Scope) -> Self {
+        Self {
+            type_id,
+            found: Found::All {
+                request: scope.request_binding_id(type_id),
+                sealed: scope.sealed_id(),
+            },
+        }
+    }
+
+    /// Checks whether reading this read's type in `scope` would find the
+    /// same values.
     pub(crate) fn matches(&self, scope: &Scope) -> bool {
-        scope.binding_id(self.type_id) == self.binding_id
+        match self.found {
+            Found::Closest(binding_id) => scope.binding_id(self.type_id) == binding_id,
+            Found::All { .. } => Self::all_of(self.type_id, scope) == *self,
+        }
+    }
+
+    /// Re-expresses this read relative to `entry`, the scope a tracked call
+    /// started with. Returns `None` if the read does not depend on `entry`.
+    ///
+    /// A closest read that `entry` does not match found a value the call
+    /// added itself, so it is dropped. A read of every value is kept but
+    /// re-read from `entry`. Values the call added only stack on top of the
+    /// values of `entry`, so the walk also visited every value of `entry`.
+    fn relative_to(&self, entry: &Scope) -> Option<Self> {
+        match self.found {
+            Found::Closest(_) => self.matches(entry).then_some(*self),
+            Found::All { .. } => Some(Self::all_of(self.type_id, entry)),
+        }
     }
 }
 
@@ -62,20 +114,22 @@ impl ContextTracker {
         }
     }
 
-    /// Records `read`, unless it resolved through a binding the tracked call
+    /// Records `read`, unless it only found a binding the tracked call
     /// created itself.
     pub(crate) fn record(&self, read: ContextRead) {
         self.merge(&[read]);
     }
 
-    /// Records every read in `reads` that passes the entry filter, skipping
+    /// Records every read in `reads` relative to the entry scope, skipping
     /// reads already recorded.
     ///
     /// Replaying a nested tracked call's reads through this re-expresses them
-    /// relative to this tracker's own entry scope: a read whose value was
-    /// shadowed after tracking started resolves through a binding the tracked
-    /// call created itself, so it is not a dependency and is dropped, even
-    /// where it was a genuine dependency of the nested call.
+    /// relative to this tracker's own entry scope: a closest read whose value
+    /// was shadowed after tracking started resolves through a binding the
+    /// tracked call created itself, so it is not a dependency and is dropped,
+    /// even where it was a genuine dependency of the nested call. A read of
+    /// every value is re-read from the entry scope instead, since the walk
+    /// continues into the values of the entry scope.
     pub(crate) fn merge(&self, reads: &[ContextRead]) {
         // Skip the lock when the function read no context values.
         if reads.is_empty() {
@@ -83,8 +137,10 @@ impl ContextTracker {
         }
         let mut own = self.reads.lock().expect("context tracker lock poisoned");
         for read in reads {
-            if read.matches(&self.entry) && !own.contains(read) {
-                own.push(*read);
+            if let Some(read) = read.relative_to(&self.entry)
+                && !own.contains(&read)
+            {
+                own.push(read);
             }
         }
     }
@@ -102,7 +158,7 @@ impl ContextTracker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::context::{Cx, context, try_context};
+    use crate::context::{Cx, context, iter_context, try_context};
 
     struct Session;
     struct Theme;
@@ -282,6 +338,79 @@ mod tests {
         tracker.merge(&[inherited, internal, inherited]);
 
         assert_eq!(tracker.take_reads(), [inherited]);
+    }
+
+    #[test]
+    fn shadowing_invalidates_an_iteration_read() {
+        let cx = Cx::default().with(Session);
+        let read = ContextRead::all::<Session>(cx.scope());
+
+        let shadowed = cx.with(Session);
+
+        assert!(read.matches(cx.scope()));
+        assert!(!read.matches(shadowed.scope()));
+    }
+
+    #[test]
+    fn an_unrelated_binding_leaves_an_iteration_read_valid() {
+        let cx = Cx::default().with(Session);
+        let read = ContextRead::all::<Session>(cx.scope());
+
+        let extended = cx.with(Theme);
+
+        assert!(read.matches(extended.scope()));
+    }
+
+    #[test]
+    fn other_sealed_layers_invalidate_an_iteration_read() {
+        let cx = Cx::new(Arc::default());
+        let read = ContextRead::all::<Session>(cx.scope());
+
+        assert!(!read.matches(Cx::new(Arc::default()).scope()));
+    }
+
+    #[test]
+    fn an_iteration_read_is_recorded() {
+        let cx = Cx::default().with(Session);
+        let (child, tracker) = cx.track();
+
+        let _ = iter_context::<Session>(&child).count();
+
+        assert_eq!(
+            tracker.take_reads(),
+            [ContextRead::all::<Session>(cx.scope())]
+        );
+    }
+
+    #[test]
+    fn an_iteration_through_an_internal_binding_is_recorded_from_the_entry() {
+        let cx = Cx::default().with(Session);
+        let (child, tracker) = cx.track();
+        let derived = child.with(Session);
+
+        let _ = iter_context::<Session>(&derived).count();
+
+        assert_eq!(
+            tracker.take_reads(),
+            [ContextRead::all::<Session>(cx.scope())]
+        );
+    }
+
+    #[test]
+    fn closest_and_iteration_reads_of_one_type_are_both_recorded() {
+        let cx = Cx::default().with(Session);
+        let (child, tracker) = cx.track();
+
+        let _ = try_context::<Session>(&child);
+        let _ = iter_context::<Session>(&child).count();
+
+        assert_eq!(
+            tracker.take_reads(),
+            [
+                expected::<Session>(&cx),
+                ContextRead::all::<Session>(cx.scope())
+            ]
+        );
     }
 
     #[test]

@@ -59,6 +59,7 @@ impl Cx {
                 }),
                 values: ContextMap::new(),
                 sealed: Some(Arc::new(Sealed {
+                    id: BindingId::new(),
                     values: shared,
                     parent: None,
                 })),
@@ -230,6 +231,22 @@ impl Scope {
             .or_else(|| self.sealed().find_map(|values| values.binding_id(type_id)))
     }
 
+    /// Returns the binding ID of the newest request value of `type_id`, or
+    /// `None` if the request values have none.
+    ///
+    /// The ID also identifies every older request value of that type.
+    pub(crate) fn request_binding_id(&self, type_id: TypeId) -> Option<BindingId> {
+        self.values.binding_id(type_id)
+    }
+
+    /// Returns the ID of the newest sealed layer, or `None` if there is none.
+    ///
+    /// Layers never change after they are created, so the ID also
+    /// identifies every older layer.
+    pub(crate) fn sealed_id(&self) -> Option<BindingId> {
+        self.sealed.as_ref().map(|layer| layer.id)
+    }
+
     /// Visits the sealed maps from newest to oldest.
     fn sealed(&self) -> impl Iterator<Item = &ContextMap> {
         iter::successors(self.sealed.as_deref(), |layer| layer.parent.as_deref())
@@ -244,6 +261,8 @@ impl Scope {
 /// map's reference count.
 #[derive(Debug)]
 struct Sealed {
+    /// Identifies this layer together with its parents.
+    id: BindingId,
     /// The map this layer reads from.
     values: Arc<ContextMap>,
     /// The next layer to search if this one lacks a type.
@@ -341,6 +360,7 @@ mod tests {
     fn sealed_layers(layers: Vec<ContextMap>) -> Cx {
         let sealed = layers.into_iter().rev().fold(None, |parent, values| {
             Some(Arc::new(Sealed {
+                id: BindingId::new(),
                 values: Arc::new(values),
                 parent,
             }))

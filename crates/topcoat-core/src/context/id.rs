@@ -30,7 +30,9 @@ impl Default for CxId {
 /// An ID for a value registered in a context map.
 ///
 /// Each insertion into a [`ContextMap`](crate::context::ContextMap) gets
-/// a new ID. Matching IDs therefore refer to the same registered value.
+/// a new ID. Matching IDs therefore refer to the same registered value,
+/// together with the values it shadows. Layers of values shared across
+/// requests get IDs from the same counter.
 ///
 /// IDs start at one. This lets `Option<BindingId>` use the same amount of
 /// space as `BindingId`.
