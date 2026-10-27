@@ -2,21 +2,50 @@
 
 Add a `cx: &Cx` parameter when a function needs these values. Topcoat supplies it to pages, layouts, routes, layers, and components. When you call a plain function, pass `cx` yourself.
 
-# How context works
+# Reading values
 
-A context holds values by their Rust type. Use [`context::<T>(cx)`](fn@context) to borrow the value of type `T`:
+A context holds values by their Rust type. Use [`context::<T>(cx)`](fn@context) to borrow the value of type `T`. It panics if the context has none. When a value may be missing, use [`try_context`] to get an `Option`:
 
 ```rust
-use topcoat::context::{Cx, context};
+use topcoat::context::{Cx, context, try_context};
 
 struct Database;
+struct Customer;
 
 fn db(cx: &Cx) -> &Database {
-    context::<Database>(cx)
+    context(cx)
+}
+
+fn current_customer(cx: &Cx) -> Option<&Customer> {
+    try_context(cx)
 }
 ```
 
-## Shadowing
+Use the exact type you added. If you added an `Arc<Database>`, ask for `Arc<Database>`, not `Database`.
+
+Small helpers such as `db(cx)` and `current_customer(cx)` give these reads clear names. They also keep the choice of stored type and the handling of missing values in one place. Topcoat's own values come with helpers like these, such as [`headers(cx)`](crate::router::request::headers) for request data. See [`router::request`](crate::router::request) and the documentation of each feature.
+
+A context can hold several values of one type, because a new value [shadows](#adding-values) older ones instead of removing them. `context` returns the closest one. [`iter_context`] visits every value of the type, starting with the closest one and walking back through the values it shadows. This suits types that several scopes add to, such as breadcrumbs:
+
+```rust
+use topcoat::context::{Cx, iter_context};
+
+struct Crumb(&'static str);
+
+fn trail(cx: &Cx) -> String {
+    let mut crumbs: Vec<_> = iter_context::<Crumb>(cx).map(|crumb| crumb.0).collect();
+    crumbs.reverse();
+    crumbs.join(" / ")
+}
+
+let cx = Cx::default().with(Crumb("Home"));
+let posts = cx.with(Crumb("Posts"));
+
+assert_eq!(trail(&posts), "Home / Posts");
+assert_eq!(trail(&cx), "Home");
+```
+
+# Adding values
 
 Adding a value never removes one. When a context already has a value of the same type, the new value shadows it. Reads return the newest value, and the older one stays underneath.
 
@@ -39,46 +68,6 @@ assert_eq!(theme(&cx), "light");
 ```
 
 Only code given the child context sees its new value. The caller and other children keep reading their own values.
-
-## Reading values
-
-[`context`](fn@context) panics if the context has no value of that type. When a value may be missing, use [`try_context`] to get an `Option`:
-
-```rust
-use topcoat::context::{Cx, try_context};
-
-struct Customer;
-
-fn current_customer(cx: &Cx) -> Option<&Customer> {
-    try_context(cx)
-}
-```
-
-Use the exact type you registered. If you added an `Arc<Database>`, ask for `Arc<Database>`, not `Database`.
-
-Small helper functions such as `db(cx)`, `config(cx)`, and `current_tenant(cx)` give these reads clear names. They also keep the choice of stored type and the handling of missing values in one place.
-
-[`context`](fn@context) returns only the closest value of a type. [`iter_context`] visits every value of the type, starting with the closest one and walking back through the values it shadows.
-
-This suits types that several scopes add to, such as breadcrumbs. Each section of a site adds its own crumb, and the code that renders the trail reads all of them:
-
-```rust
-use topcoat::context::{Cx, iter_context};
-
-struct Crumb(&'static str);
-
-fn trail(cx: &Cx) -> String {
-    let mut crumbs: Vec<_> = iter_context::<Crumb>(cx).map(|crumb| crumb.0).collect();
-    crumbs.reverse();
-    crumbs.join(" / ")
-}
-
-let cx = Cx::default().with(Crumb("Home"));
-let posts = cx.with(Crumb("Posts"));
-
-assert_eq!(trail(&posts), "Home / Posts");
-assert_eq!(trail(&cx), "Home");
-```
 
 # Sharing values across requests
 
