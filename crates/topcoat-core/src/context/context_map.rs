@@ -148,11 +148,10 @@ impl ContextValues for ContextMap {
                 entry.insert(binding);
                 continue;
             }
-            let values: Vec<_> = iter::successors(Some(&binding), |binding| {
-                binding.previous.as_deref()
-            })
-            .map(|binding| Arc::clone(&binding.value))
-            .collect();
+            let values: Vec<_> =
+                iter::successors(Some(&binding), |binding| binding.previous.as_deref())
+                    .map(|binding| Arc::clone(&binding.value))
+                    .collect();
             for value in values.into_iter().rev() {
                 context.push(type_id, value);
             }
