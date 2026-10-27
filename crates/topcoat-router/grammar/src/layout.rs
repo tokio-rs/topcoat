@@ -1,8 +1,9 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
-    FnArg, ItemFn, Pat, ReturnType,
+    FnArg, ItemFn, Pat, ReturnType, Token,
     parse::{Parse, ParseStream},
+    punctuated::Punctuated,
     spanned::Spanned,
 };
 use topcoat_core_grammar::{
@@ -10,16 +11,26 @@ use topcoat_core_grammar::{
     paths::{topcoat_context, topcoat_inventory, topcoat_router, topcoat_view, topcoat_view_macro},
 };
 
-use super::common::HandlerPath;
+use super::common::{HandlerPath, RouteContext};
 
 pub struct LayoutAttr {
-    path: Option<HandlerPath>,
+    pub path: Option<HandlerPath>,
+    /// The comma between the path and the `with(...)` entries.
+    pub comma: Option<Token![,]>,
+    pub context: Punctuated<RouteContext, Token![,]>,
 }
 
 impl Parse for LayoutAttr {
     fn parse(input: ParseStream) -> syn::Result<Self> {
+        let path = input.call(HandlerPath::parse_option)?;
         Ok(Self {
-            path: input.call(HandlerPath::parse_option)?,
+            comma: if path.is_some() && !input.is_empty() {
+                Some(input.parse()?)
+            } else {
+                None
+            },
+            path,
+            context: Punctuated::parse_terminated(input)?,
         })
     }
 }
@@ -126,6 +137,7 @@ impl ToTokens for Layout {
                 ))
             }
         };
+        let context = RouteContext::context_method(&attr.context);
         let (layout, submit_as) =
             if let Some(path) = attr.path.as_ref().and_then(HandlerPath::absolute) {
                 let layout = quote! {
@@ -134,6 +146,8 @@ impl ToTokens for Layout {
                             const PATH: &#topcoat_router::Path = #topcoat_router::Path::new(#path);
                             PATH
                         }
+
+                        #context
 
                         #render
                     }
@@ -151,6 +165,8 @@ impl ToTokens for Layout {
                         }
 
                         #relative_path
+
+                        #context
 
                         #render
                     }

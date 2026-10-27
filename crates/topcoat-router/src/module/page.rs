@@ -1,4 +1,4 @@
-use topcoat_core::context::Cx;
+use topcoat_core::context::{ContextMap, Cx};
 use topcoat_view::BoxView;
 
 use crate::{Body, Layout, Methods, Page, Path, PathBuf, RouteId, Slot, route};
@@ -26,6 +26,14 @@ pub trait ModulePage: Send + Sync + 'static {
     /// itself.
     fn relative_path(&self) -> Option<&Path> {
         None
+    }
+
+    /// The values attached to this page, such as metadata that describes
+    /// it.
+    ///
+    /// Defaults to an empty map.
+    fn context(&self) -> ContextMap {
+        ContextMap::new()
     }
 
     /// Renders the page [`View`] under `cx`.
@@ -62,6 +70,10 @@ impl<P: ModulePage + ?Sized> ModulePage for &'static P {
         (**self).relative_path()
     }
 
+    fn context(&self) -> ContextMap {
+        (**self).context()
+    }
+
     fn render<'a>(&'a self, cx: &'a Cx, body: Body) -> BoxView<'a> {
         (**self).render(cx, body)
     }
@@ -96,6 +108,10 @@ impl<P: ModulePage> Page for ResolvedPage<P> {
         &self.path
     }
 
+    fn context(&self) -> ContextMap {
+        self.page.context()
+    }
+
     fn render<'a>(&'a self, cx: &'a Cx, body: Body) -> BoxView<'a> {
         self.page.render(cx, body)
     }
@@ -121,6 +137,14 @@ pub trait ModuleLayout: Send + Sync + 'static {
         None
     }
 
+    /// The values attached to this layout, such as defaults for the pages it
+    /// wraps.
+    ///
+    /// Defaults to an empty map.
+    fn context(&self) -> ContextMap {
+        ContextMap::new()
+    }
+
     /// Renders the layout, embedding the given child content [`Slot`],
     /// under `cx`.
     fn render<'a>(&'a self, cx: &'a Cx, slot: Slot<'a>) -> BoxView<'a>;
@@ -133,6 +157,10 @@ impl<L: ModuleLayout + ?Sized> ModuleLayout for &'static L {
 
     fn relative_path(&self) -> Option<&Path> {
         (**self).relative_path()
+    }
+
+    fn context(&self) -> ContextMap {
+        (**self).context()
     }
 
     fn render<'a>(&'a self, cx: &'a Cx, slot: Slot<'a>) -> BoxView<'a> {
@@ -159,6 +187,10 @@ impl<L: ModuleLayout> ResolvedLayout<L> {
 impl<L: ModuleLayout> Layout for ResolvedLayout<L> {
     fn path(&self) -> &Path {
         &self.path
+    }
+
+    fn context(&self) -> ContextMap {
+        self.layout.context()
     }
 
     fn render<'a>(&'a self, cx: &'a Cx, slot: Slot<'a>) -> BoxView<'a> {

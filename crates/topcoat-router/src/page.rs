@@ -1,6 +1,6 @@
 use std::{borrow::Cow, sync::Arc};
 
-use topcoat_core::context::Cx;
+use topcoat_core::context::{ContextMap, Cx};
 use topcoat_view::{
     BoxView, Child,
     internal::{MoveView, ScopeView},
@@ -28,6 +28,14 @@ pub trait Page: Send + Sync + 'static {
 
     /// The URL path this page handles.
     fn path(&self) -> &Path;
+
+    /// The values attached to this page, such as metadata that describes
+    /// it.
+    ///
+    /// Defaults to an empty map.
+    fn context(&self) -> ContextMap {
+        ContextMap::new()
+    }
 
     /// Renders the page to a [`View`](topcoat_view::View) under the request
     /// context `cx`.
@@ -58,6 +66,10 @@ impl<P: Page + ?Sized> Page for &'static P {
 
     fn path(&self) -> &Path {
         (**self).path()
+    }
+
+    fn context(&self) -> ContextMap {
+        (**self).context()
     }
 
     fn render<'a>(&'a self, cx: &'a Cx, body: Body) -> BoxView<'a> {
@@ -147,6 +159,14 @@ pub trait Layout: Send + Sync + 'static {
     /// The path prefix this layout applies to.
     fn path(&self) -> &Path;
 
+    /// The values attached to this layout, such as defaults for the pages it
+    /// wraps.
+    ///
+    /// Defaults to an empty map.
+    fn context(&self) -> ContextMap {
+        ContextMap::new()
+    }
+
     /// Renders the layout, embedding the given child content [`Slot`], to a
     /// [`View`](topcoat_view::View) under the request context `cx`.
     fn render<'a>(&'a self, cx: &'a Cx, slot: Slot<'a>) -> BoxView<'a>;
@@ -155,6 +175,10 @@ pub trait Layout: Send + Sync + 'static {
 impl<L: Layout + ?Sized> Layout for &'static L {
     fn path(&self) -> &Path {
         (**self).path()
+    }
+
+    fn context(&self) -> ContextMap {
+        (**self).context()
     }
 
     fn render<'a>(&'a self, cx: &'a Cx, slot: Slot<'a>) -> BoxView<'a> {
@@ -256,6 +280,10 @@ impl Route for PageWithLayouts {
 
     fn path(&self) -> &Path {
         self.inner.page.path()
+    }
+
+    fn context(&self) -> ContextMap {
+        self.inner.page.context()
     }
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {

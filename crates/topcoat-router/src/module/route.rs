@@ -1,4 +1,4 @@
-use topcoat_core::context::Cx;
+use topcoat_core::context::{ContextMap, Cx};
 
 use crate::{Body, Methods, Path, PathBuf, Route, RouteFuture, RouteId};
 
@@ -27,6 +27,14 @@ pub trait ModuleRoute: Send + Sync + 'static {
         None
     }
 
+    /// The values attached to this route, such as metadata that describes
+    /// it.
+    ///
+    /// Defaults to an empty map.
+    fn context(&self) -> ContextMap {
+        ContextMap::new()
+    }
+
     /// Handles a request, producing a response.
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx>;
 }
@@ -46,6 +54,10 @@ impl<R: ModuleRoute + ?Sized> ModuleRoute for &'static R {
 
     fn relative_path(&self) -> Option<&Path> {
         (**self).relative_path()
+    }
+
+    fn context(&self) -> ContextMap {
+        (**self).context()
     }
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
@@ -80,6 +92,10 @@ impl<R: ModuleRoute> Route for ResolvedRoute<R> {
 
     fn path(&self) -> &Path {
         &self.path
+    }
+
+    fn context(&self) -> ContextMap {
+        self.route.context()
     }
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {

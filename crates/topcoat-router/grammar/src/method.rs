@@ -22,15 +22,35 @@ pub enum Methods {
     Any(Token![*]),
 }
 
+impl Methods {
+    /// Parses one method name. HTTP methods are case-sensitive and the
+    /// standard ones are uppercase, so a name with any other character is
+    /// rejected, which leaves lowercase names free for other syntax.
+    fn parse_method(input: ParseStream) -> syn::Result<Ident> {
+        let ident: Ident = input.parse()?;
+        if !Self::is_method(&ident) {
+            return Err(syn::Error::new(
+                ident.span(),
+                "expected an uppercase HTTP method, such as `GET`",
+            ));
+        }
+        Ok(ident)
+    }
+
+    fn is_method(ident: &Ident) -> bool {
+        ident.to_string().bytes().all(|byte| byte.is_ascii_uppercase())
+    }
+}
+
 impl Parse for Methods {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let lookahead = input.lookahead1();
         if lookahead.peek(Ident) {
-            Ok(Self::One(input.parse()?))
+            Ok(Self::One(input.call(Self::parse_method)?))
         } else if lookahead.peek(Bracket) {
             let items;
             let bracket = syn::bracketed!(items in input);
-            let items = items.parse_terminated(Ident::parse, Token![,])?;
+            let items = items.parse_terminated(Self::parse_method, Token![,])?;
             if items.is_empty() {
                 return Err(syn::Error::new(
                     bracket.span.join(),
@@ -48,7 +68,12 @@ impl Parse for Methods {
 
 impl ParseOption for Methods {
     fn peek(input: ParseStream) -> bool {
-        input.peek(Ident) || input.peek(Bracket) || input.peek(Token![*])
+        input
+            .cursor()
+            .ident()
+            .is_some_and(|(ident, _)| Self::is_method(&ident))
+            || input.peek(Bracket)
+            || input.peek(Token![*])
     }
 }
 

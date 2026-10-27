@@ -1,9 +1,10 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
 use syn::{
-    FnArg, ItemFn, Pat, ReturnType,
+    FnArg, ItemFn, Pat, ReturnType, Token,
     parse::{Parse, ParseStream},
     parse_quote,
+    punctuated::Punctuated,
     spanned::Spanned,
 };
 use topcoat_core_grammar::{
@@ -12,21 +13,32 @@ use topcoat_core_grammar::{
 };
 
 use super::{
-    common::{HandlerArg, HandlerArgs, HandlerPath},
+    common::{HandlerArg, HandlerArgs, HandlerPath, RouteContext},
     method::Methods,
 };
 
 pub struct PageAttr {
     /// The declared HTTP methods; the page serves `GET` when omitted.
-    methods: Option<Methods>,
-    path: Option<HandlerPath>,
+    pub methods: Option<Methods>,
+    pub path: Option<HandlerPath>,
+    /// The comma between the methods or path and the `with(...)` entries.
+    pub comma: Option<Token![,]>,
+    pub context: Punctuated<RouteContext, Token![,]>,
 }
 
 impl Parse for PageAttr {
     fn parse(input: ParseStream) -> syn::Result<Self> {
+        let methods = Methods::parse_option(input)?;
+        let path = input.call(HandlerPath::parse_option)?;
         Ok(Self {
-            methods: Methods::parse_option(input)?,
-            path: input.call(HandlerPath::parse_option)?,
+            comma: if (methods.is_some() || path.is_some()) && !input.is_empty() {
+                Some(input.parse()?)
+            } else {
+                None
+            },
+            methods,
+            path,
+            context: Punctuated::parse_terminated(input)?,
         })
     }
 }
@@ -152,6 +164,7 @@ impl ToTokens for Page {
             || quote! { #topcoat_router::Methods::Only(&[#topcoat_router::Method::GET]) },
             ToTokens::to_token_stream,
         );
+        let context = RouteContext::context_method(&attr.context);
         let id = quote! {
             fn id(&self) -> #topcoat_router::RouteId {
                 *ID
@@ -176,6 +189,8 @@ impl ToTokens for Page {
                             PATH
                         }
 
+                        #context
+
                         #render
                     }
                 };
@@ -196,6 +211,8 @@ impl ToTokens for Page {
                         }
 
                         #relative_path
+
+                        #context
 
                         #render
                     }

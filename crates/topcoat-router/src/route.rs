@@ -15,7 +15,10 @@ use std::{
 
 #[cfg(feature = "fs")]
 pub use directory::*;
-use topcoat_core::{context::Cx, error::Result};
+use topcoat_core::{
+    context::{ContextMap, Cx},
+    error::Result,
+};
 
 use crate::{
     Body, EndpointIndex, HrefTarget, IntoPath, Layer, Methods, Next, OwnedMethods, Path, Terminal,
@@ -60,6 +63,14 @@ pub trait Route: Send + Sync + 'static {
     /// The URL path this route handles.
     fn path(&self) -> &Path;
 
+    /// The values attached to this route, such as metadata that describes
+    /// it.
+    ///
+    /// Defaults to an empty map.
+    fn context(&self) -> ContextMap {
+        ContextMap::new()
+    }
+
     /// Handles a request, producing a response.
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx>;
 
@@ -88,6 +99,10 @@ impl<R: Route + ?Sized> Route for &'static R {
 
     fn path(&self) -> &Path {
         (**self).path()
+    }
+
+    fn context(&self) -> ContextMap {
+        (**self).context()
     }
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
@@ -226,6 +241,10 @@ impl Route for RouteWithLayers {
 
     fn path(&self) -> &Path {
         self.route.path()
+    }
+
+    fn context(&self) -> ContextMap {
+        self.route.context()
     }
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
