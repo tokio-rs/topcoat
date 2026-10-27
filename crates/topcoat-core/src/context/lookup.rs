@@ -4,11 +4,11 @@ use std::any::{Any, type_name};
 
 use crate::context::{ContextRead, Cx};
 
-/// Borrows the value of type `T` in `cx`, or returns `None` if it is absent.
+/// Borrows the closest value of type `T` in `cx`, or returns `None` if there
+/// is none.
 ///
-/// Ask for the exact type that was registered. A value added with
-/// [`Cx::with`] overrides an earlier value of that type, including a router
-/// default. Only the child context sees the replacement.
+/// Ask for the exact type that was added. A value added with [`Cx::with`]
+/// shadows the earlier values of its type, so this returns the newest one.
 ///
 /// # Examples
 ///
@@ -33,11 +33,10 @@ where
     binding.map(|(_, value)| value)
 }
 
-/// Borrows the value of type `T` in `cx`.
+/// Borrows the closest value of type `T` in `cx`.
 ///
-/// Use the same type that was registered. Values added with [`Cx::with`]
-/// take priority over earlier values of that type in the child context.
-/// The parent still reads its original value.
+/// Ask for the exact type that was added. A value added with [`Cx::with`]
+/// shadows the earlier values of its type, so this returns the newest one.
 ///
 /// # Panics
 ///

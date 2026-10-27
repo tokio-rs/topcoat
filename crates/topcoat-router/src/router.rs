@@ -78,13 +78,13 @@ impl Router {
     ///
     /// Pass a tuple or a [`ContextMap`]. Handling follows [`handle`](Self::handle),
     /// with these values available through
-    /// [`context`](topcoat_core::context::context). They override values of
-    /// the same type registered on the router builder.
+    /// [`context`](topcoat_core::context::context). They shadow values of
+    /// the same type added on the router builder.
     ///
     /// Every rewrite starts with a fresh context and keeps these values.
     /// A rewrite can replace one by supplying the same type again. The
     /// router's request data, such as request parts and path parameters,
-    /// takes priority over supplied values.
+    /// shadows supplied values.
     ///
     /// A route or layer can use this method to make another request to the
     /// router and receive its response. That request gets its own context.
