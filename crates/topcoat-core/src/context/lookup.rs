@@ -154,9 +154,7 @@ mod tests {
 
     #[test]
     fn memoized_iterations_rerun_when_a_value_is_added() {
-        fn count(cx: Cx, (): ()) -> usize {
-            iter_context::<Database>(&cx).count()
-        }
+        let count = |cx: Cx, (): ()| iter_context::<Database>(&cx).count();
 
         let cx = Cx::default().with(Database("primary"));
         let child = cx.with(Database("replica"));
@@ -168,9 +166,7 @@ mod tests {
 
     #[test]
     fn memoized_iterations_through_own_values_depend_on_the_caller() {
-        fn count(cx: Cx, (): ()) -> usize {
-            iter_context::<Database>(&cx.with(Database("own"))).count()
-        }
+        let count = |cx: Cx, (): ()| iter_context::<Database>(&cx.with(Database("own"))).count();
 
         let cx = Cx::default().with(Database("primary"));
         let child = cx.with(Database("replica"));

@@ -556,7 +556,7 @@ mod tests {
     fn iter_is_empty_for_unregistered_type() {
         let cx = shared(Other("router")).with(Other("request"));
 
-        assert!(markers(&cx).is_empty());
+        assert_eq!(markers(&cx), Vec::<u32>::new());
     }
 
     #[test]
