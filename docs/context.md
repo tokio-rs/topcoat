@@ -47,27 +47,25 @@ assert_eq!(trail(&cx), "Home");
 
 # Adding values
 
-Adding a value never removes one. When a context already has a value of the same type, the new value shadows it. Reads return the newest value, and the older one stays underneath.
+[`Cx::with`] creates a child context with a new value. The child can read the new value and every value of its parent. The parent stays unchanged, so only code given the child sees the new value.
 
-[`Cx::with`] creates a child context with the new value on top. The child can read the new value and every value of its parent. The parent stays unchanged. Pass the child to any code that should see the new value. For example, a layer can shadow a default, and a component can shadow it again for its own content:
+Adding a value never removes one. When the context already has a value of the same type, the new value shadows it. Reads return the new value, and the old one stays underneath. This lets code change a default for the code it calls. For example, [`UrlForm`] controls whether URLs are relative to the site root or absolute. The default is relative. Shadow it with `UrlForm::Absolute` for content such as an email body:
 
 ```rust
-use topcoat::context::{Cx, context};
+use topcoat::context::{Cx, UrlForm, url_form};
 
-struct Theme(&'static str);
-
-fn theme(cx: &Cx) -> &'static str {
-    context::<Theme>(cx).0
+fn email_context(cx: &Cx) -> Cx {
+    cx.with(UrlForm::Absolute)
 }
 
-let cx = Cx::default().with(Theme("light"));
-let inner = cx.with(Theme("dark"));
-
-assert_eq!(theme(&inner), "dark");
-assert_eq!(theme(&cx), "light");
+let cx = Cx::default();
+assert_eq!(url_form(&cx), UrlForm::Relative);
+assert_eq!(url_form(&email_context(&cx)), UrlForm::Absolute);
 ```
 
-Only code given the child context sees its new value. The caller and other children keep reading their own values.
+A [layer](crate::router#layers) can add values for the rest of the request by passing a child context to [`next.run`](crate::router::Next::run). For data that code can load when it needs it, such as the current user, prefer [helper functions](#functions-not-middlewares).
+
+To add several values at once, pass a tuple to [`Cx::with_many`]. The result is the same as calling `with` for each value, but it creates one child context instead of one per value.
 
 # Sharing values across requests
 
@@ -138,79 +136,6 @@ assert_eq!(context::<Site>(&cx).title, "Topcoat");
 ```
 
 For tests, start with an empty `Cx::default()`. Add the values the test needs with [`Cx::with`] or [`Cx::with_many`].
-
-# Adding values during a request
-
-## In a layer
-
-A layer can set values such as the current tenant or locale before calling the rest of the request. Pass its child context to [`next.run`](crate::router::Next::run) so the inner layers, layouts, and handler can read those values:
-
-```rust
-use topcoat::{
-    Result,
-    context::Cx,
-    router::{Body, Next, layer, request::headers, response::Response},
-};
-
-struct Tenant(String);
-
-#[layer]
-async fn tenant(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
-    let name = headers(cx)
-        .get("x-tenant")
-        .and_then(|value| value.to_str().ok())
-        .unwrap_or("default");
-    let cx = cx.with(Tenant(name.to_owned()));
-    next.run(&cx, body).await
-}
-```
-
-A layer's path determines which requests it wraps. For example, a layer under `/admin` can override values just for that part of the app. See [layers](crate::router#layers) for the matching and ordering rules.
-
-## In plain code
-
-Plain functions can create and pass child contexts too:
-
-```rust
-use topcoat::context::{Cx, context};
-
-struct Customer {
-    name: String,
-}
-
-fn greet(cx: &Cx) -> String {
-    let cx = cx.with(Customer {
-        name: "Ada".to_owned(),
-    });
-    format!("Hello, {}", greeting_name(&cx))
-}
-
-fn greeting_name(cx: &Cx) -> &str {
-    &context::<Customer>(cx).name
-}
-```
-
-To add several values at once, pass a tuple to [`Cx::with_many`]. The result is the same as calling `with` for each value, but it creates one child context instead of one per value.
-
-## Replacing a router value
-
-Router values can serve as defaults that a child context overrides. For example, [`UrlForm`] controls whether URLs are relative to the site root or absolute. The default is relative. Add `UrlForm::Absolute` to the router to use absolute URLs throughout the app, or to a child context for content such as an email body:
-
-```rust
-use topcoat::context::{Cx, UrlForm, url_form};
-
-fn email_context(cx: &Cx) -> Cx {
-    cx.with(UrlForm::Absolute)
-}
-
-let cx = Cx::default();
-assert_eq!(url_form(&cx), UrlForm::Relative);
-assert_eq!(url_form(&email_context(&cx)), UrlForm::Absolute);
-```
-
-## Values from outside a request
-
-When calling the router yourself, use [`Router::handle_with`](crate::router::Router::handle_with) to supply extra context values. A [rewrite](crate::router::error#rewrites) creates a fresh context. Use [`RewriteError::with`](crate::router::error::RewriteError::with) for values that should reach the rewritten request.
 
 # Built-in accessors
 
