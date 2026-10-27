@@ -119,7 +119,7 @@ impl Cx {
 
     /// Creates a child context containing `value`.
     ///
-    /// In the child, `value` replaces any earlier value of the same type.
+    /// In the child, `value` shadows any earlier value of the same type.
     /// Other values and the request state are shared with the parent.
     /// The parent's values stay unchanged.
     #[must_use]

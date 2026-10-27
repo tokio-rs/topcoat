@@ -115,6 +115,7 @@ impl RewriteError {
     where
         T: Any + Send + Sync,
     {
+        self.context.remove::<T>();
         self.context.insert(value);
         self
     }
@@ -209,7 +210,7 @@ impl RewriteChain {
         if let Some(headers) = rewrite.headers {
             parts.headers = headers;
         }
-        rewrite.context.install(&mut self.context);
+        self.context.overwrite(rewrite.context);
         Ok(Request::from_parts(parts, rewrite.body))
     }
 }

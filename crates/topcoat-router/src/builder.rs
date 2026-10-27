@@ -320,9 +320,10 @@ impl RouterBuilder {
     /// Adds a value that all requests to this router can share.
     ///
     /// Read it with [`context`](topcoat_core::context::context). Adding the
-    /// same type again on the builder replaces its value. During a request,
-    /// [`Cx::with`](topcoat_core::context::Cx::with) can override it in a child
-    /// context without changing the router's value.
+    /// same type again on the builder shadows its value, like
+    /// [`Cx::with`](topcoat_core::context::Cx::with) does during a request.
+    /// Reads return the newest value, and a child context can shadow it
+    /// without changing the router's value.
     ///
     /// # Examples
     ///
@@ -715,7 +716,7 @@ mod tests {
     }
 
     #[test]
-    fn a_later_value_replaces_an_earlier_one() {
+    fn a_later_value_shadows_an_earlier_one() {
         let builder = RouterBuilder::new().with(1u32).with_many((2u32, Greeting));
 
         assert_eq!(*builder.context::<u32>(), 2);

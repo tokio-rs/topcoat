@@ -28,7 +28,7 @@ Read all of these values with the same functions. The code reading a value does 
 
 [`Cx::with`] creates a child context. The child can read the new value and the values in its parent. The parent stays unchanged. Pass the child to any code that should see the new value.
 
-Adding another value of the same type replaces that value in the child. For example, a layer can override a router default, and a component can override it again for its own content:
+Adding another value of the same type shadows that value in the child, so reads in the child return the new value. For example, a layer can override a router default, and a component can override it again for its own content:
 
 ```rust
 use topcoat::context::{Cx, context};
@@ -88,7 +88,7 @@ fn router() -> Router {
 }
 ```
 
-Use [`with_many`](crate::router::RouterBuilder::with_many) to add a tuple of values at once. Adding a type again replaces its earlier value. To keep two values of the same underlying type, give each one a different wrapper type:
+Use [`with_many`](crate::router::RouterBuilder::with_many) to add a tuple of values at once. Adding a type again shadows its earlier value, so reads return the newest one. To read two values of the same underlying type, give each one a different wrapper type:
 
 ```rust
 use topcoat::router::Router;
