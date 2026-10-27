@@ -4,7 +4,7 @@ Add a `cx: &Cx` parameter when a function needs these values. Topcoat supplies i
 
 # How context works
 
-Each value in a context is stored under its Rust type. Use [`context::<T>(cx)`](fn@context) to borrow the value stored under `T`:
+A context holds values by their Rust type. Use [`context::<T>(cx)`](fn@context) to borrow the value of type `T`:
 
 ```rust
 use topcoat::context::{Cx, context};
@@ -16,19 +16,11 @@ fn db(cx: &Cx) -> &Database {
 }
 ```
 
-There are three ways to add values:
+## Shadowing
 
-1. Call [`with`](crate::router::RouterBuilder::with) on the router builder to [share a value across requests](#sharing-values-across-requests).
-2. The router supplies each request's HTTP data and path parameters. Read these through Topcoat's [built-in accessors](#built-in-accessors).
-3. Call [`Cx::with`] while handling a request to [add a value for the code you call next](#adding-values-during-a-request).
+Adding a value never removes one. When a context already has a value of the same type, the new value shadows it. Reads return the newest value, and the older one stays underneath.
 
-Read all of these values with the same functions. The code reading a value does not need to know how it was added.
-
-## Scopes
-
-[`Cx::with`] creates a child context. The child can read the new value and the values in its parent. The parent stays unchanged. Pass the child to any code that should see the new value.
-
-Adding another value of the same type shadows that value in the child, so reads in the child return the new value. For example, a layer can override a router default, and a component can override it again for its own content:
+[`Cx::with`] creates a child context with the new value on top. The child can read the new value and every value of its parent. The parent stays unchanged. Pass the child to any code that should see the new value. For example, a layer can shadow a default, and a component can shadow it again for its own content:
 
 ```rust
 use topcoat::context::{Cx, context};
@@ -46,7 +38,7 @@ assert_eq!(theme(&inner), "dark");
 assert_eq!(theme(&cx), "light");
 ```
 
-Only code given the child context sees its changes. The caller and other children keep their own values.
+Only code given the child context sees its new value. The caller and other children keep reading their own values.
 
 ## Reading values
 
@@ -66,6 +58,28 @@ Use the exact type you registered. If you added an `Arc<Database>`, ask for `Arc
 
 Small helper functions such as `db(cx)`, `config(cx)`, and `current_tenant(cx)` give these reads clear names. They also keep the choice of stored type and the handling of missing values in one place.
 
+[`context`](fn@context) returns only the closest value of a type. [`iter_context`] visits every value of the type, starting with the closest one and walking back through the values it shadows.
+
+This suits types that several scopes add to, such as breadcrumbs. Each section of a site adds its own crumb, and the code that renders the trail reads all of them:
+
+```rust
+use topcoat::context::{Cx, iter_context};
+
+struct Crumb(&'static str);
+
+fn trail(cx: &Cx) -> String {
+    let mut crumbs: Vec<_> = iter_context::<Crumb>(cx).map(|crumb| crumb.0).collect();
+    crumbs.reverse();
+    crumbs.join(" / ")
+}
+
+let cx = Cx::default().with(Crumb("Home"));
+let posts = cx.with(Crumb("Posts"));
+
+assert_eq!(trail(&posts), "Home / Posts");
+assert_eq!(trail(&cx), "Home");
+```
+
 # Sharing values across requests
 
 ## Registering values
@@ -84,27 +98,6 @@ fn router() -> Router {
     Router::builder()
         .with(Database::connect())
         .with(HttpClient::new())
-        .build()
-}
-```
-
-Use [`with_many`](crate::router::RouterBuilder::with_many) to add a tuple of values at once. Adding a type again shadows its earlier value, so reads return the newest one. To read two values of the same underlying type, give each one a different wrapper type:
-
-```rust
-use topcoat::router::Router;
-#
-# struct Database;
-# impl Database { fn connect(_url: &str) -> Self { Self } }
-
-struct PrimaryDb(Database);
-struct ReplicaDb(Database);
-
-fn router() -> Router {
-    Router::builder()
-        .with_many((
-            PrimaryDb(Database::connect("postgres://primary")),
-            ReplicaDb(Database::connect("postgres://replica")),
-        ))
         .build()
 }
 ```
@@ -131,24 +124,6 @@ fn router() -> Router {
 
 fn count_view(cx: &Cx) -> u64 {
     context::<PageViews>(cx).0.fetch_add(1, Ordering::Relaxed) + 1
-}
-```
-
-## Reading values while building
-
-While building a router, read values already added with [`RouterBuilder::context`](crate::router::RouterBuilder::context) or [`RouterBuilder::try_context`](crate::router::RouterBuilder::try_context). This is useful in setup helpers that should supply a default only when the application has not supplied a value:
-
-```rust
-use topcoat::router::RouterBuilder;
-
-struct Resolver;
-
-fn with_default_resolver(builder: RouterBuilder) -> RouterBuilder {
-    if builder.try_context::<Resolver>().is_some() {
-        builder
-    } else {
-        builder.with(Resolver)
-    }
 }
 ```
 
@@ -226,7 +201,7 @@ fn greeting_name(cx: &Cx) -> &str {
 }
 ```
 
-To add several values together, use [`Cx::with_many`]. It has the same result as calling `with` for each value, but creates the child context in one step.
+To add several values at once, pass a tuple to [`Cx::with_many`]. The result is the same as calling `with` for each value, but it creates one child context instead of one per value.
 
 ## Replacing a router value
 
@@ -554,31 +529,3 @@ async fn user_avatar(cx: &Cx) -> Result<impl View> {
 Every render of `user_avatar` checks authentication. If the request has no valid session, the component returns an unauthorized error. Other components and handlers that need protection must also call the helper.
 
 Calls with the same user ID and context dependencies share the database lookup. Each caller can ask for the user without knowing whether another caller has already loaded it.
-
-### Shape the functions by meaning
-
-Give each helper one job:
-
-- `session_cookie(cx)` finds the session cookie in the headers.
-- `fetch_user(cx, user_id)` loads and caches the user.
-- `fetch_current_user(cx)` finds the user for the session, if there is one.
-- `require_auth(cx)` requires that user to be present.
-
-Choose the helper that fits the caller. A public page can use `fetch_current_user(cx)` and show a signed-out view when there is no user. A private page can use `require_auth(cx).await?` to stop with an error. An admin check can build on that helper:
-
-```rust
-use topcoat::{context::Cx, router::error::RouterErrorExt, Result};
-
-# use topcoat::router::error::UnauthorizedError;
-# struct User;
-# impl User { fn is_admin(&self) -> bool { false } }
-# async fn require_auth(_: &Cx) -> Result<&User, UnauthorizedError> { Err(topcoat::router::error::unauthorized()) }
-#
-/// Requires the current user to be an admin.
-async fn require_admin(cx: &Cx) -> Result<&User> {
-    let user = require_auth(cx).await?;
-    Ok(user.is_admin().then_some(user).ok_or_forbidden()?)
-}
-```
-
-This approach also works for other data and rules tied to a request. Use a router layer for work that needs to wrap request handling, such as response compression.
