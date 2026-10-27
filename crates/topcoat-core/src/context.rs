@@ -206,6 +206,20 @@ impl Scope {
             .or_else(|| self.sealed().find_map(ContextMap::lookup::<T>))
     }
 
+    /// Visits every value of type `T`, closest first.
+    ///
+    /// Uses the same search order as [`lookup`](Self::lookup) but continues
+    /// past the first value. Request values come from newest to oldest, then
+    /// the values of each sealed layer from newest to oldest.
+    pub(crate) fn iter<T>(&self) -> impl Iterator<Item = &T>
+    where
+        T: Any + Send + Sync,
+    {
+        self.values
+            .iter::<T>()
+            .chain(self.sealed().flat_map(ContextMap::iter::<T>))
+    }
+
     /// Finds the binding ID for `type_id`, or returns `None` if it is absent.
     ///
     /// Uses the same search order as [`lookup`](Self::lookup). Accepting a
@@ -321,6 +335,28 @@ mod tests {
         let mut values = ContextMap::new();
         values.insert(value);
         Cx::new(Arc::new(values))
+    }
+
+    /// Creates a context whose sealed layers hold `layers`, newest first.
+    fn sealed_layers(layers: Vec<ContextMap>) -> Cx {
+        let sealed = layers.into_iter().rev().fold(None, |parent, values| {
+            Some(Arc::new(Sealed {
+                values: Arc::new(values),
+                parent,
+            }))
+        });
+        Cx {
+            scope: Arc::new(Scope {
+                sealed,
+                ..Scope::default()
+            }),
+            ..Cx::default()
+        }
+    }
+
+    /// Collects every `Marker` that `cx` can see, closest first.
+    fn markers(cx: &Cx) -> Vec<u32> {
+        cx.scope.iter::<Marker>().map(|marker| marker.0).collect()
     }
 
     #[test]
@@ -463,6 +499,44 @@ mod tests {
             context::<Other>(&child),
             context::<Other>(&cx)
         ));
+    }
+
+    #[test]
+    fn iter_visits_request_values_before_sealed_values() {
+        let cx = shared(Marker(1))
+            .with(Marker(2))
+            .with_many((Marker(3), Other("many")));
+
+        assert_eq!(markers(&cx), [3, 2, 1]);
+    }
+
+    #[test]
+    fn iter_visits_sealed_layers_newest_first() {
+        let mut older = ContextMap::new();
+        older.insert(Marker(0));
+        older.insert(Marker(1));
+        let mut newer = ContextMap::new();
+        newer.insert(Marker(2));
+        newer.insert(Other("newer"));
+        let cx = sealed_layers(vec![newer, ContextMap::new(), older]).with(Marker(3));
+
+        assert_eq!(markers(&cx), [3, 2, 1, 0]);
+    }
+
+    #[test]
+    fn iter_leaves_the_parent_unchanged() {
+        let cx = shared(Marker(1)).with(Marker(2));
+        let child = cx.with(Marker(3));
+
+        assert_eq!(markers(&cx), [2, 1]);
+        assert_eq!(markers(&child), [3, 2, 1]);
+    }
+
+    #[test]
+    fn iter_is_empty_for_unregistered_type() {
+        let cx = shared(Other("router")).with(Other("request"));
+
+        assert!(markers(&cx).is_empty());
     }
 
     #[test]

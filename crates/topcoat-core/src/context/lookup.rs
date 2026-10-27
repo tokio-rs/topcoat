@@ -74,6 +74,41 @@ where
     }
 }
 
+/// Visits every value of type `T` in `cx`, from the closest to the oldest.
+///
+/// Adding a value with [`Cx::with`] shadows the earlier values of its type
+/// but keeps them. [`context`] returns only the closest value. This
+/// function starts at that value and walks back through every value it
+/// shadows, in the reverse of the order they were added.
+///
+/// # Panics
+///
+/// Panics if `cx` belongs to a memoized call.
+///
+/// # Examples
+///
+/// ```rust
+/// use topcoat::context::{Cx, iter_context};
+///
+/// struct Crumb(&'static str);
+///
+/// let cx = Cx::default().with(Crumb("Home")).with(Crumb("Posts"));
+/// let crumbs: Vec<_> = iter_context::<Crumb>(&cx).map(|crumb| crumb.0).collect();
+///
+/// assert_eq!(crumbs, ["Posts", "Home"]);
+/// ```
+#[track_caller]
+pub fn iter_context<T>(cx: &Cx) -> impl Iterator<Item = &T>
+where
+    T: Any + Send + Sync,
+{
+    assert!(
+        cx.tracker.is_none(),
+        "iter_context cannot be used inside memoized functions"
+    );
+    cx.scope.iter::<T>()
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -104,5 +139,31 @@ mod tests {
     fn context_panics_for_unregistered_type() {
         let cx = Cx::default();
         let _: &Database = context(&cx);
+    }
+
+    #[test]
+    fn iter_context_visits_request_values_before_sealed_values() {
+        let mut shared = ContextMap::new();
+        shared.insert(Database("primary"));
+        let cx = Cx::new(Arc::new(shared))
+            .with(Database("replica"))
+            .with(Database("cache"));
+
+        assert_eq!(
+            iter_context::<Database>(&cx).collect::<Vec<_>>(),
+            [
+                &Database("cache"),
+                &Database("replica"),
+                &Database("primary")
+            ]
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "iter_context cannot be used inside memoized functions")]
+    fn iter_context_panics_inside_memoized_functions() {
+        let cx = Cx::default();
+        let (tracked, _tracker) = cx.track();
+        let _ = iter_context::<Database>(&tracked).count();
     }
 }
