@@ -122,116 +122,9 @@ async fn place_order(cx: &Cx) -> Result<&'static str> {
 
 The clone remains usable after the handler returns, but it cannot change headers already sent to the client. Writing cookies after the jar is sealed panics.
 
-# Memoization
-
-Use [`#[memoize]`](macro@memoize) when several parts of a request need the result of the same expensive work. It caches a function's result for that request. Calls can reuse a result when their arguments match and the context values the function read have not been replaced. The macro's documentation explains the requirements and how child contexts affect reuse.
-
-# Composing helpers
-
-Give your own helpers a `cx: &`[`Cx`] parameter to read request data or call other helpers:
-
-```rust
-use topcoat::{
-    context::Cx,
-    router::request::{headers, uri},
-};
-
-fn locale(cx: &Cx) -> &str {
-    headers(cx)
-        .get("accept-language")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.split(',').next())
-        .unwrap_or("en")
-}
-
-fn canonical_url(cx: &Cx) -> String {
-    format!("https://example.com{}", uri(cx).path())
-}
-```
-
-Put common request logic in these functions and call them from pages, layouts, components, or routes. The next section shows how to use this approach for authentication and other request checks.
-
 # Functions, not middlewares
 
-Put request checks in functions that take `cx: &Cx`. A helper can read request data, load the current user, or check whether that user is allowed to continue.
-
-Call the helper from the code that needs the check or its result. Add `#[memoize]` when several callers should share expensive work within a request.
-
-## What not to do
-
-### Middleware
-
-With authentication middleware, the check and the code using the user often live in different places. The middleware stores a user on the request. The page then reads that value and assumes the check has already happened:
-
-```rust
-# struct Request { extensions: Extensions }
-# struct Extensions;
-# impl Extensions { fn insert<T>(&mut self, _v: T) {} fn get<T>(&self) -> Option<&T> { None } }
-# struct Html;
-# struct User;
-# async fn authenticate(_: &Request) -> User { User }
-# fn render_account(_: &User) -> Html { Html }
-async fn auth_middleware(request: &mut Request) {
-    let user = authenticate(request).await;
-    request.extensions.insert(user);
-}
-
-async fn account_page(request: &Request) -> Html {
-    let user = request
-        .extensions
-        .get::<User>()
-        .expect("auth middleware must have run");
-
-    render_account(user)
-}
-```
-
-For this page to work, the right middleware must run first. Missing it or setting the wrong order can cause a panic or leave a route without its authentication check.
-
-### Extractors
-
-An extractor puts the authentication requirement in the handler's parameters:
-
-```rust
-# struct Auth(User);
-# struct User;
-# struct Html;
-# fn render_account(_: User) -> Html { Html }
-async fn account_page(Auth(user): Auth) -> Html {
-    render_account(user)
-}
-```
-
-The handler now states that it needs an authenticated user. Components below it still need the user passed to them:
-
-```rust
-# struct Auth(User);
-# #[derive(Clone)] struct User { avatar_url: u8 }
-# struct Html;
-# fn render(_: Html, _: Html) -> Html { Html }
-# async fn account_settings(_: User) -> Html { Html }
-# fn render_image(_: u8) -> Html { Html }
-async fn account_page(Auth(user): Auth) -> Html {
-    render(
-        account_sidebar(user.clone()).await,
-        account_settings(user.clone()).await,
-    )
-}
-
-async fn account_sidebar(user: User) -> Html {
-    user_avatar(user).await
-}
-
-async fn user_avatar(user: User) -> Html {
-    render_image(user.avatar_url)
-}
-```
-
-Passing values this way is useful for data chosen by the caller. For data shared across a request, it can mean passing a value through components that never use it themselves.
-
-## What to do in Topcoat
-
-Write small helpers that take `&Cx` and call one another. Any page, layout, or component can use them:
+Put request logic in small functions that take `cx: &Cx` and call one another. A helper can read request data, load the current user, or check whether that user is allowed to continue. Call it from the page, layout, or component that needs the result. Add [`#[memoize]`](macro@memoize) when several callers should share expensive work. It caches the result for the request and reuses it while the function would still find the same context values:
 
 ```rust
 use topcoat::{
@@ -305,6 +198,6 @@ async fn user_avatar(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-Every render of `user_avatar` checks authentication. If the request has no valid session, the component returns an unauthorized error. Other components and handlers that need protection must also call the helper.
+Every render of `user_avatar` checks authentication, and calls for the same user share one database lookup. Each caller asks for the user without knowing whether another caller has already loaded it.
 
-Calls with the same user ID and context dependencies share the database lookup. Each caller can ask for the user without knowing whether another caller has already loaded it.
+Compare this with authentication middleware, which stores the user on the request so the page can assume the check already ran. If the middleware is missing or runs in the wrong order, the page panics or skips the check. An extractor such as `Auth(user)` puts the requirement in the handler's signature, but the handler then has to pass the user down through components that may never use it. With a helper, the code that needs the user asks for it.

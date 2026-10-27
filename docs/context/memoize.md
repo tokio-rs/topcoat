@@ -1,4 +1,4 @@
-`#[memoize]` saves a function's result so other calls in the same request can reuse it. Calls share a result when their arguments match and the context values read by the function have not been replaced.
+`#[memoize]` saves a function's result so other calls in the same request can reuse it. Calls share a result when their arguments match and the function would still find the same context values.
 
 The cache belongs to one request. Every new request starts with an empty cache.
 
@@ -109,9 +109,7 @@ The [context rules below](#context-dependencies) explain when adding a value mak
 
 # Context dependencies
 
-While the function runs, Topcoat records which context values it reads. A later call can reuse the result only if those reads would find the same registered values in its context. Registering a value again counts as a replacement, even if the new value is equal to the old one.
-
-`Cx::with` can override a value in a child context. A memoized function called with that child may therefore need to run again:
+While the function runs, Topcoat records which context values it reads. A later call reuses the result only if reading those types in its context would find the same values. A value added with `Cx::with` shadows the old one, so it counts as a change even if the two values are equal:
 
 ```rust
 # fn main() {}
@@ -132,11 +130,11 @@ greeting(&scoped); // a different Locale, so the body runs again
 # }
 ```
 
-These calls read different registered `Locale` values, so the function runs for each one. The cache keeps both results. Later calls use the one that matches their context.
+These calls find different `Locale` values, so the function runs for each one. The cache keeps both results, and later calls use the one that matches their context.
 
-Only types the function looked up matter. Adding a value of another type does not change which result is reused. A lookup that found nothing also matters. If a later call has a value of that type, the function runs again.
+Only the types the function read matter. Adding a value of another type does not change which result is reused. Finding no value counts too. If a later call has a value of that type, the function runs again.
 
-Values added by the function itself do not make the result depend on the caller's context:
+Values the function adds itself do not depend on the caller:
 
 ```rust
 # fn main() {}
@@ -149,7 +147,9 @@ fn banner(cx: &Cx) -> String {
 }
 ```
 
-Here, `banner` always supplies its own `Locale`. Changing the caller's `Locale` does not change the result.
+`banner` always reads its own `Locale`, so the caller's `Locale` does not matter.
+
+`iter_context` is different, because it walks past the function's own values into the caller's. A function that iterates depends on every value of the type, so adding one in the caller's context makes it run again.
 
 A function also depends on the context values read by memoized functions it calls:
 
@@ -168,9 +168,7 @@ fn greeting(cx: &Cx) -> String {
 }
 ```
 
-`greeting` reads `Locale` indirectly through `locale`. Overriding `Locale` makes both functions run again for that context. Topcoat records this dependency even when `locale` returns a cached result.
-
-Router values follow the same rules. Calls in a request can share a result that reads a router value. If a child context overrides that type with `Cx::with`, calls using the child need a result for the replacement value.
+`greeting` reads `Locale` through `locale`. Shadowing `Locale` makes both functions run again for that context. Topcoat records this dependency even when `locale` returns a cached result.
 
 # Borrowing Option and Result contents
 
