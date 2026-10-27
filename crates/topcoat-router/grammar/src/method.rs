@@ -38,7 +38,10 @@ impl Methods {
     }
 
     fn is_method(ident: &Ident) -> bool {
-        ident.to_string().bytes().all(|byte| byte.is_ascii_uppercase())
+        ident
+            .to_string()
+            .bytes()
+            .all(|byte| byte.is_ascii_uppercase())
     }
 }
 

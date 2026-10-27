@@ -288,6 +288,19 @@ mod tests {
     }
 
     #[test]
+    fn attr_accepts_context_entries_after_methods_and_path() {
+        let attr: RouteAttr = syn::parse_str("GET, with(a)").unwrap();
+        assert_eq!(attr.context.len(), 1);
+        let attr: RouteAttr = syn::parse_str("GET \"./report.csv\", with(a), with(b),").unwrap();
+        assert_eq!(attr.context.len(), 2);
+    }
+
+    #[test]
+    fn attr_requires_methods_before_context_entries() {
+        assert!(syn::parse_str::<RouteAttr>("with(a)").is_err());
+    }
+
+    #[test]
     fn accepts_async_fn_with_return_type() {
         syn::parse_str::<RouteItem>("async fn ping(cx: &Cx) -> Result { todo!() }").unwrap();
     }

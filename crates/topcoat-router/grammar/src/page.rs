@@ -299,6 +299,50 @@ mod tests {
     }
 
     #[test]
+    fn attr_accepts_context_entries_after_any_prefix() {
+        let cases = [
+            ("with(a)", 1),
+            ("with(a), with(b),", 2),
+            ("\"/about\", with(a)", 1),
+            ("POST, with(a)", 1),
+            ("POST \"/submit\", with(a), with(b)", 2),
+        ];
+        for (source, entries) in cases {
+            let attr: PageAttr = syn::parse_str(source).unwrap();
+            assert_eq!(attr.context.len(), entries, "{source}");
+        }
+    }
+
+    #[test]
+    fn attr_does_not_take_with_for_a_method() {
+        let attr: PageAttr = syn::parse_str("with(a)").unwrap();
+        assert!(attr.methods.is_none());
+        assert_eq!(attr.context.len(), 1);
+    }
+
+    #[test]
+    fn attr_rejects_context_entries_without_a_separating_comma() {
+        assert!(syn::parse_str::<PageAttr>("\"/about\" with(a)").is_err());
+        assert!(syn::parse_str::<PageAttr>("with(a) with(b)").is_err());
+    }
+
+    #[test]
+    fn attr_rejects_a_leading_comma() {
+        assert!(syn::parse_str::<PageAttr>(", with(a)").is_err());
+    }
+
+    #[test]
+    fn attr_rejects_unknown_entries() {
+        assert!(syn::parse_str::<PageAttr>("\"/about\", title(a)").is_err());
+    }
+
+    #[test]
+    fn attr_rejects_lowercase_methods() {
+        assert!(syn::parse_str::<PageAttr>("get \"/about\"").is_err());
+        assert!(syn::parse_str::<PageAttr>("[GET, post] \"/about\"").is_err());
+    }
+
+    #[test]
     fn accepts_async_fn_with_return_type() {
         let item = syn::parse_str::<PageItem>("async fn home() -> Result { todo!() }").unwrap();
         assert!(item.args.request().is_none());

@@ -13,6 +13,8 @@ fn page() {
         quote! { "/posts/{post_id}" },
         quote! { [GET, POST] "/either" },
         quote! { * "/anything" },
+        quote! { with(Head::new()) },
+        quote! { POST "/posts/{post_id}", with(Head::new()), with(OpenApi::new()), },
     ];
     for attr in attrs {
         assert_deterministic(|| {
@@ -34,6 +36,7 @@ fn route() {
         quote! { POST },
         quote! { GET "./health" },
         quote! { [GET, POST] "/multi" },
+        quote! { GET "./report.csv", with(Export::skip()) },
     ];
     for attr in attrs {
         assert_deterministic(|| {
@@ -51,7 +54,12 @@ fn route() {
 
 #[test]
 fn layout() {
-    for attr in [quote! {}, quote! { "./admin" }] {
+    let attrs = [
+        quote! {},
+        quote! { "./admin" },
+        quote! { "/admin", with(Head::new()) },
+    ];
+    for attr in attrs {
         assert_deterministic(|| {
             Layout::parse(
                 attr.clone(),

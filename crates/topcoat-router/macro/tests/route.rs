@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{Body, Router, href, route, to_bytes},
+    router::{Body, ModuleRoute, Route, Router, href, route, to_bytes},
 };
 
 /// Dispatches a request with the given method through the router and returns
@@ -52,6 +52,21 @@ async fn self_linked(cx: &Cx) -> Result<String> {
     Ok(format!("{self_linked}: {}", href!(self_linked).resolve(cx)))
 }
 
+#[derive(Debug, PartialEq)]
+struct Title(&'static str);
+
+// A route with route context: each `with(...)` adds one value.
+#[route(GET "/report.csv", with(Title("first")), with(Title("second")),)]
+async fn report() -> Result<&'static str> {
+    Ok("report")
+}
+
+// A route with route context but no path, derived by the module router.
+#[route(POST, with(Title("module")))]
+async fn module_report() -> Result<&'static str> {
+    Ok("module")
+}
+
 #[tokio::test]
 async fn a_single_method_serves_only_that_method() {
     let router = Router::builder().route(one).build();
@@ -89,4 +104,22 @@ async fn a_specific_method_wins_over_a_star_route() {
     let router = Router::builder().route(mixed_get).route(mixed_rest).build();
     assert_eq!(send(&router, "GET", "/mixed").await, (200, "get".into()));
     assert_eq!(send(&router, "POST", "/mixed").await, (200, "rest".into()));
+}
+
+#[test]
+fn a_route_holds_the_values_of_its_context() {
+    let context = Route::context(&report);
+    let titles: Vec<_> = context.iter::<Title>().collect();
+    assert_eq!(titles, [&Title("second"), &Title("first")]);
+}
+
+#[test]
+fn a_route_without_context_holds_no_values() {
+    assert!(Route::context(&one).get::<Title>().is_none());
+}
+
+#[test]
+fn a_module_route_holds_the_values_of_its_context() {
+    let context = ModuleRoute::context(&module_report);
+    assert_eq!(context.get::<Title>(), Some(&Title("module")));
 }

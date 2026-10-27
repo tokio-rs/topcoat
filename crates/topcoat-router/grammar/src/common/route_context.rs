@@ -76,10 +76,7 @@ mod tests {
     fn keeps_the_value_tokens_as_written() {
         // Not an expression, so parsing it would fail.
         let entry: RouteContext = syn::parse_str("with(a, b; c)").unwrap();
-        assert_eq!(
-            entry.value.to_string(),
-            quote! { a, b; c }.to_string()
-        );
+        assert_eq!(entry.value.to_string(), quote! { a, b; c }.to_string());
     }
 
     #[test]

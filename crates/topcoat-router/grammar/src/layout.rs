@@ -204,6 +204,16 @@ mod tests {
     }
 
     #[test]
+    fn attr_accepts_context_entries_with_or_without_a_path() {
+        let attr: LayoutAttr = syn::parse_str("with(a)").unwrap();
+        assert!(attr.path.is_none());
+        assert_eq!(attr.context.len(), 1);
+        let attr: LayoutAttr = syn::parse_str("\"/admin\", with(a), with(b)").unwrap();
+        assert!(attr.path.is_some());
+        assert_eq!(attr.context.len(), 2);
+    }
+
+    #[test]
     fn accepts_a_slot_parameter() {
         syn::parse_str::<LayoutItem>(
             "async fn shell(slot: Slot<'_>) -> Result<impl View> { todo!() }",

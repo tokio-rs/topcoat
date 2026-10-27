@@ -2,7 +2,7 @@ use serde::Deserialize;
 use topcoat::{
     Result,
     context::Cx,
-    router::{Body, Router, content::Form, href, page, request::uri, to_bytes},
+    router::{Body, ModulePage, Page, Router, content::Form, href, page, request::uri, to_bytes},
     view::{View, view},
 };
 
@@ -96,6 +96,36 @@ async fn anything() -> Result<impl View> {
     Ok(view! { <p>"anything"</p> })
 }
 
+#[derive(Debug, PartialEq)]
+struct Title(&'static str);
+
+#[derive(Debug, PartialEq)]
+struct Tag(&'static str);
+
+mod presets {
+    pub fn tag() -> super::Tag {
+        super::Tag("preset")
+    }
+}
+
+// A page with route context: each `with(...)` adds one value.
+#[page(POST "/described", with(Title("described")), with(presets::tag()))]
+async fn described() -> Result<impl View> {
+    Ok(view! { <p>"described"</p> })
+}
+
+// A page repeating a type: the later value shadows the earlier one.
+#[page("/retitled", with(Title("first")), with(Title("second")))]
+async fn retitled() -> Result<impl View> {
+    Ok(view! { <p>"retitled"</p> })
+}
+
+// A page with route context but no path, derived by the module router.
+#[page(with(Title("module")))]
+async fn module_described() -> Result<impl View> {
+    Ok(view! { <p>"module"</p> })
+}
+
 #[tokio::test]
 async fn renders_a_page_registered_by_name() {
     let router = Router::builder().page(home).build();
@@ -173,4 +203,30 @@ async fn renders_pages_as_components() {
         body,
         "<h1>home</h1><p>searching for topcoat</p><p>/composed</p>"
     );
+}
+
+#[test]
+fn a_page_holds_the_values_of_its_context() {
+    let context = Page::context(&described);
+    assert_eq!(context.get::<Title>(), Some(&Title("described")));
+    assert_eq!(context.get::<Tag>(), Some(&Tag("preset")));
+}
+
+#[test]
+fn a_page_without_context_holds_no_values() {
+    assert!(Page::context(&home).get::<Title>().is_none());
+}
+
+#[test]
+fn a_later_context_value_shadows_an_earlier_one() {
+    let context = Page::context(&retitled);
+    assert_eq!(context.get::<Title>(), Some(&Title("second")));
+    let titles: Vec<_> = context.iter::<Title>().collect();
+    assert_eq!(titles, [&Title("second"), &Title("first")]);
+}
+
+#[test]
+fn a_module_page_holds_the_values_of_its_context() {
+    let context = ModulePage::context(&module_described);
+    assert_eq!(context.get::<Title>(), Some(&Title("module")));
 }
