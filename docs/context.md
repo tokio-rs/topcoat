@@ -65,35 +65,11 @@ assert_eq!(url_form(&email_context(&cx)), UrlForm::Absolute);
 
 A [layer](crate::router#layers) can add values for the rest of the request by passing a child context to [`next.run`](crate::router::Next::run). For data that code can load when it needs it, such as the current user, prefer [helper functions](#functions-not-middlewares).
 
-To add several values at once, pass a tuple to [`Cx::with_many`]. The result is the same as calling `with` for each value, but it creates one child context instead of one per value.
+To add several values at once, pass a tuple to [`Cx::with_many`]. The result is the same as calling `with` for each value, but it creates one child context instead of one per value, so it is more efficient.
 
 # Sharing values across requests
 
-## Registering values
-
-Use [`with`](crate::router::RouterBuilder::with) on the router builder for values that requests should share, such as configuration or a database pool:
-
-```rust
-use topcoat::router::Router;
-#
-# struct Database;
-# impl Database { fn connect() -> Self { Self } }
-# struct HttpClient;
-# impl HttpClient { fn new() -> Self { Self } }
-
-fn router() -> Router {
-    Router::builder()
-        .with(Database::connect())
-        .with(HttpClient::new())
-        .build()
-}
-```
-
-## Shared state
-
-Requests borrow the same value rather than receiving a copy, so `Clone` is not required. The value must be `Send + Sync + 'static`. It cannot borrow data that will be dropped while the router still needs it.
-
-To let requests update shared state, store a value that supports changes through a shared reference. An atomic or a [`Mutex`](std::sync::Mutex) can do this:
+Use [`with`](crate::router::RouterBuilder::with) on the router builder for values that every request should see, such as configuration or a database pool. Requests borrow the same value rather than receiving a copy, so `Clone` is not required. The value must be `Send + Sync + 'static`. To let requests update shared state, store a value that supports changes through a shared reference, such as an atomic or a [`Mutex`](std::sync::Mutex):
 
 ```rust
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -114,118 +90,7 @@ fn count_view(cx: &Cx) -> u64 {
 }
 ```
 
-## Without a router
-
-You can also create a context without a router. Put the shared values in a [`ContextMap`], wrap it in an `Arc`, and call [`Cx::new`] for each render:
-
-```rust
-use std::sync::Arc;
-
-use topcoat::context::{ContextMap, Cx, context};
-
-struct Site {
-    title: &'static str,
-}
-
-let mut shared = ContextMap::new();
-shared.insert(Site { title: "Topcoat" });
-let shared = Arc::new(shared);
-
-let cx = Cx::new(Arc::clone(&shared));
-assert_eq!(context::<Site>(&cx).title, "Topcoat");
-```
-
-For tests, start with an empty `Cx::default()`. Add the values the test needs with [`Cx::with`] or [`Cx::with_many`].
-
-# Built-in accessors
-
-Topcoat stores its own values in the context too. It provides helper functions to read them, so you usually do not need to call [`context`](fn@context) directly for these values.
-
-## Request data
-
-Read HTTP request data with the functions in [`router::request`](crate::router::request):
-
-```rust
-use topcoat::{
-    context::Cx,
-    router::request::{headers, method, uri},
-};
-
-fn request_summary(cx: &Cx) -> String {
-    let user_agent = headers(cx)
-        .get("user-agent")
-        .and_then(|value| value.to_str().ok())
-        .unwrap_or("unknown");
-
-    format!("{} {} from {user_agent}", method(cx), uri(cx).path())
-}
-```
-
-For a single part of the request, use a helper such as [`headers(cx)`](crate::router::request::headers). The [`router::request`](crate::router::request) module lists the others.
-
-Use [`parts(cx)`](crate::router::request::parts) to read several request fields together:
-
-```rust
-use topcoat::{context::Cx, router::request::parts};
-
-fn cache_key(cx: &Cx) -> String {
-    let parts = parts(cx);
-    format!("{}:{}", parts.method, parts.uri)
-}
-```
-
-Use [`extensions(cx)`](crate::router::request::extensions) to read values attached to the HTTP request by a service or request layer:
-
-```rust
-use topcoat::{context::Cx, router::request::extensions};
-
-struct RequestId(String);
-
-fn request_id(cx: &Cx) -> Option<&str> {
-    extensions(cx).get::<RequestId>().map(|id| id.0.as_str())
-}
-```
-
-The HTTP helpers read the current request, including changes made by a [rewrite](crate::router::error#rewrites) or a layer. Use the `original_` helpers, such as [`original_parts(cx)`](crate::router::request::original_parts) and [`original_uri(cx)`](crate::router::request::original_uri), to read what the client sent. For example, [`StripPrefixLayer`](crate::router::StripPrefixLayer) changes `uri(cx)` but leaves `original_uri(cx)` unchanged. Topcoat determines the client IP address when the request arrives and keeps it across rewrites.
-
-## Path and query parameters
-
-Declare path parameters with [`module_param!`](macro@crate::router::module_param) and query fields with [`#[query_params]`](macro@crate::router::query_params). Read them with [`path_param::<T>(cx)`](fn@crate::router::path_param) and [`query_params::<T>(cx)`](fn@crate::router::query_params). Topcoat parses them when first needed and caches the results for the request.
-
-```rust
-// src/app/posts/post_id.rs
-use topcoat::{
-    Result,
-    context::Cx,
-    router::{module_param, page, path_param, query_params},
-    view::{View, view},
-};
-
-module_param!(post_id: uuid::Uuid, error = bad_request);
-
-#[query_params(error = bad_request)]
-struct PostQuery {
-    preview: Option<bool>,
-}
-
-#[page]
-async fn post(cx: &Cx) -> Result<impl View> {
-    let post_id = path_param::<PostId>(cx)?;
-    let query = query_params::<PostQuery>(cx)?;
-
-    Ok(view! {
-        <article data-preview=(query.preview.unwrap_or(false))>
-            "post id: " (post_id.to_string())
-        </article>
-    })
-}
-```
-
-These helpers work in any function that receives `&Cx`.
-
-## Other features
-
-Other features provide similar helpers. For example, [`base_url`] reads the URL set with [`RouterBuilder::base_url`](crate::router::RouterBuilder::base_url), and [`url_form`] reads the context's [`UrlForm`]. Look in each feature's documentation for its helpers.
+Without a router, put the shared values in a [`ContextMap`], wrap it in an `Arc`, and call [`Cx::new`] for each render. For tests, start with an empty `Cx::default()` and add the values the test needs with [`Cx::with`].
 
 # Work that outlives the handler
 
