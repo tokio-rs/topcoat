@@ -29,8 +29,7 @@ pub trait Page: Send + Sync + 'static {
     /// The URL path this page handles.
     fn path(&self) -> &Path;
 
-    /// The values attached to this page, such as metadata that describes
-    /// it.
+    /// The values attached to this page, such as metadata that describes it.
     ///
     /// Defaults to an empty map.
     fn context(&self) -> ContextMap {

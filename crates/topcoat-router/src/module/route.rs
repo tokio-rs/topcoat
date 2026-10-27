@@ -27,8 +27,7 @@ pub trait ModuleRoute: Send + Sync + 'static {
         None
     }
 
-    /// The values attached to this route, such as metadata that describes
-    /// it.
+    /// The values attached to this route, such as metadata that describes it.
     ///
     /// Defaults to an empty map.
     fn context(&self) -> ContextMap {

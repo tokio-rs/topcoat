@@ -63,8 +63,7 @@ pub trait Route: Send + Sync + 'static {
     /// The URL path this route handles.
     fn path(&self) -> &Path;
 
-    /// The values attached to this route, such as metadata that describes
-    /// it.
+    /// The values attached to this route, such as metadata that describes it.
     ///
     /// Defaults to an empty map.
     fn context(&self) -> ContextMap {

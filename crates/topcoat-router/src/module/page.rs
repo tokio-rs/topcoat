@@ -28,8 +28,7 @@ pub trait ModulePage: Send + Sync + 'static {
         None
     }
 
-    /// The values attached to this page, such as metadata that describes
-    /// it.
+    /// The values attached to this page, such as metadata that describes it.
     ///
     /// Defaults to an empty map.
     fn context(&self) -> ContextMap {
