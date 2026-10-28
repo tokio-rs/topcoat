@@ -5555,6 +5555,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "topcoat-metadata"
+version = "0.11.0"
+
+[[package]]
 name = "topcoat-router"
 version = "0.11.0"
 dependencies = [

@@ -54,6 +54,7 @@ changelog_include = [
     "topcoat-mail",
     "topcoat-mail-grammar",
     "topcoat-mail-macro",
+    "topcoat-metadata",
     "topcoat-router",
     "topcoat-router-grammar",
     "topcoat-router-macro",
@@ -171,6 +172,11 @@ version_group = "topcoat"
 
 [[package]]
 name = "topcoat-mail-macro"
+release = true
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-metadata"
 release = true
 version_group = "topcoat"
 
