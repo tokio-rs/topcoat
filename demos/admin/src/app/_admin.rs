@@ -12,7 +12,7 @@ use topcoat::{
     l10n::{Translation, fluent::messages},
     router::{HrefTarget, Slot, href, layout, request::uri},
     runtime::{Event, Signal, link, link_attrs, prefetch_mode, signal},
-    view::{View, attributes, component, element_id, suspense, view},
+    view::{View, attributes, component, element_id, view},
 };
 
 use super::{_common::role_label, language::language_menu, logout};
@@ -36,7 +36,6 @@ use crate::{
             sidebar_group_label, sidebar_header, sidebar_inset, sidebar_menu,
             sidebar_menu_button_variants, sidebar_menu_item, sidebar_provider, sidebar_trigger,
         },
-        skeleton::skeleton,
     },
     features::{
         auth::require_user,
@@ -293,7 +292,11 @@ async fn user_menu(cx: &Cx, user: &User) -> Result<impl View> {
 async fn page_breadcrumb(cx: &Cx) -> Result<impl View> {
     let section = *context::<Section>(cx);
     let href = href!(section.target());
-    let crumb = try_context::<Crumb>(cx);
+    // Crumbs show the page's own entity, which the page loads before streaming starts.
+    let crumb = match try_context::<Crumb>(cx) {
+        Some(crumb) => Some(crumb.0.call(cx).await?),
+        None => None,
+    };
 
     Ok(view! {
         breadcrumb(
@@ -310,24 +313,13 @@ async fn page_breadcrumb(cx: &Cx) -> Result<impl View> {
                         )
                     }
                 )
-                if let Some(crumb) = crumb {
+                if let Some(label) = crumb {
                     breadcrumb_separator()
-                    breadcrumb_item(
-                        suspense(
-                            fallback: view! { skeleton(attrs: attributes! { class="h-4 w-24" }) },
-                            crumb_label(crumb: crumb)
-                        )
-                    )
+                    breadcrumb_item(breadcrumb_page((label)))
                 }
             )
         )
     })
-}
-
-#[component]
-async fn crumb_label(cx: &Cx, crumb: &Crumb) -> Result<impl View> {
-    let label = crumb.0.call(cx).await?;
-    Ok(view! { breadcrumb_page((label)) })
 }
 
 #[component]
