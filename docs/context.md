@@ -38,7 +38,7 @@ fn trail(cx: &Cx) -> String {
     crumbs.join(" / ")
 }
 
-let cx = Cx::default().with(Crumb("Home"));
+let cx = Cx::new().with(Crumb("Home"));
 let posts = cx.with(Crumb("Posts"));
 
 assert_eq!(trail(&posts), "Home / Posts");
@@ -58,7 +58,7 @@ fn email_context(cx: &Cx) -> Cx {
     cx.with(UrlForm::Absolute)
 }
 
-let cx = Cx::default();
+let cx = Cx::new();
 assert_eq!(url_form(&cx), UrlForm::Relative);
 assert_eq!(url_form(&email_context(&cx)), UrlForm::Absolute);
 ```
@@ -90,13 +90,13 @@ fn count_view(cx: &Cx) -> u64 {
 }
 ```
 
-Without a router, put the shared values in a [`ContextMap`], wrap it in an `Arc`, and attach it to a fresh context with `Cx::new().with_shared(shared)` for each render. See [`Cx::with_shared`]. For tests, start with an empty `Cx::default()` and add the values the test needs with [`Cx::with`].
+Without a router, put the shared values in a [`ContextMap`], wrap it in an `Arc`, and attach it to a fresh context with `Cx::new().with_shared(shared)` for each render. See [`Cx::with_shared`]. For tests, start with an empty `Cx::new()` and add the values the test needs with [`Cx::with`].
 
 # Route context
 
-Route context lets a page declare metadata that its outer layouts and layers can read. Add values with `with(...)` in a [`#[page]`](crate::router::page), [`#[route]`](macro@crate::router::route), or [`#[layout]`](crate::router::layout) attribute. After matching a request, the router adds the matched route's values to the context before any layer, layout, or handler runs. For a page, it also adds the values of all matching layouts.
+Use route context to declare metadata that layers and layouts can read before the handler runs. Add it with `with(...)` on a [`#[route]`](macro@crate::router::route), [`#[page]`](crate::router::page), or [`#[layout]`](crate::router::layout). The router puts these values in the request context as soon as it selects the route.
 
-This lets information flow from the matched page to the code around it. A page can declare its title or navigation section, and the outer layout can use that metadata to render the document head or highlight a sidebar entry. The page does not need to run first or pass the value up through its view:
+For example, a page can choose the title that its layout renders in `<title>`:
 
 ```rust
 use topcoat::{
@@ -108,9 +108,9 @@ use topcoat::{
 
 struct Title(&'static str);
 
-#[layout("/", with(Title("My shop")))]
+#[layout("/")]
 async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
-    let title = context::<Title>(cx).0;
+    let Title(title) = context::<Title>(cx);
 
     Ok(view! {
         <!DOCTYPE html>
@@ -129,20 +129,9 @@ async fn products() -> Result<impl View> {
 let router = Router::builder().layout(shell).page(products).build();
 ```
 
-For `/products`, `shell` reads `"Products"`. Pages without their own `Title` use the layout's `"My shop"` default. A layer can read the same metadata before calling `next.run`. In contrast, `cx.with(value)` inside a page creates a child context for code given that child. It does not change the context of an outer layout.
+Router builder values come first, followed by route context, then values added during the request with `cx.with(...)`. Each value shadows earlier values of the same type. For pages, route context follows the layout hierarchy from outermost to innermost, with the page's values last.
 
-Values are searched in this order:
-
-1. Request values added with [`Cx::with`], [`Cx::with_many`], or [`Router::handle_with`](crate::router::Router::handle_with).
-2. The matched page or route's values.
-3. For pages, matching layouts' values, from innermost to outermost.
-4. Router builder values.
-
-[`context`](fn@context) returns the closest value of the requested type. [`iter_context`] visits all of them in that order, including shadowed values. For example, layouts and a page can each declare a breadcrumb, and the outer layout can collect the whole trail.
-
-Each `with(...)` adds one value. Repeat it to add several values, with later entries shadowing earlier entries of the same type. The expressions are evaluated while the router is built, not for each request, and their values must be `Send + Sync + 'static`. Layout values apply only to the pages they wrap, not to API routes. Requests with no matching route have no route context.
-
-Hand-built handlers can attach values with [`RouteFn::with`](crate::router::RouteFn::with), [`PageFn::with`](crate::router::PageFn::with), and [`LayoutFn::with`](crate::router::LayoutFn::with).
+Shadowed values remain available through [`iter_context`], which visits the closest value first. This lets pages and layouts contribute metadata that an outer layout collects and renders together. For breadcrumbs, each layout and page could declare a `Crumb` value. The outer layout collects them with `iter_context::<Crumb>(cx)` and reverses the order to render the trail from root to page.
 
 # Work that outlives the handler
 

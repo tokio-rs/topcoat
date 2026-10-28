@@ -80,7 +80,7 @@ fn recurse(cx: &Cx, n: u64) -> u64 {
 }
 
 fn main() {
-    recurse(&Cx::default(), 1);
+    recurse(&Cx::new(), 1);
 }
 ```
 

@@ -20,7 +20,7 @@ The result is a [`Translation`]. In a view, you can use it as text or as an attr
 # use topcoat::{context::Cx, l10n::locale};
 topcoat::l10n::fluent::messages!("l10n/{locale}.ftl");
 
-let cx = &Cx::default().with(locale!("en"));
+let cx = &Cx::new().with(locale!("en"));
 assert_eq!(t!(hello).resolve(cx), "Hello, world!");
 assert_eq!(t!(login-input.placeholder).resolve(cx), "Your name");
 
