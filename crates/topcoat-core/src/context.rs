@@ -1,4 +1,5 @@
 mod context_map;
+mod cx_fn;
 mod id;
 mod lookup;
 mod tracking;
@@ -11,6 +12,7 @@ use std::{
 };
 
 pub use context_map::*;
+pub use cx_fn::*;
 pub use id::*;
 pub use lookup::*;
 pub(crate) use tracking::*;
