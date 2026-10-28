@@ -76,12 +76,7 @@ impl TrailingSlash {
             };
             if self == Self::Redirect {
                 let route = Box::new(RedirectRoute::new(path));
-                let route = routes.push(
-                    route,
-                    twin_index,
-                    always_layers.into(),
-                    ContextMap::new(),
-                );
+                let route = routes.push(route, twin_index, always_layers.into(), ContextMap::new());
                 endpoints[twin_index].insert_any(route);
             }
         }
