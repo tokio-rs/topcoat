@@ -96,7 +96,7 @@ Without a router, put the shared values in a [`ContextMap`], wrap it in an `Arc`
 
 Use route context to declare metadata that layers and layouts can read before the handler runs. Add it with `with(...)` on a [`#[route]`](macro@crate::router::route), [`#[page]`](crate::router::page), or [`#[layout]`](crate::router::layout). The router puts these values in the request context as soon as it selects the route.
 
-For example, a page can choose the title that its layout renders in `<title>`:
+For example, a layout can set a default title, and a page can replace it with its own:
 
 ```rust
 use topcoat::{
@@ -108,7 +108,7 @@ use topcoat::{
 
 struct Title(&'static str);
 
-#[layout("/")]
+#[layout("/", with(Title("My shop")))]
 async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     let Title(title) = context::<Title>(cx);
 
@@ -129,9 +129,11 @@ async fn products() -> Result<impl View> {
 let router = Router::builder().layout(shell).page(products).build();
 ```
 
-Router builder values come first, followed by route context, then values added during the request with `cx.with(...)`. Each value shadows earlier values of the same type. For pages, route context follows the layout hierarchy from outermost to innermost, with the page's values last.
+Router builder values are added first, followed by route context, then values added during the request with `cx.with(...)`. Each value shadows earlier values of the same type. For pages, route context follows the layout hierarchy from outermost to innermost, with the page's values last. Repeat `with(...)` to add several values. A request that matches no route has no route context.
 
 Shadowed values remain available through [`iter_context`], which visits the closest value first. This lets pages and layouts contribute metadata that an outer layout collects and renders together. For breadcrumbs, each layout and page could declare a `Crumb` value. The outer layout collects them with `iter_context::<Crumb>(cx)` and reverses the order to render the trail from root to page.
+
+Route context is built once, when the router is built. For a value that depends on the request, such as a crumb showing a customer's name, store a function as a [`BoxCxFn`] and call it while rendering. Calls are not memoized, so load data through [`#[memoize]`](macro@memoize) functions the page uses too.
 
 # Work that outlives the handler
 
