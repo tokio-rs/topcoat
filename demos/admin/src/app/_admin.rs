@@ -7,12 +7,12 @@ mod products;
 
 use topcoat::{
     Result,
-    context::{Cx, try_context},
+    context::{AsyncCxFn, BoxCxFn, Cx, context, try_context},
     icon::{IconData, icon, iconify::iconify_icon},
     l10n::{Translation, fluent::messages},
     router::{HrefTarget, Slot, href, layout, request::uri},
     runtime::{Event, Signal, link, link_attrs, prefetch_mode, signal},
-    view::{View, attributes, component, element_id, view},
+    view::{View, attributes, component, element_id, suspense, view},
 };
 
 use super::{_common::role_label, language::language_menu, logout};
@@ -36,6 +36,7 @@ use crate::{
             sidebar_group_label, sidebar_header, sidebar_inset, sidebar_menu,
             sidebar_menu_button_variants, sidebar_menu_item, sidebar_provider, sidebar_trigger,
         },
+        skeleton::skeleton,
     },
     features::{
         auth::require_user,
@@ -46,45 +47,61 @@ use crate::{
 
 messages!("{mod}/l10n/{locale}.ftl");
 
-struct NavItem {
-    label: fn() -> Translation<'static>,
-    icon: IconData,
-    target: &'static (dyn HrefTarget + Sync),
+/// A sidebar entry. Pages declare their section in their route context, such as
+/// `#[layout(with(Section::Orders))]`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Section {
+    Dashboard,
+    Orders,
+    Products,
+    Customers,
 }
 
-static NAV: [NavItem; 4] = [
-    NavItem {
-        label: || t!(nav_dashboard),
-        icon: iconify_icon!("lucide:layout-dashboard"),
-        target: &_dashboard::page,
-    },
-    NavItem {
-        label: || t!(nav_orders),
-        icon: iconify_icon!("lucide:shopping-cart"),
-        target: &orders::page,
-    },
-    NavItem {
-        label: || t!(nav_products),
-        icon: iconify_icon!("lucide:package"),
-        target: &products::page,
-    },
-    NavItem {
-        label: || t!(nav_customers),
-        icon: iconify_icon!("lucide:users"),
-        target: &customers::page,
-    },
-];
+impl Section {
+    /// The sections in sidebar order.
+    const ALL: [Self; 4] = [
+        Self::Dashboard,
+        Self::Orders,
+        Self::Products,
+        Self::Customers,
+    ];
 
-/// A breadcrumb label for a detail page. Add it to the request context in a layer.
-pub struct Crumb(pub String);
+    fn label(self) -> Translation<'static> {
+        match self {
+            Self::Dashboard => t!(nav_dashboard),
+            Self::Orders => t!(nav_orders),
+            Self::Products => t!(nav_products),
+            Self::Customers => t!(nav_customers),
+        }
+    }
 
-fn in_section(cx: &Cx, path: &str) -> bool {
-    let current = uri(cx).path();
-    current == path
-        || (path != "/"
-            && current
-                .strip_prefix(path)
-                .is_some_and(|rest| rest.starts_with('/')))
+    fn icon(self) -> IconData {
+        match self {
+            Self::Dashboard => iconify_icon!("lucide:layout-dashboard"),
+            Self::Orders => iconify_icon!("lucide:shopping-cart"),
+            Self::Products => iconify_icon!("lucide:package"),
+            Self::Customers => iconify_icon!("lucide:users"),
+        }
+    }
+
+    fn target(self) -> &'static (dyn HrefTarget + Sync) {
+        match self {
+            Self::Dashboard => &_dashboard::page,
+            Self::Orders => &orders::page,
+            Self::Products => &products::page,
+            Self::Customers => &customers::page,
+        }
+    }
+}
+
+/// The breadcrumb label of a detail page, computed for each request. Pages declare it
+/// in their route context, such as `#[page(with(Crumb::new(async |cx| ...)))]`.
+pub struct Crumb(BoxCxFn<Result<String>>);
+
+impl Crumb {
+    pub fn new(label: impl AsyncCxFn<Result<String>>) -> Self {
+        Self(BoxCxFn::new(label))
+    }
 }
 
 #[layout]
@@ -191,25 +208,24 @@ async fn app_sidebar(
                     sidebar_group_label((t!(store)))
                     sidebar_group_content(
                         sidebar_menu(
-                            for item in &NAV {
-                                let href = href!(item.target);
-                                let current = in_section(cx, &href.resolve(cx));
+                            for section in Section::ALL {
+                                let current = *context::<Section>(cx) == section;
                                 sidebar_menu_item(
                                     link(
-                                        href: href,
+                                        href: href!(section.target()),
                                         attrs: attributes! {
                                             data-sidebar="menu-button"
                                             data-active=(if current { "true" } else { "false" })
                                             aria-current=(current.then_some("page"))
-                                            title=((item.label)())
+                                            title=(section.label())
                                             class=(sidebar_menu_button_variants(
                                                 SidebarMenuButtonVariant::Default,
                                                 SidebarMenuButtonSize::Md,
                                             ))
                                             @click=$(|_e: Event| mobile_open.set(false))
                                         },
-                                        icon(data: item.icon.clone())
-                                        <span>((item.label)())</span>
+                                        icon(data: section.icon())
+                                        <span>(section.label())</span>
                                     )
                                 )
                             }
@@ -275,36 +291,43 @@ async fn user_menu(cx: &Cx, user: &User) -> Result<impl View> {
 
 #[component]
 async fn page_breadcrumb(cx: &Cx) -> Result<impl View> {
-    let section = NAV
-        .iter()
-        .map(|item| (item, href!(item.target)))
-        .find(|(_, href)| in_section(cx, &href.resolve(cx)));
+    let section = *context::<Section>(cx);
+    let href = href!(section.target());
     let crumb = try_context::<Crumb>(cx);
 
     Ok(view! {
         breadcrumb(
             breadcrumb_list(
                 breadcrumb_item("Backroom")
-                if let Some((item, href)) = section {
+                breadcrumb_separator()
+                breadcrumb_item(
+                    if href.is_current(cx) {
+                        breadcrumb_page((section.label()))
+                    } else {
+                        breadcrumb_link(
+                            attrs: attributes! { (link_attrs(cx, href, prefetch_mode(cx))) },
+                            (section.label())
+                        )
+                    }
+                )
+                if let Some(crumb) = crumb {
                     breadcrumb_separator()
                     breadcrumb_item(
-                        if href.is_current(cx) {
-                            breadcrumb_page(((item.label)()))
-                        } else {
-                            breadcrumb_link(
-                                attrs: attributes! { (link_attrs(cx, href, prefetch_mode(cx))) },
-                                ((item.label)())
-                            )
-                        }
+                        suspense(
+                            fallback: view! { skeleton(attrs: attributes! { class="h-4 w-24" }) },
+                            crumb_label(crumb: crumb)
+                        )
                     )
-                    if let Some(Crumb(label)) = crumb {
-                        breadcrumb_separator()
-                        breadcrumb_item(breadcrumb_page((label)))
-                    }
                 }
             )
         )
     })
+}
+
+#[component]
+async fn crumb_label(cx: &Cx, crumb: &Crumb) -> Result<impl View> {
+    let label = crumb.0.call(cx).await?;
+    Ok(view! { breadcrumb_page((label)) })
 }
 
 #[component]

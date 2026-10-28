@@ -4,12 +4,13 @@ use std::{
     pin::{Pin, pin},
     sync::Arc,
     task::Poll,
+    time::Duration,
 };
 
-use tokio::sync::oneshot;
+use tokio::{sync::oneshot, time::timeout};
 use topcoat::{
     Result,
-    context::{ContextMap, Cx},
+    context::{ContextMap, Cx, memoize},
     view::{SuspenseMode, View, ViewFirst, ViewSwap, component, emit, live, suspense, view},
 };
 
@@ -298,4 +299,40 @@ async fn a_scoped_mode_overrides_the_router_mode() {
         .with_shared(Arc::new(router))
         .with(SuspenseMode::Stream);
     assert!(streams_fallback(cx, None).await);
+}
+
+/// A memoized label that is pending on its first poll.
+#[memoize]
+async fn shared_label(cx: &Cx) -> String {
+    tokio::task::yield_now().await;
+    String::from("shared")
+}
+
+#[component]
+async fn shared(cx: &Cx) -> Result<impl View> {
+    let label = shared_label(cx).await;
+    Ok(view! { <i>(label)</i> })
+}
+
+#[tokio::test]
+async fn a_suspended_child_does_not_block_a_sibling_awaiting_the_same_memoized_call() {
+    let cx = &Cx::default();
+    let mut view = pin!(view! {
+        cx =>
+        suspense(fallback: view! { <p>"loading"</p> }, shared())
+        <b>shared()</b>
+    });
+
+    // The suspense starts the memoized call, then stops polling its child once
+    // the fallback goes out. The sibling must still get the label.
+    let content = timeout(Duration::from_secs(5), first(&mut view))
+        .await
+        .expect("the sibling should not wait on the suspended child")
+        .unwrap();
+    let html = content.content.render(cx);
+    assert!(html.contains("<p>loading</p>"), "{html}");
+    assert!(html.contains("<b><i>shared</i></b>"), "{html}");
+
+    let swap = next_swap(&mut view).await.unwrap().unwrap();
+    assert_eq!(swap.replacement.render(cx), "<i>shared</i>");
 }

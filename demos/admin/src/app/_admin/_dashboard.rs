@@ -14,9 +14,12 @@ use topcoat::{
     },
 };
 
-use super::orders::{
-    order_id::{self, OrderId},
-    status_badge, time_ago,
+use super::{
+    Section,
+    orders::{
+        order_id::{self, OrderId},
+        status_badge, time_ago,
+    },
 };
 use crate::{
     app::_common::{money, timestamp},
@@ -39,7 +42,7 @@ messages!("{mod}/l10n/{locale}.ftl");
 
 const TICK: Duration = Duration::from_secs(1);
 
-#[page]
+#[page(with(Section::Dashboard))]
 pub async fn page(cx: &Cx) -> Result<impl View> {
     let user = require_user(cx).await?;
     let first_name = user.name.split_whitespace().next().unwrap_or(&user.name);

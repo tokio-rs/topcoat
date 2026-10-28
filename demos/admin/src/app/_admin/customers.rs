@@ -6,12 +6,13 @@ use topcoat::{
     context::Cx,
     icon::{icon, iconify::iconify_icon},
     l10n::{DateTime, DateTimeStyle, Translation, fluent::messages},
-    router::{href, page, query_params},
+    router::{Slot, href, layout, page, query_params},
     runtime::{Event, Signal, link, shard, signal},
     view::{View, attributes, component, element_id, suspense, view},
 };
 
 use self::customer_id::CustomerId;
+use super::Section;
 use crate::{
     app::_common::money,
     components::{
@@ -51,6 +52,12 @@ impl CustomersQuery {
             page: (number > 1).then_some(number),
         }
     }
+}
+
+/// Marks the customer pages as part of the customers section.
+#[layout(with(Section::Customers))]
+async fn section(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! { (slot) })
 }
 
 #[page]

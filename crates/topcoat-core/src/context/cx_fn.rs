@@ -19,9 +19,7 @@ macro_rules! cx_fn {
         ($($arg:ident: $ty:ident),*)
     ) => {
         /// Names the future that a function returns for one lifetime of its
-        /// [`Cx`], so [`
-        #[doc = stringify!($bound)]
-        /// `] can require it to be `Send`.
+        #[doc = concat!("[`Cx`], so [`", stringify!($bound), "`] can require it to be `Send`.")]
         #[doc(hidden)]
         pub trait $future<'cx, $($ty,)* R>:
             Fn(&'cx Cx $(, $ty)*) -> <Self as $future<'cx, $($ty,)* R>>::Fut

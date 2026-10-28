@@ -3,10 +3,7 @@ use topcoat::{
     context::{Cx, memoize},
     icon::{IconData, icon, iconify::iconify_icon},
     l10n::Translation,
-    router::{
-        Body, Next, error::RouterErrorExt, href, layer, module_param, page, path_param,
-        response::Response,
-    },
+    router::{error::RouterErrorExt, href, module_param, page, path_param},
     runtime::link,
     view::{Child, View, attributes, component, suspense, view},
 };
@@ -47,14 +44,7 @@ async fn customer(cx: &Cx) -> Result<Customer> {
     Ok(Customer::find(cx, id).await?.ok_or_not_found()?)
 }
 
-#[layer]
-async fn crumb(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
-    let name = customer(cx).await?.name.clone();
-    let cx = cx.with(Crumb(name));
-    next.run(&cx, body).await
-}
-
-#[page]
+#[page(with(Crumb::new(async |cx| Ok(customer(cx).await?.name.clone()))))]
 pub async fn page(cx: &Cx) -> Result<impl View> {
     require_user(cx).await?;
     let customer = customer(cx).await?;

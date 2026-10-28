@@ -7,12 +7,13 @@ use topcoat::{
     context::Cx,
     icon::{icon, iconify::iconify_icon},
     l10n::{DateTime, DateTimeStyle, Translation, fluent::messages},
-    router::{href, page, query_params},
+    router::{Slot, href, layout, page, query_params},
     runtime::{Event, Signal, link, shard, signal},
     view::{StaticClass, View, attributes, class, component, element_id, suspense, view},
 };
 
 use self::order_id::OrderId;
+use super::Section;
 use crate::{
     app::_common::{money, timestamp},
     components::{
@@ -55,6 +56,12 @@ impl OrdersQuery {
             page: (number > 1).then_some(number),
         }
     }
+}
+
+/// Marks the order pages as part of the orders section.
+#[layout(with(Section::Orders))]
+async fn section(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! { (slot) })
 }
 
 #[page]

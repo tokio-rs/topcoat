@@ -4,12 +4,9 @@ use topcoat::{
     context::Cx,
     l10n::{DateTime, DateTimeStyle, Translation},
     router::{
-        Body, Next,
         content::Form,
         error::{RouterErrorExt, SeeOther, see_other},
-        href, layer, module_param, page, path_param,
-        response::Response,
-        route,
+        href, module_param, page, path_param, route,
     },
     runtime::{Event, link, signal},
     view::{View, attributes, component, element_id, suspense, view},
@@ -44,14 +41,7 @@ use crate::{
 
 module_param!(pub order_id: u64, error = not_found);
 
-#[layer]
-async fn crumb(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
-    let id = path_param::<OrderId>(cx)?;
-    let cx = cx.with(Crumb(format!("#{id}")));
-    next.run(&cx, body).await
-}
-
-#[page]
+#[page(with(Crumb::new(async |cx| Ok(format!("#{}", path_param::<OrderId>(cx)?)))))]
 pub async fn page(cx: &Cx) -> Result<impl View> {
     let user = require_user(cx).await?;
     let id = *path_param::<OrderId>(cx)?;

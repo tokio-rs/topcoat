@@ -6,12 +6,13 @@ use topcoat::{
     context::Cx,
     icon::{icon, iconify::iconify_icon},
     l10n::{Translation, fluent::messages},
-    router::{href, page, query_params},
+    router::{Slot, href, layout, page, query_params},
     runtime::{Event, Signal, link, shard, signal},
     view::{StaticClass, View, attributes, class, component, element_id, suspense, view},
 };
 
 use self::product_id::ProductId;
+use super::Section;
 use crate::{
     app::_common::money,
     components::{
@@ -53,6 +54,12 @@ impl ProductsQuery {
             page: (number > 1).then_some(number),
         }
     }
+}
+
+/// Marks the product pages as part of the products section.
+#[layout(with(Section::Products))]
+async fn section(slot: Slot<'_>) -> Result<impl View> {
+    Ok(view! { (slot) })
 }
 
 #[page]

@@ -3,12 +3,10 @@ use topcoat::{
     context::{Cx, memoize, try_context},
     l10n::Translation,
     router::{
-        Body, Method, Next, StatusCode,
+        Body, Method, StatusCode,
         content::Form,
         error::{RouterErrorExt, SeeOther, rewrite, see_other},
-        href, layer, module_param, page, path_param,
-        response::Response,
-        route,
+        href, module_param, page, path_param, route,
     },
     runtime::link,
     view::{Attributes, View, attributes, class, component, element_id, view},
@@ -42,14 +40,7 @@ async fn product(cx: &Cx) -> Result<Product> {
     Ok(Product::find(cx, id).await?.ok_or_not_found()?)
 }
 
-#[layer]
-async fn crumb(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
-    let name = product(cx).await?.name.clone();
-    let cx = cx.with(Crumb(name));
-    next.run(&cx, body).await
-}
-
-#[page]
+#[page(with(Crumb::new(async |cx| Ok(product(cx).await?.name.clone()))))]
 pub async fn page(cx: &Cx) -> Result<impl View> {
     let user = require_user(cx).await?;
     let product = product(cx).await?;
