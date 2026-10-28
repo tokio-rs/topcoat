@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use topcoat_core::context::Cx;
+use topcoat_core::context::{ContextMap, Cx};
 
 use crate::{
     Body, Endpoint, Endpoints, Layer, Methods, Path, PathBuf, PathSegment, Route, RouteFuture,
@@ -76,7 +76,12 @@ impl TrailingSlash {
             };
             if self == Self::Redirect {
                 let route = Box::new(RedirectRoute::new(path));
-                let route = routes.push(route, twin_index, always_layers.into());
+                let route = routes.push(
+                    route,
+                    twin_index,
+                    always_layers.into(),
+                    ContextMap::new(),
+                );
                 endpoints[twin_index].insert_any(route);
             }
         }

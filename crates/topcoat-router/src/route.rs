@@ -296,19 +296,18 @@ pub(crate) struct Routes {
 }
 
 impl Routes {
-    /// Registers `route` as served by `endpoint` and wrapped by `layers`,
-    /// returning the [`RouteIndex`] that now identifies the registration.
-    ///
-    /// Builds the route's context here, so it is built once per router.
+    /// Registers `route` as served by `endpoint`, wrapped by `layers` and
+    /// with the values of `context`, returning the [`RouteIndex`] that now
+    /// identifies the registration.
     pub(crate) fn push(
         &mut self,
         route: Box<dyn Route>,
         endpoint: EndpointIndex,
         layers: Box<[Arc<dyn Layer>]>,
+        context: ContextMap,
     ) -> RouteIndex {
         let index = RouteIndex::new(self.routes.len());
         self.endpoint_lookup.insert(route.id(), endpoint);
-        let context = route.context();
         let context = (!context.is_empty()).then(|| Arc::new(context));
         self.routes.push(RouteWithLayers {
             route,

@@ -412,18 +412,44 @@ impl RouterBuilder {
     #[must_use]
     #[track_caller]
     pub fn build(self) -> Router {
+        // Each route's context is built here, so it is built once per router.
+        let mut registrations: Vec<(Box<dyn Route>, ContextMap)> = self
+            .routes
+            .into_iter()
+            .map(|route| {
+                let context = route.context();
+                (route, context)
+            })
+            .collect();
+        // Each layout's values are built once and shared by every page it wraps.
+        let layouts: Vec<(Arc<dyn Layout>, ContextMap)> = self
+            .layouts
+            .into_iter()
+            .map(|layout| {
+                let context = layout.context();
+                (layout, context)
+            })
+            .collect();
         // Wire each page to the layouts whose path is a prefix of the page's,
         // ordered from least- to most-specific so the page nests innermost.
-        let mut registrations = self.routes;
         for page in self.pages {
-            let mut matching: Vec<Arc<dyn Layout>> = self
-                .layouts
+            let mut matching: Vec<_> = layouts
                 .iter()
-                .filter(|layout| page.path().starts_with(layout.path()))
-                .cloned()
+                .filter(|(layout, _)| page.path().starts_with(layout.path()))
                 .collect();
-            matching.sort_by_key(|layout| layout.path().len());
-            registrations.push(Box::new(PageWithLayouts::new(page, matching)));
+            matching.sort_by_key(|(layout, _)| layout.path().len());
+
+            // Outermost layout first and the page last, so each level shadows
+            // the levels around it.
+            let mut layouts = Vec::with_capacity(matching.len());
+            let mut context = ContextMap::new();
+            for (layout, layout_context) in matching {
+                layouts.push(Arc::clone(layout));
+                layout_context.clone().install(&mut context);
+            }
+            page.context().install(&mut context);
+
+            registrations.push((Box::new(PageWithLayouts::new(page, layouts)), context));
         }
 
         // Group routes that share a path onto a single endpoint. Two routes
@@ -435,7 +461,7 @@ impl RouterBuilder {
         let mut endpoints = Endpoints::default();
         let mut grouped: HashMap<Cow<'static, str>, EndpointIndex> = HashMap::new();
         let mut layers_used = vec![false; self.layers.len()];
-        for route in registrations {
+        for (route, context) in registrations {
             // The layers wrapping a route are selected against its own path,
             // group segments included, so a layer inside a group wraps only
             // the routes registered through that group.
@@ -454,7 +480,7 @@ impl RouterBuilder {
                     endpoints.push(key.clone(), Endpoint::new(Path::new(key)))
                 });
 
-            let route_index = routes.push(route, endpoint_index, layer_stack);
+            let route_index = routes.push(route, endpoint_index, layer_stack, context);
             let route = &routes[route_index];
             let endpoint = &mut endpoints[endpoint_index];
 
