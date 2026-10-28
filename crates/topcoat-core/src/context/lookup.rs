@@ -116,7 +116,7 @@ mod tests {
     fn context_returns_a_sealed_value() {
         let mut shared = ContextMap::new();
         shared.insert(Database("primary"));
-        let cx = Cx::new(Arc::new(shared));
+        let cx = Cx::new().with_shared(Arc::new(shared));
 
         assert_eq!(context::<Database>(&cx), &Database("primary"));
     }
@@ -138,7 +138,8 @@ mod tests {
     fn iter_context_visits_request_values_before_sealed_values() {
         let mut shared = ContextMap::new();
         shared.insert(Database("primary"));
-        let cx = Cx::new(Arc::new(shared))
+        let cx = Cx::new()
+            .with_shared(Arc::new(shared))
             .with(Database("replica"))
             .with(Database("cache"));
 

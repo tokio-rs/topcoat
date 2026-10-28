@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use topcoat::{
     Result,
-    context::Cx,
+    context::{Cx, context},
     router::{Body, ModulePage, Page, Router, content::Form, href, page, request::uri, to_bytes},
     view::{View, view},
 };
@@ -120,6 +120,13 @@ async fn retitled() -> Result<impl View> {
     Ok(view! { <p>"retitled"</p> })
 }
 
+// A page reading its own route context during a request.
+#[page("/titled", with(Title("titled")))]
+async fn titled(cx: &Cx) -> Result<impl View> {
+    let title = context::<Title>(cx).0;
+    Ok(view! { <p>(title)</p> })
+}
+
 // A page with route context but no path, derived by the module router.
 #[page(with(Title("module")))]
 async fn module_described() -> Result<impl View> {
@@ -223,6 +230,14 @@ fn a_later_context_value_shadows_an_earlier_one() {
     assert_eq!(context.get::<Title>(), Some(&Title("second")));
     let titles: Vec<_> = context.iter::<Title>().collect();
     assert_eq!(titles, [&Title("second"), &Title("first")]);
+}
+
+#[tokio::test]
+async fn a_page_reads_its_context_during_a_request() {
+    let router = Router::builder().page(titled).build();
+    let (status, body) = send(&router, "/titled").await;
+    assert_eq!(status, 200);
+    assert_eq!(body, "<p>titled</p>");
 }
 
 #[test]

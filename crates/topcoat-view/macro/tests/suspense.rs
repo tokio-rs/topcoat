@@ -294,6 +294,8 @@ async fn suspense_takes_its_mode_from_the_context() {
 async fn a_scoped_mode_overrides_the_router_mode() {
     let mut router = ContextMap::new();
     router.insert(SuspenseMode::Wait);
-    let cx = &Cx::new(Arc::new(router)).with(SuspenseMode::Stream);
+    let cx = &Cx::new()
+        .with_shared(Arc::new(router))
+        .with(SuspenseMode::Stream);
     assert!(streams_fallback(cx, None).await);
 }

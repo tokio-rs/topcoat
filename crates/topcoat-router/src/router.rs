@@ -122,7 +122,8 @@ impl Router {
             // Rewrites start with a fresh context. Keep only the values
             // passed by the caller or a rewrite, and discard any other
             // request state. Add the router's values last so they win.
-            let cx = Cx::new(Arc::clone(&inner.context))
+            let cx = Cx::new()
+                .with_shared(Arc::clone(&inner.context))
                 .with_many(chain.context().clone())
                 .with_many((
                     Arc::clone(&self.inner),
@@ -180,15 +181,24 @@ impl Router {
                     params.iter().map(|(_, value)| value),
                 );
                 let route_index = endpoint.get(&parts.method).or_else(|| endpoint.any());
-                let next = match route_index {
-                    Some(index) => Next::new(&[], Terminal::Route(&inner.routes[index])),
-                    None => Next::new(&inner.always_layers, Terminal::MethodNotAllowed(endpoint)),
-                };
                 let matched = Matched {
                     endpoint: endpoint_index,
                     route: route_index,
                 };
-                (cx.with_many((matched, path_params)), next)
+                let mut matched_cx = cx.with_many((matched, path_params));
+                let next = match route_index {
+                    Some(index) => {
+                        let route = &inner.routes[index];
+                        // The route's values sit between the router's values
+                        // and the request's, so request values shadow them.
+                        if let Some(context) = route.shared_context() {
+                            matched_cx = matched_cx.with_shared(Arc::clone(context));
+                        }
+                        Next::new(&[], Terminal::Route(route))
+                    }
+                    None => Next::new(&inner.always_layers, Terminal::MethodNotAllowed(endpoint)),
+                };
+                (matched_cx, next)
             }
             None => (cx, Next::new(&inner.always_layers, Terminal::NotFound)),
         };
@@ -366,13 +376,15 @@ pub(crate) fn test_matched_cx(path: &crate::Path) -> Cx {
         #[cfg(feature = "compression")]
         compression: crate::Compression::new(),
     };
-    Cx::new(Arc::clone(&inner.context)).with_many((
-        Arc::new(inner),
-        Matched {
-            endpoint,
-            route: None,
-        },
-    ))
+    Cx::new()
+        .with_shared(Arc::clone(&inner.context))
+        .with_many((
+            Arc::new(inner),
+            Matched {
+                endpoint,
+                route: None,
+            },
+        ))
 }
 
 #[cfg(test)]
@@ -380,13 +392,16 @@ mod tests {
     use std::{
         borrow::Cow,
         future::Future,
-        sync::{Arc, Mutex, OnceLock},
+        sync::{
+            Arc, Mutex, OnceLock,
+            atomic::{AtomicUsize, Ordering},
+        },
     };
 
     use http::{HeaderMap, StatusCode};
     use topcoat::view::{DynViewPart, HtmlWriter, NodeViewParts, PartsWriter, view};
     use topcoat_core::{
-        context::{Cx, context},
+        context::{Cx, context, iter_context},
         error::Result,
     };
     use topcoat_view::{BoxView, ViewExt, internal::MoveView};
@@ -2111,5 +2126,160 @@ mod tests {
         // still reads the request context through its owned clone.
         let body = block_on(to_bytes(response.into_body(), usize::MAX)).unwrap();
         assert!(body.starts_with(b"data: hello"), "{body:?}");
+    }
+
+    // -- Route context --
+
+    /// A value attached at several levels, so tests can see which levels a
+    /// request reads and in what order.
+    struct Tag(&'static str);
+
+    /// Joins every `Tag` in `cx`, closest first.
+    fn tags(cx: &Cx) -> String {
+        iter_context::<Tag>(cx)
+            .map(|tag| tag.0)
+            .collect::<Vec<_>>()
+            .join(",")
+    }
+
+    fn echo_tags(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { tags(cx).into_response(cx) })
+    }
+
+    fn render_tags(cx: &Cx, _body: Body) -> BoxView<'static> {
+        let tags = tags(cx);
+        view! { cx => (tags) }.boxed()
+    }
+
+    /// Answers every request with the tags it sees, without running the
+    /// route.
+    fn answer_tags<'a>(cx: &'a Cx, _body: Body, _next: Next<'a>) -> LayerFuture<'a> {
+        Box::pin(async move { tags(cx).into_response(cx) })
+    }
+
+    /// Adds a tag before running the rest of the chain.
+    fn tag_in_layer<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+        Box::pin(async move { next.run(&cx.with(Tag("layer")), body).await })
+    }
+
+    #[test]
+    fn a_route_reads_its_context_before_the_router_values() {
+        let router = RouterBuilder::new()
+            .with(Tag("app"))
+            .route(RouteFn::new(Method::GET, path("/x"), echo_tags).with(Tag("route")))
+            .build();
+
+        let (_, _, body) = send(&router, Method::GET, "/x");
+        assert_eq!(&body[..], b"route,app");
+    }
+
+    #[test]
+    fn a_page_reads_its_own_values_before_those_of_its_layouts() {
+        let router = RouterBuilder::new()
+            .with(Tag("app"))
+            .layout(LayoutFn::new(path("/"), layout_root).with(Tag("root")))
+            .layout(LayoutFn::new(path("/admin"), layout_admin).with(Tag("admin")))
+            .page(PageFn::new(Method::GET, path("/admin/users"), render_tags).with(Tag("page")))
+            .build();
+
+        let (_, _, body) = send(&router, Method::GET, "/admin/users");
+        assert_eq!(&body[..], b"R[A[page,admin,root,app]]");
+    }
+
+    #[test]
+    fn layouts_reach_only_the_pages_they_wrap() {
+        let router = RouterBuilder::new()
+            .layout(LayoutFn::new(path("/admin"), layout_admin).with(Tag("admin")))
+            .page(PageFn::new(Method::GET, path("/about"), render_tags).with(Tag("page")))
+            .build();
+
+        let (_, _, body) = send(&router, Method::GET, "/about");
+        assert_eq!(&body[..], b"page");
+    }
+
+    #[test]
+    fn values_passed_to_handle_with_shadow_route_values() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/x"), echo_tags).with(Tag("route")))
+            .build();
+
+        let response = block_on(router.handle_with(request(Method::GET, "/x"), (Tag("request"),)));
+        let body = block_on(to_bytes(response.into_body(), usize::MAX)).unwrap();
+        assert_eq!(&body[..], b"request,route");
+    }
+
+    #[test]
+    fn a_layer_value_shadows_route_values() {
+        let router = RouterBuilder::new()
+            .layer(LayerFn::new(None::<&Path>, tag_in_layer))
+            .route(RouteFn::new(Method::GET, path("/x"), echo_tags).with(Tag("route")))
+            .build();
+
+        let (_, _, body) = send(&router, Method::GET, "/x");
+        assert_eq!(&body[..], b"layer,route");
+    }
+
+    #[test]
+    fn layers_see_the_context_of_the_matched_route_only() {
+        let router = RouterBuilder::new()
+            .layer(LayerFn::new(None::<&Path>, answer_tags))
+            .route(RouteFn::new(Method::GET, path("/x"), say_route).with(Tag("route")))
+            .build();
+
+        assert_eq!(&send(&router, Method::GET, "/x").2[..], b"route");
+        // No route matched, so no route values are in scope.
+        assert_eq!(&send(&router, Method::GET, "/missing").2[..], b"");
+        assert_eq!(&send(&router, Method::POST, "/x").2[..], b"");
+    }
+
+    #[test]
+    fn a_rewrite_reads_the_context_of_its_target() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/old"), rewrite_to_x).with(Tag("old")))
+            .route(RouteFn::new(Method::GET, path("/x"), echo_tags).with(Tag("x")))
+            .build();
+
+        let (_, _, body) = send(&router, Method::GET, "/old");
+        assert_eq!(&body[..], b"x");
+    }
+
+    #[test]
+    fn the_route_context_is_built_once_per_router() {
+        static BUILDS: AtomicUsize = AtomicUsize::new(0);
+
+        /// Counts how often the router asks for its context.
+        struct Counted(RouteFn);
+
+        impl Route for Counted {
+            fn id(&self) -> RouteId {
+                self.0.id()
+            }
+
+            fn methods(&self) -> Methods<'_> {
+                self.0.methods()
+            }
+
+            fn path(&self) -> &Path {
+                Route::path(&self.0)
+            }
+
+            fn context(&self) -> ContextMap {
+                BUILDS.fetch_add(1, Ordering::Relaxed);
+                self.0.context()
+            }
+
+            fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
+                self.0.handle(cx, body)
+            }
+        }
+
+        let route = RouteFn::new(Method::GET, path("/x"), echo_tags).with(Tag("route"));
+        let router = RouterBuilder::new().route(Counted(route)).build();
+        assert_eq!(BUILDS.load(Ordering::Relaxed), 1);
+
+        for _ in 0..2 {
+            assert_eq!(&send(&router, Method::GET, "/x").2[..], b"route");
+        }
+        assert_eq!(BUILDS.load(Ordering::Relaxed), 1);
     }
 }

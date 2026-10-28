@@ -43,30 +43,14 @@ pub struct Cx {
 }
 
 impl Cx {
-    /// Starts a new request context with access to `shared`.
+    /// Starts a new request context with no values.
     ///
-    /// Several requests can use the same map without copying its values.
-    /// Calling [`with`](Self::with) can override a shared value in a child
-    /// context without changing the shared map.
+    /// Add values shared across requests with
+    /// [`with_shared`](Self::with_shared), and values of this request with
+    /// [`with`](Self::with).
     #[must_use]
-    pub fn new(shared: Arc<ContextMap>) -> Self {
-        Self {
-            scope: Arc::new(Scope {
-                request: Arc::new(RequestState {
-                    id: CxId::new(),
-                    memoize_cache: MemoizeCache::new(),
-                    abort_store: AbortStore::new(),
-                }),
-                values: ContextMap::new(),
-                sealed: Some(Arc::new(Sealed {
-                    id: BindingId::new(),
-                    values: shared,
-                    parent: None,
-                })),
-            }),
-            tracker: None,
-            identity: Identity::ROOT,
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Returns this request's unique [`CxId`].
@@ -145,6 +129,31 @@ impl Cx {
         let mut derived = self.scope.values.clone();
         values.install(&mut derived);
         self.derive(derived)
+    }
+
+    /// Creates a child context that can also read the values of `shared`.
+    ///
+    /// Several requests can use the same map without copying its values.
+    /// The child searches `shared` after the values added with
+    /// [`with`](Self::with) or [`with_many`](Self::with_many), whatever order
+    /// the calls were made in, and before the maps added by earlier calls to
+    /// this method. A request value therefore shadows a shared value of the
+    /// same type, and the newest shared map shadows older ones.
+    #[must_use]
+    pub fn with_shared(&self, shared: Arc<ContextMap>) -> Cx {
+        Cx {
+            scope: Arc::new(Scope {
+                request: Arc::clone(&self.scope.request),
+                values: self.scope.values.clone(),
+                sealed: Some(Arc::new(Sealed {
+                    id: BindingId::new(),
+                    values: shared,
+                    parent: self.scope.sealed.clone(),
+                })),
+            }),
+            tracker: self.tracker.clone(),
+            identity: self.identity,
+        }
     }
 
     /// Creates a child with `values`, keeping the same request state and
@@ -349,11 +358,16 @@ mod tests {
     #[derive(Debug, PartialEq)]
     struct Other(&'static str);
 
-    /// Creates a context with `value` in its shared map.
-    fn shared<T: Any + Send + Sync>(value: T) -> Cx {
+    /// Creates a shared map holding `value`.
+    fn map<T: Any + Send + Sync>(value: T) -> Arc<ContextMap> {
         let mut values = ContextMap::new();
         values.insert(value);
-        Cx::new(Arc::new(values))
+        Arc::new(values)
+    }
+
+    /// Creates a context with `value` in its shared map.
+    fn shared<T: Any + Send + Sync>(value: T) -> Cx {
+        Cx::new().with_shared(map(value))
     }
 
     /// Creates a context whose sealed layers hold `layers`, newest first.
@@ -381,8 +395,8 @@ mod tests {
 
     #[test]
     fn a_fresh_context_has_a_unique_id() {
-        let first = Cx::new(Arc::new(ContextMap::new()));
-        let second = Cx::new(Arc::new(ContextMap::new()));
+        let first = Cx::new();
+        let second = Cx::new();
         assert_ne!(first.id(), second.id());
     }
 
@@ -519,6 +533,32 @@ mod tests {
             context::<Other>(&child),
             context::<Other>(&cx)
         ));
+    }
+
+    #[test]
+    fn request_values_shadow_shared_values_added_later() {
+        let cx = Cx::new().with(Marker(1)).with_shared(map(Marker(2)));
+
+        assert_eq!(context::<Marker>(&cx), &Marker(1));
+        assert_eq!(markers(&cx), [1, 2]);
+    }
+
+    #[test]
+    fn newer_shared_maps_shadow_older_ones() {
+        let cx = shared(Marker(1)).with_shared(map(Marker(2)));
+
+        assert_eq!(context::<Marker>(&cx), &Marker(2));
+        assert_eq!(markers(&cx), [2, 1]);
+    }
+
+    #[test]
+    fn with_shared_keeps_the_request_state() {
+        let cx = Cx::new().with(Marker(1));
+        let child = cx.with_shared(map(Other("shared")));
+
+        assert_eq!(child.id(), cx.id());
+        assert!(std::ptr::eq(memoize_cache(&child), memoize_cache(&cx)));
+        assert_eq!(try_context::<Other>(&cx), None);
     }
 
     #[test]

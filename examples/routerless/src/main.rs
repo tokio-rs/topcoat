@@ -24,9 +24,10 @@ async fn main() -> Result<()> {
     let shared = Arc::new(shared);
 
     for name in ["Ada & Grace", "World"] {
-        // Start a context for this render using the shared map.
-        // Use Cx::default() when there are no shared values.
-        let cx = Cx::new(Arc::clone(&shared)).with(Reader { name });
+        // Start a context for this render that reads the shared map.
+        let cx = Cx::new()
+            .with_shared(Arc::clone(&shared))
+            .with(Reader { name });
         let html = render(&cx).await?;
         println!("{html}");
     }

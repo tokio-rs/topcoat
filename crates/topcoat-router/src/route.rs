@@ -2,6 +2,7 @@
 mod directory;
 
 use std::{
+    any::Any,
     borrow::Cow,
     collections::HashMap,
     num::NonZeroUsize,
@@ -129,6 +130,8 @@ pub struct RouteFn {
     path: Cow<'static, Path>,
     /// The handler function that produces the response.
     handle: RouteHandlerFn,
+    /// The values attached to this route.
+    context: ContextMap,
 }
 
 impl RouteFn {
@@ -165,7 +168,21 @@ impl RouteFn {
             methods: methods.into(),
             path: path.into_path(),
             handle,
+            context: ContextMap::new(),
         }
+    }
+
+    /// Adds `value` to the context of this route.
+    ///
+    /// The value shadows an earlier value of the same type. Read it during
+    /// a request with [`context`](topcoat_core::context::context).
+    #[must_use]
+    pub fn with<T>(mut self, value: T) -> Self
+    where
+        T: Any + Send + Sync,
+    {
+        self.context.insert(value);
+        self
     }
 }
 
@@ -180,6 +197,10 @@ impl Route for RouteFn {
 
     fn path(&self) -> &Path {
         &self.path
+    }
+
+    fn context(&self) -> ContextMap {
+        self.context.clone()
     }
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
@@ -227,6 +248,16 @@ pub(crate) struct RouteWithLayers {
     /// route's path (group segments included) and ordered from least- to
     /// most-specific so the outermost layer runs first.
     layers: Box<[Arc<dyn Layer>]>,
+    /// The route's context, built once when the router is built, or `None`
+    /// when it holds no values.
+    context: Option<Arc<ContextMap>>,
+}
+
+impl RouteWithLayers {
+    /// Returns the route's context, or `None` when it holds no values.
+    pub(crate) fn shared_context(&self) -> Option<&Arc<ContextMap>> {
+        self.context.as_ref()
+    }
 }
 
 impl Route for RouteWithLayers {
@@ -243,7 +274,7 @@ impl Route for RouteWithLayers {
     }
 
     fn context(&self) -> ContextMap {
-        self.route.context()
+        self.context.as_deref().cloned().unwrap_or_default()
     }
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
@@ -267,6 +298,8 @@ pub(crate) struct Routes {
 impl Routes {
     /// Registers `route` as served by `endpoint` and wrapped by `layers`,
     /// returning the [`RouteIndex`] that now identifies the registration.
+    ///
+    /// Builds the route's context here, so it is built once per router.
     pub(crate) fn push(
         &mut self,
         route: Box<dyn Route>,
@@ -275,7 +308,13 @@ impl Routes {
     ) -> RouteIndex {
         let index = RouteIndex::new(self.routes.len());
         self.endpoint_lookup.insert(route.id(), endpoint);
-        self.routes.push(RouteWithLayers { route, layers });
+        let context = route.context();
+        let context = (!context.is_empty()).then(|| Arc::new(context));
+        self.routes.push(RouteWithLayers {
+            route,
+            layers,
+            context,
+        });
         index
     }
 

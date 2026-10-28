@@ -363,10 +363,10 @@ mod tests {
 
     #[test]
     fn other_sealed_layers_invalidate_an_iteration_read() {
-        let cx = Cx::new(Arc::default());
+        let cx = Cx::new().with_shared(Arc::default());
         let read = ContextRead::all::<Session>(cx.scope());
 
-        assert!(!read.matches(Cx::new(Arc::default()).scope()));
+        assert!(!read.matches(Cx::new().with_shared(Arc::default()).scope()));
     }
 
     #[test]

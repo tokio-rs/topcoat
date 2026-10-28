@@ -84,6 +84,12 @@ impl ContextMap {
         self.entries.contains_key(&TypeId::of::<T>())
     }
 
+    /// Returns `true` if the map holds no values.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
     /// Borrows the value stored under `T`, or returns `None` if it is absent.
     #[must_use]
     pub fn get<T>(&self) -> Option<&T>
