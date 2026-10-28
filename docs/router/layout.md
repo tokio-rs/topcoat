@@ -10,6 +10,10 @@ The function must be `async` and return a [`Result`](../type.Result.html) contai
 
 Render `slot` where the inner content should appear. Wrap it in an [`error_boundary`](../view/struct.error_boundary.html) to show a custom view if it fails. See the [error guide](../router/error/index.html).
 
+# Route context
+
+Attach metadata with `with(...)`, such as `#[layout(with(Title("My shop")))]` or `#[layout("/", with(Title("My shop")))]`. You can add multiple `with(...)` entries, separated by commas. The values are initialized when the router is built and added to the context of every page the layout wraps, before any layer, layout, or handler runs. Inner layouts and pages can shadow these defaults. See [route context](../context/index.html#route-context) for reading and combining metadata.
+
 # Examples
 
 Module-derived path (in `src/app/settings.rs` under `module_router!()`, this wraps every page under `/settings`):

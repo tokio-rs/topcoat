@@ -14,6 +14,10 @@ Use `#[route(GET)]` without a path string with [module routing](macro.module_rou
 
 The function must be `async` and return `Result<T>`, where `T` implements [`AsyncIntoResponse`](response/trait.AsyncIntoResponse.html). Every [`IntoResponse`](response/trait.IntoResponse.html) type meets this bound. The handler may take [`cx: &Cx`](../context/struct.Cx.html) and one body parameter implementing [`FromRequest`](request/trait.FromRequest.html). Both are optional and may appear in either order. The body parameter may use a pattern such as `Json(input): Json<T>`.
 
+# Route context
+
+Attach metadata with `with(...)` after the methods and optional path, such as `#[route(GET, with(Operation("health-check")))]` or `#[route(GET "/health", with(Operation("health-check")))]`. You can add multiple `with(...)` entries, separated by commas. The values are initialized when the router is built and are available to layers before the handler runs. See [route context](../context/index.html#route-context) for reading and combining metadata.
+
 # Response conversion
 
 The macro converts the success value into a response. See [`IntoResponse`](response/trait.IntoResponse.html) for supported types and tuples. Wrap a value in [`Json<T>`](content/struct.Json.html) to serialize it as JSON.
