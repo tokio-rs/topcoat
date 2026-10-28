@@ -498,7 +498,7 @@ mod tests {
         }
         let (parts, ()) = builder.body(()).unwrap().into_parts();
 
-        Cx::default().with_many((parts, CookieJarCell::new()))
+        Cx::new().with_many((parts, CookieJarCell::new()))
     }
 
     /// The leading `name=value` pair of the request's first `Set-Cookie` value.

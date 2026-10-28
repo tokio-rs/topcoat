@@ -2,7 +2,7 @@ use topcoat::view::ViewExt;
 
 #[tokio::test]
 async fn attributes_macro_builds_runtime_attributes() {
-    let cx = &topcoat::context::Cx::default();
+    let cx = &topcoat::context::Cx::new();
     let id = "submit";
     let dynamic = [
         ("data-skip", "skip"),
@@ -55,7 +55,7 @@ async fn attributes_macro_builds_runtime_attributes() {
 async fn spread_inserts_attribute_fragment_into_element() {
     use topcoat::{context::Cx, view::view};
 
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let attrs = topcoat::view::attributes! { cx => type="submit" };
     let result = view! { cx => <button (attrs)>"Save"</button> };
     let html = result.single().await.unwrap().render(cx);
@@ -67,7 +67,7 @@ async fn spread_inserts_attribute_fragment_into_element() {
 async fn spread_follows_other_attributes() {
     use topcoat::{context::Cx, view::view};
 
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let attrs = topcoat::view::attributes! { cx => type="submit" };
     let result = view! { cx => <button class="btn" (attrs)>"Save"</button> };
     let html = result.single().await.unwrap().render(cx);
@@ -80,7 +80,7 @@ async fn spread_follows_other_attributes() {
 async fn dynamic_key_still_parses_after_spread_support() {
     // A parenthesized key followed by `=` remains a dynamic attribute, not a
     // spread.
-    let cx = &topcoat::context::Cx::default();
+    let cx = &topcoat::context::Cx::new();
     let name = "data-state";
     let attrs = topcoat::view::attributes! { cx => (name)="ready" };
     assert!(attrs.contains_key("data-state"));
@@ -90,7 +90,7 @@ async fn dynamic_key_still_parses_after_spread_support() {
 async fn spread_merges_within_attributes_macro() {
     use topcoat::{context::Cx, view::view};
 
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let base = topcoat::view::attributes! { cx => class="btn" type="button" };
     let merged = topcoat::view::attributes! { cx => class="card" (base) };
 

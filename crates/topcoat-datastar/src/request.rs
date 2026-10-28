@@ -27,7 +27,7 @@ mod tests {
         }
 
         let (parts, ()) = builder.body(()).unwrap().into_parts();
-        Cx::default().with(parts)
+        Cx::new().with(parts)
     }
 
     #[test]
@@ -41,6 +41,6 @@ mod tests {
             "false"
         )])));
         assert!(!datastar_request(&cx_with(&[])));
-        assert!(!datastar_request(&Cx::default()));
+        assert!(!datastar_request(&Cx::new()));
     }
 }

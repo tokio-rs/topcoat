@@ -299,7 +299,7 @@ mod tests {
             .body(())
             .unwrap();
         let (parts, ()) = request.into_parts();
-        let cx = Cx::default().with(parts);
+        let cx = Cx::new().with(parts);
         assert_eq!(last_event_id(&cx), Some("42"));
     }
 
@@ -315,7 +315,7 @@ mod tests {
             .body(())
             .unwrap();
         let (parts, ()) = request.into_parts();
-        let cx = Cx::default().with(parts);
+        let cx = Cx::new().with(parts);
         assert_eq!(last_event_id(&cx), Some(id));
     }
 
@@ -330,7 +330,7 @@ mod tests {
             .body(())
             .unwrap();
         let (parts, ()) = request.into_parts();
-        let cx = Cx::default().with(parts);
+        let cx = Cx::new().with(parts);
         assert_eq!(last_event_id(&cx), None);
     }
 
@@ -341,7 +341,7 @@ mod tests {
             .body(())
             .unwrap()
             .into_parts();
-        let cx = Cx::default().with(parts);
+        let cx = Cx::new().with(parts);
         assert_eq!(last_event_id(&cx), None);
     }
 }

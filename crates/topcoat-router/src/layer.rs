@@ -377,7 +377,7 @@ mod tests {
     #[test]
     fn run_invokes_the_route_terminal_when_no_layers_remain() {
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
-        let cx = Cx::default();
+        let cx = Cx::new();
 
         let next = Next::new(&[], Terminal::Route(&route));
         let result = block_on(next.run(&cx, Body::empty()));
@@ -392,7 +392,7 @@ mod tests {
         let mut endpoint = Endpoint::new(&path("/x"));
         endpoint.insert(Method::GET, RouteIndex::new(0));
         endpoint.insert(Method::POST, RouteIndex::new(1));
-        let cx = Cx::default();
+        let cx = Cx::new();
 
         let next = Next::new(&[], Terminal::MethodNotAllowed(&endpoint));
         let result = block_on(next.run(&cx, Body::empty()));
@@ -419,7 +419,7 @@ mod tests {
         let route = RouteFn::new(Method::GET, path("/x"), record_route);
 
         let trace: Arc<Trace> = Arc::new(Mutex::new(Vec::new()));
-        let cx = Cx::default().with(trace.clone());
+        let cx = Cx::new().with(trace.clone());
 
         let next = Next::new(&layers, Terminal::Route(&route));
         block_on(next.run(&cx, Body::empty())).unwrap();
@@ -433,7 +433,7 @@ mod tests {
         let layers: [Arc<dyn Layer>; 1] = [Arc::new(LayerFn::new(Some(path("/")), short_circuit))];
         // The route would answer "route", but the layer never calls `next.run`.
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
-        let cx = Cx::default();
+        let cx = Cx::new();
 
         let next = Next::new(&layers, Terminal::Route(&route));
         let result = block_on(next.run(&cx, Body::empty()));

@@ -257,7 +257,7 @@ mod tests {
             builder = builder.header(*name, *value);
         }
         let (parts, ()) = builder.body(()).expect("request should build").into_parts();
-        Cx::default().with(parts)
+        Cx::new().with(parts)
     }
 
     fn check(policy: &OriginPolicy, method: Method, headers: &[(&str, &str)]) -> OriginVerdict {

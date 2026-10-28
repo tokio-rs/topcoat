@@ -371,7 +371,7 @@ mod tests {
             JoinUnit::new(ticker(a, 3)),
             JoinPair::new(JoinUnit::new(ticker(b, 1)), JoinUnit::new(ticker(c, 2))),
         );
-        let cx = Cx::default();
+        let cx = Cx::new();
         let mut view = std::pin::pin!(JoinView::new(&cx, units, |_, _| ()));
 
         let mut task_cx = Context::from_waker(Waker::noop());

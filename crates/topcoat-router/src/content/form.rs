@@ -218,7 +218,7 @@ mod tests {
 
         let (parts, ()) = builder.body(()).expect("request should build").into_parts();
 
-        Cx::default().with(parts)
+        Cx::new().with(parts)
     }
 
     #[tokio::test]
@@ -343,7 +343,7 @@ mod tests {
             ("a".to_owned(), "1".to_owned()),
             ("b".to_owned(), "two".to_owned()),
         ])
-        .into_response(&Cx::default())
+        .into_response(&Cx::new())
         .expect("serialization succeeds");
 
         assert_eq!(

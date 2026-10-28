@@ -745,7 +745,7 @@ mod tests {
 
     /// Builds a context carrying `https://example.com` as its base URL.
     fn cx_with_base_url() -> Cx {
-        Cx::default().with(BaseUrl::new("https://example.com").expect("a valid base URL"))
+        Cx::new().with(BaseUrl::new("https://example.com").expect("a valid base URL"))
     }
 
     /// Builds a context whose request URI is `uri`.
@@ -756,7 +756,7 @@ mod tests {
             .expect("a valid request URI")
             .into_parts();
 
-        Cx::default().with(parts)
+        Cx::new().with(parts)
     }
 
     /// Assigns `params` to `path` and returns the URL it produces.
@@ -933,7 +933,7 @@ mod tests {
         let url = href("/users/{id}", (Param("id", "42"),))
             .query([("page", "2")])
             .fragment("bio")
-            .resolve(&Cx::default());
+            .resolve(&Cx::new());
 
         assert_eq!(url, "/users/42?page=2#bio");
     }
@@ -945,19 +945,19 @@ mod tests {
             Param("id", "42"),
             Param("post_id", "7")
         )
-        .resolve(&Cx::default());
+        .resolve(&Cx::new());
 
         assert_eq!(url, "/users/42/posts/7");
     }
 
     #[test]
     fn the_macro_without_parameters_resolves_a_static_path() {
-        assert_eq!(href!("/users").resolve(&Cx::default()), "/users");
+        assert_eq!(href!("/users").resolve(&Cx::new()), "/users");
     }
 
     #[test]
     fn a_set_form_overrides_the_context_form() {
-        let cx = Cx::default().with(UrlForm::Absolute);
+        let cx = Cx::new().with(UrlForm::Absolute);
         let url = href("/users", ()).relative().resolve(&cx);
 
         assert_eq!(url, "/users");

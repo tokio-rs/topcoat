@@ -70,7 +70,7 @@ impl Cx {
     ///
     /// ```
     /// # use topcoat_core::context::Cx;
-    /// # let cx = Cx::default();
+    /// # let cx = Cx::new();
     /// let first = cx.keyed(());
     /// let second = cx.keyed(());
     ///
@@ -386,7 +386,7 @@ mod tests {
                 sealed,
                 ..Scope::default()
             }),
-            ..Cx::default()
+            ..Cx::new()
         }
     }
 
@@ -408,12 +408,9 @@ mod tests {
             cx.keyed(key)
         }
 
-        let cx = Cx::default();
+        let cx = Cx::new();
         assert_ne!(identity(&cx.keyed(())), identity(&cx.keyed(())));
-        assert_eq!(
-            identity(&child(&cx, 1)),
-            identity(&child(&Cx::default(), 1))
-        );
+        assert_eq!(identity(&child(&cx, 1)), identity(&child(&Cx::new(), 1)));
         assert_ne!(identity(&child(&cx, 1)), identity(&child(&cx, 2)));
         assert_ne!(
             identity(&child(&child(&cx, 1), 2)),
@@ -424,7 +421,7 @@ mod tests {
 
     #[test]
     fn keyed_contexts_share_request_state_and_preserve_their_scope() {
-        let cx = Cx::default().with(Marker(7));
+        let cx = Cx::new().with(Marker(7));
         let child = cx.keyed("child");
         assert!(Arc::ptr_eq(&child.scope, &cx.scope));
         assert_eq!(child.id(), cx.id());
@@ -444,7 +441,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "identity cannot be read inside memoized functions")]
     fn memoized_functions_cannot_read_identity() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         memoize_cache(&cx).memoize(&cx, (), (), |cx, ()| {
             identity(&cx.keyed(()).with(Marker(7)))
         });
@@ -453,14 +450,14 @@ mod tests {
     #[test]
     #[should_panic(expected = "identity cannot be read inside memoized functions")]
     fn memoized_functions_cannot_try_identity() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         memoize_cache(&cx).memoize(&cx, (), (), |cx, ()| try_identity(&cx));
     }
 
     #[tokio::test]
     #[should_panic(expected = "identity cannot be read inside memoized functions")]
     async fn memoized_functions_cannot_read_identity_after_suspension() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         memoize_cache(&cx)
             .memoize_async(&cx, (), (), |cx, ()| async move {
                 tokio::task::yield_now().await;
@@ -471,7 +468,7 @@ mod tests {
 
     #[test]
     fn with_registers_a_value_on_the_child() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         let child = cx.with(Marker(1));
 
         assert_eq!(try_context::<Marker>(&cx), None);
@@ -480,7 +477,7 @@ mod tests {
 
     #[test]
     fn with_shadows_without_touching_the_parent() {
-        let cx = Cx::default().with(Marker(1));
+        let cx = Cx::new().with(Marker(1));
         let child = cx.with(Marker(2));
 
         assert_eq!(context::<Marker>(&cx), &Marker(1));
@@ -499,7 +496,7 @@ mod tests {
 
     #[test]
     fn with_many_registers_every_value() {
-        let cx = Cx::default().with_many((Marker(1), Other("many")));
+        let cx = Cx::new().with_many((Marker(1), Other("many")));
 
         assert_eq!(context::<Marker>(&cx), &Marker(1));
         assert_eq!(context::<Other>(&cx), &Other("many"));
@@ -507,7 +504,7 @@ mod tests {
 
     #[test]
     fn a_child_shares_the_request_state() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         let child = cx.with(Marker(1));
 
         assert_eq!(child.id(), cx.id());
@@ -517,7 +514,7 @@ mod tests {
 
     #[test]
     fn clones_outlive_the_original() {
-        let cx = Cx::default().with(Marker(7));
+        let cx = Cx::new().with(Marker(7));
         let id = cx.id();
         let handle = cx.clone();
         drop(cx);
@@ -616,7 +613,7 @@ mod tests {
 
     #[test]
     fn track_shares_the_scope() {
-        let cx = Cx::default().with(Marker(1));
+        let cx = Cx::new().with(Marker(1));
         let (child, _tracker) = cx.track();
 
         assert!(Arc::ptr_eq(&child.scope, &cx.scope));
@@ -626,7 +623,7 @@ mod tests {
 
     #[test]
     fn derived_handles_keep_the_tracker() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         let (child, tracker) = cx.track();
         let derived = child.with(Marker(1)).keyed(());
 

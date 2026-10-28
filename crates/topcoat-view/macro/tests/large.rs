@@ -13,7 +13,7 @@ async fn item(n: usize) -> Result<impl View> {
 
 #[tokio::test]
 async fn hundreds_of_dynamic_positions_in_one_template_compile_and_render_in_order() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let counter = AtomicUsize::new(0);
     let next = || counter.fetch_add(1, Ordering::Relaxed);
 

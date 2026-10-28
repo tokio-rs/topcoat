@@ -85,7 +85,7 @@ mod tests {
     #[test]
     fn responds_503_with_a_retry_after_header() {
         let response = service_unavailable(2)
-            .into_response(&Cx::default())
+            .into_response(&Cx::new())
             .expect("the response builds");
 
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);

@@ -317,7 +317,7 @@ mod tests {
         let mut cx = Context::from_waker(Waker::noop());
         loop {
             if let Poll::Ready(first) = view.as_mut().poll_first(&mut cx) {
-                return first.unwrap().content.render(&Cx::default());
+                return first.unwrap().content.render(&Cx::new());
             }
         }
     }
@@ -348,7 +348,7 @@ mod tests {
             panic!("expected a swap");
         };
         assert_eq!(
-            swap.replacement.render(&Cx::default()),
+            swap.replacement.render(&Cx::new()),
             "<!--swap-->replacement"
         );
         assert!(matches!(
@@ -400,14 +400,8 @@ mod tests {
             panic!("expected content");
         };
 
-        assert_eq!(
-            first.content.render(&Cx::default()),
-            "<!--a--><!--a-->content"
-        );
-        assert_eq!(
-            second.content.render(&Cx::default()),
-            "<!--b--><!--b-->content"
-        );
+        assert_eq!(first.content.render(&Cx::new()), "<!--a--><!--a-->content");
+        assert_eq!(second.content.render(&Cx::new()), "<!--b--><!--b-->content");
     }
 
     #[test]
@@ -554,17 +548,14 @@ mod tests {
                 break first.unwrap();
             }
         };
-        assert_eq!(
-            first.content.render(&Cx::default()),
-            "<!--a--><!--b-->content"
-        );
+        assert_eq!(first.content.render(&Cx::new()), "<!--a--><!--b-->content");
 
         // The swap's replacement is fresh content, so the keys hoist again.
         let Poll::Ready(Ok(Some(swap))) = view.as_mut().poll_swap(&mut cx) else {
             panic!("expected a swap");
         };
         assert_eq!(
-            swap.replacement.render(&Cx::default()),
+            swap.replacement.render(&Cx::new()),
             "<!--a--><!--b-->replacement"
         );
     }

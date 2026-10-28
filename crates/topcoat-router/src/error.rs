@@ -276,7 +276,7 @@ mod tests {
     fn a_service_unavailable_error_maps_to_503_not_500() {
         let error: Error = service_unavailable(2).into();
 
-        let response = error_into_response(&Cx::default(), error);
+        let response = error_into_response(&Cx::new(), error);
 
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(
@@ -293,7 +293,7 @@ mod tests {
     fn a_too_many_requests_error_maps_to_429_not_500() {
         let error: Error = too_many_requests(60).into();
 
-        let response = error_into_response(&Cx::default(), error);
+        let response = error_into_response(&Cx::new(), error);
 
         assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
         assert_eq!(
@@ -309,7 +309,7 @@ mod tests {
     fn an_error_that_is_not_on_the_list_still_maps_to_500() {
         let error: Error = std::io::Error::other("boom").into();
 
-        let response = error_into_response(&Cx::default(), error);
+        let response = error_into_response(&Cx::new(), error);
 
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
@@ -323,7 +323,7 @@ mod tests {
         let error: Error = not_found().into();
         let cached = error.clone();
 
-        let response = error_into_response(&Cx::default(), error);
+        let response = error_into_response(&Cx::new(), error);
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
         drop(cached);

@@ -415,7 +415,7 @@ mod tests {
         }
         let (parts, ()) = builder.body(()).unwrap().into_parts();
 
-        Cx::default().with_many((parts, CookieJarCell::new()))
+        Cx::new().with_many((parts, CookieJarCell::new()))
     }
 
     /// Builds the context used by [`cx_with`] and adds the key read by
@@ -426,7 +426,7 @@ mod tests {
 
     #[test]
     fn try_accessors_return_none_without_the_cookie_layer() {
-        let cx = Cx::default().with(Key::generate());
+        let cx = Cx::new().with(Key::generate());
 
         assert!(try_cookies(&cx).is_none());
         assert!(try_signed_cookies(&cx).is_none());
@@ -548,7 +548,7 @@ mod tests {
         // The jar is never accessed, so nothing should be written. Crucially,
         // we register no `Parts`: if `write_cookies` parsed the request anyway
         // it would panic looking them up, proving it short-circuits.
-        let cx = Cx::default().with(CookieJarCell::new());
+        let cx = Cx::new().with(CookieJarCell::new());
         let mut headers = HeaderMap::new();
         write_cookies(&cx, &mut headers);
 

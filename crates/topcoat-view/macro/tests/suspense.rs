@@ -59,7 +59,7 @@ async fn next_swap<V: View>(view: &mut Pin<&mut V>) -> Result<Option<ViewSwap>> 
 
 #[tokio::test]
 async fn suspense_shows_the_fallback_until_the_child_is_ready() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let (tx, rx) = oneshot::channel();
     let mut view = pin!(view! {
         cx =>
@@ -84,7 +84,7 @@ async fn suspense_shows_the_fallback_until_the_child_is_ready() {
 
 #[tokio::test]
 async fn suspense_renders_a_ready_child_in_place() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let mut view = pin!(view! {
         cx =>
         suspense(
@@ -103,7 +103,7 @@ async fn suspense_renders_a_ready_child_in_place() {
 
 #[tokio::test]
 async fn suspense_forwards_a_ready_childs_swaps() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let mut view = pin!(view! {
         cx =>
         suspense(
@@ -132,7 +132,7 @@ async fn suspense_forwards_a_ready_childs_swaps() {
 
 #[tokio::test]
 async fn suspense_forwards_child_swaps_after_replacing_the_fallback() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let (tx, rx) = oneshot::channel::<()>();
     let mut view = pin!(view! {
         cx =>
@@ -175,7 +175,7 @@ async fn suspense_forwards_child_swaps_after_replacing_the_fallback() {
 
 #[tokio::test]
 async fn suspense_propagates_a_child_error() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let (tx, rx) = oneshot::channel();
     let mut view = pin!(view! {
         cx =>
@@ -194,12 +194,12 @@ async fn suspense_propagates_a_child_error() {
 
 #[tokio::test]
 async fn suspense_streams_by_default() {
-    assert!(streams_fallback(&Cx::default(), None).await);
+    assert!(streams_fallback(&Cx::new(), None).await);
 }
 
 #[tokio::test]
 async fn waiting_suspense_holds_its_first_content_until_the_child_is_ready() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let (tx, rx) = oneshot::channel();
     let mut view = pin!(view! {
         cx =>
@@ -222,7 +222,7 @@ async fn waiting_suspense_holds_its_first_content_until_the_child_is_ready() {
 
 #[tokio::test]
 async fn waiting_suspense_forwards_a_live_childs_swaps() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let (tx, rx) = oneshot::channel::<()>();
     let mut view = pin!(view! {
         cx =>
@@ -257,7 +257,7 @@ async fn waiting_suspense_forwards_a_live_childs_swaps() {
 
 #[tokio::test]
 async fn waiting_suspense_propagates_a_child_error() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let (tx, rx) = oneshot::channel();
     let mut view = pin!(view! {
         cx =>
@@ -277,16 +277,16 @@ async fn waiting_suspense_propagates_a_child_error() {
 
 #[tokio::test]
 async fn an_explicit_mode_overrides_the_context() {
-    let cx = &Cx::default().with(SuspenseMode::Wait);
+    let cx = &Cx::new().with(SuspenseMode::Wait);
     assert!(streams_fallback(cx, Some(SuspenseMode::Stream)).await);
 
-    let cx = &Cx::default().with(SuspenseMode::Stream);
+    let cx = &Cx::new().with(SuspenseMode::Stream);
     assert!(!streams_fallback(cx, Some(SuspenseMode::Wait)).await);
 }
 
 #[tokio::test]
 async fn suspense_takes_its_mode_from_the_context() {
-    let cx = &Cx::default().with(SuspenseMode::Wait);
+    let cx = &Cx::new().with(SuspenseMode::Wait);
     assert!(!streams_fallback(cx, None).await);
 }
 

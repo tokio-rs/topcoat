@@ -16,7 +16,7 @@ async fn sync_memoized_function_runs_body_once_per_key_per_request() {
         x + y
     }
 
-    let cx = Cx::default();
+    let cx = Cx::new();
 
     let a = add(&cx, 1, 2);
     let b = add(&cx, 1, 2);
@@ -39,8 +39,8 @@ async fn sync_memoized_function_cache_does_not_cross_requests() {
         x + y
     }
 
-    let cx1 = Cx::default();
-    let cx2 = Cx::default();
+    let cx1 = Cx::new();
+    let cx2 = Cx::new();
 
     add(&cx1, 7, 7);
     add(&cx2, 7, 7);
@@ -59,7 +59,7 @@ async fn async_memoized_function_runs_body_once_per_key_per_request() {
         format!("post:{slug}")
     }
 
-    let cx = Cx::default();
+    let cx = Cx::new();
 
     let a = fetch(&cx, "hello").await;
     let b = fetch(&cx, "hello").await;
@@ -91,7 +91,7 @@ async fn async_memoized_function_with_borrowed_argument_works_in_send_future() {
         future
     }
 
-    let cx = Cx::default();
+    let cx = Cx::new();
 
     let value = require_send(async {
         let slug = String::from("hello");
@@ -111,7 +111,7 @@ async fn async_memoized_function_returns_stable_reference() {
         format!("post:{slug}")
     }
 
-    let cx = Cx::default();
+    let cx = Cx::new();
 
     let first: &String = fetch(&cx, "same").await;
     let second: &String = fetch(&cx, "same").await;
@@ -130,7 +130,7 @@ async fn memoized_option_return_is_borrowed_ergonomically_with_as_ref() {
         if is_some { Some(42) } else { None }
     }
 
-    let cx = Cx::default();
+    let cx = Cx::new();
 
     let some_value: Option<&i32> = maybe(&cx, true);
     let none_value: Option<&i32> = maybe(&cx, false);
@@ -150,7 +150,7 @@ async fn memoized_result_return_is_borrowed_ergonomically_with_as_ref() {
         if fail { Err("nope".to_owned()) } else { Ok(42) }
     }
 
-    let cx = Cx::default();
+    let cx = Cx::new();
 
     let ok_value: Result<&i32, &String> = fallible(&cx, false);
     let err_value: Result<&i32, &String> = fallible(&cx, true);
@@ -172,7 +172,7 @@ mod cx_import_used_only_by_memoized_signature {
 
 #[tokio::test]
 async fn memoized_signature_uses_the_written_cx_type() {
-    let cx = Cx::default();
+    let cx = Cx::new();
 
     assert_eq!(*cx_import_used_only_by_memoized_signature::value(&cx), 42);
 }
@@ -200,7 +200,7 @@ async fn memoized_topcoat_error_propagates_with_question_mark_under_as_ref() {
         Ok(*fallible(cx)?)
     }
 
-    let cx = Cx::default();
+    let cx = Cx::new();
 
     assert!(caller(&cx).unwrap_err().is::<Failure>());
 }
@@ -213,7 +213,7 @@ async fn memoized_option_return_is_a_plain_reference_by_default() {
         if is_some { Some(42) } else { None }
     }
 
-    let cx = Cx::default();
+    let cx = Cx::new();
 
     let value: &Option<i32> = maybe(&cx, true);
 
@@ -239,7 +239,7 @@ async fn separate_memoized_functions_have_independent_caches() {
         x * 10
     }
 
-    let cx = Cx::default();
+    let cx = Cx::new();
 
     assert_eq!(*fn_a(&cx, 1), 1);
     assert_eq!(*fn_b(&cx, 1), 10);
@@ -276,7 +276,7 @@ async fn sync_direct_and_indirect_recursion_with_different_keys() {
         if depth == 0 { 0 } else { 1 + *a(cx, depth - 1) }
     }
 
-    let cx = Cx::default();
+    let cx = Cx::new();
 
     assert_eq!(*direct(&cx, 5), 5);
     assert_eq!(*a(&cx, 5), 5);
@@ -320,7 +320,7 @@ async fn async_direct_and_indirect_recursion_with_different_keys() {
         }
     }
 
-    let cx = Cx::default();
+    let cx = Cx::new();
 
     assert_eq!(*direct(&cx, 5).await, 5);
     assert_eq!(*a(&cx, 5).await, 5);
@@ -334,7 +334,7 @@ async fn sync_direct_recursion_with_same_key_panics() {
         *recursive(cx)
     }
 
-    recursive(&Cx::default());
+    recursive(&Cx::new());
 }
 
 #[tokio::test]
@@ -355,7 +355,7 @@ async fn sync_indirect_recursion_with_same_key_panics() {
         *a(cx)
     }
 
-    a(&Cx::default());
+    a(&Cx::new());
 }
 
 #[tokio::test]
@@ -366,7 +366,7 @@ async fn async_direct_recursion_with_same_key_panics() {
         *Box::pin(recursive(cx)).await
     }
 
-    recursive(&Cx::default()).await;
+    recursive(&Cx::new()).await;
 }
 
 #[tokio::test]
@@ -387,5 +387,5 @@ async fn async_indirect_recursion_with_same_key_panics() {
         *Box::pin(a(cx)).await
     }
 
-    a(&Cx::default()).await;
+    a(&Cx::new()).await;
 }

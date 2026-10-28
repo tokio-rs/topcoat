@@ -31,7 +31,7 @@ async fn next_swap<V: View>(view: &mut Pin<&mut V>) -> Result<Option<ViewSwap>> 
 
 #[tokio::test]
 async fn error_boundary_renders_child_content_as_plain_content() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let html = view! {
         cx =>
         error_boundary(fallback: |_| Ok(view! { <p>"failed"</p> }), <p>"content"</p>)
@@ -46,7 +46,7 @@ async fn error_boundary_renders_child_content_as_plain_content() {
 
 #[tokio::test]
 async fn error_boundary_shows_the_fallback_for_a_failed_child() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let html = view! {
         cx =>
         error_boundary(
@@ -64,7 +64,7 @@ async fn error_boundary_shows_the_fallback_for_a_failed_child() {
 
 #[tokio::test]
 async fn error_boundary_rethrows_an_error_the_fallback_returns() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let error = view! {
         cx =>
         error_boundary(
@@ -86,7 +86,7 @@ async fn error_boundary_rethrows_an_error_the_fallback_returns() {
 
 #[tokio::test]
 async fn error_boundary_replaces_streamed_content_on_a_late_error() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let (tx, rx) = oneshot::channel::<()>();
     let mut view = pin!(view! {
         cx =>
@@ -114,7 +114,7 @@ async fn error_boundary_replaces_streamed_content_on_a_late_error() {
 
 #[tokio::test]
 async fn error_boundary_finishes_after_a_single_emission_fallback() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let (tx, rx) = oneshot::channel::<()>();
     let mut view = pin!(view! {
         cx =>
@@ -142,7 +142,7 @@ async fn error_boundary_finishes_after_a_single_emission_fallback() {
 
 #[tokio::test]
 async fn error_boundary_streams_a_multi_emission_fallback_after_a_late_error() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let (tx, rx) = oneshot::channel::<()>();
     let mut view = pin!(view! {
         cx =>

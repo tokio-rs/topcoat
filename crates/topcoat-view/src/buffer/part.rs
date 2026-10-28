@@ -492,7 +492,7 @@ mod tests {
 
     /// Builds a view through a writer sealed with `context` and renders it.
     fn render_with(context: HtmlContext, f: impl FnOnce(&mut PartsWriter<'_>)) -> String {
-        ViewBuffer::build(|parts| parts.in_context(context, f)).render(&Cx::default())
+        ViewBuffer::build(|parts| parts.in_context(context, f)).render(&Cx::new())
     }
 
     #[test]

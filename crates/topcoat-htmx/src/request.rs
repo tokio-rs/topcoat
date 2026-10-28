@@ -86,7 +86,7 @@ mod tests {
         }
         let (parts, ()) = builder.body(()).unwrap().into_parts();
 
-        Cx::default().with(parts)
+        Cx::new().with(parts)
     }
 
     #[test]
@@ -131,7 +131,7 @@ mod tests {
 
     #[test]
     fn headers_are_absent_outside_a_request() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         assert!(!hx_request(&cx));
         assert_eq!(hx_target(&cx), None);
     }

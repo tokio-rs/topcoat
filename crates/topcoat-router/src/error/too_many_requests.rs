@@ -83,7 +83,7 @@ mod tests {
     #[test]
     fn responds_429_with_a_retry_after_header() {
         let response = too_many_requests(60)
-            .into_response(&Cx::default())
+            .into_response(&Cx::new())
             .expect("the response builds");
 
         assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);

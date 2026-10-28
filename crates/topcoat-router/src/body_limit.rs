@@ -150,18 +150,18 @@ mod tests {
 
     #[test]
     fn body_limit_defaults_to_two_mebibytes() {
-        assert_eq!(body_limit(&Cx::default()), DEFAULT_BODY_LIMIT);
+        assert_eq!(body_limit(&Cx::new()), DEFAULT_BODY_LIMIT);
     }
 
     #[test]
     fn body_limit_reads_the_registered_limit() {
-        let cx = Cx::default().with(BodyLimitKind::Limit(16));
+        let cx = Cx::new().with(BodyLimitKind::Limit(16));
         assert_eq!(body_limit(&cx), 16);
     }
 
     #[test]
     fn body_limit_disabled_is_unlimited() {
-        let cx = Cx::default().with(BodyLimitKind::Disable);
+        let cx = Cx::new().with(BodyLimitKind::Disable);
         assert_eq!(body_limit(&cx), usize::MAX);
     }
 

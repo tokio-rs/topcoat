@@ -168,19 +168,19 @@ greeting = Hallo, { $name }!
             .body(())
             .expect("request should build")
             .into_parts();
-        Cx::default().with(parts)
+        Cx::new().with(parts)
     }
 
     #[test]
     fn resolves_for_the_locale_of_the_scope() {
-        let cx = Cx::default().with(locale!("de"));
+        let cx = Cx::new().with(locale!("de"));
         assert_eq!(title().resolve(&cx), "Willkommen");
     }
 
     #[test]
     fn resolves_in_a_locale_other_than_the_one_of_the_scope() {
         let title = title();
-        let cx = Cx::default().with(locale!("en"));
+        let cx = Cx::new().with(locale!("en"));
         assert_eq!(title.resolve(&cx), "Welcome");
         assert_eq!(title.resolve_in(&locale!("de")), "Willkommen");
         assert_eq!(title.resolve_in(&locale!("fr")), "title");
@@ -206,7 +206,7 @@ greeting = Hallo, { $name }!
             test_translation_record!("unknown", "title", None),
             Box::new([]),
         );
-        let cx = Cx::default().with(locale!("en"));
+        let cx = Cx::new().with(locale!("en"));
         assert_eq!(title.resolve(&cx), "title");
     }
 
@@ -219,7 +219,7 @@ greeting = Hallo, { $name }!
                 ("count", Argument::from(8)),
             ]),
         );
-        let cx = Cx::default().with(locale!("en"));
+        let cx = Cx::new().with(locale!("en"));
         assert_eq!(
             missing.resolve(&cx),
             r#"missing.label(name = "Ada", count = 8)"#
@@ -233,7 +233,7 @@ greeting = Hallo, { $name }!
             test_translation_record!(NAMESPACE, "greeting", None),
             Box::new([("name", Argument::from(&name))]),
         );
-        let cx = Cx::default().with(locale!("de"));
+        let cx = Cx::new().with(locale!("de"));
         // Fluent isolates the argument from the surrounding text.
         assert_eq!(greeting.resolve(&cx), "Hallo, \u{2068}Ada\u{2069}!");
     }
@@ -264,7 +264,7 @@ greeting = Hallo, { $name }!
             test_translation_record!(NAMESPACE, "greeting", None),
             Box::new([("name", Argument::custom(Name))]),
         );
-        let cx = Cx::default().with(locale!("en"));
+        let cx = Cx::new().with(locale!("en"));
         assert_eq!(greeting.resolve(&cx), "Hello, \u{2068}Ada\u{2069}!");
     }
 
@@ -276,7 +276,7 @@ greeting = Hallo, { $name }!
 
     #[test]
     fn borrows_text_without_arguments() {
-        let cx = Cx::default().with(locale!("en"));
+        let cx = Cx::new().with(locale!("en"));
         assert!(matches!(title().resolve(&cx), Cow::Borrowed(_)));
     }
 
@@ -290,7 +290,7 @@ greeting = Hallo, { $name }!
             test_translation_record!(NAMESPACE, "greeting", None),
             Box::new([("name", Argument::from("<b>"))]),
         );
-        let cx = &Cx::default().with(locale!("en"));
+        let cx = &Cx::new().with(locale!("en"));
         let html = render(view! { cx => <p>(greeting)</p> }, cx).await;
         assert_eq!(html, "<p>Hello, \u{2068}&lt;b&gt;\u{2069}!</p>");
     }
@@ -301,7 +301,7 @@ greeting = Hallo, { $name }!
             test_translation_record!(NAMESPACE, "login-input", Some("placeholder")),
             Box::new([]),
         );
-        let cx = &Cx::default().with(locale!("en"));
+        let cx = &Cx::new().with(locale!("en"));
         let html = render(view! { cx => <input placeholder=(placeholder)> }, cx).await;
         assert_eq!(html, r#"<input placeholder="Your name">"#);
     }

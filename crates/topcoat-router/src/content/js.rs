@@ -63,7 +63,7 @@ mod tests {
     #[tokio::test]
     async fn into_response_sets_javascript_content_type() {
         let response = Js("export const a = 1;")
-            .into_response(&Cx::default())
+            .into_response(&Cx::new())
             .expect("response builds");
 
         assert_eq!(

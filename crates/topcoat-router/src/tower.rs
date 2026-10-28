@@ -604,7 +604,7 @@ mod tests {
             .body(())
             .unwrap()
             .into_parts();
-        Cx::default().with(parts)
+        Cx::new().with(parts)
     }
 
     /// Runs a request through `layer` wrapped directly around `route`.

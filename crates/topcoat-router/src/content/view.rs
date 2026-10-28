@@ -773,7 +773,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_view_handle_response_carries_its_status_and_headers() {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let handle = view! {
             cx =>
             (StatusCode::CREATED)
@@ -988,11 +988,11 @@ mod tests {
     #[test]
     fn a_request_without_a_delivery_gets_html() {
         assert_eq!(
-            view_response_delivery(&Cx::default()),
+            view_response_delivery(&Cx::new()),
             ViewResponseDelivery::Html
         );
         assert_eq!(
-            view_response_delivery(&Cx::default().with(ViewResponseDelivery::Frames)),
+            view_response_delivery(&Cx::new().with(ViewResponseDelivery::Frames)),
             ViewResponseDelivery::Frames
         );
     }
@@ -1158,7 +1158,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_framed_view_handle_response_is_a_snapshot_frame_with_its_status() {
-        let cx = &Cx::default().with(ViewResponseDelivery::Frames);
+        let cx = &Cx::new().with(ViewResponseDelivery::Frames);
         let handle = view! {
             cx =>
             (StatusCode::CREATED)

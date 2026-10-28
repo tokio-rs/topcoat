@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn a_present_read_matches_its_own_scope() {
-        let cx = Cx::default().with(Session);
+        let cx = Cx::new().with(Session);
 
         let read = expected::<Session>(&cx);
         assert!(read.matches(cx.scope()));
@@ -179,7 +179,7 @@ mod tests {
 
     #[test]
     fn shadowing_invalidates_a_present_read() {
-        let cx = Cx::default().with(Session);
+        let cx = Cx::new().with(Session);
         let read = expected::<Session>(&cx);
 
         let shadowed = cx.with(Session);
@@ -190,14 +190,14 @@ mod tests {
 
     #[test]
     fn an_absence_read_matches_while_the_type_is_absent() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         let read = expected::<Session>(&cx);
         assert!(read.matches(cx.scope()));
     }
 
     #[test]
     fn registering_the_type_invalidates_an_absence_read() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         let read = expected::<Session>(&cx);
 
         let extended = cx.with(Session);
@@ -208,7 +208,7 @@ mod tests {
 
     #[test]
     fn an_unrelated_binding_leaves_a_read_valid() {
-        let cx = Cx::default().with(Session);
+        let cx = Cx::new().with(Session);
         let read = expected::<Session>(&cx);
 
         let extended = cx.with(Theme);
@@ -218,7 +218,7 @@ mod tests {
 
     #[test]
     fn a_present_read_is_recorded() {
-        let cx = Cx::default().with(Session);
+        let cx = Cx::new().with(Session);
         let (child, tracker) = cx.track();
 
         let _: &Session = context(&child);
@@ -228,7 +228,7 @@ mod tests {
 
     #[test]
     fn an_absence_read_is_recorded() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         let (child, tracker) = cx.track();
 
         assert!(try_context::<Session>(&child).is_none());
@@ -237,7 +237,7 @@ mod tests {
 
     #[test]
     fn a_repeated_read_is_recorded_once() {
-        let cx = Cx::default().with(Session);
+        let cx = Cx::new().with(Session);
         let (child, tracker) = cx.track();
 
         let _ = try_context::<Session>(&child);
@@ -248,7 +248,7 @@ mod tests {
 
     #[test]
     fn distinct_reads_are_all_recorded() {
-        let cx = Cx::default().with(Session);
+        let cx = Cx::new().with(Session);
         let (child, tracker) = cx.track();
 
         let _ = try_context::<Session>(&child);
@@ -262,7 +262,7 @@ mod tests {
 
     #[test]
     fn an_inherited_read_through_a_derived_scope_is_recorded() {
-        let cx = Cx::default().with(Session);
+        let cx = Cx::new().with(Session);
         let (child, tracker) = cx.track();
         let derived = child.with(Theme);
 
@@ -273,7 +273,7 @@ mod tests {
 
     #[test]
     fn a_read_of_an_internal_binding_is_not_recorded() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         let (child, tracker) = cx.track();
         let derived = child.with(Theme);
 
@@ -284,7 +284,7 @@ mod tests {
 
     #[test]
     fn a_read_of_an_internal_shadowing_binding_is_not_recorded() {
-        let cx = Cx::default().with(Session);
+        let cx = Cx::new().with(Session);
         let (child, tracker) = cx.track();
         let derived = child.with(Session);
 
@@ -295,7 +295,7 @@ mod tests {
 
     #[test]
     fn a_read_through_the_untracked_original_is_not_recorded() {
-        let cx = Cx::default().with(Session);
+        let cx = Cx::new().with(Session);
         let (_child, tracker) = cx.track();
 
         let _ = try_context::<Session>(&cx);
@@ -305,7 +305,7 @@ mod tests {
 
     #[test]
     fn a_read_through_a_clone_of_the_tracked_handle_is_recorded() {
-        let cx = Cx::default().with(Session);
+        let cx = Cx::new().with(Session);
         let (child, tracker) = cx.track();
 
         let _ = try_context::<Session>(&child.clone());
@@ -315,7 +315,7 @@ mod tests {
 
     #[test]
     fn a_read_on_another_thread_is_recorded() {
-        let cx = Cx::default().with(Session);
+        let cx = Cx::new().with(Session);
         let (child, tracker) = cx.track();
 
         std::thread::spawn(move || {
@@ -329,7 +329,7 @@ mod tests {
 
     #[test]
     fn merge_applies_the_entry_filter_and_deduplicates() {
-        let cx = Cx::default().with(Session);
+        let cx = Cx::new().with(Session);
         let (child, tracker) = cx.track();
         let scoped = child.with(Theme);
         let inherited = expected::<Session>(&cx);
@@ -342,7 +342,7 @@ mod tests {
 
     #[test]
     fn shadowing_invalidates_an_iteration_read() {
-        let cx = Cx::default().with(Session);
+        let cx = Cx::new().with(Session);
         let read = ContextRead::all::<Session>(cx.scope());
 
         let shadowed = cx.with(Session);
@@ -353,7 +353,7 @@ mod tests {
 
     #[test]
     fn an_unrelated_binding_leaves_an_iteration_read_valid() {
-        let cx = Cx::default().with(Session);
+        let cx = Cx::new().with(Session);
         let read = ContextRead::all::<Session>(cx.scope());
 
         let extended = cx.with(Theme);
@@ -371,7 +371,7 @@ mod tests {
 
     #[test]
     fn an_iteration_read_is_recorded() {
-        let cx = Cx::default().with(Session);
+        let cx = Cx::new().with(Session);
         let (child, tracker) = cx.track();
 
         let _ = iter_context::<Session>(&child).count();
@@ -384,7 +384,7 @@ mod tests {
 
     #[test]
     fn an_iteration_through_an_internal_binding_is_recorded_from_the_entry() {
-        let cx = Cx::default().with(Session);
+        let cx = Cx::new().with(Session);
         let (child, tracker) = cx.track();
         let derived = child.with(Session);
 
@@ -398,7 +398,7 @@ mod tests {
 
     #[test]
     fn closest_and_iteration_reads_of_one_type_are_both_recorded() {
-        let cx = Cx::default().with(Session);
+        let cx = Cx::new().with(Session);
         let (child, tracker) = cx.track();
 
         let _ = try_context::<Session>(&child);
@@ -415,7 +415,7 @@ mod tests {
 
     #[test]
     fn a_nested_track_replaces_the_inherited_tracker() {
-        let cx = Cx::default().with(Session);
+        let cx = Cx::new().with(Session);
         let (child, outer) = cx.track();
         let (nested, inner) = child.track();
 

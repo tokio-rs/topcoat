@@ -7,7 +7,7 @@ use topcoat::{
 };
 
 fn empty_cx() -> Cx {
-    Cx::default()
+    Cx::new()
 }
 
 /// Renders its own identity hash as `label=hash;` for the assertions to
@@ -289,7 +289,7 @@ fn region_ids(html: &str) -> Vec<&str> {
 
 #[tokio::test]
 async fn sibling_region_ids_do_not_depend_on_completion_order() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let mut previous = None;
     for slow_first in [false, true] {
         let mut view = pin!(view! {
@@ -339,7 +339,7 @@ async fn updating(label: &str) -> Result<impl View> {
 
 #[tokio::test]
 async fn region_ids_follow_component_keys_when_reordered() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let render = |labels: [&'static str; 2]| async move {
         view! {
             cx =>

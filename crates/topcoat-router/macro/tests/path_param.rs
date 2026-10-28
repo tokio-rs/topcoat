@@ -275,19 +275,19 @@ fn constructs_public_parameter_values() {
 
 #[test]
 fn fills_a_typed_param_into_an_href() {
-    let url = href("/posts/{public_id}", (PublicId(42),)).resolve(&Cx::default());
+    let url = href("/posts/{public_id}", (PublicId(42),)).resolve(&Cx::new());
     assert_eq!(url, "/posts/42");
 }
 
 #[test]
 fn escapes_an_unparsed_param_filled_into_an_href() {
-    let url = href("/tags/{public_slug}", (PublicSlug("getting started"),)).resolve(&Cx::default());
+    let url = href("/tags/{public_slug}", (PublicSlug("getting started"),)).resolve(&Cx::new());
     assert_eq!(url, "/tags/getting%20started");
 }
 
 #[test]
 fn fills_one_href_segment_per_typed_catch_all_element() {
-    let url = href("/archive/{*number_path}", (NumberPath(vec![1, 2, 3]),)).resolve(&Cx::default());
+    let url = href("/archive/{*number_path}", (NumberPath(vec![1, 2, 3]),)).resolve(&Cx::new());
     assert_eq!(url, "/archive/1/2/3");
 }
 
@@ -295,8 +295,7 @@ fn fills_one_href_segment_per_typed_catch_all_element() {
 fn fills_one_href_segment_per_unparsed_catch_all_element() {
     // A `/` inside an element is escaped, so it stays within its own segment
     // instead of adding one.
-    let url =
-        href("/docs/{*public_parts}", (PublicParts(["guides", "a/b"]),)).resolve(&Cx::default());
+    let url = href("/docs/{*public_parts}", (PublicParts(["guides", "a/b"]),)).resolve(&Cx::new());
     assert_eq!(url, "/docs/guides/a%2Fb");
 }
 

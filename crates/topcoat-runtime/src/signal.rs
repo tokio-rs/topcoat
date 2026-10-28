@@ -355,7 +355,7 @@ mod tests {
     /// Renders a body creating one string signal, whose value is read back
     /// into the content.
     fn render_with_signal(value: &'static str) -> String {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let view = HoistView::new(ThenView::new(async move {
             let signal = signal(cx, || String::from(value));
             Ok(view! { cx => <p>(signal.read_untracked())</p> })
@@ -366,7 +366,7 @@ mod tests {
     /// Renders a body creating one number signal and reading it with
     /// `read`, returning the content and the signal's dependency marker.
     fn render_reading(read: impl Fn(&Signal<String>) + Send + 'static) -> (String, String) {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let id = Arc::new(OnceLock::new());
         let out = Arc::clone(&id);
         let view = HoistView::new(ThenView::new(async move {
@@ -383,7 +383,7 @@ mod tests {
     /// Renders a body creating one signal under the component identity at
     /// `site`, returning the signal's id.
     fn signal_id_at(site: SiteKey) -> SignalId {
-        let cx = &with_identity(Cx::default(), Identity::ROOT.child(site));
+        let cx = &with_identity(Cx::new(), Identity::ROOT.child(site));
         let view = HoistView::new(ThenView::new(async move {
             let signal = signal(cx, || 0.0_f64);
             Ok(view! { cx => <p>(signal.id().to_string())</p> })
@@ -396,7 +396,7 @@ mod tests {
 
     #[test]
     fn creating_a_signal_outside_a_body_panics() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         let panic = catch_unwind(AssertUnwindSafe(|| signal(&cx, || 0.0_f64))).unwrap_err();
         let message = panic.downcast::<&str>().expect("panics with a message");
         assert!(message.contains("no view is collecting hoisted parts"));
@@ -410,7 +410,7 @@ mod tests {
 
     #[test]
     fn distinct_call_sites_render_distinct_ids() {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let view = HoistView::new(ThenView::new(async move {
             let first = signal(cx, || 0.0_f64);
             let second = signal(cx, || 0.0_f64);
@@ -428,7 +428,7 @@ mod tests {
     #[test]
     fn an_ambiguous_identity_panics() {
         let cx = with_identity(
-            Cx::default(),
+            Cx::new(),
             Identity::ROOT.ambiguous_child(SITE_A, "`card` at src/a.rs:1"),
         );
         let panic = catch_unwind(AssertUnwindSafe(|| signal(&cx, || 0.0_f64))).unwrap_err();
@@ -461,12 +461,12 @@ mod tests {
 
     /// A context carrying `value` for the signal `id`.
     fn cx_carrying(id: SignalId, value: serde_json::Value) -> Cx {
-        Cx::default().with(SignalValues(HashMap::from([(id, value)])))
+        Cx::new().with(SignalValues(HashMap::from([(id, value)])))
     }
 
     #[test]
     fn a_signal_resumes_from_the_value_the_request_carries() {
-        let (id, value, init_ran) = number_signal(&Cx::default());
+        let (id, value, init_ran) = number_signal(&Cx::new());
         assert_eq!((value, init_ran), (1.0, true));
 
         let cx = cx_carrying(id, serde_json::json!(5.0));
@@ -476,7 +476,7 @@ mod tests {
     #[test]
     fn context_keys_distinguish_repeated_helper_calls() {
         fn keyed_number(key: u32) -> SignalId {
-            number_signal(&Cx::default().keyed(key)).0
+            number_signal(&Cx::new().keyed(key)).0
         }
 
         let first = keyed_number(1);
@@ -485,7 +485,7 @@ mod tests {
         assert_eq!(keyed_number(2), second);
         assert_eq!(keyed_number(1), first);
 
-        let cx = Cx::default();
+        let cx = Cx::new();
         let first = number_signal(&cx.keyed(())).0;
         let second = number_signal(&cx.keyed(())).0;
         assert_ne!(first, second);
@@ -494,14 +494,14 @@ mod tests {
     #[test]
     #[should_panic(expected = "identity cannot be read inside memoized functions")]
     fn memoized_functions_cannot_create_signals() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         topcoat_core::context::memoize_cache(&cx)
             .memoize(&cx, (), (), |cx, ()| signal(&cx.keyed(()), || 0.0));
     }
 
     #[test]
     fn a_value_that_does_not_fit_the_signal_is_ignored() {
-        let (id, ..) = number_signal(&Cx::default());
+        let (id, ..) = number_signal(&Cx::new());
 
         let cx = cx_carrying(id, serde_json::json!("five"));
         assert_eq!(number_signal(&cx), (id, 1.0, true));

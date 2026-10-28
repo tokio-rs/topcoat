@@ -182,7 +182,7 @@ mod tests {
     #[test]
     fn sync_same_key_runs_body_once() {
         let cache = MemoizeCache::new();
-        let cx = Cx::default();
+        let cx = Cx::new();
         let n = counter();
         let f = move |_: Cx, (x, y): (i32, i32)| {
             n.fetch_add(1, Ordering::SeqCst);
@@ -200,7 +200,7 @@ mod tests {
     #[test]
     fn sync_different_keys_run_body_per_key() {
         let cache = MemoizeCache::new();
-        let cx = Cx::default();
+        let cx = Cx::new();
         let n = counter();
         let f = move |_: Cx, (x, y): (i32, i32)| {
             n.fetch_add(1, Ordering::SeqCst);
@@ -217,7 +217,7 @@ mod tests {
     #[test]
     fn sync_different_functions_dont_collide() {
         let cache = MemoizeCache::new();
-        let cx = Cx::default();
+        let cx = Cx::new();
         let n1 = counter();
         let n2 = counter();
         let f1 = move |_: Cx, (x,): (i32,)| {
@@ -241,7 +241,7 @@ mod tests {
     #[test]
     fn sync_borrowed_str_key_dedupes_by_value() {
         let cache = MemoizeCache::new();
-        let cx = Cx::default();
+        let cx = Cx::new();
         let n = counter();
         let f = move |_: Cx, (s,): (&str,)| {
             n.fetch_add(1, Ordering::SeqCst);
@@ -266,7 +266,7 @@ mod tests {
         struct Token(u32);
 
         let cache = MemoizeCache::new();
-        let cx = Cx::default();
+        let cx = Cx::new();
         let n = counter();
         let f = move |_: Cx, (t,): (&Token,)| {
             n.fetch_add(1, Ordering::SeqCst);
@@ -284,7 +284,7 @@ mod tests {
     #[test]
     fn sync_zero_arity_key() {
         let cache = MemoizeCache::new();
-        let cx = Cx::default();
+        let cx = Cx::new();
         let n = counter();
         let f = move |_: Cx, (): ()| {
             n.fetch_add(1, Ordering::SeqCst);
@@ -302,7 +302,7 @@ mod tests {
     #[test]
     fn sync_panicked_initializer_can_retry() {
         let cache = MemoizeCache::new();
-        let cx = Cx::default();
+        let cx = Cx::new();
         let n = counter();
         let f = move |_: Cx, (): ()| {
             assert_ne!(n.fetch_add(1, Ordering::SeqCst), 0, "first attempt");
@@ -320,7 +320,7 @@ mod tests {
     #[test]
     fn get_observes_memoized_value() {
         let cache = MemoizeCache::new();
-        let cx = Cx::default();
+        let cx = Cx::new();
         let f = move |cx: Cx, (x,): (i32,)| x * context::<Setting>(&cx).0;
 
         let cx = cx.with(Setting(2));
@@ -337,7 +337,7 @@ mod tests {
     #[test]
     fn sync_shadowed_read_computes_a_new_variant() {
         let cache = MemoizeCache::new();
-        let cx = Cx::default().with(Setting(1));
+        let cx = Cx::new().with(Setting(1));
         let shadowed = cx.with(Setting(2));
         let n = counter();
         let f = move |cx: Cx, (): ()| {
@@ -357,7 +357,7 @@ mod tests {
     #[test]
     fn sync_registering_an_absent_read_computes_a_new_variant() {
         let cache = MemoizeCache::new();
-        let cx = Cx::default();
+        let cx = Cx::new();
         let extended = cx.with(Setting(5));
         let n = counter();
         let f = move |cx: Cx, (): ()| {
@@ -374,7 +374,7 @@ mod tests {
     #[test]
     fn sync_unread_bindings_share_the_variant() {
         let cache = MemoizeCache::new();
-        let cx = Cx::default().with(Setting(1));
+        let cx = Cx::new().with(Setting(1));
         let n = counter();
         let f = move |cx: Cx, (): ()| {
             n.fetch_add(1, Ordering::SeqCst);
@@ -389,7 +389,7 @@ mod tests {
     #[test]
     fn sync_pure_body_shares_the_variant_across_scopes() {
         let cache = MemoizeCache::new();
-        let cx = Cx::default().with(Setting(1));
+        let cx = Cx::new().with(Setting(1));
         let n = counter();
         let f = move |_: Cx, (): ()| {
             n.fetch_add(1, Ordering::SeqCst);
@@ -415,7 +415,7 @@ mod tests {
             *cache.memoize(&cx, (), (), inner) * 10
         };
 
-        let cx = Cx::default().with(Setting(1));
+        let cx = Cx::new().with(Setting(1));
         assert_eq!(*cache.memoize(&cx, (), (), outer), 10);
         // The outer body never reads `Setting` itself, but depends on it
         // through the nested call, so shadowing must recompute both.
@@ -434,7 +434,7 @@ mod tests {
             *cache.memoize(&cx, (), (), inner) * 10
         };
 
-        let cx = Cx::default().with(Setting(1));
+        let cx = Cx::new().with(Setting(1));
         // Compute the inner value up front, so the outer body's nested call
         // is a cache hit whose stored reads must still be replayed.
         cache.memoize(&cx, (), (), inner);
@@ -454,7 +454,7 @@ mod tests {
             *cache.memoize(&scoped, (), (), inner)
         };
 
-        let cx = Cx::default();
+        let cx = Cx::new();
         assert_eq!(*cache.memoize(&cx, (), (), outer), 7);
         // The nested call depends on `Setting`, but through a binding the
         // outer body created itself, so callers shadowing the type still
@@ -466,7 +466,7 @@ mod tests {
     #[test]
     fn sync_internal_binding_is_not_a_dependency() {
         let cache = MemoizeCache::new();
-        let cx = Cx::default();
+        let cx = Cx::new();
         let n = counter();
         let f = move |cx: Cx, (): ()| {
             n.fetch_add(1, Ordering::SeqCst);
@@ -484,7 +484,7 @@ mod tests {
     #[tokio::test]
     async fn async_concurrent_same_key_runs_body_once() {
         let cache = MemoizeCache::new();
-        let cx = Cx::default();
+        let cx = Cx::new();
         let n = counter();
         let f = async move |_: Cx, (x, y): (i32, i32)| {
             n.fetch_add(1, Ordering::SeqCst);
@@ -505,7 +505,7 @@ mod tests {
     #[tokio::test]
     async fn async_different_keys_run_body_per_key() {
         let cache = MemoizeCache::new();
-        let cx = Cx::default();
+        let cx = Cx::new();
         let n = counter();
         let f = async move |_: Cx, (x, y): (i32, i32)| {
             n.fetch_add(1, Ordering::SeqCst);
@@ -522,7 +522,7 @@ mod tests {
     #[tokio::test]
     async fn async_shadowed_read_computes_a_new_variant() {
         let cache = MemoizeCache::new();
-        let cx = Cx::default().with(Setting(1));
+        let cx = Cx::new().with(Setting(1));
         let n = counter();
         let f = async move |cx: Cx, (): ()| {
             n.fetch_add(1, Ordering::SeqCst);
@@ -547,7 +547,7 @@ mod tests {
             *cache.memoize_async(&cx, (), (), inner).await * 10
         };
 
-        let cx = Cx::default().with(Setting(1));
+        let cx = Cx::new().with(Setting(1));
         // Compute the inner value up front, so the outer body's nested call
         // is a cache hit whose stored reads must still be replayed.
         cache.memoize_async(&cx, (), (), inner).await;
@@ -564,7 +564,7 @@ mod tests {
     #[tokio::test]
     async fn async_cancelled_initializer_can_retry() {
         let cache = MemoizeCache::new();
-        let cx = Cx::default();
+        let cx = Cx::new();
         let n = counter();
         let f = async move |_: Cx, (): ()| {
             if n.fetch_add(1, Ordering::SeqCst) == 0 {

@@ -94,7 +94,7 @@ mod tests {
 
         let (parts, ()) = builder.body(()).expect("request should build").into_parts();
 
-        Cx::default().with(parts)
+        Cx::new().with(parts)
     }
 
     #[tokio::test]
@@ -153,7 +153,7 @@ mod tests {
     #[tokio::test]
     async fn into_response_sets_html_content_type() {
         let response = Html("<h1>hi</h1>")
-            .into_response(&Cx::default())
+            .into_response(&Cx::new())
             .expect("response builds");
 
         assert_eq!(

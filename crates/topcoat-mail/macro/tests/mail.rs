@@ -21,7 +21,7 @@ async fn empty_body_builds_a_default_mail() -> Result<()> {
 
 #[tokio::test]
 async fn collects_every_field() -> Result<()> {
-    let cx = Cx::default();
+    let cx = Cx::new();
     let mail = mail! {
         from: Mailbox::named("Ada", "ada@example.com")?,
         to: [Mailbox::new("bob@example.com")?, Mailbox::new("grace@example.com")?],
@@ -49,7 +49,7 @@ async fn collects_every_field() -> Result<()> {
     assert_eq!(mail.reply_to(), [Mailbox::new("replies@example.com")?]);
     assert_eq!(mail.subject(), "Analytical engines");
     assert_eq!(
-        mail.html().map(|html| html.clone().render(&Cx::default())),
+        mail.html().map(|html| html.clone().render(&Cx::new())),
         Some("<p>The engine weaves algebraic patterns.</p>".to_owned())
     );
     assert_eq!(
@@ -91,7 +91,7 @@ async fn additive_fields_append_in_written_order() -> Result<()> {
 
 #[tokio::test]
 async fn html_renders_dynamic_parts_against_the_named_context() -> Result<()> {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let name = "Ada";
 
     let mail = mail! {

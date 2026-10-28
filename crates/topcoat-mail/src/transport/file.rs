@@ -115,7 +115,7 @@ mod tests {
             .subject("Hello")
             .text("Hi Bob")
             .build();
-        let receipt = transport.send(&Cx::default(), mail).await.unwrap();
+        let receipt = transport.send(&Cx::new(), mail).await.unwrap();
 
         let entries: Vec<_> = std::fs::read_dir(&directory)
             .unwrap()

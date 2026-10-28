@@ -29,7 +29,7 @@ mod tests {
             builder = builder.extension(RemoteAddr(addr));
         }
         let (parts, ()) = builder.body(()).expect("request should build").into_parts();
-        Cx::default().with(parts)
+        Cx::new().with(parts)
     }
 
     #[test]
@@ -45,6 +45,6 @@ mod tests {
 
     #[test]
     fn a_context_without_a_request_has_none() {
-        assert_eq!(remote_addr(&Cx::default()), None);
+        assert_eq!(remote_addr(&Cx::new()), None);
     }
 }

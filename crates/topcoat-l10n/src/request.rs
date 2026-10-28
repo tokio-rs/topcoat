@@ -140,7 +140,7 @@ mod tests {
             .body(())
             .expect("request should build")
             .into_parts();
-        Cx::default().with(parts)
+        Cx::new().with(parts)
     }
 
     #[test]
@@ -153,7 +153,7 @@ mod tests {
 
     #[test]
     fn there_is_no_header_outside_a_request() {
-        assert_eq!(accept_language(&Cx::default()), []);
+        assert_eq!(accept_language(&Cx::new()), []);
     }
 
     #[test]

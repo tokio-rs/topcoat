@@ -141,7 +141,7 @@ mod tests {
     use crate::internal::Builder;
 
     fn render(attribute: impl AttributeViewParts) -> String {
-        let cx = Cx::default();
+        let cx = Cx::new();
         Builder::build(&cx, |b| b.attributes(attribute)).render(&cx)
     }
 

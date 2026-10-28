@@ -40,7 +40,7 @@ mod lint_regressions {
 // `#[component]`. These tests stand in for those wrappers by binding it by
 // hand.
 fn empty_cx() -> Cx {
-    Cx::default()
+    Cx::new()
 }
 
 #[component]

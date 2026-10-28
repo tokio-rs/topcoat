@@ -191,7 +191,7 @@ mod tests {
             panic!("expected the child's swap");
         };
         assert_eq!(swap.region, region(1));
-        assert_eq!(swap.replacement.render(&Cx::default()), "<p>updated</p>");
+        assert_eq!(swap.replacement.render(&Cx::new()), "<p>updated</p>");
         assert!(!dropped.load(Ordering::Relaxed));
         assert!(matches!(
             view.as_mut().poll_swap(&mut cx),

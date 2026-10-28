@@ -19,7 +19,7 @@ use crate::{
 /// use topcoat_mail::{Mail, MemoryTransport, Transport};
 ///
 /// # async fn test() -> topcoat_core::error::Result<()> {
-/// # let cx = Cx::default();
+/// # let cx = Cx::new();
 /// # let mail = Mail::builder()
 /// #     .from(topcoat_mail::Mailbox::new("ada@example.com")?)
 /// #     .to([topcoat_mail::Mailbox::new("bob@example.com")?])
@@ -99,7 +99,7 @@ mod tests {
         let transport = MemoryTransport::new();
         let clone = transport.clone();
 
-        let receipt = clone.send(&Cx::default(), mail()).await.unwrap();
+        let receipt = clone.send(&Cx::new(), mail()).await.unwrap();
         assert!(receipt.message_id().contains('@'));
 
         let sent = transport.sent();
@@ -115,7 +115,7 @@ mod tests {
         let transport = MemoryTransport::new();
         let unsendable = Mail::builder().text("Hi").build();
 
-        assert!(transport.send(&Cx::default(), unsendable).await.is_err());
+        assert!(transport.send(&Cx::new(), unsendable).await.is_err());
         assert!(transport.sent().is_empty());
     }
 }

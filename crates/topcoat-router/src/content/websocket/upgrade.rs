@@ -351,7 +351,7 @@ mod tests {
             builder = builder.header(*name, *value);
         }
         let (parts, ()) = builder.body(()).expect("request should build").into_parts();
-        Cx::default().with(parts)
+        Cx::new().with(parts)
     }
 
     /// The headers of a conforming handshake request.

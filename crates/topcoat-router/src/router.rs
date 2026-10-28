@@ -1128,7 +1128,7 @@ mod tests {
 
     #[test]
     fn a_request_outside_a_router_has_no_router() {
-        assert!(try_router(&Cx::default()).is_none());
+        assert!(try_router(&Cx::new()).is_none());
     }
 
     #[test]
@@ -1349,7 +1349,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "matched no endpoint")]
     fn endpoint_panics_without_a_match() {
-        let _ = endpoint(&Cx::default());
+        let _ = endpoint(&Cx::new());
     }
 
     #[test]
@@ -1381,7 +1381,7 @@ mod tests {
 
     #[test]
     fn try_accessors_report_no_match() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         assert!(try_endpoint(&cx).is_none());
         assert!(try_route(&cx).is_none());
     }

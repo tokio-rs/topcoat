@@ -468,7 +468,7 @@ mod tests {
 
     /// Captures `value` the way [`Attributes::insert`] does.
     fn capture(value: impl AttributeValueViewParts) -> AttributeValue {
-        let cx = Cx::default();
+        let cx = Cx::new();
         let mut attrs = Attributes::new();
         attrs.insert(&cx, "x", value);
         attrs.remove("x").unwrap()
@@ -476,7 +476,7 @@ mod tests {
 
     /// Writes a captured value in attribute value position and renders it.
     fn render(value: &AttributeValue) -> String {
-        let cx = Cx::default();
+        let cx = Cx::new();
         Builder::build(&cx, |b| b.attribute_value(value)).render(&cx)
     }
 

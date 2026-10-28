@@ -11,7 +11,7 @@ use crate::context::{Cx, try_context};
 /// ```
 /// use topcoat::context::{Cx, UrlForm, url_form};
 ///
-/// let cx = Cx::default();
+/// let cx = Cx::new();
 /// assert_eq!(url_form(&cx), UrlForm::Relative);
 ///
 /// let cx = cx.with(UrlForm::Absolute);
@@ -42,18 +42,18 @@ mod tests {
 
     #[test]
     fn defaults_to_relative() {
-        assert_eq!(url_form(&Cx::default()), UrlForm::Relative);
+        assert_eq!(url_form(&Cx::new()), UrlForm::Relative);
     }
 
     #[test]
     fn a_scope_registers_another_form() {
-        let cx = Cx::default().with(UrlForm::Absolute);
+        let cx = Cx::new().with(UrlForm::Absolute);
         assert_eq!(url_form(&cx), UrlForm::Absolute);
     }
 
     #[test]
     fn an_inner_scope_shadows_the_outer_form() {
-        let cx = Cx::default().with(UrlForm::Absolute);
+        let cx = Cx::new().with(UrlForm::Absolute);
         let inner = cx.with(UrlForm::Relative);
         assert_eq!(url_form(&inner), UrlForm::Relative);
         assert_eq!(url_form(&cx), UrlForm::Absolute);

@@ -59,19 +59,19 @@ mod tests {
 
     #[test]
     fn repeated_calls_at_one_site_return_the_same_id() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         assert_eq!(id_at_one_site(&cx), id_at_one_site(&cx.clone()));
     }
 
     #[test]
     fn different_sites_return_different_ids() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         assert_ne!(element_id(&cx), element_id(&cx));
     }
 
     #[test]
     fn keyed_contexts_return_different_ids() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         let ids: Vec<_> = (0..3).map(|key| id_at_one_site(&cx.keyed(key))).collect();
         assert_ne!(ids[0], ids[1]);
         assert_ne!(ids[1], ids[2]);
@@ -80,7 +80,7 @@ mod tests {
 
     #[test]
     fn ids_are_valid_css_identifiers() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         for key in 0..64 {
             let id = id_at_one_site(&cx.keyed(key));
             assert!(id.starts_with(|c: char| c.is_ascii_alphabetic()), "{id}");
@@ -97,7 +97,7 @@ mod tests {
     fn an_ambiguous_identity_panics() {
         let site = SiteKey::new(file!(), line!(), column!(), 0);
         let cx = with_identity(
-            Cx::default(),
+            Cx::new(),
             Identity::ROOT.ambiguous_child(site, "unkeyed-test-loop"),
         );
         let _ = element_id(&cx);

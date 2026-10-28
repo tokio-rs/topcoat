@@ -122,7 +122,7 @@ mod tests {
 
     async fn wire_format(script: ExecuteScript) -> String {
         let response = script
-            .into_response(&Cx::default())
+            .into_response(&Cx::new())
             .expect("the response should build");
 
         let body = to_bytes(response.into_body(), usize::MAX)

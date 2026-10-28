@@ -439,7 +439,7 @@ fn product_grid(cx: &Cx, products: &[Product]) -> impl View {
 // ---------------------------------------------------------------------------
 
 fn bench_render(c: &mut Criterion) {
-    let cx = Cx::default();
+    let cx = Cx::new();
     let mut group = c.benchmark_group("view_render");
 
     block_on(async {

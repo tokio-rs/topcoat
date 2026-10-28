@@ -304,7 +304,7 @@ mod tests {
 
     /// Builds a `Cx` with `https://example.com` registered as the base URL.
     fn cx() -> Cx {
-        Cx::default().with(BaseUrl::new("https://example.com").expect("a valid base URL"))
+        Cx::new().with(BaseUrl::new("https://example.com").expect("a valid base URL"))
     }
 
     #[test]
@@ -387,7 +387,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "attempted to access the base URL")]
     fn a_relative_location_without_a_base_url_panics() {
-        let _ = Sitemap::new().url("/").serialize(&Cx::default());
+        let _ = Sitemap::new().url("/").serialize(&Cx::new());
     }
 
     #[tokio::test]

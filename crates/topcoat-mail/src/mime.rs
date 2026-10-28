@@ -223,7 +223,7 @@ mod tests {
     }
 
     fn formatted(mail: Mail) -> String {
-        String::from_utf8(mail.formatted(&Cx::default()).unwrap()).unwrap()
+        String::from_utf8(mail.formatted(&Cx::new()).unwrap()).unwrap()
     }
 
     #[test]
@@ -324,7 +324,7 @@ mod tests {
             .text("Hi")
             .build();
 
-        let message = message(&Cx::default(), mail.clone(), BccHeader::Dropped).unwrap();
+        let message = message(&Cx::new(), mail.clone(), BccHeader::Dropped).unwrap();
         let recipients: Vec<String> = message
             .envelope()
             .to()
@@ -345,7 +345,7 @@ mod tests {
             .text("Hi")
             .build();
 
-        let message = message(&Cx::default(), mail, BccHeader::Kept).unwrap();
+        let message = message(&Cx::new(), mail, BccHeader::Kept).unwrap();
         let wire = String::from_utf8(message.formatted()).unwrap();
         assert!(wire.contains("Bcc: dan@example.com\r\n"));
     }
@@ -367,7 +367,7 @@ mod tests {
     fn missing_message_id_and_date_are_generated() {
         let mail = base().text("Hi").build();
 
-        let message = message(&Cx::default(), mail, BccHeader::Dropped).unwrap();
+        let message = message(&Cx::new(), mail, BccHeader::Dropped).unwrap();
         let id = message_id(&message);
         assert!(id.contains('@'), "generated Message-ID: {id:?}");
         assert!(message.headers().get_raw("Date").is_some());
@@ -407,7 +407,7 @@ mod tests {
             .text("Hi")
             .build();
         assert!(matches!(
-            missing_from.formatted(&Cx::default()),
+            missing_from.formatted(&Cx::new()),
             Err(SendError::MissingFrom)
         ));
 
@@ -416,13 +416,13 @@ mod tests {
             .text("Hi")
             .build();
         assert!(matches!(
-            missing_recipients.formatted(&Cx::default()),
+            missing_recipients.formatted(&Cx::new()),
             Err(SendError::MissingRecipients)
         ));
 
         let missing_body = base().build();
         assert!(matches!(
-            missing_body.formatted(&Cx::default()),
+            missing_body.formatted(&Cx::new()),
             Err(SendError::MissingBody)
         ));
 
@@ -431,7 +431,7 @@ mod tests {
             .attachments([Attachment::inline("logo", "image/png", b"\x89PNG")])
             .build();
         assert!(matches!(
-            orphan_inline.formatted(&Cx::default()),
+            orphan_inline.formatted(&Cx::new()),
             Err(SendError::InlineWithoutHtml)
         ));
     }
@@ -443,7 +443,7 @@ mod tests {
             .attachments([Attachment::new("a.bin", "not a mime type", b"")])
             .build();
         assert!(matches!(
-            content_type.formatted(&Cx::default()),
+            content_type.formatted(&Cx::new()),
             Err(SendError::InvalidContentType { .. })
         ));
 
@@ -452,7 +452,7 @@ mod tests {
             .headers([("Bad Name".to_owned(), "value".to_owned())])
             .build();
         assert!(matches!(
-            header_name.formatted(&Cx::default()),
+            header_name.formatted(&Cx::new()),
             Err(SendError::InvalidHeaderName { .. })
         ));
     }

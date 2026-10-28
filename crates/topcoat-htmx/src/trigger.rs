@@ -161,9 +161,7 @@ mod tests {
     fn header_value(trigger: HxResponseTrigger) -> (HeaderName, String) {
         let name = trigger.timing.header();
         let mut parts = http::Response::new(()).into_parts().0;
-        trigger
-            .into_response_parts(&Cx::default(), &mut parts)
-            .unwrap();
+        trigger.into_response_parts(&Cx::new(), &mut parts).unwrap();
         let value = parts
             .headers
             .get(&name)

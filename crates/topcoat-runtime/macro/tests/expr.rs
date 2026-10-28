@@ -36,7 +36,7 @@ async fn nested_expressions(cx: &Cx) -> Result<impl View> {
 
 #[tokio::test]
 async fn nested_expressions_preserve_static_and_dynamic_bindings() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let html = view! { cx => nested_expressions() }
         .single()
         .await
@@ -67,7 +67,7 @@ fn capturing_an_expression_reuses_its_server_value() {
 
 #[tokio::test]
 async fn trailing_comma_in_an_inline_expression_keeps_both_attributes() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let dark = false;
     let html = view! {
         cx =>
@@ -98,7 +98,7 @@ async fn toggle_button(cx: &Cx) -> Result<impl View> {
 
 #[tokio::test]
 async fn toggle_reaches_the_generated_javascript() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let html = view! { cx => toggle_button() }
         .single()
         .await
@@ -127,7 +127,7 @@ async fn counter_buttons(cx: &Cx) -> Result<impl View> {
 
 #[tokio::test]
 async fn increment_and_decrement_reach_the_generated_javascript() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let html = view! { cx => counter_buttons() }
         .single()
         .await
@@ -146,7 +146,7 @@ async fn push_str_button(cx: &Cx) -> Result<impl View> {
 
 #[tokio::test]
 async fn push_str_reaches_the_generated_javascript_with_its_argument() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let html = view! { cx => push_str_button() }
         .single()
         .await
@@ -169,7 +169,7 @@ async fn counter_display(cx: &Cx) -> Result<impl View> {
 
 #[tokio::test]
 async fn a_signal_is_declared_once_ahead_of_every_capture() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let html = view! { cx => counter_display() }
         .single()
         .await
@@ -190,7 +190,7 @@ async fn test_procedure(v: String) -> Result<String, std::convert::Infallible> {
 
 #[tokio::test]
 async fn procedure_call_inside_if_is_an_async_func() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let html = view! {
         cx =>
         <button
@@ -216,7 +216,7 @@ async fn procedure_call_inside_if_is_an_async_func() {
 
 #[tokio::test]
 async fn procedure_call_inside_block_is_an_async_func() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let html = view! {
         cx =>
         <button
@@ -256,7 +256,7 @@ async fn push_str_input(cx: &Cx) -> Result<impl View> {
 
 #[tokio::test]
 async fn push_str_accepts_the_owned_string_from_an_event() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let html = view! { cx => push_str_input() }
         .single()
         .await
@@ -272,7 +272,7 @@ async fn push_str_accepts_the_owned_string_from_an_event() {
 /// snapshot between the markers is escaped for its text position.
 #[tokio::test]
 async fn a_captured_value_cannot_break_out_of_its_marker_comment() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let spicy = String::from(r#"-->"<&"#);
     let html = view! { cx => captured_text(text: spicy) }
         .single()
@@ -307,7 +307,7 @@ async fn captured_text(cx: &Cx, text: String) -> Result<impl View> {
 
 #[tokio::test]
 async fn a_string_literal_with_quotes_stays_inside_the_handler_attribute() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let html = view! { cx => quoted_push_str_button() }
         .single()
         .await
@@ -325,7 +325,7 @@ async fn panel(#[into] open: Expr<bool>) -> Result<impl View> {
 
 #[tokio::test]
 async fn value_conversion_renders_props_as_ordinary_attributes() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let html = view! {
         cx =>
         panel(open: true)
@@ -347,7 +347,7 @@ async fn interactive_panel(cx: &Cx) -> Result<impl View> {
 
 #[tokio::test]
 async fn expression_conversion_preserves_runtime_prop_bindings() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let html = view! { cx => interactive_panel() }
         .single()
         .await
@@ -360,7 +360,7 @@ async fn expression_conversion_preserves_runtime_prop_bindings() {
 
 #[tokio::test]
 async fn value_conversion_renders_nodes_without_markers_and_escapes_html() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let text = Expr::from("<b>&");
     let html = view! { cx => <p>(text)</p> }
         .single()
@@ -373,7 +373,7 @@ async fn value_conversion_renders_nodes_without_markers_and_escapes_html() {
 
 #[tokio::test]
 async fn constants_and_captured_values_render_without_bindings() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     assert!(expr!(true).is_static());
     let captured = String::from("<&");
     assert!(expr!(captured.to_owned()).is_static());
@@ -391,7 +391,7 @@ async fn constants_and_captured_values_render_without_bindings() {
 
 #[tokio::test]
 async fn dynamic_constants_render_bindings() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let open = Expr::from(true).dynamic();
     let state = expr!(if open { "open" } else { "closed" });
     assert!(!state.is_static());
@@ -408,7 +408,7 @@ async fn dynamic_constants_render_bindings() {
 
 #[tokio::test]
 async fn forwarded_value_conversions_replace_dynamic_bindings() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let html = view! { cx => replaced_dynamic_bindings() }
         .single()
         .await
@@ -437,7 +437,7 @@ async fn replaced_dynamic_bindings(cx: &Cx) -> Result<impl View> {
 
 #[tokio::test]
 async fn forwarded_dynamic_bindings_replace_value_conversions() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let html = view! { cx => replaced_static_binding() }
         .single()
         .await
@@ -496,7 +496,7 @@ async fn observed_expressions(cx: &Cx) -> Result<impl View> {
 
 #[tokio::test]
 async fn signal_reads_and_raw_fallbacks_keep_bindings_but_not_server_dependencies() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let html = view! { cx => observed_expressions() }
         .single()
         .await

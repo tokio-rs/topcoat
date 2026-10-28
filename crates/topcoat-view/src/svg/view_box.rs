@@ -60,7 +60,7 @@ mod tests {
     use crate::internal::Builder;
 
     fn render(value: impl AttributeValueViewParts) -> String {
-        let cx = Cx::default();
+        let cx = Cx::new();
         Builder::build(&cx, |b| b.attribute_value(value)).render(&cx)
     }
 

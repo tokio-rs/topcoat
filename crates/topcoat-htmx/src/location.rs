@@ -183,7 +183,7 @@ mod tests {
     fn header_value(location: HxLocation) -> String {
         let mut parts = http::Response::new(()).into_parts().0;
         location
-            .into_response_parts(&Cx::default(), &mut parts)
+            .into_response_parts(&Cx::new(), &mut parts)
             .unwrap();
         parts
             .headers

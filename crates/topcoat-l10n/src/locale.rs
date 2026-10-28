@@ -288,13 +288,13 @@ mod tests {
 
     #[test]
     fn the_locale_is_the_one_in_the_scope() {
-        let cx = Cx::default().with(locale!("fr"));
+        let cx = Cx::new().with(locale!("fr"));
         assert_eq!(locale(&cx), &locale!("fr"));
     }
 
     #[test]
     #[should_panic(expected = "no locale")]
     fn locale_panics_without_a_locale() {
-        let _ = locale(&Cx::default());
+        let _ = locale(&Cx::new());
     }
 }

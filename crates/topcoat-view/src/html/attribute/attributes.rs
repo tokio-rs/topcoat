@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn insert_then_contains_key() {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let mut attrs = Attributes::new();
         attrs.insert(cx, "class", "button");
         assert!(attrs.contains_key("class"));
@@ -180,14 +180,14 @@ mod tests {
 
     #[test]
     fn insert_returns_none_for_new_key() {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let mut attrs = Attributes::new();
         assert!(attrs.insert(cx, "class", "button").is_none());
     }
 
     #[test]
     fn insert_replaces_existing_value() {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let mut attrs = Attributes::new();
         attrs.insert(cx, "class", "button");
         let previous = attrs.insert(cx, "class", "link");
@@ -197,7 +197,7 @@ mod tests {
 
     #[test]
     fn get_returns_inserted_value() {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let mut attrs = Attributes::new();
         attrs.insert(cx, "class", "button");
         assert!(attrs.get("class").is_some());
@@ -206,7 +206,7 @@ mod tests {
 
     #[test]
     fn remove_returns_value_and_deletes_entry() {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let mut attrs = Attributes::new();
         attrs.insert(cx, "class", "button");
         assert!(attrs.remove("class").is_some());
@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn clear_removes_all_entries() {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let mut attrs = Attributes::new();
         attrs.insert(cx, "class", "button");
         attrs.insert(cx, "id", "submit");
@@ -227,7 +227,7 @@ mod tests {
 
     #[test]
     fn renders_single_attribute() {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let mut attrs = Attributes::new();
         attrs.insert(cx, "class", "button");
         assert_eq!(render(cx, attrs), " class=\"button\"");
@@ -235,7 +235,7 @@ mod tests {
 
     #[test]
     fn renders_multiple_attributes() {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let mut attrs = Attributes::new();
         attrs.insert(cx, "class", "button");
         attrs.insert(cx, "id", "submit");
@@ -250,7 +250,7 @@ mod tests {
 
     #[test]
     fn escapes_attribute_value() {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let mut attrs = Attributes::new();
         attrs.insert(cx, "data-x", "a\"b<c");
         assert_eq!(render(cx, attrs), " data-x=\"a&quot;b<c\"");
@@ -258,7 +258,7 @@ mod tests {
 
     #[test]
     fn omits_false_boolean_attribute() {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let mut attrs = Attributes::new();
         attrs.insert(cx, "disabled", false);
         assert_eq!(render(cx, attrs), "");
@@ -266,7 +266,7 @@ mod tests {
 
     #[test]
     fn renders_true_boolean_attribute() {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let mut attrs = Attributes::new();
         attrs.insert(cx, "disabled", true);
         assert_eq!(render(cx, attrs), " disabled=\"\"");
@@ -274,7 +274,7 @@ mod tests {
 
     #[test]
     fn omits_none_option_attribute() {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let mut attrs = Attributes::new();
         attrs.insert(cx, "title", Option::<&str>::None);
         assert!(!attrs.get("title").unwrap().is_present());
@@ -283,7 +283,7 @@ mod tests {
 
     #[test]
     fn renders_some_option_attribute() {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let mut attrs = Attributes::new();
         attrs.insert(cx, "title", Some("hello"));
         assert_eq!(render(cx, attrs), " title=\"hello\"");
@@ -291,7 +291,7 @@ mod tests {
 
     #[test]
     fn iter_yields_inserted_entries() {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let mut attrs = Attributes::new();
         attrs.insert(cx, "class", "button");
         attrs.insert(cx, "id", "submit");
@@ -302,7 +302,7 @@ mod tests {
 
     #[test]
     fn into_iter_yields_inserted_entries() {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let mut attrs = Attributes::new();
         attrs.insert(cx, "class", "button");
         attrs.insert(cx, "id", "submit");

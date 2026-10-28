@@ -383,7 +383,7 @@ mod tests {
     use crate::{AttributeValue, Attributes, internal::Builder};
 
     fn render(class: Class<impl ClassEntries>) -> String {
-        let cx = Cx::default();
+        let cx = Cx::new();
         Builder::build(&cx, |b| b.attribute_value(class)).render(&cx)
     }
 
@@ -483,7 +483,7 @@ mod tests {
 
     #[test]
     fn attribute_value_entries_are_spliced_as_captured() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         let mut attrs = Attributes::new();
         attrs.insert(&cx, "class", "[&>*]:mt-2");
         let value = attrs.remove("class").unwrap();

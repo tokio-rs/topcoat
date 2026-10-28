@@ -279,7 +279,7 @@ mod tests {
 
     /// Captures `key` the way [`Attributes::insert`] does.
     fn capture(key: impl AttributeKeyViewParts) -> AttributeKey {
-        let cx = Cx::default();
+        let cx = Cx::new();
         let mut attrs = Attributes::new();
         attrs.insert(&cx, key, true);
         attrs.into_iter().next().unwrap().0
@@ -287,7 +287,7 @@ mod tests {
 
     /// Writes a captured key in attribute key position and renders it.
     fn render(key: &AttributeKey) -> String {
-        let cx = Cx::default();
+        let cx = Cx::new();
         Builder::build(&cx, |b| b.attribute_key(key)).render(&cx)
     }
 

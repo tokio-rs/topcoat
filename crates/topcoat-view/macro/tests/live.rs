@@ -30,7 +30,7 @@ async fn next_swap<V: View>(view: &mut Pin<&mut V>) -> Result<Option<ViewSwap>> 
 
 #[tokio::test]
 async fn region_emitting_once_renders_as_plain_content() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let html = view! { cx => <main>(live! { emit! { load(fail: false) } })</main> }
         .single()
         .await
@@ -42,7 +42,7 @@ async fn region_emitting_once_renders_as_plain_content() {
 
 #[tokio::test]
 async fn region_emitting_once_is_not_live() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let mut view = pin!(view! { cx => <main>(live! { emit! { load(fail: false) } })</main> });
 
     assert!(!first(&mut view).await.unwrap().live);
@@ -51,7 +51,7 @@ async fn region_emitting_once_is_not_live() {
 
 #[tokio::test]
 async fn region_emitting_a_view_against_its_own_cx_renders_its_content() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let html = view! { cx => <main>(live! { emit! { cx => <p>"own"</p> } })</main> }
         .single()
         .await
@@ -63,7 +63,7 @@ async fn region_emitting_a_view_against_its_own_cx_renders_its_content() {
 
 #[tokio::test]
 async fn region_remapping_a_failed_emission_renders_as_plain_content() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let html = view! {
         cx =>
         <main>
@@ -86,12 +86,12 @@ async fn region_remapping_a_failed_emission_renders_as_plain_content() {
 #[tokio::test]
 async fn an_explicit_context_is_owned_by_the_live_body() {
     let region = {
-        let cx = Cx::default();
+        let cx = Cx::new();
         let region = live! { cx => emit! { load(fail: false) } };
         drop(cx);
         region
     };
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let html = view! { cx => (region) }.single().await.unwrap().render(cx);
     assert_eq!(html, "<p>loaded</p>");
 }
@@ -99,14 +99,14 @@ async fn an_explicit_context_is_owned_by_the_live_body() {
 #[tokio::test]
 async fn an_explicit_context_reference_is_cloned_into_the_view() {
     let (plain, live) = {
-        let context = Cx::default();
+        let context = Cx::new();
         let cx = &context;
         (
             view! { cx => load(fail: false) },
             live! { cx => emit! { load(fail: false) } },
         )
     };
-    let cx = &Cx::default();
+    let cx = &Cx::new();
 
     assert_eq!(plain.single().await.unwrap().render(cx), "<p>loaded</p>");
     assert_eq!(live.single().await.unwrap().render(cx), "<p>loaded</p>");
@@ -114,7 +114,7 @@ async fn an_explicit_context_reference_is_cloned_into_the_view() {
 
 #[tokio::test]
 async fn region_failing_before_its_content_fails_the_view() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let error = view! { cx => <main>(live! { emit! { load(fail: true) } })</main> }
         .single()
         .await
@@ -125,7 +125,7 @@ async fn region_failing_before_its_content_fails_the_view() {
 
 #[tokio::test]
 async fn region_failing_after_an_emission_fails_the_view() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let error = view! {
         cx =>
         <main>
@@ -144,7 +144,7 @@ async fn region_failing_after_an_emission_fails_the_view() {
 
 #[tokio::test]
 async fn region_hoisting_sync_control_flow_renders() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let html = view! {
         cx =>
         <main>
@@ -172,7 +172,7 @@ async fn region_hoisting_sync_control_flow_renders() {
 
 #[tokio::test]
 async fn swapped_emission_hoisting_sync_control_flow_renders() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let mut view = pin!(view! {
         cx =>
         <main>
@@ -200,7 +200,7 @@ async fn swapped_emission_hoisting_sync_control_flow_renders() {
 
 #[tokio::test]
 async fn region_emitting_twice_swaps_its_content() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let mut view = pin!(view! {
         cx =>
         <main>
@@ -234,7 +234,7 @@ async fn region_emitting_twice_swaps_its_content() {
 async fn region_ids_are_stable_across_root_views() {
     let mut previous = None;
     for _ in 0..2 {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let mut view = pin!(view! {
             cx =>
             <main>
@@ -266,7 +266,7 @@ async fn region_ids_are_stable_across_root_views() {
 
 #[tokio::test]
 async fn region_emitting_three_times_swaps_its_content_twice() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let mut view = pin!(view! {
         cx =>
         <main>
@@ -288,7 +288,7 @@ async fn region_emitting_three_times_swaps_its_content_twice() {
 
 #[tokio::test]
 async fn first_loop_iteration_delivers_its_swap() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let mut view = pin!(view! {
         cx =>
         <ul>
@@ -310,7 +310,7 @@ async fn first_loop_iteration_delivers_its_swap() {
 
 #[tokio::test]
 async fn live_loop_iterations_take_turns_swapping() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let mut view = pin!(view! {
         cx =>
         <ul>
@@ -337,7 +337,7 @@ async fn live_loop_iterations_take_turns_swapping() {
 #[tokio::test]
 #[should_panic(expected = "used `.single()` on a View that is live")]
 async fn single_panics_on_a_region_that_may_update() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let _ = view! {
         cx =>
         <main>
@@ -353,7 +353,7 @@ async fn single_panics_on_a_region_that_may_update() {
 
 #[tokio::test]
 async fn joined_emissions_all_reach_the_region() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let mut view = pin!(view! {
         cx =>
         <main>
@@ -387,7 +387,7 @@ async fn joined_emissions_all_reach_the_region() {
 
 #[tokio::test]
 async fn joined_emissions_deliver_the_swaps_of_a_nested_region() {
-    let cx = &Cx::default();
+    let cx = &Cx::new();
     let mut view = pin!(view! {
         cx =>
         <main>

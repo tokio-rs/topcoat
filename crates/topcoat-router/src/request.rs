@@ -765,7 +765,7 @@ mod tests {
             .body(())
             .unwrap()
             .into_parts();
-        Cx::default().with(parts)
+        Cx::new().with(parts)
     }
 
     #[test]
@@ -780,7 +780,7 @@ mod tests {
 
     #[test]
     fn try_accessors_return_none_outside_a_request() {
-        let cx = Cx::default();
+        let cx = Cx::new();
 
         assert!(try_parts(&cx).is_none());
         assert!(try_original_parts(&cx).is_none());
@@ -792,6 +792,6 @@ mod tests {
     #[test]
     #[should_panic(expected = "does not belong to a router request")]
     fn accessors_panic_outside_a_request() {
-        let _ = uri(&Cx::default());
+        let _ = uri(&Cx::new());
     }
 }

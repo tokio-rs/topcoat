@@ -119,7 +119,7 @@ mod tests {
 
     fn cx_for(request: Request<()>) -> Cx {
         let (parts, ()) = request.into_parts();
-        Cx::default().with(parts)
+        Cx::new().with(parts)
     }
 
     #[tokio::test]

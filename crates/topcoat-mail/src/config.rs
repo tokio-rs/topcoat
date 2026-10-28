@@ -20,7 +20,7 @@ use crate::{Mail, Receipt, Transport};
 /// let config = MailConfig::builder()
 ///     .transport(MemoryTransport::new())
 ///     .build();
-/// let cx = Cx::default().with(config);
+/// let cx = Cx::new().with(config);
 ///
 /// let mail = Mail::builder()
 ///     .from(Mailbox::new("ada@example.com")?)
@@ -108,7 +108,7 @@ mod tests {
     }
 
     fn cx_with(transport: MemoryTransport) -> Cx {
-        Cx::default().with(MailConfig::builder().transport(transport).build())
+        Cx::new().with(MailConfig::builder().transport(transport).build())
     }
 
     #[tokio::test]
@@ -138,7 +138,7 @@ mod tests {
     #[tokio::test]
     #[should_panic(expected = "attempted to access context")]
     async fn send_panics_without_a_registered_config() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         let _ = send(&cx, Mail::builder().build()).await;
     }
 

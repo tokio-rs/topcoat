@@ -210,7 +210,7 @@ mod tests {
 
         let (parts, ()) = builder.body(()).expect("request should build").into_parts();
 
-        Cx::default().with(parts)
+        Cx::new().with(parts)
     }
 
     #[tokio::test]
@@ -310,7 +310,7 @@ mod tests {
     #[tokio::test]
     async fn into_response_serializes_json_with_content_type() {
         let response = Json(json!({ "a": 1 }))
-            .into_response(&Cx::default())
+            .into_response(&Cx::new())
             .expect("serialization succeeds");
 
         assert_eq!(

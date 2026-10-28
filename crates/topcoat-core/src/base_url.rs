@@ -298,7 +298,7 @@ mod tests {
 
     #[test]
     fn reads_the_registered_base_url_from_context() -> Result<(), BaseUrlError> {
-        let cx = Cx::default().with(BaseUrl::new("https://example.com")?);
+        let cx = Cx::new().with(BaseUrl::new("https://example.com")?);
 
         assert_eq!(base_url(&cx).as_str(), "https://example.com");
         assert_eq!(
@@ -311,14 +311,14 @@ mod tests {
 
     #[test]
     fn try_base_url_is_none_when_unregistered() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         assert_eq!(try_base_url(&cx), None);
     }
 
     #[test]
     #[should_panic(expected = "attempted to access the base URL")]
     fn base_url_panics_when_unregistered() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         let _ = base_url(&cx);
     }
 }

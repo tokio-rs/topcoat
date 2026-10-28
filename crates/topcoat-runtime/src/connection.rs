@@ -84,26 +84,26 @@ mod tests {
             let result = check(cx);
             Ok(view! { cx => <p>(result)</p> })
         }));
-        block_on(view.single()).unwrap().render(&Cx::default())
+        block_on(view.single()).unwrap().render(&Cx::new())
     }
 
     #[test]
     fn an_http_render_is_not_connected_and_requests_a_connection() {
-        let html = render(Cx::default(), connected);
+        let html = render(Cx::new(), connected);
         assert!(html.starts_with(MARKER), "{html}");
         assert!(html.ends_with("<p>false</p>"), "{html}");
     }
 
     #[test]
     fn a_connected_render_is_connected_and_keeps_requesting_a_connection() {
-        let html = render(Cx::default().with(ConnectedRender), connected);
+        let html = render(Cx::new().with(ConnectedRender), connected);
         assert!(html.starts_with(MARKER), "{html}");
         assert!(html.ends_with("<p>true</p>"), "{html}");
     }
 
     #[test]
     fn repeated_checks_render_one_marker() {
-        let html = render(Cx::default(), |cx| {
+        let html = render(Cx::new(), |cx| {
             let _ = connected(cx);
             let _ = connected(cx);
             connected(cx)
@@ -113,25 +113,25 @@ mod tests {
 
     #[test]
     fn the_untracked_check_renders_no_marker() {
-        let html = render(Cx::default(), connected_untracked);
+        let html = render(Cx::new(), connected_untracked);
         assert!(!html.contains("::topcoat::connect"), "{html}");
         assert!(html.ends_with("<p>false</p>"), "{html}");
 
-        let html = render(Cx::default().with(ConnectedRender), connected_untracked);
+        let html = render(Cx::new().with(ConnectedRender), connected_untracked);
         assert!(!html.contains("::topcoat::connect"), "{html}");
         assert!(html.ends_with("<p>true</p>"), "{html}");
     }
 
     #[test]
     fn a_cloned_context_shares_the_render_mode() {
-        let cx = Cx::default().with(ConnectedRender);
+        let cx = Cx::new().with(ConnectedRender);
         assert!(connected_untracked(&cx.keyed(1)));
         assert!(connected_untracked(&cx.with(())));
     }
 
     #[test]
     fn the_tracked_check_outside_a_body_panics() {
-        let cx = Cx::default();
+        let cx = Cx::new();
         let panic = catch_unwind(AssertUnwindSafe(|| connected(&cx))).unwrap_err();
         let message = panic.downcast::<&str>().expect("panics with a message");
         assert!(message.contains("no view is collecting hoisted parts"));
@@ -139,7 +139,7 @@ mod tests {
 
     #[test]
     fn the_untracked_check_works_outside_a_body() {
-        assert!(!connected_untracked(&Cx::default()));
-        assert!(connected_untracked(&Cx::default().with(ConnectedRender)));
+        assert!(!connected_untracked(&Cx::new()));
+        assert!(connected_untracked(&Cx::new().with(ConnectedRender)));
     }
 }

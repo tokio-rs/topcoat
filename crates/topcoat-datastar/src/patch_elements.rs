@@ -153,7 +153,7 @@ mod tests {
 
     async fn wire_format(patch: PatchElements) -> String {
         let response = patch
-            .into_response(&Cx::default())
+            .into_response(&Cx::new())
             .expect("the response should build");
 
         assert_eq!(

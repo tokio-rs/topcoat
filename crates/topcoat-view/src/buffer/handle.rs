@@ -292,9 +292,9 @@ mod tests {
 
     #[test]
     fn static_views_render_without_a_buffer() {
-        assert_eq!(ViewHandle::empty().render(&Cx::default()), "");
+        assert_eq!(ViewHandle::empty().render(&Cx::new()), "");
         let view = ViewHandle::unescaped_unchecked("<b>raw</b>");
-        assert_eq!(view.render(&Cx::default()), "<b>raw</b>");
+        assert_eq!(view.render(&Cx::new()), "<b>raw</b>");
     }
 
     #[test]
@@ -308,7 +308,7 @@ mod tests {
             parts.push_view_handle(inner);
             parts.push_str_unescaped("</p>");
         });
-        assert_eq!(outer.seal(buffer).render(&Cx::default()), "<p>a &lt; b</p>");
+        assert_eq!(outer.seal(buffer).render(&Cx::new()), "<p>a &lt; b</p>");
     }
 
     #[test]
@@ -325,7 +325,7 @@ mod tests {
             parts.push_view_handle(first);
             parts.push_view_handle(second);
         });
-        assert_eq!(outer.seal(buffer).render(&Cx::default()), "AB");
+        assert_eq!(outer.seal(buffer).render(&Cx::new()), "AB");
     }
 
     #[test]
@@ -334,7 +334,7 @@ mod tests {
             parts.push_str("a < b");
         });
         assert!(matches!(view.repr, ViewRepr::Owned { .. }));
-        assert_eq!(view.render(&Cx::default()), "a &lt; b");
+        assert_eq!(view.render(&Cx::new()), "a &lt; b");
     }
 
     #[test]
@@ -347,7 +347,7 @@ mod tests {
             parts.push_view_handle(inner);
             parts.push_str_unescaped("</p>");
         });
-        assert_eq!(outer.render(&Cx::default()), "<p>a &lt; b</p>");
+        assert_eq!(outer.render(&Cx::new()), "<p>a &lt; b</p>");
     }
 
     #[test]
@@ -366,7 +366,7 @@ mod tests {
             parts.push_view_handle(ViewHandle::unescaped_unchecked("<hr>"));
             parts.push_view_handle(ViewHandle::empty());
         });
-        assert_eq!(outer.render(&Cx::default()), "<hr>");
+        assert_eq!(outer.render(&Cx::new()), "<hr>");
     }
 
     #[test]
@@ -394,7 +394,7 @@ mod tests {
                     parts.push_str("a < b");
                 })
             });
-            view.render(&Cx::default())
+            view.render(&Cx::new())
         });
         assert_eq!(rendered, "a &lt; b");
     }
@@ -404,7 +404,7 @@ mod tests {
     fn rendering_a_nested_view_outside_any_build_panics() {
         let mut buffer = ViewBuffer::new();
         let view = nested(&mut buffer, |_parts| {});
-        let _ = view.render(&Cx::default());
+        let _ = view.render(&Cx::new());
     }
 
     #[test]
@@ -412,7 +412,7 @@ mod tests {
     fn rendering_a_nested_view_inside_a_different_build_panics() {
         let mut buffer = ViewBuffer::new();
         let view = nested(&mut buffer, |_parts| {});
-        in_scope(|| view.render(&Cx::default()));
+        in_scope(|| view.render(&Cx::new()));
     }
 
     #[test]
@@ -450,7 +450,7 @@ mod tests {
 
         #[test]
         fn status_code_is_recorded_and_renders_nothing() {
-            let cx = &Cx::default();
+            let cx = &Cx::new();
             let view = owned(|parts| {
                 push_node(cx, parts, "a");
                 push_node(cx, parts, StatusCode::NOT_FOUND);
@@ -465,7 +465,7 @@ mod tests {
 
         #[test]
         fn render_response_without_declarations_is_empty() {
-            let cx = &Cx::default();
+            let cx = &Cx::new();
             let view = owned(|parts| {
                 push_node(cx, parts, "a");
             });
@@ -478,7 +478,7 @@ mod tests {
 
         #[test]
         fn render_discards_declarations() {
-            let cx = &Cx::default();
+            let cx = &Cx::new();
             let view = owned(|parts| {
                 push_node(cx, parts, StatusCode::NOT_FOUND);
                 push_node(
@@ -494,7 +494,7 @@ mod tests {
 
         #[test]
         fn first_status_code_wins() {
-            let cx = &Cx::default();
+            let cx = &Cx::new();
             let view = owned(|parts| {
                 push_node(cx, parts, StatusCode::NOT_FOUND);
                 push_node(cx, parts, StatusCode::OK);
@@ -506,7 +506,7 @@ mod tests {
 
         #[test]
         fn first_mention_of_a_header_name_wins() {
-            let cx = &Cx::default();
+            let cx = &Cx::new();
             let view = owned(|parts| {
                 push_node(
                     cx,
@@ -529,7 +529,7 @@ mod tests {
 
         #[test]
         fn one_map_keeps_all_values_for_a_name() {
-            let cx = &Cx::default();
+            let cx = &Cx::new();
             let mut first = HeaderMap::new();
             first.append(SET_COOKIE, HeaderValue::from_static("a=1"));
             first.append(SET_COOKIE, HeaderValue::from_static("b=2"));
@@ -548,7 +548,7 @@ mod tests {
 
         #[test]
         fn placement_decides_precedence_across_nested_views() {
-            let cx = &Cx::default();
+            let cx = &Cx::new();
             let inner = owned(|parts| {
                 push_node(cx, parts, StatusCode::NOT_FOUND);
                 push_node(cx, parts, "inner");

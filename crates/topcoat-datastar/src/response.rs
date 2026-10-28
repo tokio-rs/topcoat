@@ -159,7 +159,7 @@ mod tests {
     fn selector_carries_the_css_selector() {
         let mut parts = parts();
         DatastarSelector::from("#feed")
-            .into_response_parts(&Cx::default(), &mut parts)
+            .into_response_parts(&Cx::new(), &mut parts)
             .unwrap();
         assert_eq!(header_value(&parts, &header::DATASTAR_SELECTOR), "#feed");
     }
@@ -180,7 +180,7 @@ mod tests {
             assert!(
                 std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     DatastarSelector(selector.to_owned())
-                        .into_response_parts(&Cx::default(), &mut parts)
+                        .into_response_parts(&Cx::new(), &mut parts)
                         .unwrap();
                 }))
                 .is_err(),
@@ -193,7 +193,7 @@ mod tests {
     fn mode_uses_the_patch_mode_string() {
         let mut parts = parts();
         DatastarMode(ElementPatchMode::Append)
-            .into_response_parts(&Cx::default(), &mut parts)
+            .into_response_parts(&Cx::new(), &mut parts)
             .unwrap();
         assert_eq!(header_value(&parts, &header::DATASTAR_MODE), "append");
     }
@@ -202,10 +202,10 @@ mod tests {
     fn booleans_serialize_as_true_and_false() {
         let mut parts = parts();
         DatastarUseViewTransition(true)
-            .into_response_parts(&Cx::default(), &mut parts)
+            .into_response_parts(&Cx::new(), &mut parts)
             .unwrap();
         DatastarOnlyIfMissing(false)
-            .into_response_parts(&Cx::default(), &mut parts)
+            .into_response_parts(&Cx::new(), &mut parts)
             .unwrap();
         assert_eq!(
             header_value(&parts, &header::DATASTAR_USE_VIEW_TRANSITION),
@@ -222,7 +222,7 @@ mod tests {
         let mut parts = parts();
         DatastarScriptAttributes::new(json!({ "type": "module" }))
             .unwrap()
-            .into_response_parts(&Cx::default(), &mut parts)
+            .into_response_parts(&Cx::new(), &mut parts)
             .unwrap();
         assert_eq!(
             header_value(&parts, &header::DATASTAR_SCRIPT_ATTRIBUTES),

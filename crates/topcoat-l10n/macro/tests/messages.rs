@@ -14,7 +14,7 @@ mod admin {
 
 /// Creates a context with the given locale.
 fn scope(locale: Locale) -> Cx {
-    Cx::default().with(locale)
+    Cx::new().with(locale)
 }
 
 #[test]
@@ -40,7 +40,7 @@ fn a_missing_message_renders_the_placeholder() {
     // A locale without files has no messages at all.
     assert_eq!(t!(title).resolve(&scope(locale!("fr"))), "title");
     // Neither has a scope without a locale.
-    assert_eq!(t!(title).resolve(&Cx::default()), "title");
+    assert_eq!(t!(title).resolve(&Cx::new()), "title");
 }
 
 #[test]

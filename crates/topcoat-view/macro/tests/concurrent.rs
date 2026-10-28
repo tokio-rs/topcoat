@@ -12,7 +12,7 @@ use topcoat::{
 // `#[component]`. These tests stand in for those wrappers by binding it by
 // hand.
 fn empty_cx() -> Cx {
-    Cx::default()
+    Cx::new()
 }
 
 /// Renders its label once every party has arrived at the barrier.

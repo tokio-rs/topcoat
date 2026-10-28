@@ -88,7 +88,7 @@ mod tests {
             .expect("request should build")
             .into_parts();
 
-        Cx::default().with(parts)
+        Cx::new().with(parts)
     }
 
     #[test]

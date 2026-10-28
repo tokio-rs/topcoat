@@ -266,7 +266,7 @@ mod tests {
 
     #[test]
     fn formats_for_the_locale_of_the_context() {
-        let cx = Cx::default().with(locale!("de"));
+        let cx = Cx::new().with(locale!("de"));
         assert_eq!(
             Number::new(1234.5).resolve(&cx),
             Number::new(1234.5).resolve_in(&locale!("de"))

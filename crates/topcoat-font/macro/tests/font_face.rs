@@ -5,7 +5,7 @@ use topcoat::{
 
 fn render(face: &FontFace) -> String {
     let mut out = String::new();
-    face.fmt(&Cx::default(), &mut out).unwrap();
+    face.fmt(&Cx::new(), &mut out).unwrap();
     out
 }
 

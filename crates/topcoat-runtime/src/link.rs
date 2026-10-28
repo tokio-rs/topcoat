@@ -130,12 +130,12 @@ mod tests {
     }
 
     fn render(view: impl View) -> String {
-        block_on(view.single()).unwrap().render(&Cx::default())
+        block_on(view.single()).unwrap().render(&Cx::new())
     }
 
     #[test]
     fn link_attrs_mark_the_anchor_with_its_destination_and_mode() {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let attrs = link_attrs(cx, "/products", PrefetchMode::Viewport);
         let html = render(view! { cx => <a (attrs)>"Products"</a> });
 
@@ -145,7 +145,7 @@ mod tests {
 
     #[test]
     fn every_mode_renders_differently() {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let mut seen = Vec::new();
         for prefetch in [
             PrefetchMode::Never,
@@ -161,7 +161,7 @@ mod tests {
 
     #[test]
     fn link_renders_an_anchor_with_forwarded_attributes() {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let attrs = attributes! { cx => class="nav" aria-current="page" };
         let html = render(view! { cx => link(href: "/account", attrs: attrs, "Account") });
 
@@ -176,7 +176,7 @@ mod tests {
 
     #[test]
     fn explicit_props_take_precedence_over_forwarded_attributes() {
-        let cx = &Cx::default();
+        let cx = &Cx::new();
         let attrs = attributes! { cx => href="/elsewhere" data-topcoat-link="viewport" };
         let html = render(view! {
             cx =>
@@ -190,7 +190,7 @@ mod tests {
 
     #[test]
     fn prefetch_mode_uses_the_innermost_value() {
-        let outer = Cx::default().with(PrefetchMode::Viewport);
+        let outer = Cx::new().with(PrefetchMode::Viewport);
         assert_eq!(prefetch_mode(&outer), PrefetchMode::Viewport);
 
         let scoped = outer.with(PrefetchMode::Never);
@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn link_uses_the_context_mode_unless_given_one() {
-        let cx = &Cx::default().with(PrefetchMode::Viewport);
+        let cx = &Cx::new().with(PrefetchMode::Viewport);
         let html = render(view! { cx => link(href: "/", "Home") });
         assert!(html.contains(r#"data-topcoat-link="viewport""#), "{html}");
 

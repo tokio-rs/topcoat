@@ -273,7 +273,7 @@ mod tests {
 
         let (parts, ()) = builder.body(()).expect("request should build").into_parts();
 
-        Cx::default().with(parts)
+        Cx::new().with(parts)
     }
 
     /// A two-field multipart body: a plain text `greeting` field and an
