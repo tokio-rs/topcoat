@@ -10,7 +10,23 @@ keywords.workspace = true
 categories.workspace = true
 rust-version.workspace = true
 
+[features]
+asset = [
+	"dep:topcoat-asset",
+]
+l10n = [
+	"dep:topcoat-l10n",
+	"topcoat-l10n/fluent",
+]
+router = [
+	"dep:topcoat-router",
+]
+
 [dependencies]
+topcoat-asset = { workspace = true, optional = true }
+topcoat-core.workspace = true
+topcoat-l10n = { workspace = true, optional = true }
+topcoat-router = { workspace = true, optional = true }
 
 [lints]
 workspace = true
