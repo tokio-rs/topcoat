@@ -250,8 +250,9 @@ async fn customer_details(cx: &Cx, id: u64) -> Result<impl View> {
                     <dt class="text-muted-foreground">(t!(customer_since))</dt>
                     <dd>
                         <time datetime=(customer.joined_at.to_string())>
-                            (DateTime::from(customer.joined_at)
-                                .date_style(DateTimeStyle::Medium))
+                            (DateTime::from(customer.joined_at).date_style(
+                                DateTimeStyle::Medium,
+                            ))
                         </time>
                     </dd>
                 </div>

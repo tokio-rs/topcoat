@@ -1,7 +1,9 @@
+mod open_graph;
 mod robots;
 
 use std::borrow::Cow;
 
+pub use open_graph::*;
 pub use robots::*;
 use topcoat_core::{
     context::{AsyncCxFn, BoxCxFn},
@@ -45,6 +47,7 @@ pub struct Metadata {
     pub(crate) viewport: Field<Cow<'static, str>>,
     pub(crate) robots: Robots,
     pub(crate) theme_color: Field<Cow<'static, str>>,
+    pub(crate) open_graph: Option<Box<OpenGraphFields>>,
     /// Loads more fields for each request. Fields set on this value take
     /// precedence over the loaded ones.
     pub(crate) load: Option<BoxCxFn<Result<Metadata>>>,
@@ -153,6 +156,19 @@ impl Metadata {
     #[must_use]
     pub fn no_theme_color(mut self) -> Self {
         self.theme_color = Field::Removed;
+        self
+    }
+
+    /// Sets the Open Graph fields of the page, which social networks use for
+    /// link previews, as in `.open_graph(|og| og.site_name("Acme"))`.
+    ///
+    /// The title, description, and URL default to the page's own, so most
+    /// pages only add images. Fields that `f` leaves unset come from further
+    /// up.
+    #[must_use]
+    pub fn open_graph(mut self, f: impl FnOnce(OpenGraphBuilder) -> OpenGraphBuilder) -> Self {
+        let fields = self.open_graph.map(|fields| *fields).unwrap_or_default();
+        self.open_graph = Some(Box::new(f(OpenGraphBuilder(fields)).0));
         self
     }
 }

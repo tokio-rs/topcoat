@@ -1,6 +1,8 @@
+mod image;
 mod text;
 mod url;
 
+pub use image::*;
 pub use text::*;
 pub use url::*;
 
@@ -29,6 +31,16 @@ impl<T> Field<T> {
         match self {
             Self::Set(value) => Some(value),
             Self::Inherit | Self::Removed => None,
+        }
+    }
+
+    /// Returns the value if the field is set, or `fallback` if no level set
+    /// or removed it.
+    pub(crate) fn value_or<'a>(&'a self, fallback: Option<&'a T>) -> Option<&'a T> {
+        match self {
+            Self::Set(value) => Some(value),
+            Self::Inherit => fallback,
+            Self::Removed => None,
         }
     }
 

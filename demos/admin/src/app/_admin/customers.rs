@@ -244,8 +244,9 @@ async fn customer_rows(
                         table_cell(
                             attrs: attributes! { class="text-muted-foreground" },
                             <time datetime=(customer.joined_at.to_string())>
-                                (DateTime::from(customer.joined_at)
-                                    .date_style(DateTimeStyle::Medium))
+                                (DateTime::from(customer.joined_at).date_style(
+                                    DateTimeStyle::Medium,
+                                ))
                             </time>
                         )
                         table_cell(

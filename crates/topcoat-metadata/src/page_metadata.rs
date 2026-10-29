@@ -6,7 +6,7 @@ use topcoat_core::{
 };
 use topcoat_core_macro::memoize;
 
-use crate::{Field, Metadata, Robots, Text, Url};
+use crate::{Field, Metadata, OpenGraph, OpenGraphFields, Robots, Text, Url};
 
 /// Reads the metadata of the current page.
 ///
@@ -59,6 +59,7 @@ pub struct PageMetadata {
     viewport: Field<Cow<'static, str>>,
     robots: Robots,
     theme_color: Field<Cow<'static, str>>,
+    pub(crate) open_graph: OpenGraphFields,
 }
 
 impl PageMetadata {
@@ -106,6 +107,12 @@ impl PageMetadata {
         self.theme_color.value().map(|color| &**color)
     }
 
+    /// Returns the Open Graph metadata of the page.
+    #[must_use]
+    pub fn open_graph(&self) -> OpenGraph<'_> {
+        OpenGraph::new(self)
+    }
+
     /// Fills the fields that are still unset from metadata stored in the
     /// context, cloning its values.
     fn fill_from(&mut self, metadata: &Metadata) {
@@ -119,6 +126,9 @@ impl PageMetadata {
         self.robots.fill_from(&metadata.robots);
         self.theme_color
             .fill(metadata.theme_color.as_ref().map(Cow::clone));
+        if let Some(open_graph) = &metadata.open_graph {
+            self.open_graph.fill_from(open_graph);
+        }
     }
 
     /// Fills the fields that are still unset from loaded metadata, taking
@@ -130,6 +140,9 @@ impl PageMetadata {
         self.viewport.fill(metadata.viewport);
         self.robots.fill_from(&metadata.robots);
         self.theme_color.fill(metadata.theme_color);
+        if let Some(open_graph) = metadata.open_graph {
+            self.open_graph.fill_from_loaded(*open_graph);
+        }
     }
 }
 
@@ -150,7 +163,11 @@ mod tests {
     #[tokio::test]
     async fn reads_each_field_from_the_closest_level_that_sets_it() {
         let cx = Cx::new()
-            .with(Metadata::new().title("Shop").description("Everything for tea."))
+            .with(
+                Metadata::new()
+                    .title("Shop")
+                    .description("Everything for tea."),
+            )
             .with(Metadata::new().title("Teapot"));
 
         assert_eq!(
@@ -255,6 +272,47 @@ mod tests {
 
         let cx = cx.with(Metadata::new().robots(|robots| robots.index(true)));
         assert!(metadata(&cx).await.unwrap().robots().index());
+    }
+
+    #[tokio::test]
+    async fn open_graph_falls_back_to_the_page_title_and_description() {
+        let cx = Cx::new().with(
+            Metadata::new()
+                .title("Teapot")
+                .description("A sturdy teapot.")
+                .open_graph(|og| og.title("The best teapot")),
+        );
+        let page = metadata(&cx).await.unwrap();
+        let og = page.open_graph();
+
+        let resolve = |text: Option<&Text>| text.map(|text| text.resolve(&cx).into_owned());
+        assert_eq!(resolve(og.title()).as_deref(), Some("The best teapot"));
+        assert_eq!(
+            resolve(og.description()).as_deref(),
+            Some("A sturdy teapot.")
+        );
+    }
+
+    #[tokio::test]
+    async fn combines_open_graph_fields_from_every_level() {
+        let cx = Cx::new()
+            .with(Metadata::new().open_graph(|og| og.site_name("Acme").image("/acme.png")))
+            .with(Metadata::new().open_graph(|og| og.image("/teapot.png").image("/lid.png")));
+        let page = metadata(&cx).await.unwrap();
+        let og = page.open_graph();
+
+        assert_eq!(
+            og.site_name()
+                .map(|name| name.resolve(&cx).into_owned())
+                .as_deref(),
+            Some("Acme")
+        );
+        let images: Vec<_> = og
+            .images()
+            .iter()
+            .map(|image| image.url.resolve(&cx).into_owned())
+            .collect();
+        assert_eq!(images, ["/teapot.png", "/lid.png"]);
     }
 
     #[tokio::test]

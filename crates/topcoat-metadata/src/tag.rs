@@ -111,6 +111,49 @@ pub async fn theme_color(
     })
 }
 
+/// Renders the [Open Graph metadata](crate::OpenGraph) of a page, which
+/// social networks use for link previews. URLs are always in the absolute
+/// form.
+#[component]
+pub async fn open_graph(
+    cx: &Cx,
+    /// The metadata of the page.
+    metadata: &PageMetadata,
+) -> Result<impl View> {
+    let og = metadata.open_graph();
+    let absolute = cx.with(UrlForm::Absolute);
+    Ok(view! {
+        <meta property="og:type" content=(og.kind().as_str())>
+        if let Some(og_title) = og.title() {
+            <meta property="og:title" content=(og_title)>
+        }
+        if let Some(og_description) = og.description() {
+            <meta property="og:description" content=(og_description)>
+        }
+        if let Some(site_name) = og.site_name() {
+            <meta property="og:site_name" content=(site_name)>
+        }
+        (view! {
+            absolute =>
+            if let Some(url) = og.url() {
+                <meta property="og:url" content=(url)>
+            }
+            for image in og.images() {
+                <meta property="og:image" content=(&image.url)>
+                if let Some(width) = image.width {
+                    <meta property="og:image:width" content=(width)>
+                }
+                if let Some(height) = image.height {
+                    <meta property="og:image:height" content=(height)>
+                }
+                if let Some(alt) = &image.alt {
+                    <meta property="og:image:alt" content=(alt)>
+                }
+            }
+        })
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use topcoat_core::base_url::BaseUrl;
@@ -132,7 +175,41 @@ mod tests {
             .unwrap()
             .render(cx);
 
-        assert!(html.contains(r#"href="https://example.com/about""#), "{html}");
+        assert!(
+            html.contains(r#"href="https://example.com/about""#),
+            "{html}"
+        );
+    }
+
+    #[tokio::test]
+    async fn renders_open_graph_urls_in_the_absolute_form() {
+        let cx = &Cx::new()
+            .with(BaseUrl::new("https://example.com").unwrap())
+            .with(
+                Metadata::new()
+                    .canonical("/teapot")
+                    .open_graph(|og| og.image(crate::Image::new("/teapot.png").size(1200, 630))),
+            );
+        let page = metadata(cx).await.unwrap();
+
+        let html = view! { cx => open_graph(metadata: page) }
+            .single()
+            .await
+            .unwrap()
+            .render(cx);
+
+        assert!(
+            html.contains(r#"property="og:url" content="https://example.com/teapot""#),
+            "{html}"
+        );
+        assert!(
+            html.contains(r#"property="og:image" content="https://example.com/teapot.png""#),
+            "{html}"
+        );
+        assert!(
+            html.contains(r#"property="og:image:width" content="1200""#),
+            "{html}"
+        );
     }
 
     #[tokio::test]
