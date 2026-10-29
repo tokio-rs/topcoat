@@ -1,4 +1,4 @@
-use crate::Field;
+use crate::field::{Field, fill_fields};
 
 /// Tells search engines what to do with a page after fetching it: whether
 /// to show it in their results and whether to follow its links.
@@ -26,13 +26,9 @@ impl Robots {
     pub fn follow(&self) -> bool {
         self.follow.value().copied().unwrap_or(true)
     }
-
-    /// Fills the directives that are still unset from `robots`.
-    pub(crate) fn fill_from(&mut self, robots: &Robots) {
-        self.index.fill(robots.index.as_ref().map(bool::clone));
-        self.follow.fill(robots.follow.as_ref().map(bool::clone));
-    }
 }
+
+fill_fields!(Robots { index, follow });
 
 /// Sets the directives of [`Robots`] in [`Metadata::robots`](crate::Metadata::robots).
 pub struct RobotsBuilder(pub(crate) Robots);

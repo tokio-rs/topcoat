@@ -62,3 +62,60 @@ impl<T> Field<T> {
         }
     }
 }
+
+/// Fills the fields of a value that are still unset from the fields of
+/// another one, combining levels of metadata from the closest one out.
+pub(crate) trait Fill<From = Self> {
+    /// Fills from metadata stored in the context, cloning its values.
+    fn fill_from(&mut self, from: &From);
+
+    /// Fills from metadata loaded for the request, taking its values.
+    fn fill_from_owned(&mut self, from: From);
+}
+
+impl<T: Clone> Fill for Field<T> {
+    fn fill_from(&mut self, from: &Self) {
+        self.fill(from.as_ref().map(T::clone));
+    }
+
+    fn fill_from_owned(&mut self, from: Self) {
+        self.fill(from);
+    }
+}
+
+/// Fills a group of fields from a level that may not set any of them.
+impl<T: Fill> Fill<Option<Box<T>>> for T {
+    fn fill_from(&mut self, from: &Option<Box<T>>) {
+        if let Some(from) = from {
+            <T as Fill>::fill_from(self, from);
+        }
+    }
+
+    fn fill_from_owned(&mut self, from: Option<Box<T>>) {
+        if let Some(from) = from {
+            <T as Fill>::fill_from_owned(self, *from);
+        }
+    }
+}
+
+/// Implements [`Fill`] for a struct, filling each listed field from the
+/// field of the same name. `Target from Source { ... }` fills from another
+/// type.
+macro_rules! fill_fields {
+    ($ty:ident from $from:ident { $($field:ident),* $(,)? }) => {
+        impl $crate::field::Fill<$from> for $ty {
+            fn fill_from(&mut self, from: &$from) {
+                $($crate::field::Fill::fill_from(&mut self.$field, &from.$field);)*
+            }
+
+            fn fill_from_owned(&mut self, from: $from) {
+                $($crate::field::Fill::fill_from_owned(&mut self.$field, from.$field);)*
+            }
+        }
+    };
+    ($ty:ident { $($field:ident),* $(,)? }) => {
+        $crate::field::fill_fields!($ty from $ty { $($field),* });
+    };
+}
+
+pub(crate) use fill_fields;

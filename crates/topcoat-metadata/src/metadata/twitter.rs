@@ -1,6 +1,9 @@
 use std::borrow::Cow;
 
-use crate::{Field, PageMetadata};
+use crate::{
+    PageMetadata,
+    field::{Field, fill_fields},
+};
 
 /// The layout X uses for link previews, rendered as `twitter:card`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,23 +34,11 @@ pub(crate) struct TwitterFields {
     pub(crate) creator: Field<Cow<'static, str>>,
 }
 
-impl TwitterFields {
-    /// Fills the fields that are still unset from `fields`, cloning its
-    /// values.
-    pub(crate) fn fill_from(&mut self, fields: &TwitterFields) {
-        self.card.fill(fields.card.as_ref().map(TwitterCard::clone));
-        self.site.fill(fields.site.as_ref().map(Cow::clone));
-        self.creator.fill(fields.creator.as_ref().map(Cow::clone));
-    }
-
-    /// Fills the fields that are still unset from loaded `fields`, taking
-    /// its values.
-    pub(crate) fn fill_from_loaded(&mut self, fields: TwitterFields) {
-        self.card.fill(fields.card);
-        self.site.fill(fields.site);
-        self.creator.fill(fields.creator);
-    }
-}
+fill_fields!(TwitterFields {
+    card,
+    site,
+    creator,
+});
 
 /// Sets the X fields in [`Metadata::twitter`](crate::Metadata::twitter).
 pub struct TwitterBuilder(pub(crate) TwitterFields);

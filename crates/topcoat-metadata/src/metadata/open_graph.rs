@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use crate::{Field, Image, PageMetadata, Text, Url};
+use crate::{
+    Image, PageMetadata, Text, Url,
+    field::{Field, fill_fields},
+};
 
 /// The kind of object a page describes, rendered as `og:type`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -36,32 +39,14 @@ pub(crate) struct OpenGraphFields {
     pub(crate) images: Field<Arc<[Image]>>,
 }
 
-impl OpenGraphFields {
-    /// Fills the fields that are still unset from `fields`, cloning its
-    /// values.
-    pub(crate) fn fill_from(&mut self, fields: &OpenGraphFields) {
-        self.title.fill(fields.title.as_ref().map(Text::clone));
-        self.description
-            .fill(fields.description.as_ref().map(Text::clone));
-        self.url.fill(fields.url.as_ref().map(Url::clone));
-        self.site_name
-            .fill(fields.site_name.as_ref().map(Text::clone));
-        self.kind
-            .fill(fields.kind.as_ref().map(OpenGraphType::clone));
-        self.images.fill(fields.images.as_ref().map(Arc::clone));
-    }
-
-    /// Fills the fields that are still unset from loaded `fields`, taking
-    /// its values.
-    pub(crate) fn fill_from_loaded(&mut self, fields: OpenGraphFields) {
-        self.title.fill(fields.title);
-        self.description.fill(fields.description);
-        self.url.fill(fields.url);
-        self.site_name.fill(fields.site_name);
-        self.kind.fill(fields.kind);
-        self.images.fill(fields.images);
-    }
-}
+fill_fields!(OpenGraphFields {
+    title,
+    description,
+    url,
+    site_name,
+    kind,
+    images,
+});
 
 /// Sets the Open Graph fields in
 /// [`Metadata::open_graph`](crate::Metadata::open_graph).
