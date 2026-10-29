@@ -509,3 +509,35 @@ async fn signal_reads_and_raw_fallbacks_keep_bindings_but_not_server_dependencie
     assert!(html.contains("data-topcoat-on:input="), "{html}");
     assert!(!html.contains("::topcoat::dep("), "{html}");
 }
+
+/// The marker tells the browser that the first evaluation writes, so the
+/// text the server rendered is replaced instead of kept. Only a synced
+/// expression carries the flag.
+#[component]
+async fn synced_and_dynamic_text() -> Result<impl View> {
+    let language = expr!(raw!("navigator.language", "en")).synced();
+    let title = expr!(raw!("document.title", "Topcoat")).dynamic();
+    Ok(view! {
+        <p>(language)</p>
+        <p>(title)</p>
+    })
+}
+
+#[tokio::test]
+async fn a_synced_expression_marks_its_text_as_written_by_the_browser() {
+    let cx = &Cx::default();
+    let html = view! { cx => synced_and_dynamic_text() }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+
+    assert!(
+        html.contains(r#"::topcoat::expr::start("navigator.language", true)"#),
+        "{html}"
+    );
+    assert!(
+        html.contains(r#"::topcoat::expr::start("document.title")"#),
+        "{html}"
+    );
+}
