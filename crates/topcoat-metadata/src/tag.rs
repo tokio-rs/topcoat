@@ -98,6 +98,19 @@ pub async fn robots(
     })
 }
 
+/// Renders the [theme color](crate::Metadata::theme_color) of a page.
+#[component]
+pub async fn theme_color(
+    /// The metadata of the page.
+    metadata: &PageMetadata,
+) -> Result<impl View> {
+    Ok(view! {
+        if let Some(color) = metadata.theme_color() {
+            <meta name="theme-color" content=(color)>
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use topcoat_core::base_url::BaseUrl;
@@ -133,7 +146,7 @@ mod tests {
             .render(allowed);
         assert!(!html.contains("robots"), "{html}");
 
-        let denied = &Cx::new().with(Metadata::new().robots(|robots| robots.index(false)));
+        let denied = &Cx::new().with(Metadata::new().robots(|r| r.index(false)));
         let page = metadata(denied).await.unwrap();
         let html = view! { denied => robots(metadata: page) }
             .single()

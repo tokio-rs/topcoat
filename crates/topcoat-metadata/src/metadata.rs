@@ -8,7 +8,7 @@ use topcoat_core::{
     error::Result,
 };
 
-use crate::{Text, Url};
+use crate::{Field, Text, Url};
 
 /// The metadata of a page, such as its title and description.
 ///
@@ -44,6 +44,7 @@ pub struct Metadata {
     pub(crate) canonical: Field<Url>,
     pub(crate) viewport: Field<Cow<'static, str>>,
     pub(crate) robots: Robots,
+    pub(crate) theme_color: Field<Cow<'static, str>>,
     /// Loads more fields for each request. Fields set on this value take
     /// precedence over the loaded ones.
     pub(crate) load: Option<BoxCxFn<Result<Metadata>>>,
@@ -139,51 +140,19 @@ impl Metadata {
         self.robots = f(RobotsBuilder(self.robots)).0;
         self
     }
-}
 
-/// The state of one field in one level of metadata.
-#[derive(Default)]
-pub(crate) enum Field<T> {
-    /// The field is not set here, so a level further up decides.
-    #[default]
-    Inherit,
-    /// The field is set to this value.
-    Set(T),
-    /// The field is removed, hiding any value set further up.
-    Removed,
-}
-
-impl<T> Field<T> {
-    /// Replaces this field with `field` if it is not set or removed yet.
-    pub(crate) fn fill(&mut self, field: Field<T>) {
-        if let Self::Inherit = self {
-            *self = field;
-        }
+    /// Sets the theme color of the page, which some browsers use to tint
+    /// their interface around it, as in `.theme_color("#1d4ed8")`.
+    #[must_use]
+    pub fn theme_color(mut self, color: impl Into<Cow<'static, str>>) -> Self {
+        self.theme_color = Field::Set(color.into());
+        self
     }
 
-    /// Returns the value if the field is set.
-    pub(crate) fn value(&self) -> Option<&T> {
-        match self {
-            Self::Set(value) => Some(value),
-            Self::Inherit | Self::Removed => None,
-        }
-    }
-
-    /// Converts the value with `f`, keeping the state.
-    pub(crate) fn map<U>(self, f: impl FnOnce(T) -> U) -> Field<U> {
-        match self {
-            Self::Inherit => Field::Inherit,
-            Self::Set(value) => Field::Set(f(value)),
-            Self::Removed => Field::Removed,
-        }
-    }
-
-    /// Borrows the value, keeping the state.
-    pub(crate) fn as_ref(&self) -> Field<&T> {
-        match self {
-            Self::Inherit => Field::Inherit,
-            Self::Set(value) => Field::Set(value),
-            Self::Removed => Field::Removed,
-        }
+    /// Removes the theme color set further up, so the page has none.
+    #[must_use]
+    pub fn no_theme_color(mut self) -> Self {
+        self.theme_color = Field::Removed;
+        self
     }
 }

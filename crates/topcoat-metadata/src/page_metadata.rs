@@ -58,6 +58,7 @@ pub struct PageMetadata {
     canonical: Field<Url>,
     viewport: Field<Cow<'static, str>>,
     robots: Robots,
+    theme_color: Field<Cow<'static, str>>,
 }
 
 impl PageMetadata {
@@ -99,6 +100,12 @@ impl PageMetadata {
         &self.robots
     }
 
+    /// Returns the theme color of the page.
+    #[must_use]
+    pub fn theme_color(&self) -> Option<&str> {
+        self.theme_color.value().map(|color| &**color)
+    }
+
     /// Fills the fields that are still unset from metadata stored in the
     /// context, cloning its values.
     fn fill_from(&mut self, metadata: &Metadata) {
@@ -110,6 +117,8 @@ impl PageMetadata {
         self.viewport
             .fill(metadata.viewport.as_ref().map(Cow::clone));
         self.robots.fill_from(&metadata.robots);
+        self.theme_color
+            .fill(metadata.theme_color.as_ref().map(Cow::clone));
     }
 
     /// Fills the fields that are still unset from loaded metadata, taking
@@ -120,6 +129,7 @@ impl PageMetadata {
         self.canonical.fill(metadata.canonical);
         self.viewport.fill(metadata.viewport);
         self.robots.fill_from(&metadata.robots);
+        self.theme_color.fill(metadata.theme_color);
     }
 }
 
