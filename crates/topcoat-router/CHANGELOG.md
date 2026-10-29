@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0](https://github.com/tokio-rs/topcoat/compare/topcoat-router-v0.11.0...topcoat-router-v0.12.0) - 2026-10-29
+
+### Added
+
+- [**breaking**] unify macro syntax ([#571](https://github.com/tokio-rs/topcoat/pull/571))
+- *(router)* route context with `#[route(with(...))]` ([#566](https://github.com/tokio-rs/topcoat/pull/566))
+- *(core)* `iter_context::<T>(cx)` function to walk through shadowed context values ([#565](https://github.com/tokio-rs/topcoat/pull/565))
+- *(core)* [**breaking**] unify `app_context` and `request_context` into one `context` ([#562](https://github.com/tokio-rs/topcoat/pull/562))
+
 ## [0.11.0](https://github.com/tokio-rs/topcoat/compare/topcoat-router-v0.10.0...topcoat-router-v0.11.0) - 2026-10-24
 
 ### Fixed
