@@ -33,7 +33,7 @@ impl FontSourceUrl {
         match self {
             Self::Str(inner) => f.write_str(inner),
             #[cfg(feature = "asset")]
-            Self::Asset(inner) => topcoat_asset::asset_config(cx).fmt_url(*inner, &mut f),
+            Self::Asset(inner) => topcoat_asset::asset_config(cx).fmt_url(cx, *inner, &mut f),
         }
     }
 

@@ -21,12 +21,20 @@ l10n = [
 router = [
 	"dep:topcoat-router",
 ]
+view = [
+	"dep:topcoat-view",
+]
 
 [dependencies]
 topcoat-asset = { workspace = true, optional = true }
 topcoat-core.workspace = true
+topcoat-core-macro.workspace = true
 topcoat-l10n = { workspace = true, optional = true }
 topcoat-router = { workspace = true, optional = true }
+topcoat-view = { workspace = true, optional = true }
+
+[dev-dependencies]
+topcoat.workspace = true
 
 [lints]
 workspace = true
@@ -34,3 +42,6 @@ workspace = true
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+
+[package.metadata.cargo-udeps.ignore]
+development = ["topcoat"]

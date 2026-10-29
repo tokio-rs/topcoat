@@ -91,6 +91,7 @@ mod tests {
     use std::{env, fmt::Write, fs, path::PathBuf};
 
     use http::{Method, StatusCode, header::CONTENT_TYPE};
+    use topcoat_core::context::Cx;
     use topcoat_router::{Body, Router};
 
     use super::*;
@@ -198,7 +199,7 @@ mod tests {
             .unwrap()
             .to_owned();
         let config = AssetConfig::serve(bundle);
-        let url = config.resolve(asset);
+        let url = config.resolve(&Cx::new(), asset);
         assert_eq!(
             url,
             format!("{ASSET_ROUTE_PREFIX}/logo%23dark%3F50%2525-{suffix}")

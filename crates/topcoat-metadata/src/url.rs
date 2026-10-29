@@ -9,6 +9,8 @@ use topcoat_core::{
 };
 #[cfg(feature = "router")]
 use topcoat_router::{HrefTarget, href, request::uri};
+#[cfg(feature = "view")]
+use topcoat_view::{AttributeValueViewParts, PartsWriter};
 
 /// A URL in a page's metadata, such as its canonical URL or a social image.
 ///
@@ -61,7 +63,7 @@ impl Url {
             #[cfg(feature = "router")]
             Self::Route(target) => Cow::Owned(href(*target, ()).resolve(cx)),
             #[cfg(feature = "asset")]
-            Self::Asset(asset) => in_form(cx, Cow::Owned(asset_config(cx).resolve(*asset))),
+            Self::Asset(asset) => Cow::Owned(asset_config(cx).resolve(cx, *asset)),
         }
     }
 }
@@ -91,15 +93,67 @@ impl From<Asset> for Url {
     }
 }
 
+/// Displays the URL in an attribute value, in the [form](url_form) set on
+/// the view's context, as in `<link rel="canonical" href=(canonical)>`.
+#[cfg(feature = "view")]
+impl AttributeValueViewParts for &Url {
+    fn attribute_present(&self) -> bool {
+        true
+    }
+
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
+        match self {
+            Url::Str(Cow::Borrowed(url)) => {
+                push_base(cx, url, parts);
+                parts.push_static_str(*url);
+            }
+            Url::Str(Cow::Owned(url)) => {
+                push_base(cx, url, parts);
+                parts.push_str(url);
+            }
+            #[cfg(feature = "router")]
+            Url::Current => {
+                let path = uri(cx).path();
+                push_base(cx, path, parts);
+                parts.push_str(path);
+            }
+            #[cfg(feature = "router")]
+            Url::Route(target) => {
+                AttributeValueViewParts::into_view_parts(href(*target, ()), cx, parts);
+            }
+            #[cfg(feature = "asset")]
+            Url::Asset(asset) => {
+                AttributeValueViewParts::into_view_parts(*asset, cx, parts);
+            }
+        }
+    }
+}
+
 /// Returns `url` in the form set on `cx`: joined with the base URL when the
 /// form is absolute and `url` is relative to the site root, and unchanged
 /// otherwise.
 fn in_form<'a>(cx: &Cx, url: Cow<'a, str>) -> Cow<'a, str> {
-    match url_form(cx) {
-        // `//host/path` is relative to the scheme only, not to the site root.
-        UrlForm::Absolute if url.starts_with('/') && !url.starts_with("//") => {
-            Cow::Owned(base_url(cx).join(&url))
-        }
-        _ => url,
+    if needs_base(cx, &url) {
+        Cow::Owned(base_url(cx).join(&url))
+    } else {
+        url
     }
+}
+
+/// Appends the base URL of `cx` to the view if `url` needs it in front.
+#[cfg(feature = "view")]
+fn push_base(cx: &Cx, url: &str, parts: &mut PartsWriter<'_>) {
+    if needs_base(cx, url) {
+        parts.push_str(base_url(cx).as_str());
+    }
+}
+
+/// Returns whether `url` needs the base URL of `cx` in front: when the form
+/// set on `cx` is absolute and `url` is relative to the site root.
+///
+/// Such a URL starts with exactly one `/`, so the base URL, which has no
+/// trailing slash, can be written right before it.
+fn needs_base(cx: &Cx, url: &str) -> bool {
+    // `//host/path` is relative to the scheme only, not to the site root.
+    url_form(cx) == UrlForm::Absolute && url.starts_with('/') && !url.starts_with("//")
 }

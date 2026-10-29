@@ -9,7 +9,7 @@ impl DynViewPart for Asset {
         let asset_config = try_context::<AssetConfig>(cx).unwrap_or_else(|| {
             panic!("no asset config registered in this router context; load the asset bundle with `.assets(AssetBundle::load().unwrap())`");
         });
-        let _ = asset_config.fmt_url(*self, w);
+        let _ = asset_config.fmt_url(cx, *self, w);
     }
 }
 

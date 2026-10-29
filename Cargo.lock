@@ -5558,10 +5558,13 @@ dependencies = [
 name = "topcoat-metadata"
 version = "0.11.0"
 dependencies = [
+ "topcoat",
  "topcoat-asset",
  "topcoat-core",
+ "topcoat-core-macro",
  "topcoat-l10n",
  "topcoat-router",
+ "topcoat-view",
 ]
 
 [[package]]
