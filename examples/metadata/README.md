@@ -1,6 +1,6 @@
 # Metadata
 
-This example shows how to set page titles, descriptions, canonical URLs, and social link previews. The root layout provides defaults for all pages and calls `metadata::tags()` to render them in `<head>`.
+This example shows how to set page titles, descriptions, canonical URLs, and social link previews. The root layout provides defaults for all pages and calls `topcoat::metadata::tags()` to render them in `<head>`.
 
 Each page can replace the fields it needs to change. The about page removes the default description. Product pages load their title, description, and preview image from the selected product.
 

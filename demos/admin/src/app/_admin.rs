@@ -10,6 +10,7 @@ use topcoat::{
     context::{AsyncCxFn, BoxCxFn, Cx, context, try_context},
     icon::{IconData, icon, iconify::iconify_icon},
     l10n::{Translation, fluent::messages},
+    metadata::{Metadata, Text},
     router::{HrefTarget, Slot, href, layout, request::uri},
     runtime::{Event, Signal, link, link_attrs, prefetch_mode, signal},
     view::{View, attributes, component, element_id, view},
@@ -103,7 +104,13 @@ impl Crumb {
     }
 }
 
-#[layout]
+#[layout(with(Metadata::from_fn(async |cx| {
+    let title = match try_context::<Crumb>(cx) {
+        Some(crumb) => Text::from(crumb.0.call(cx).await?),
+        None => Text::from(context::<Section>(cx).label()),
+    };
+    Ok(Metadata::new().title(title))
+})))]
 async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     let user = require_user(cx).await?;
 

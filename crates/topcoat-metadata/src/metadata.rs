@@ -6,11 +6,11 @@ use std::borrow::Cow;
 
 pub use open_graph::*;
 pub use robots::*;
-pub use twitter::*;
 use topcoat_core::{
     context::{AsyncCxFn, BoxCxFn},
     error::Result,
 };
+pub use twitter::*;
 
 use crate::{Field, Text, Url};
 

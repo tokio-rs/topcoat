@@ -9,7 +9,7 @@ Add `Metadata` to a layout or page with `with(...)`. The router makes these valu
 ```rust
 use topcoat::{
     Result,
-    metadata::{self, Metadata},
+    metadata::Metadata,
     router::{Router, Slot, layout, page},
     view::{View, view},
 };
@@ -23,7 +23,7 @@ async fn shell(slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>
-            <head>metadata::tags()</head>
+            <head>topcoat::metadata::tags()</head>
             <body>(slot)</body>
         </html>
     })
@@ -71,7 +71,7 @@ The accessor combines every `Metadata` value visible in the context. Reading `co
 
 # Rendering tags
 
-Use [`metadata::tags()`](tags) to render the page's combined metadata. Place it first in the layout's `<head>`:
+Use [`topcoat::metadata::tags()`](tags) to render the page's combined metadata. Place it first in the layout's `<head>`:
 
 ```rust
 use topcoat::{

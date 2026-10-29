@@ -15,7 +15,7 @@ use crate::{metadata, tag};
 /// ```
 /// use topcoat::{
 ///     Result,
-///     metadata::{self, Metadata},
+///     metadata::Metadata,
 ///     router::{Slot, layout},
 ///     view::{View, view},
 /// };
@@ -26,7 +26,7 @@ use crate::{metadata, tag};
 ///         <!DOCTYPE html>
 ///         <html>
 ///             <head>
-///                 metadata::tags()
+///                 topcoat::metadata::tags()
 ///             </head>
 ///             <body>(slot)</body>
 ///         </html>
