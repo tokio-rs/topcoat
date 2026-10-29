@@ -38,6 +38,7 @@ topcoat-view-macro = { workspace = true, optional = true }
 
 [dev-dependencies]
 topcoat = { workspace = true, features = ["metadata"] }
+tokio = { workspace = true, features = ["macros", "rt"] }
 
 [lints]
 workspace = true

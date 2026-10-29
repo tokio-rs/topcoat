@@ -74,3 +74,72 @@ pub async fn canonical(
         }
     })
 }
+
+/// Renders the [robots directives](crate::Robots) of a page.
+///
+/// Renders nothing when they allow everything, which is what search engines
+/// assume without the tag.
+#[component]
+pub async fn robots(
+    /// The metadata of the page.
+    metadata: &PageMetadata,
+) -> Result<impl View> {
+    let robots = metadata.robots();
+    let content = match (robots.index(), robots.follow()) {
+        (true, true) => None,
+        (false, true) => Some("noindex"),
+        (true, false) => Some("nofollow"),
+        (false, false) => Some("noindex, nofollow"),
+    };
+    Ok(view! {
+        if let Some(content) = content {
+            <meta name="robots" content=(content)>
+        }
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use topcoat_core::base_url::BaseUrl;
+    use topcoat_view::ViewExt;
+
+    use super::*;
+    use crate::{Metadata, metadata};
+
+    #[tokio::test]
+    async fn renders_the_canonical_url_in_the_absolute_form() {
+        let cx = &Cx::new()
+            .with(BaseUrl::new("https://example.com").unwrap())
+            .with(Metadata::new().canonical("/about"));
+        let page = metadata(cx).await.unwrap();
+
+        let html = view! { cx => canonical(metadata: page) }
+            .single()
+            .await
+            .unwrap()
+            .render(cx);
+
+        assert!(html.contains(r#"href="https://example.com/about""#), "{html}");
+    }
+
+    #[tokio::test]
+    async fn renders_robots_only_when_a_directive_is_denied() {
+        let allowed = &Cx::new();
+        let page = metadata(allowed).await.unwrap();
+        let html = view! { allowed => robots(metadata: page) }
+            .single()
+            .await
+            .unwrap()
+            .render(allowed);
+        assert!(!html.contains("robots"), "{html}");
+
+        let denied = &Cx::new().with(Metadata::new().robots(|robots| robots.index(false)));
+        let page = metadata(denied).await.unwrap();
+        let html = view! { denied => robots(metadata: page) }
+            .single()
+            .await
+            .unwrap()
+            .render(denied);
+        assert!(html.contains("noindex"), "{html}");
+    }
+}

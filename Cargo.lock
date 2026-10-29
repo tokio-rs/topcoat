@@ -5567,6 +5567,7 @@ dependencies = [
 name = "topcoat-metadata"
 version = "0.11.0"
 dependencies = [
+ "tokio",
  "topcoat",
  "topcoat-asset",
  "topcoat-core",

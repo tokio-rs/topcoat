@@ -1,5 +1,8 @@
+mod robots;
+
 use std::borrow::Cow;
 
+pub use robots::*;
 use topcoat_core::{
     context::{AsyncCxFn, BoxCxFn},
     error::Result,
@@ -40,6 +43,7 @@ pub struct Metadata {
     pub(crate) description: Field<Text>,
     pub(crate) canonical: Field<Url>,
     pub(crate) viewport: Field<Cow<'static, str>>,
+    pub(crate) robots: Robots,
     /// Loads more fields for each request. Fields set on this value take
     /// precedence over the loaded ones.
     pub(crate) load: Option<BoxCxFn<Result<Metadata>>>,
@@ -122,6 +126,17 @@ impl Metadata {
     #[must_use]
     pub fn no_viewport(mut self) -> Self {
         self.viewport = Field::Removed;
+        self
+    }
+
+    /// Sets the [`Robots`] directives of the page, as in
+    /// `.robots(|robots| robots.index(false))` to keep it out of search
+    /// results.
+    ///
+    /// Directives that `f` leaves unset come from further up.
+    #[must_use]
+    pub fn robots(mut self, f: impl FnOnce(RobotsBuilder) -> RobotsBuilder) -> Self {
+        self.robots = f(RobotsBuilder(self.robots)).0;
         self
     }
 }

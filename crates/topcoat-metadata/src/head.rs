@@ -45,5 +45,6 @@ pub async fn tags(cx: &Cx) -> Result<impl View> {
         tag::title(metadata: metadata)
         tag::description(metadata: metadata)
         tag::canonical(metadata: metadata)
+        tag::robots(metadata: metadata)
     })
 }
