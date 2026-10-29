@@ -118,3 +118,52 @@ fn constructed_records() {
         Order { r#type: item.name.clone(), items: order.items.clone(), note: Some(item) }
     });
 }
+
+#[test]
+fn updated_records() {
+    let order = order();
+    let item = order.items[0].clone();
+    coherent!(Item {
+        count: 5u32,
+        ..item.clone()
+    });
+    coherent!(Item { ..item.clone() });
+    coherent!(
+        Item {
+            name: "milk".to_owned(),
+            ..item.clone()
+        }
+        .count
+    );
+    coherent!(Order {
+        r#type: "".to_owned(),
+        ..order.clone()
+    });
+    coherent!(Order {
+        note: Some(Item {
+            count: 0u32,
+            ..order.items.index(1).clone()
+        }),
+        ..order.clone()
+    });
+    coherent!({
+        let base = order.clone();
+        Order {
+            items: base.items.clone(),
+            ..base
+        }
+    });
+    // A panic in a field or in the base agrees in both languages.
+    let missing: Option<Item> = None;
+    coherent!(Order {
+        note: Some(missing.unwrap()),
+        ..order.clone()
+    });
+    coherent!(Item {
+        count: 1u32,
+        ..order.note.unwrap()
+    });
+
+    let late = Awaitable::ready(item.clone()).after_yield();
+    coherent!(async => Item { count: 9u32, ..late.await });
+}

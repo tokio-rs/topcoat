@@ -113,6 +113,25 @@ fn expressions_construct_records_and_read_fields() {
     assert_eq!(nested, 1);
 }
 
+#[test]
+fn expressions_update_records_from_a_base() {
+    let order = order();
+    let (updated, _) = expr!(Order {
+        id: 8u64,
+        ..order.clone()
+    })
+    .into_evaluated_and_js();
+    assert_eq!(updated.id, 8);
+    assert_eq!(updated.r#type, order.r#type);
+    assert_eq!(updated.items, order.items);
+
+    let (item, _) = expr!(Item {
+        ..order.items.index(0).clone()
+    })
+    .into_evaluated_and_js();
+    assert_eq!(item, order.items[0]);
+}
+
 /// Exercises record operations that do not require `Clone`.
 #[record]
 struct Plain {
