@@ -54,6 +54,7 @@ members = [
     "examples/live",
     "examples/mail",
     "examples/manual-router",
+    "examples/metadata",
     "examples/module-router",
     "examples/path-query-params",
     "examples/request-response",
