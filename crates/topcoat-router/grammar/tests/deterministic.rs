@@ -97,8 +97,8 @@ fn not_found() {
 
 #[test]
 fn segment() {
-    assert_deterministic(|| syn::parse_str::<Segment>(r#"rename = "documentation""#));
-    assert_deterministic(|| syn::parse_str::<Segment>("kind = Group"));
+    assert_deterministic(|| syn::parse_str::<Segment>(r#"rename: "documentation""#));
+    assert_deterministic(|| syn::parse_str::<Segment>("kind: Group"));
 }
 
 #[test]

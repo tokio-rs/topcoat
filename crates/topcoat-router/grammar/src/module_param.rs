@@ -19,7 +19,7 @@ impl ModuleParam {
             quote! { Param }
         };
 
-        quote! { #topcoat_router_macro::segment!(kind = #kind, rename = #name); }
+        quote! { #topcoat_router_macro::segment!(kind: #kind, rename: #name); }
     }
 }
 

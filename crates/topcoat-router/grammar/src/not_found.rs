@@ -56,7 +56,7 @@ impl ToTokens for NotFound {
                 /// Serves every unmatched URL under this module as a
                 /// not-found error.
                 pub mod not_found {
-                    #topcoat_router_macro::segment!(kind = CatchAll, rename = "rest");
+                    #topcoat_router_macro::segment!(kind: CatchAll, rename: "rest");
 
                     #page
                 }

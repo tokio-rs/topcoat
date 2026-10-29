@@ -243,7 +243,7 @@ Handlers read an unparsed catch-all as [`CatchAllSegments`](crate::CatchAllSegme
 
 See the [`path_param!` macro reference](https://docs.rs/topcoat/latest/topcoat/router/macro.path_param.html) for value shapes, construction, parsing, and errors.
 
-A manual `segment!(kind = CatchAll)` capture remains available through [`raw_path_params`](crate::raw_path_params). Its value carries the encoded tail, with `/` separators intact, next to its separately decoded segments.
+A manual `segment!(kind: CatchAll)` capture remains available through [`raw_path_params`](crate::raw_path_params). Its value carries the encoded tail, with `/` separators intact, next to its separately decoded segments.
 
 # Query parameters
 
@@ -283,10 +283,10 @@ async fn posts(cx: &Cx) -> Result<impl View> {
 | Declaration | Result |
 |---|---|
 | none in `blog_posts` | `/blog-posts` |
-| `segment!(rename = "articles")` | `/articles` |
-| `segment!(kind = Group)` | no served URL segment |
-| `segment!(kind = Param, rename = "id")` | `/{id}` |
-| `segment!(kind = CatchAll, rename = "path")` | `/{*path}` |
+| `segment!(rename: "articles")` | `/articles` |
+| `segment!(kind: Group)` | no served URL segment |
+| `segment!(kind: Param, rename: "id")` | `/{id}` |
+| `segment!(kind: CatchAll, rename: "path")` | `/{*path}` |
 
 `Static` is the default kind for regular modules. `Group` is the default for modules whose names start with `_`. A rename is used as written; Topcoat does not kebab-case it.
 
@@ -315,13 +315,13 @@ Use an explicit kind when the module name should not select the default:
 ```rust
 use topcoat::router::segment;
 // src/app/marketing.rs: hide `marketing` from served URLs.
-segment!(kind = Group);
+segment!(kind: Group);
 ```
 
 ```rust
 use topcoat::router::segment;
 // src/app/_internal.rs: serve the module at /internal.
-segment!(kind = Static);
+segment!(kind: Static);
 ```
 
 Group names remain part of Topcoat's logical paths. A layout or layer in `_marketing` applies only to descendants of `_marketing`, even though the group name is absent from request URLs.

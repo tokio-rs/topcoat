@@ -6,12 +6,12 @@ use std::{borrow::Cow, collections::HashMap};
 /// default to `Static`. Modules starting with `_` default to `Group`, which
 /// does not appear in the URL. Use `segment!(...)` to choose another kind.
 ///
-/// The `segment!` macro accepts comma-separated `key = value` attributes:
+/// The `segment!` macro accepts comma-separated `key: value` options:
 ///
-/// | Attribute        | Description                                                    |
-/// |------------------|----------------------------------------------------------------|
-/// | `kind = <Kind>`  | Overrides the segment kind (`Static`, `Group`, `Param`, `CatchAll`). |
-/// | `rename = "..."` | Overrides the URL name (defaults to the module name).          |
+/// | Option          | Description                                                          |
+/// |-----------------|----------------------------------------------------------------------|
+/// | `kind: <Kind>`  | Overrides the segment kind (`Static`, `Group`, `Param`, `CatchAll`). |
+/// | `rename: "..."` | Overrides the URL name (defaults to the module name).                |
 ///
 /// # Examples
 ///
@@ -19,14 +19,14 @@ use std::{borrow::Cow, collections::HashMap};
 /// use topcoat::router::segment;
 ///
 /// // In a module-router module (e.g. src/app/users/id.rs):
-/// segment!(kind = Param);
+/// segment!(kind: Param);
 /// // This module now maps to /users/{id}
 ///
 /// // Rename the URL segment:
-/// segment!(rename = "user-id");
+/// segment!(rename: "user-id");
 ///
-/// // Combine attributes:
-/// segment!(kind = CatchAll, rename = "path");
+/// // Combine options:
+/// segment!(kind: CatchAll, rename: "path");
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SegmentKind {

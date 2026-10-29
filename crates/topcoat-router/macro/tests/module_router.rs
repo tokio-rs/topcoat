@@ -84,7 +84,7 @@ mod docs {
         view::{View, view},
     };
 
-    segment!(rename = "documentation");
+    segment!(rename: "documentation");
 
     #[page]
     async fn docs() -> Result<impl View> {

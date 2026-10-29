@@ -37,7 +37,7 @@ impl Parse for Segment {
             if !keys.insert(attr.keyword()) {
                 return Err(syn::Error::new(
                     attr.span(),
-                    format_args!("duplicate attribute `{}`", attr.keyword()),
+                    format_args!("duplicate option `{}`", attr.keyword()),
                 ));
             }
         }
@@ -85,12 +85,12 @@ mod kw {
 pub enum SegmentAttr {
     Kind {
         kind_kw: kw::kind,
-        eq_token: Token![=],
+        colon_token: Token![:],
         value: Ident,
     },
     Rename {
         rename_kw: kw::rename,
-        eq_token: Token![=],
+        colon_token: Token![:],
         value: LitStr,
     },
 }
@@ -131,17 +131,43 @@ impl Parse for SegmentAttr {
         if lookahead.peek(kw::kind) {
             Ok(Self::Kind {
                 kind_kw: input.parse()?,
-                eq_token: input.parse()?,
+                colon_token: input.parse()?,
                 value: input.parse()?,
             })
         } else if lookahead.peek(kw::rename) {
             Ok(Self::Rename {
                 rename_kw: input.parse()?,
-                eq_token: input.parse()?,
+                colon_token: input.parse()?,
                 value: input.parse()?,
             })
         } else {
             Err(lookahead.error())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(input: &str) -> syn::Result<Segment> {
+        syn::parse_str(input)
+    }
+
+    #[test]
+    fn parses_options() {
+        let segment = parse(r#"kind: CatchAll, rename: "path","#).unwrap();
+        assert_eq!(segment.find_kind().unwrap(), "CatchAll");
+        assert_eq!(segment.find_rename().unwrap().value(), "path");
+    }
+
+    #[test]
+    fn rejects_an_equals_sign() {
+        assert!(parse("kind = Group").is_err());
+    }
+
+    #[test]
+    fn rejects_a_duplicate_option() {
+        assert!(parse("kind: Group, kind: Static").is_err());
     }
 }
