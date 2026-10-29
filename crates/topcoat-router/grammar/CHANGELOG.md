@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0](https://github.com/tokio-rs/topcoat/compare/topcoat-router-grammar-v0.11.0...topcoat-router-grammar-v0.12.0) - 2026-10-29
+
+### Added
+
+- [**breaking**] unify macro syntax ([#571](https://github.com/tokio-rs/topcoat/pull/571))
+- *(router)* route context with `#[route(with(...))]` ([#566](https://github.com/tokio-rs/topcoat/pull/566))
+
 ## [0.10.0](https://github.com/tokio-rs/topcoat/compare/topcoat-router-grammar-v0.9.0...topcoat-router-grammar-v0.10.0) - 2026-10-03
 
 ### Added

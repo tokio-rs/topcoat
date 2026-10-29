@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0](https://github.com/tokio-rs/topcoat/compare/topcoat-font-v0.11.0...topcoat-font-v0.12.0) - 2026-10-29
+
+### Added
+
+- *(metadata)* built-in page metadata support ([#570](https://github.com/tokio-rs/topcoat/pull/570))
+- *(router)* route context with `#[route(with(...))]` ([#566](https://github.com/tokio-rs/topcoat/pull/566))
+- *(core)* [**breaking**] unify `app_context` and `request_context` into one `context` ([#562](https://github.com/tokio-rs/topcoat/pull/562))
+
 ## [0.11.0](https://github.com/tokio-rs/topcoat/compare/topcoat-font-v0.10.0...topcoat-font-v0.11.0) - 2026-10-24
 
 ### Other

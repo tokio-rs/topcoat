@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0](https://github.com/tokio-rs/topcoat/compare/topcoat-htmx-v0.11.0...topcoat-htmx-v0.12.0) - 2026-10-29
+
+### Added
+
+- *(router)* route context with `#[route(with(...))]` ([#566](https://github.com/tokio-rs/topcoat/pull/566))
+- *(core)* [**breaking**] unify `app_context` and `request_context` into one `context` ([#562](https://github.com/tokio-rs/topcoat/pull/562))
+
 ## [0.9.0](https://github.com/tokio-rs/topcoat/compare/topcoat-htmx-v0.8.1...topcoat-htmx-v0.9.0) - 2026-09-24
 
 ### Other

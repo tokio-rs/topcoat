@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0](https://github.com/tokio-rs/topcoat/compare/v0.11.0...v0.12.0) - 2026-10-29
+
+### Added
+
+- *(metadata)* built-in page metadata support ([#570](https://github.com/tokio-rs/topcoat/pull/570))
+- *(core)* [**breaking**] unify `app_context` and `request_context` into one `context` ([#562](https://github.com/tokio-rs/topcoat/pull/562))
+- *(router)* route context with `#[route(with(...))]` ([#566](https://github.com/tokio-rs/topcoat/pull/566))
+- [**breaking**] unify macro syntax ([#571](https://github.com/tokio-rs/topcoat/pull/571))
+- *(core)* `iter_context::<T>(cx)` function to walk through shadowed context values ([#565](https://github.com/tokio-rs/topcoat/pull/565))
+
+### Fixed
+
+- *(cli)* all cli commands that build should honor default bin ([#569](https://github.com/tokio-rs/topcoat/pull/569))
+
+### Other
+
+- remove functions not middlewares from readme
+
 ## [0.11.0](https://github.com/tokio-rs/topcoat/compare/v0.10.0...v0.11.0) - 2026-10-24
 
 ### Added
