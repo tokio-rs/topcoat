@@ -1,6 +1,6 @@
 # Metadata
 
-This example sets page metadata such as titles, descriptions, and canonical URLs. The root layout sets defaults for every page and renders them in `<head>` with `metadata::tags()`. Pages override single fields, the about page removes the description, and product pages load their title and description from the product they show.
+This example sets page metadata such as titles, descriptions, canonical URLs, and link previews for social networks. The root layout sets defaults for every page and renders them in `<head>` with `metadata::tags()`. Pages override single fields, the about page removes the description, and product pages load their title, description, and preview image from the product they show.
 
 Clone the Topcoat repository:
 

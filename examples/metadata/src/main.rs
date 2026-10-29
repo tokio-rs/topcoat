@@ -27,6 +27,9 @@ async fn main() {
         .title("Acme")
         .description("Acme sells everything you need for tea.")
         .canonical(Url::Current)
+        .theme_color("#0f766e")
+        .open_graph(|og| og.site_name("Acme"))
+        .twitter(|x| x.site("@acme"))
 ))]
 async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
