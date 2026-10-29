@@ -1,13 +1,15 @@
 //! Components that each render one kind of metadata tag.
 //!
 //! [`tags`](crate::tags) renders all of them. Use these instead to pick the
-//! tags to render, for example to write one of them yourself.
+//! tags to render, for example to write one of them yourself. Read the
+//! metadata once with [`metadata`](crate::metadata) and pass it to each
+//! component.
 
 use topcoat_core::{context::Cx, error::Result, url_form::UrlForm};
 use topcoat_view::View;
 use topcoat_view_macro::{component, view};
 
-use crate::metadata;
+use crate::PageMetadata;
 
 /// Renders `<meta charset="utf-8">`.
 ///
@@ -18,10 +20,12 @@ pub async fn charset() -> Result<impl View> {
     Ok(view! { <meta charset="utf-8"> })
 }
 
-/// Renders the [viewport](crate::Metadata::viewport) of the current page.
+/// Renders the [viewport](crate::Metadata::viewport) of a page.
 #[component]
-pub async fn viewport(cx: &Cx) -> Result<impl View> {
-    let metadata = metadata(cx).await?;
+pub async fn viewport(
+    /// The metadata of the page.
+    metadata: &PageMetadata,
+) -> Result<impl View> {
     Ok(view! {
         if let Some(viewport) = metadata.viewport() {
             <meta name="viewport" content=(viewport)>
@@ -29,10 +33,12 @@ pub async fn viewport(cx: &Cx) -> Result<impl View> {
     })
 }
 
-/// Renders the [title](crate::Metadata::title) of the current page.
+/// Renders the [title](crate::Metadata::title) of a page.
 #[component]
-pub async fn title(cx: &Cx) -> Result<impl View> {
-    let metadata = metadata(cx).await?;
+pub async fn title(
+    /// The metadata of the page.
+    metadata: &PageMetadata,
+) -> Result<impl View> {
     Ok(view! {
         if let Some(title) = metadata.title() {
             <title>(title)</title>
@@ -40,11 +46,12 @@ pub async fn title(cx: &Cx) -> Result<impl View> {
     })
 }
 
-/// Renders the [description](crate::Metadata::description) of the current
-/// page.
+/// Renders the [description](crate::Metadata::description) of a page.
 #[component]
-pub async fn description(cx: &Cx) -> Result<impl View> {
-    let metadata = metadata(cx).await?;
+pub async fn description(
+    /// The metadata of the page.
+    metadata: &PageMetadata,
+) -> Result<impl View> {
     Ok(view! {
         if let Some(description) = metadata.description() {
             <meta name="description" content=(description)>
@@ -52,11 +59,14 @@ pub async fn description(cx: &Cx) -> Result<impl View> {
     })
 }
 
-/// Renders the [canonical URL](crate::Metadata::canonical) of the current
-/// page, always in the absolute form.
+/// Renders the [canonical URL](crate::Metadata::canonical) of a page, always
+/// in the absolute form.
 #[component]
-pub async fn canonical(cx: &Cx) -> Result<impl View> {
-    let metadata = metadata(cx).await?;
+pub async fn canonical(
+    cx: &Cx,
+    /// The metadata of the page.
+    metadata: &PageMetadata,
+) -> Result<impl View> {
     let absolute = cx.with(UrlForm::Absolute);
     Ok(view! {
         if let Some(canonical) = metadata.canonical() {

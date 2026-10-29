@@ -18,6 +18,7 @@ default = [
 	"cookie",
 	"font",
 	"icon",
+	"metadata",
 	"router",
 	"runtime",
 	"serve",

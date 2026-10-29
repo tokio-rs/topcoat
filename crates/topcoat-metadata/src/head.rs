@@ -1,14 +1,15 @@
-use topcoat_core::error::Result;
+use topcoat_core::{context::Cx, error::Result};
 use topcoat_view::View;
 use topcoat_view_macro::{component, view};
 
-use crate::tag;
+use crate::{metadata, tag};
 
 /// Renders the metadata of the current page as tags for `<head>`.
 ///
 /// Render it at the start of `<head>`, because it begins with
-/// [`<meta charset>`](tag::charset). To leave out a tag or write it
-/// yourself, render the components of [`tag`] you need instead.
+/// [`<meta charset>`](tag::charset). It reads the metadata once and passes
+/// it to every component of [`tag`]. To leave out a tag or write it
+/// yourself, render the components you need instead.
 ///
 /// ```
 /// use topcoat::{
@@ -31,13 +32,18 @@ use crate::tag;
 ///     })
 /// }
 /// ```
+///
+/// # Errors
+///
+/// Returns the error of [`metadata`] when reading the metadata fails.
 #[component]
-pub async fn tags() -> Result<impl View> {
+pub async fn tags(cx: &Cx) -> Result<impl View> {
+    let metadata = metadata(cx).await?;
     Ok(view! {
         tag::charset()
-        tag::viewport()
-        tag::title()
-        tag::description()
-        tag::canonical()
+        tag::viewport(metadata: metadata)
+        tag::title(metadata: metadata)
+        tag::description(metadata: metadata)
+        tag::canonical(metadata: metadata)
     })
 }
