@@ -88,7 +88,7 @@ Follow these rules throughout the project:
 - Plain ASCII everywhere, in code, docs, and commit messages. Write `->` instead of an arrow character and `...` instead of an ellipsis, and avoid em dashes.
 - Do not add unsafe code.
 
-Match the surrounding code and follow the [`style`](.agents/skills/style/SKILL.md) skill. For guides, also read the [`prose`](.agents/skills/prose/SKILL.md) skill. For procedural macros, read the [`macro`](.agents/skills/macro/SKILL.md) skill.
+Match the surrounding code and follow the [`style`](.agents/skills/style/SKILL.md) skill. For guides, also read the [`prose`](.agents/skills/prose/SKILL.md) skill. For macros, read the [`macro`](.agents/skills/macro/SKILL.md) skill.
 
 ## Commits and pull requests
 
