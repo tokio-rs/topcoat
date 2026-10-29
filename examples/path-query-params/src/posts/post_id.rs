@@ -5,10 +5,7 @@ use topcoat::{
     view::{View, view},
 };
 
-module_param!(pub(crate)
-    post_id: u32,
-    error = bad_request("Post ID must be a number!"),
-);
+module_param!(pub(crate) post_id: u32 else bad_request("Post ID must be a number!"));
 
 #[page]
 pub(crate) async fn post(cx: &Cx) -> Result<impl View> {

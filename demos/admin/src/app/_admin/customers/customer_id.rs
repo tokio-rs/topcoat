@@ -34,7 +34,7 @@ use crate::{
     },
 };
 
-module_param!(pub customer_id: u64, error = not_found);
+module_param!(pub customer_id: u64 else not_found);
 
 const SKELETON_ROWS: usize = 5;
 

@@ -33,9 +33,9 @@ async fn tag(cx: &Cx) -> Result<impl View> {
     })
 }
 
-// `error = ...` declares the response for a failed parse on the parameter
+// `else ...` declares the response for a failed parse on the parameter
 // itself, so handlers propagate it with `?`.
-path_param!(user_id: u32, error = not_found);
+path_param!(user_id: u32 else not_found);
 
 #[page("/users/{user_id}")]
 async fn user(cx: &Cx) -> Result<impl View> {
@@ -46,8 +46,8 @@ async fn user(cx: &Cx) -> Result<impl View> {
     })
 }
 
-// A bare `error = bad_request` prefills the description with the parameter name.
-path_param!(item_id: u32, error = bad_request);
+// A bare `else bad_request` prefills the description with the parameter name.
+path_param!(item_id: u32 else bad_request);
 
 #[page("/items/{item_id}")]
 async fn item(cx: &Cx) -> Result<impl View> {
@@ -58,11 +58,8 @@ async fn item(cx: &Cx) -> Result<impl View> {
     })
 }
 
-// `error = bad_request("...")` overrides the prefilled description.
-path_param!(
-    order_id: u32,
-    error = bad_request("order_id must be a number"),
-);
+// `else bad_request("...")` overrides the prefilled description.
+path_param!(order_id: u32 else bad_request("order_id must be a number"));
 
 #[page("/orders/{order_id}")]
 async fn order(cx: &Cx) -> Result<impl View> {
@@ -73,8 +70,8 @@ async fn order(cx: &Cx) -> Result<impl View> {
     })
 }
 
-// `error = redirect("...")` sends the client elsewhere on a failed parse.
-path_param!(page_id: u32, error = redirect("/pages"));
+// `else redirect("...")` sends the client elsewhere on a failed parse.
+path_param!(page_id: u32 else redirect("/pages"));
 
 #[page("/pages/{page_id}")]
 async fn page_detail(cx: &Cx) -> Result<impl View> {
@@ -95,7 +92,7 @@ async fn document(cx: &Cx) -> Result<impl View> {
     Ok(view! { (path) })
 }
 
-path_param!(*number_path: u32, error = bad_request);
+path_param!(*number_path: u32 else bad_request);
 
 #[page("/numbers/{*number_path}")]
 async fn numbers(cx: &Cx) -> Result<impl View> {

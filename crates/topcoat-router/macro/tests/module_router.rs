@@ -64,7 +64,7 @@ mod posts {
             view::{View, view},
         };
 
-        module_param!(post_id: u32, error = not_found);
+        module_param!(post_id: u32 else not_found);
 
         #[page]
         async fn post(cx: &Cx) -> Result<impl View> {
@@ -239,8 +239,8 @@ mod threads {
         view::{View, view},
     };
 
-    path_param!(thread_id: u32, error = not_found);
-    path_param!(reply_id: u32, error = not_found);
+    path_param!(thread_id: u32 else not_found);
+    path_param!(reply_id: u32 else not_found);
 
     #[page]
     async fn threads() -> Result<impl View> {

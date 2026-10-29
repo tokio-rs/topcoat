@@ -63,12 +63,12 @@ The unparsed declaration generates `struct Slug<T: AsRef<str> = String>(T)`. `St
 
 # Failing with an error response
 
-`error = ...` maps a parse failure to a router error, so a handler can use `?`.
+An `else` clause after the type maps a parse failure to a router error, so a handler can use `?`.
 
 ```rust
 // src/app/posts.rs
 # use topcoat::{context::Cx, Result, router::{page, path_param}, view::{View, view}};
-path_param!(post_id: u64, error = not_found);
+path_param!(post_id: u64 else not_found);
 
 #[page("./{post_id}")]
 async fn post(cx: &Cx) -> Result<impl View> {
@@ -79,18 +79,18 @@ async fn post(cx: &Cx) -> Result<impl View> {
 
 The supported forms mirror the router's error constructors:
 
-- `error = not_found`
-- `error = unauthorized`
-- `error = forbidden`
-- `error = bad_request` or `error = bad_request("description")`
-- `error = redirect("/path")`
-- `error = redirect_permanent("/path")`
+- `else not_found`
+- `else unauthorized`
+- `else forbidden`
+- `else bad_request` or `else bad_request("description")`
+- `else redirect("/path")`
+- `else redirect_permanent("/path")`
 
-A bare `error = bad_request` uses `invalid value for path parameter "post_id"`.
+A bare `else bad_request` uses `invalid value for path parameter "post_id"`.
 
-Without `error = ...`, the reader returns `Result<&T, &<T as FromStr>::Err>` and the call site chooses a response with [`RouterErrorExt`](error/trait.RouterErrorExt.html).
+Without an `else` clause, the reader returns `Result<&T, &<T as FromStr>::Err>` and the call site chooses a response with [`RouterErrorExt`](error/trait.RouterErrorExt.html).
 
-An unparsed parameter cannot use `error` because it cannot fail.
+An unparsed parameter cannot have an `else` clause because it cannot fail.
 
 # Visibility and construction
 
@@ -135,7 +135,7 @@ A typed catch-all parses each segment and returns a memoized slice.
 ```rust
 // src/app/archive.rs
 # use topcoat::{context::Cx, Result, router::{page, path_param}, view::{View, view}};
-path_param!(*ids: u32, error = bad_request);
+path_param!(*ids: u32 else bad_request);
 
 #[page("./{*ids}")]
 async fn archive(cx: &Cx) -> Result<impl View> {
@@ -144,9 +144,9 @@ async fn archive(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-The type after `:` is the type of one segment, so this declaration generates `struct Ids(Vec<u32>)`. Without `error = ...`, the reader returns `Result<&[u32], &<u32 as FromStr>::Err>`; it returns the first parse error without a segment index.
+The type after `:` is the type of one segment, so this declaration generates `struct Ids(Vec<u32>)`. Without an `else` clause, the reader returns `Result<&[u32], &<u32 as FromStr>::Err>`; it returns the first parse error without a segment index.
 
-A bare `error = bad_request` includes the zero-based failing segment index. For `/archive/1/x/3`, its description is `invalid value for path parameter "ids" at segment 1`.
+A bare `else bad_request` includes the zero-based failing segment index. For `/archive/1/x/3`, its description is `invalid value for path parameter "ids" at segment 1`.
 
 An unparsed catch-all accepts any `IntoIterator` whose items implement `AsRef<str>`. For example, `path_param!(pub *doc_path)` accepts `DocPath(["guide", "start"])` and defaults to `DocPath<Vec<String>>` in type positions.
 

@@ -6,7 +6,7 @@ use topcoat::{
     view::{View, view},
 };
 
-module_param!(pub(crate) product_id: u32, error = not_found);
+module_param!(pub(crate) product_id: u32 else not_found);
 
 #[derive(Clone)]
 pub(crate) struct Product {

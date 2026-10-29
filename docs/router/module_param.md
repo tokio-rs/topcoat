@@ -7,7 +7,7 @@ For example, `module_param!(post_id: u64)` gives the module a `{post_id}` segmen
 ```rust
 // src/app/posts/post_id.rs serves /posts/{post_id}.
 # use topcoat::{context::Cx, Result, router::{module_param, page, path_param}, view::{View, view}};
-module_param!(post_id: u64, error = bad_request);
+module_param!(post_id: u64 else bad_request);
 
 #[page]
 async fn post(cx: &Cx) -> Result<impl View> {

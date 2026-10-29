@@ -8,7 +8,7 @@ use topcoat::{
 use super::patch_todo_list;
 use crate::features::todo::Todo;
 
-{{ paths.param() }}!(pub id: u64, error = bad_request);
+{{ paths.param() }}!(pub id: u64 else bad_request);
 
 #[route{{ paths.route("PATCH", "/todos/{id}") }}]
 pub async fn toggle(cx: &Cx) -> Result<PatchElements> {

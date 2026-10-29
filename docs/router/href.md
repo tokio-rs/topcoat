@@ -63,7 +63,7 @@ async fn posts(cx: &Cx) -> Result<impl View> {
 pub mod post_id {
     use super::*;
 
-    module_param!(pub post_id: u64, error = bad_request);
+    module_param!(pub post_id: u64 else bad_request);
 
     #[page]
     pub async fn post(cx: &Cx) -> Result<impl View> {

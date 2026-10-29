@@ -64,8 +64,8 @@ impl ToTokens for QueryParams {
 
         let (error_ty, map_err) = match &self.0.error {
             Some(error) => (
-                error.ty(),
-                error.map_err(quote! {
+                error.response.ty(),
+                error.response.map_err(quote! {
                     |error| #topcoat_router::error::bad_request_at(
                         error.path(),
                         format!("invalid query value: {}", error.inner()),

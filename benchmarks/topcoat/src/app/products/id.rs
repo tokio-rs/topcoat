@@ -10,7 +10,7 @@ use crate::{
     catalog::{Catalog, Product, format_rating},
 };
 
-module_param!(product_id: u32, error = not_found);
+module_param!(product_id: u32 else not_found);
 
 #[page]
 async fn product_detail(cx: &Cx) -> Result<impl View> {

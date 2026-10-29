@@ -11,7 +11,7 @@ use topcoat_core_grammar::{
     paths::{topcoat_context, topcoat_context_macro, topcoat_router},
 };
 
-use super::common::ErrorAttr;
+use super::common::ErrorResponse;
 
 /// The input to `path_param!`.
 pub struct PathParam {
@@ -32,8 +32,8 @@ impl PathParam {
         self.param_type.as_ref().map(|param_type| &param_type.ty)
     }
 
-    fn error(&self) -> Option<&ErrorAttr> {
-        self.error.as_ref().map(|error| &error.error)
+    fn error(&self) -> Option<&ErrorResponse> {
+        self.error.as_ref().map(|error| &error.response)
     }
 
     fn type_ident(&self) -> Ident {
@@ -123,7 +123,7 @@ impl PathParam {
     fn parsed_output(&self, param_type: &Type, value: &TokenStream) -> TokenStream {
         let error = self.error().map_or_else(
             || quote! { &'__cx <#param_type as ::core::str::FromStr>::Err },
-            ErrorAttr::ty,
+            ErrorResponse::ty,
         );
 
         quote! { ::core::result::Result<#value, #error> }
@@ -300,8 +300,8 @@ impl Parse for PathParam {
             && param.param_type().is_none()
         {
             return Err(syn::Error::new(
-                error.error.span(),
-                "`error` cannot be used with an unparsed path parameter, which cannot fail",
+                error.else_token.span,
+                "`else` cannot be used with an unparsed path parameter, which cannot fail",
             ));
         }
 
@@ -345,28 +345,25 @@ impl ParseOption for PathParamType {
     }
 }
 
-/// An error mapping in a `path_param!` declaration.
+/// The `else` clause of a `path_param!` declaration, choosing the error
+/// response returned when the parameter fails to parse.
 pub struct PathParamError {
-    pub comma_token: Token![,],
-    pub error: ErrorAttr,
+    pub else_token: Token![else],
+    pub response: ErrorResponse,
 }
 
 impl Parse for PathParamError {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
-            comma_token: input.parse()?,
-            error: input.parse()?,
+            else_token: input.parse()?,
+            response: input.parse()?,
         })
     }
 }
 
 impl ParseOption for PathParamError {
     fn peek(input: ParseStream) -> bool {
-        let input = input.fork();
-        if input.parse::<Token![,]>().is_err() {
-            return false;
-        }
-        ErrorAttr::peek(&input)
+        input.peek(Token![else])
     }
 }
 
@@ -375,6 +372,7 @@ mod tests {
     use quote::ToTokens;
 
     use super::*;
+    use crate::common::ErrorKind;
 
     fn parse(source: &str) -> PathParam {
         syn::parse_str(source).unwrap()
@@ -382,7 +380,7 @@ mod tests {
 
     #[test]
     fn parses_a_typed_catch_all_with_visibility_and_error() {
-        let param = parse("pub *post_ids: u64, error = bad_request,");
+        let param = parse("pub *post_ids: u64 else bad_request,");
 
         assert!(matches!(param.visibility, Visibility::Public(_)));
         assert!(param.is_catch_all());
@@ -403,6 +401,15 @@ mod tests {
     }
 
     #[test]
+    fn parses_an_else_clause_with_arguments() {
+        let param = parse(r#"post_id: u64 else bad_request("invalid id")"#);
+
+        let response = param.error().unwrap();
+        assert!(matches!(response.kind, ErrorKind::BadRequest(_)));
+        assert_eq!(response.args.as_ref().unwrap().args.len(), 1);
+    }
+
+    #[test]
     fn parses_an_unparsed_single_segment() {
         let param = parse("slug");
 
@@ -417,13 +424,13 @@ mod tests {
 
     #[test]
     fn rejects_error_on_an_unparsed_parameter() {
-        let error = syn::parse_str::<PathParam>("slug, error = not_found")
+        let error = syn::parse_str::<PathParam>("slug else not_found")
             .err()
             .unwrap();
 
         assert_eq!(
             error.to_string(),
-            "`error` cannot be used with an unparsed path parameter, which cannot fail"
+            "`else` cannot be used with an unparsed path parameter, which cannot fail"
         );
     }
 

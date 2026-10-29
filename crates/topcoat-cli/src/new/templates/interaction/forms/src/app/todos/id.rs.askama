@@ -9,7 +9,7 @@ use topcoat::{
 
 use crate::features::todo::Todo;
 
-{{ paths.param() }}!(pub id: u64, error = bad_request);
+{{ paths.param() }}!(pub id: u64 else bad_request);
 
 #[route{{ paths.route_at("POST", "./toggle", "/todos/{id}/toggle") }}]
 pub async fn toggle(cx: &Cx) -> Result<SeeOther> {

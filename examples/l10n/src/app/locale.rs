@@ -14,7 +14,7 @@ use topcoat::{
 use super::t;
 
 // The locale is the first part of the URL, as in /en or /de.
-module_param!(pub path_locale: Locale, error = not_found);
+module_param!(pub path_locale: Locale else not_found);
 
 // Sets the locale for every page in this module. Each `t!` translates into it.
 #[layer]

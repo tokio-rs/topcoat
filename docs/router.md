@@ -262,7 +262,7 @@ Both macros accept the same options, and you read their values with `path_param:
 
 - After `path_param!(slug)`, `path_param::<Slug>(cx)` returns the percent-decoded segment as `&str`.
 - A type after `:` is parsed with [`FromStr`](std::str::FromStr). The default return type is `Result<&T, &<T as FromStr>::Err>`.
-- An `error = ...` option maps parse failures to a router error. See [`path_param!`](macro@path_param) for the supported forms.
+- An `else` clause after the type, such as `else not_found`, maps parse failures to a router error. See [`path_param!`](macro@path_param) for the supported forms.
 
 ```rust
 // src/app/posts/post_id.rs
@@ -273,7 +273,7 @@ use topcoat::{
     view::{View, view},
 };
 
-module_param!(post_id: u64, error = bad_request);
+module_param!(post_id: u64 else bad_request);
 
 #[page]
 async fn post(cx: &Cx) -> Result<impl View> {

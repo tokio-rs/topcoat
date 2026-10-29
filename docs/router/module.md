@@ -197,7 +197,7 @@ use topcoat::{
     view::{View, view},
 };
 
-module_param!(post_id: u64, error = bad_request);
+module_param!(post_id: u64 else bad_request);
 
 #[page]
 async fn post(cx: &Cx) -> Result<impl View> {
@@ -206,7 +206,7 @@ async fn post(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-This page serves `/posts/{post_id}`. A request for `/posts/42` parses `42` with `u64::from_str`. A failed parse returns `400 Bad Request` because the declaration uses `error = bad_request`.
+This page serves `/posts/{post_id}`. A request for `/posts/42` parses `42` with `u64::from_str`. A failed parse returns `400 Bad Request` because the declaration uses `else bad_request`.
 
 The parameter name comes from `post_id` in the declaration, not from the filename. The file could be named `id.rs` and would still contribute `{post_id}`.
 
@@ -214,7 +214,7 @@ The parameter name comes from `post_id` in the declaration, not from the filenam
 
 - With `module_param!(slug)`, `path_param::<Slug>(cx)` returns the decoded segment as `&str`. It does not parse the value, so there is no parse error to handle.
 - With `module_param!(post_id: u64)`, `path_param::<PostId>(cx)` parses the value using `FromStr` and returns `Result<&u64, &<u64 as FromStr>::Err>`.
-- An `error = ...` option maps a parse failure to a router error. See the [`path_param!` reference](https://docs.rs/topcoat/latest/topcoat/router/macro.path_param.html) for the supported forms.
+- An `else` clause after the type, such as `else bad_request`, maps a parse failure to a router error. See the [`path_param!` reference](https://docs.rs/topcoat/latest/topcoat/router/macro.path_param.html) for the supported forms.
 
 Parsing occurs once per request. Later calls return the memoized result.
 

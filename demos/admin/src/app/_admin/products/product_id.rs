@@ -27,7 +27,7 @@ use crate::{
     },
 };
 
-module_param!(pub product_id: u64, error = not_found);
+module_param!(pub product_id: u64 else not_found);
 
 struct Rejected {
     form: ProductForm,

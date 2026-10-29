@@ -39,7 +39,7 @@ use crate::{
     },
 };
 
-module_param!(pub order_id: u64, error = not_found);
+module_param!(pub order_id: u64 else not_found);
 
 #[page(with(Crumb::new(async |cx| Ok(format!("#{}", path_param::<OrderId>(cx)?)))))]
 pub async fn page(cx: &Cx) -> Result<impl View> {
