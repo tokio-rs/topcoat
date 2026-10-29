@@ -129,6 +129,8 @@ async fn products() -> Result<impl View> {
 let router = Router::builder().layout(shell).page(products).build();
 ```
 
+This example uses a custom `Title` to show how route context works. For page titles and other page metadata, use the built-in [`metadata`](crate::metadata) module, which combines values from layouts and pages and renders their HTML tags.
+
 Router builder values are added first, followed by route context, then values added during the request with `cx.with(...)`. Each value shadows earlier values of the same type. For pages, route context follows the layout hierarchy from outermost to innermost, with the page's values last. Repeat `with(...)` to add several values. A request that matches no route has no route context.
 
 Shadowed values remain available through [`iter_context`], which visits the closest value first. This lets pages and layouts contribute metadata that an outer layout collects and renders together. For breadcrumbs, each layout and page could declare a `Crumb` value. The outer layout collects them with `iter_context::<Crumb>(cx)` and reverses the order to render the trail from root to page.
