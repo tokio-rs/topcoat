@@ -154,6 +154,25 @@ pub async fn open_graph(
     })
 }
 
+/// Renders the [X metadata](crate::Twitter) of a page, which X uses for link
+/// previews together with the [Open Graph metadata](open_graph).
+#[component]
+pub async fn twitter(
+    /// The metadata of the page.
+    metadata: &PageMetadata,
+) -> Result<impl View> {
+    let x = metadata.twitter();
+    Ok(view! {
+        <meta name="twitter:card" content=(x.card().as_str())>
+        if let Some(site) = x.site() {
+            <meta name="twitter:site" content=(site)>
+        }
+        if let Some(creator) = x.creator() {
+            <meta name="twitter:creator" content=(creator)>
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use topcoat_core::base_url::BaseUrl;

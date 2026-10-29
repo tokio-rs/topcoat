@@ -6,7 +6,9 @@ use topcoat_core::{
 };
 use topcoat_core_macro::memoize;
 
-use crate::{Field, Metadata, OpenGraph, OpenGraphFields, Robots, Text, Url};
+use crate::{
+    Field, Metadata, OpenGraph, OpenGraphFields, Robots, Text, Twitter, TwitterFields, Url,
+};
 
 /// Reads the metadata of the current page.
 ///
@@ -60,6 +62,7 @@ pub struct PageMetadata {
     robots: Robots,
     theme_color: Field<Cow<'static, str>>,
     pub(crate) open_graph: OpenGraphFields,
+    pub(crate) twitter: TwitterFields,
 }
 
 impl PageMetadata {
@@ -113,6 +116,12 @@ impl PageMetadata {
         OpenGraph::new(self)
     }
 
+    /// Returns the X metadata of the page.
+    #[must_use]
+    pub fn twitter(&self) -> Twitter<'_> {
+        Twitter::new(self)
+    }
+
     /// Fills the fields that are still unset from metadata stored in the
     /// context, cloning its values.
     fn fill_from(&mut self, metadata: &Metadata) {
@@ -129,6 +138,9 @@ impl PageMetadata {
         if let Some(open_graph) = &metadata.open_graph {
             self.open_graph.fill_from(open_graph);
         }
+        if let Some(twitter) = &metadata.twitter {
+            self.twitter.fill_from(twitter);
+        }
     }
 
     /// Fills the fields that are still unset from loaded metadata, taking
@@ -142,6 +154,9 @@ impl PageMetadata {
         self.theme_color.fill(metadata.theme_color);
         if let Some(open_graph) = metadata.open_graph {
             self.open_graph.fill_from_loaded(*open_graph);
+        }
+        if let Some(twitter) = metadata.twitter {
+            self.twitter.fill_from_loaded(*twitter);
         }
     }
 }
@@ -313,6 +328,18 @@ mod tests {
             .map(|image| image.url.resolve(&cx).into_owned())
             .collect();
         assert_eq!(images, ["/teapot.png", "/lid.png"]);
+    }
+
+    #[tokio::test]
+    async fn the_twitter_card_defaults_to_a_large_image_when_there_are_images() {
+        let without_images = Cx::new();
+        let with_images = Cx::new().with(Metadata::new().open_graph(|og| og.image("/teapot.png")));
+        let explicit = with_images.with(Metadata::new().twitter(|x| x.card(TwitterCard::Summary)));
+
+        let card = async |cx| metadata(cx).await.unwrap().twitter().card();
+        assert_eq!(card(&without_images).await, TwitterCard::Summary);
+        assert_eq!(card(&with_images).await, TwitterCard::SummaryLargeImage);
+        assert_eq!(card(&explicit).await, TwitterCard::Summary);
     }
 
     #[tokio::test]

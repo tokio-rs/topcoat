@@ -1,10 +1,12 @@
 mod open_graph;
 mod robots;
+mod twitter;
 
 use std::borrow::Cow;
 
 pub use open_graph::*;
 pub use robots::*;
+pub use twitter::*;
 use topcoat_core::{
     context::{AsyncCxFn, BoxCxFn},
     error::Result,
@@ -48,6 +50,7 @@ pub struct Metadata {
     pub(crate) robots: Robots,
     pub(crate) theme_color: Field<Cow<'static, str>>,
     pub(crate) open_graph: Option<Box<OpenGraphFields>>,
+    pub(crate) twitter: Option<Box<TwitterFields>>,
     /// Loads more fields for each request. Fields set on this value take
     /// precedence over the loaded ones.
     pub(crate) load: Option<BoxCxFn<Result<Metadata>>>,
@@ -169,6 +172,18 @@ impl Metadata {
     pub fn open_graph(mut self, f: impl FnOnce(OpenGraphBuilder) -> OpenGraphBuilder) -> Self {
         let fields = self.open_graph.map(|fields| *fields).unwrap_or_default();
         self.open_graph = Some(Box::new(f(OpenGraphBuilder(fields)).0));
+        self
+    }
+
+    /// Sets the X fields of the page, as in `.twitter(|x| x.site("@acme"))`.
+    ///
+    /// X takes the title, description, and image of link previews from the
+    /// [Open Graph fields](Self::open_graph). Fields that `f` leaves unset
+    /// come from further up.
+    #[must_use]
+    pub fn twitter(mut self, f: impl FnOnce(TwitterBuilder) -> TwitterBuilder) -> Self {
+        let fields = self.twitter.map(|fields| *fields).unwrap_or_default();
+        self.twitter = Some(Box::new(f(TwitterBuilder(fields)).0));
         self
     }
 }
