@@ -11,6 +11,22 @@ use topcoat_view_macro::{component, view};
 /// Enables runtime navigation on an anchor and sets its prefetch mode.
 const LINK_ATTRIBUTE: &str = "data-topcoat-link";
 
+/// Declares the View Transition types a link's navigation runs inside.
+///
+/// Prefer the `vt` argument on [`link`]. Use this constant when writing
+/// your own `<a>` markup instead of calling [`link`].
+pub const VT_ATTRIBUTE: &str = "data-topcoat-vt-types";
+
+/// Marks the element that morphs into its counterpart on the destination.
+///
+/// The value becomes the element's [`view-transition-name`][name] when the
+/// link is followed, pairing it with the destination element that declares
+/// the same name in its style. After the swap, the destination's markup
+/// determines the styles the element keeps.
+///
+/// [name]: https://developer.mozilla.org/docs/Web/CSS/view-transition-name
+pub const VT_SHARED_ATTRIBUTE: &str = "data-topcoat-vt-shared";
+
 /// Controls when the browser loads a linked page before the user follows it.
 ///
 /// Loading a page early, or prefetching, can make navigation faster. The
@@ -91,6 +107,14 @@ pub async fn link<H>(
     #[into]
     #[default]
     prefetch: Option<PrefetchMode>,
+    /// Space-separated View Transition types the navigation runs inside.
+    /// Omitted by default: the navigation swaps without a transition.
+    ///
+    /// To morph an element into its counterpart on the destination, mark it
+    /// with [`VT_SHARED_ATTRIBUTE`].
+    #[into]
+    #[default]
+    vt: Option<&str>,
     /// Additional HTML attributes to put on the link.
     #[default]
     mut attrs: Attributes,
@@ -103,6 +127,9 @@ where
 {
     let prefetch = prefetch.unwrap_or_else(|| prefetch_mode(cx));
     attrs.extend(link_attrs(cx, href, prefetch));
+    if let Some(vt) = vt {
+        attrs.insert(cx, VT_ATTRIBUTE, vt);
+    }
     Ok(view! { <a (attrs)>(child)</a> })
 }
 
@@ -211,5 +238,74 @@ mod tests {
             explicit.contains(r#"data-topcoat-link="never""#),
             "{explicit}"
         );
+    }
+
+    #[test]
+    fn link_renders_its_transition_types() {
+        let cx = &Cx::default();
+        let html = render(view! {
+            cx =>
+            link(href: "/articles/7", vt: "detail", "Read more")
+        });
+
+        assert!(html.contains(r#"data-topcoat-vt-types="detail""#), "{html}");
+    }
+
+    #[test]
+    fn a_link_declares_no_transition_by_default() {
+        let cx = &Cx::default();
+        let html = render(view! { cx => link(href: "/", "Home") });
+
+        assert!(!html.contains("view-transition"), "{html}");
+    }
+
+    #[test]
+    fn link_carries_no_shared_name_of_its_own() {
+        let cx = &Cx::default();
+        // The shared name belongs on the element that carries it, not on the
+        // anchor, so `link` never emits the attribute itself.
+        let html = render(view! {
+            cx =>
+            link(href: "/articles/7", vt: "detail", "Read more")
+        });
+
+        assert!(html.contains(r#"data-topcoat-vt-types="detail""#), "{html}");
+        assert!(!html.contains(VT_SHARED_ATTRIBUTE), "{html}");
+    }
+
+    #[test]
+    fn the_shared_marker_is_usable_from_an_application() {
+        let cx = &Cx::default();
+        // What an application writes on the element inside the link.
+        let attrs = attributes! { cx => data-topcoat-vt-shared=("article-7") };
+        let html = render(view! { cx =>
+            link(
+                href: "/articles/7",
+                vt: "detail",
+                <img (attrs) src="/shoes.jpg" alt="Shoes" />
+            )
+        });
+
+        assert!(
+            html.contains(r#"data-topcoat-vt-shared="article-7""#),
+            "{html}"
+        );
+        assert!(
+            VT_SHARED_ATTRIBUTE.starts_with("data-topcoat-"),
+            "{VT_SHARED_ATTRIBUTE}"
+        );
+    }
+
+    #[test]
+    fn transition_arguments_override_matching_forwarded_attributes() {
+        let cx = &Cx::default();
+        let attrs = attributes! { cx => data-topcoat-vt-types="stale" };
+        let html = render(view! {
+            cx =>
+            link(href: "/articles/7", vt: "detail", attrs: attrs, "Read more")
+        });
+
+        assert!(html.contains(r#"data-topcoat-vt-types="detail""#), "{html}");
+        assert!(!html.contains("stale"), "{html}");
     }
 }
