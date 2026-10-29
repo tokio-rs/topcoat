@@ -243,6 +243,7 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 
 **Miscellaneous**
 - [Topcoat UI](https://github.com/tokio-rs/topcoat/blob/main/docs/ui.md): premade components vendored into your project for you to edit.
+- [Metadata](https://docs.rs/topcoat/latest/topcoat/metadata/index.html): titles, descriptions, and link previews for search engines and social networks, set per layout and page.
 - [Localization](https://docs.rs/topcoat/latest/topcoat/l10n/index.html): choose the language for each request and display translations from Fluent files.
 - [Mail](https://docs.rs/topcoat/latest/topcoat/mail/index.html): declare mail with the `mail!` macro, deliver through SMTP, file, or in-memory transports.
 
