@@ -68,6 +68,66 @@ impl ParseOption for RouteContext {
     }
 }
 
+/// Prints the entry as `with(value)`, formatting the value as an expression.
+/// A long value breaks onto its own line inside the parentheses.
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for RouteContext {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        use topcoat_core_grammar::pretty::{BreakMode, Delim};
+
+        printer.move_cursor(self.with.span.start());
+        "with".pretty_print(printer);
+        printer.move_cursor(self.with.span.end());
+        let value = syn::parse2::<syn::Expr>(self.value.clone())
+            .unwrap_or_else(|_| syn::Expr::Verbatim(self.value.clone()));
+        self.paren
+            .pretty_print(printer, Some(BreakMode::Consistent), |printer| {
+                value.pretty_print(printer);
+            });
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl RouteContext {
+    /// Prints the `with(...)` entries that follow the other arguments of a
+    /// route attribute, starting with the `comma` that separates them from
+    /// those arguments. Each entry goes on its own line when the attribute
+    /// breaks. A comma after the last entry is dropped, as `rustfmt` does for
+    /// attribute arguments.
+    pub(crate) fn pretty_print_entries(
+        printer: &mut topcoat_core_grammar::pretty::Printer<'_>,
+        comma: Option<&syn::Token![,]>,
+        entries: &syn::punctuated::Punctuated<Self, syn::Token![,]>,
+    ) {
+        use topcoat_core_grammar::pretty::{PrettyPrint, Printer};
+
+        let separator = |printer: &mut Printer<'_>| {
+            printer.scan_same_line_trivia();
+            printer.scan_break();
+            " ".pretty_print(printer);
+            printer.scan_trivia(true, true);
+        };
+
+        if entries.is_empty() {
+            return;
+        }
+        if let Some(comma) = comma {
+            comma.pretty_print(printer);
+            separator(printer);
+        }
+        for (index, pair) in entries.pairs().enumerate() {
+            pair.value().pretty_print(printer);
+            if let Some(punct) = pair.punct()
+                && index < entries.len() - 1
+            {
+                printer.scan_no_break_trivia();
+                punct.pretty_print(printer);
+                separator(printer);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

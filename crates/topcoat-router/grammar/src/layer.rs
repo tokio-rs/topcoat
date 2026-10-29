@@ -24,6 +24,13 @@ impl Parse for LayerAttr {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for LayerAttr {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.path.pretty_print(printer);
+    }
+}
+
 pub struct LayerItem {
     item: ItemFn,
 }

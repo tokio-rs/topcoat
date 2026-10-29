@@ -145,3 +145,40 @@ impl ParseOption for ErrorArgs {
         input.peek(Paren)
     }
 }
+
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for ErrorResponse {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.kind.pretty_print(printer);
+        self.args.pretty_print(printer);
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for ErrorKind {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        let (name, span) = match self {
+            Self::BadRequest(kw) => ("bad_request", kw.span),
+            Self::Forbidden(kw) => ("forbidden", kw.span),
+            Self::NotFound(kw) => ("not_found", kw.span),
+            Self::Redirect(kw) => ("redirect", kw.span),
+            Self::RedirectPermanent(kw) => ("redirect_permanent", kw.span),
+            Self::Unauthorized(kw) => ("unauthorized", kw.span),
+        };
+        printer.move_cursor(span.start());
+        name.pretty_print(printer);
+        printer.move_cursor(span.end());
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for ErrorArgs {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        use topcoat_core_grammar::pretty::{BreakMode, Delim};
+
+        self.paren_token
+            .pretty_print(printer, Some(BreakMode::Consistent), |printer| {
+                self.args.pretty_print(printer);
+            });
+    }
+}

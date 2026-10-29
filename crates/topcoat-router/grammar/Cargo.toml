@@ -12,6 +12,7 @@ rust-version.workspace = true
 
 [features]
 discover = []
+pretty = ["topcoat-core-grammar/pretty"]
 
 [dependencies]
 topcoat-core-grammar.workspace = true
@@ -23,6 +24,10 @@ syn = { workspace = true, features = ["full"] }
 
 [dev-dependencies]
 topcoat-core-grammar = { workspace = true, features = ["testing"] }
+
+[[test]]
+name = "pretty"
+required-features = ["pretty"]
 
 [lints]
 workspace = true

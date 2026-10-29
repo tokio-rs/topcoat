@@ -25,10 +25,13 @@ topcoat-core = { workspace = true, features = ["build"] }
 topcoat-core-grammar = { workspace = true, features = ["pretty"] }
 topcoat-font = { workspace = true, features = ["fontsource"] }
 topcoat-font-grammar = { workspace = true, features = ["fontsource", "pretty"] }
+topcoat-icon-grammar = { workspace = true, features = ["iconify", "pretty"] }
 topcoat-l10n = { workspace = true, features = ["check"] }
 topcoat-l10n-grammar = { workspace = true, features = ["fluent", "pretty"] }
 topcoat-mail-grammar = { workspace = true, features = ["pretty"] }
 topcoat-router = { workspace = true, features = ["websocket"] }
+topcoat-router-grammar = { workspace = true, features = ["pretty"] }
+topcoat-runtime-grammar = { workspace = true, features = ["pretty"] }
 topcoat-ui.workspace = true
 topcoat-ui-registry = { workspace = true, features = ["embedded"] }
 topcoat-view-grammar = { workspace = true, features = ["pretty"] }

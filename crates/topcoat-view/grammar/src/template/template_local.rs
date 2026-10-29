@@ -230,9 +230,9 @@ mod tests {
         use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
 
         let mut registry = Registry::new();
-        registry.register_macro::<crate::view::View>("view");
-        registry.register_macro::<crate::live::Emit>("emit");
-        registry.register_macro::<crate::attributes::Attributes>("attributes");
+        registry.register_function_like::<crate::view::View>("view");
+        registry.register_function_like::<crate::live::Emit>("emit");
+        registry.register_function_like::<crate::attributes::Attributes>("attributes");
         let binding = "let x = value /* keep */ .;";
         for name in ["view", "emit", "attributes"] {
             let source = format!("{name}! {{ {binding} }}");

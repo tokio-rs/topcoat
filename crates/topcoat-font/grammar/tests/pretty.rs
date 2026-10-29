@@ -31,8 +31,8 @@ fn diff(expected: &str, actual: &str) -> String {
 
 fn registry() -> Registry {
     let mut registry = Registry::new();
-    registry.register_macro::<FontFace>("font_face");
-    registry.register_macro::<Font>("font");
+    registry.register_function_like::<FontFace>("font_face");
+    registry.register_function_like::<Font>("font");
     registry
 }
 

@@ -35,6 +35,14 @@ impl Parse for LayoutAttr {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for LayoutAttr {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.path.pretty_print(printer);
+        RouteContext::pretty_print_entries(printer, self.comma.as_ref(), &self.context);
+    }
+}
+
 /// The annotated `async fn` that becomes a layout: a component taking the
 /// child content as its `slot` parameter and, optionally, the request
 /// context as `cx`.

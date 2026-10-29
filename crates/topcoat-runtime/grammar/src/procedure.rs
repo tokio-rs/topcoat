@@ -32,6 +32,13 @@ impl Parse for ProcedureAttr {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for ProcedureAttr {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.path.pretty_print(printer);
+    }
+}
+
 /// The annotated `async fn` that becomes a procedure. Validates the function
 /// signature: procedures must be `async`, must declare a return type, and must
 /// not take a `self` receiver.

@@ -43,6 +43,18 @@ impl Parse for PageAttr {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for PageAttr {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.methods.pretty_print(printer);
+        if self.methods.is_some() && self.path.is_some() {
+            " ".pretty_print(printer);
+        }
+        self.path.pretty_print(printer);
+        RouteContext::pretty_print_entries(printer, self.comma.as_ref(), &self.context);
+    }
+}
+
 /// The annotated `async fn` that becomes a page: a component taking,
 /// optionally, the request context as `cx` and the request body as one
 /// parameter of any pattern, such as `Form(input): Form<T>`.

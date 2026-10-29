@@ -78,6 +78,9 @@ pub fn pretty_print_str(registry: &Registry, input: &str) -> Result<String, Vec<
         return Err(errors);
     }
 
+    // The syntax tree is not visited in source order everywhere: a function's
+    // inner attributes come before its signature.
+    replacements.sort_unstable_by_key(|replacement| replacement.start);
     let mut current_index = 0;
     for replacement in replacements {
         output.push_str(&input[current_index..replacement.start]);
@@ -88,4 +91,48 @@ pub fn pretty_print_str(registry: &Registry, input: &str) -> Result<String, Vec<
     output.push_str(&input[current_index..]);
 
     Ok(output)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn registry() -> Registry {
+        let mut registry = Registry::new();
+        registry.register_attribute::<::syn::Expr>("check");
+        registry
+    }
+
+    #[test]
+    fn formats_attribute_arguments() {
+        assert_eq!(
+            pretty_print_str(&registry(), "#[check(a  +  b)]\nfn f() {}").unwrap(),
+            "#[check(a + b)]\nfn f() {}",
+        );
+    }
+
+    #[test]
+    fn leaves_meta_list_attributes_to_rustfmt() {
+        let source = "#[check(a,   b)]\nfn f() {}";
+        assert_eq!(pretty_print_str(&registry(), source).unwrap(), source);
+    }
+
+    #[test]
+    fn reports_attribute_arguments_that_do_not_parse() {
+        assert!(pretty_print_str(&registry(), "#[check(+)]\nfn f() {}").is_err());
+    }
+
+    #[test]
+    fn formats_inner_attributes_before_the_rest_of_the_function() {
+        let mut registry = registry();
+        registry.register_function_like::<::syn::Expr>("value");
+        assert_eq!(
+            pretty_print_str(
+                &registry,
+                "fn f() -> [u8; value!{ 1  +  2 }] {\n    #![check(a  +  b)]\n}",
+            )
+            .unwrap(),
+            "fn f() -> [u8; value!{ 1 + 2 }] {\n    #![check(a + b)]\n}",
+        );
+    }
 }

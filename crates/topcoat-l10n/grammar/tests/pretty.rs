@@ -29,8 +29,8 @@ where
 
 fn registry() -> Registry {
     let mut registry = Registry::new();
-    registry.register_macro::<Translate>("t");
-    registry.register_macro::<Messages>("messages");
+    registry.register_function_like::<Translate>("t");
+    registry.register_function_like::<Messages>("messages");
     registry
 }
 

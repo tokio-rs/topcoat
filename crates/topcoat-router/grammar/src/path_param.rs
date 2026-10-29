@@ -309,6 +309,21 @@ impl Parse for PathParam {
     }
 }
 
+/// Prints the declaration on one line. A trailing comma is dropped.
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for PathParam {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.visibility.pretty_print(printer);
+        self.star_token.pretty_print(printer);
+        self.name.pretty_print(printer);
+        self.param_type.pretty_print(printer);
+        if let Some(error) = &self.error {
+            " ".pretty_print(printer);
+            error.pretty_print(printer);
+        }
+    }
+}
+
 impl ToTokens for PathParam {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let item = self.item();
@@ -345,6 +360,15 @@ impl ParseOption for PathParamType {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for PathParamType {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.colon_token.pretty_print(printer);
+        " ".pretty_print(printer);
+        self.ty.pretty_print(printer);
+    }
+}
+
 /// The `else` clause of a `path_param!` declaration, choosing the error
 /// response returned when the parameter fails to parse.
 pub struct PathParamError {
@@ -364,6 +388,15 @@ impl Parse for PathParamError {
 impl ParseOption for PathParamError {
     fn peek(input: ParseStream) -> bool {
         input.peek(Token![else])
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for PathParamError {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.else_token.pretty_print(printer);
+        " ".pretty_print(printer);
+        self.response.pretty_print(printer);
     }
 }
 

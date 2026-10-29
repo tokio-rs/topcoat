@@ -10,10 +10,7 @@ use topcoat_core_grammar::paths::{
     topcoat_view, topcoat_view_macro,
 };
 
-use crate::{
-    common::EndpointPath,
-    shard::{ShardAttr, ShardItem},
-};
+use crate::common::EndpointPath;
 
 /// The path prefix for shards without an explicit path.
 const SHARD_ROUTE_PREFIX: &str = "/_topcoat/runtime/shards";

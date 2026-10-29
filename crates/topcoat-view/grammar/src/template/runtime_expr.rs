@@ -109,7 +109,7 @@ mod tests {
         use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
 
         let mut registry = Registry::new();
-        registry.register_macro::<crate::view::View>("view");
+        registry.register_function_like::<crate::view::View>("view");
         for (input, expected) in [
             ("|e:Event|e.target", "|e: Event| e.target"),
             ("|e: Event| e.", "|e: Event| e."),

@@ -31,6 +31,11 @@ impl Parse for RecordAttr {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for RecordAttr {
+    fn pretty_print(&self, _printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {}
+}
+
 /// A struct accepted by `#[record]`, with named fields and no generics.
 pub struct RecordItem {
     pub item: ItemStruct,
