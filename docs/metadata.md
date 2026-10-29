@@ -1,1 +1,1 @@
-Metadata describes a page to browsers, search engines, and social networks: its title, description, canonical URL, and more. Attach [`Metadata`] to layouts and pages, then render it in `<head>` with [`tags`].
+Page metadata gives browsers, search engines, and social networks information about a page, such as its title, description, and canonical URL. Set it on layouts and pages with [`Metadata`]. Add [`tags`] to `<head>` to render the HTML tags.

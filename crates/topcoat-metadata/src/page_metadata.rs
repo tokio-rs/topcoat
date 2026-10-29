@@ -11,26 +11,27 @@ use crate::{
     field::{Field, Fill, fill_fields},
 };
 
-/// Reads the metadata of the current page.
+/// Collects the current page's metadata from its context.
 ///
-/// Every [`Metadata`] in the context is a level: the router's, then each
-/// layout's from the outermost in, then the page's. The returned
-/// [`PageMetadata`] takes each field from the closest level that sets it.
-/// Within one level, fields set on the [`Metadata`] itself come before the
-/// ones its [`from_fn`](Metadata::from_fn) function loads.
+/// [`Metadata`] can come from the router, enclosing layouts, or the page.
+/// Each field uses the closest value, so page settings override layout
+/// settings, and inner layouts override outer ones. Within a single
+/// [`Metadata`] value, fields set directly override fields loaded by its
+/// [`from_fn`](Metadata::from_fn) function. Removing a field also prevents
+/// it from inheriting a value.
 ///
-/// The result is [memoized](topcoat_core_macro::memoize): later calls in
-/// the same request reuse it while the context values it read, including
-/// those read by [`from_fn`](Metadata::from_fn) functions, stay the same.
+/// The result is [cached for the request](topcoat_core_macro::memoize).
+/// Later calls reuse it as long as the context values it depends on stay
+/// the same. This includes values read by [`from_fn`](Metadata::from_fn).
 ///
 /// # Errors
 ///
-/// Returns the first error of a [`from_fn`](Metadata::from_fn) function.
+/// Stops and returns the first error from a [`from_fn`](Metadata::from_fn) call.
 pub async fn metadata(cx: &Cx) -> Result<&PageMetadata> {
     combine(cx).await.map_err(Clone::clone)
 }
 
-/// Combines the metadata of every level, calling their
+/// Merges all metadata entries, including values loaded by their
 /// [`from_fn`](Metadata::from_fn) functions.
 #[memoize(as_ref)]
 async fn combine(cx: &Cx) -> Result<PageMetadata> {
@@ -48,12 +49,11 @@ async fn combine(cx: &Cx) -> Result<PageMetadata> {
     Ok(page)
 }
 
-/// The metadata of the current page, combined from every level that sets
-/// some of it.
+/// The page's metadata after combining its own settings with inherited ones.
 ///
-/// Get it with [`metadata`]. Each method returns the field from the closest
-/// level that sets it. Resolve the returned value for a request, or render
-/// it in a view.
+/// Call [`metadata`] to get this value. Its methods return the fields chosen
+/// from the closest metadata entries. You can resolve text and URL values
+/// for the request or render them directly in a view.
 #[derive(Default)]
 pub struct PageMetadata {
     title: Field<Text>,
@@ -67,29 +67,30 @@ pub struct PageMetadata {
 }
 
 impl PageMetadata {
-    /// The viewport of a page when no level sets one.
+    /// The viewport used when no metadata entry supplies one.
     const DEFAULT_VIEWPORT: &str = "width=device-width, initial-scale=1";
 
-    /// Returns the title of the page.
+    /// Returns the page's title, if set.
     #[must_use]
     pub fn title(&self) -> Option<&Text> {
         self.title.value()
     }
 
-    /// Returns the description of the page.
+    /// Returns the page's description, if set.
     #[must_use]
     pub fn description(&self) -> Option<&Text> {
         self.description.value()
     }
 
-    /// Returns the canonical URL of the page.
+    /// Returns the page's preferred URL, if set.
     #[must_use]
     pub fn canonical(&self) -> Option<&Url> {
         self.canonical.value()
     }
 
-    /// Returns the viewport of the page, or the default
-    /// `width=device-width, initial-scale=1` when no level sets one.
+    /// Returns the viewport setting. If none is set, it defaults to
+    /// `width=device-width, initial-scale=1`. An explicitly removed viewport
+    /// returns `None`.
     #[must_use]
     pub fn viewport(&self) -> Option<&str> {
         match &self.viewport {
@@ -99,25 +100,25 @@ impl PageMetadata {
         }
     }
 
-    /// Returns the robots directives of the page.
+    /// Returns the page's instructions for search engines.
     #[must_use]
     pub fn robots(&self) -> &Robots {
         &self.robots
     }
 
-    /// Returns the theme color of the page.
+    /// Returns the suggested browser theme color, if set.
     #[must_use]
     pub fn theme_color(&self) -> Option<&str> {
         self.theme_color.value().map(|color| &**color)
     }
 
-    /// Returns the Open Graph metadata of the page.
+    /// Provides access to the page's Open Graph values.
     #[must_use]
     pub fn open_graph(&self) -> OpenGraph<'_> {
         OpenGraph::new(self)
     }
 
-    /// Returns the X metadata of the page.
+    /// Provides access to the page's X preview settings.
     #[must_use]
     pub fn twitter(&self) -> Twitter<'_> {
         Twitter::new(self)
@@ -144,7 +145,7 @@ mod tests {
     use super::*;
     use crate::TwitterCard;
 
-    /// Reads one text field of the metadata visible to `cx`.
+    /// Resolves a selected text field from the metadata in `cx`.
     async fn read(cx: &Cx, field: fn(&PageMetadata) -> Option<&Text>) -> Option<String> {
         let metadata = metadata(cx).await.unwrap();
         field(metadata).map(|text| text.resolve(cx).into_owned())

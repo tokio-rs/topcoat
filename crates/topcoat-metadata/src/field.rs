@@ -6,27 +6,27 @@ pub use image::*;
 pub use text::*;
 pub use url::*;
 
-/// The state of one field in one level of metadata.
+/// Whether a metadata field is unset, has a value, or has been removed.
 #[derive(Default)]
 pub(crate) enum Field<T> {
-    /// The field is not set here, so a level further up decides.
+    /// Uses the value from a parent context, if there is one.
     #[default]
     Inherit,
-    /// The field is set to this value.
+    /// Uses this value for the field.
     Set(T),
-    /// The field is removed, hiding any value set further up.
+    /// Omits the field, even if a parent context supplies a value.
     Removed,
 }
 
 impl<T> Field<T> {
-    /// Replaces this field with `field` if it is not set or removed yet.
+    /// Copies the state of `field` into this field if it still inherits.
     pub(crate) fn fill(&mut self, field: Field<T>) {
         if let Self::Inherit = self {
             *self = field;
         }
     }
 
-    /// Returns the value if the field is set.
+    /// Returns the stored value, or `None` for an unset or removed field.
     pub(crate) fn value(&self) -> Option<&T> {
         match self {
             Self::Set(value) => Some(value),
@@ -34,8 +34,8 @@ impl<T> Field<T> {
         }
     }
 
-    /// Returns the value if the field is set, or `fallback` if no level set
-    /// or removed it.
+    /// Returns the stored value, `fallback` for an unset field, or `None`
+    /// for a removed field.
     pub(crate) fn value_or<'a>(&'a self, fallback: Option<&'a T>) -> Option<&'a T> {
         match self {
             Self::Set(value) => Some(value),
@@ -44,7 +44,7 @@ impl<T> Field<T> {
         }
     }
 
-    /// Converts the value with `f`, keeping the state.
+    /// Applies `f` to a stored value. Unset and removed fields stay as they are.
     pub(crate) fn map<U>(self, f: impl FnOnce(T) -> U) -> Field<U> {
         match self {
             Self::Inherit => Field::Inherit,
@@ -53,7 +53,7 @@ impl<T> Field<T> {
         }
     }
 
-    /// Borrows the value, keeping the state.
+    /// Borrows a stored value without changing whether the field is set.
     pub(crate) fn as_ref(&self) -> Field<&T> {
         match self {
             Self::Inherit => Field::Inherit,
@@ -63,13 +63,13 @@ impl<T> Field<T> {
     }
 }
 
-/// Fills the fields of a value that are still unset from the fields of
-/// another one, combining levels of metadata from the closest one out.
+/// Copies fields from another value when they are still unset.
+/// Combine metadata from the closest context first so its fields take priority.
 pub(crate) trait Fill<From = Self> {
-    /// Fills from metadata stored in the context, cloning its values.
+    /// Clones values from borrowed metadata to fill unset fields.
     fn fill_from(&mut self, from: &From);
 
-    /// Fills from metadata loaded for the request, taking its values.
+    /// Moves values from owned metadata to fill unset fields.
     fn fill_from_owned(&mut self, from: From);
 }
 
@@ -83,7 +83,7 @@ impl<T: Clone> Fill for Field<T> {
     }
 }
 
-/// Fills a group of fields from a level that may not set any of them.
+/// Fills unset fields from a group when that group is present.
 impl<T: Fill> Fill<Option<Box<T>>> for T {
     fn fill_from(&mut self, from: &Option<Box<T>>) {
         if let Some(from) = from {
@@ -98,9 +98,8 @@ impl<T: Fill> Fill<Option<Box<T>>> for T {
     }
 }
 
-/// Implements [`Fill`] for a struct, filling each listed field from the
-/// field of the same name. `Target from Source { ... }` fills from another
-/// type.
+/// Implements [`Fill`] by matching the listed fields by name.
+/// Use `Target from Source { ... }` when the source has a different type.
 macro_rules! fill_fields {
     ($ty:ident from $from:ident { $($field:ident),* $(,)? }) => {
         impl $crate::field::Fill<$from> for $ty {

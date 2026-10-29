@@ -1,13 +1,13 @@
 use crate::field::{Field, fill_fields};
 
-/// Tells search engines what to do with a page after fetching it: whether
-/// to show it in their results and whether to follow its links.
+/// Instructions asking search engines whether to include a page in search
+/// results and follow its links after fetching it.
 ///
-/// Set the directives with [`Metadata::robots`](crate::Metadata::robots),
-/// and read them with [`PageMetadata::robots`](crate::PageMetadata::robots).
-/// Each directive comes from the closest level that sets it, so a layout
-/// can hide a whole section from search results. Both are allowed when no
-/// level sets them.
+/// Use [`Metadata::robots`](crate::Metadata::robots) to set these instructions
+/// and [`PageMetadata::robots`](crate::PageMetadata::robots) to read them.
+/// Each setting is inherited separately, with the closest value taking
+/// priority. A layout can set defaults for a whole section. Both indexing
+/// and following links are allowed by default.
 #[derive(Default)]
 pub struct Robots {
     index: Field<bool>,
@@ -15,13 +15,13 @@ pub struct Robots {
 }
 
 impl Robots {
-    /// Returns whether search engines may show the page in their results.
+    /// Returns whether the page allows search engines to list it in results.
     #[must_use]
     pub fn index(&self) -> bool {
         self.index.value().copied().unwrap_or(true)
     }
 
-    /// Returns whether search engines may follow the links on the page.
+    /// Returns whether the page allows search engines to follow its links.
     #[must_use]
     pub fn follow(&self) -> bool {
         self.follow.value().copied().unwrap_or(true)
@@ -30,22 +30,22 @@ impl Robots {
 
 fill_fields!(Robots { index, follow });
 
-/// Sets the directives of [`Robots`] in [`Metadata::robots`](crate::Metadata::robots).
+/// A builder for search engine instructions in [`Metadata::robots`](crate::Metadata::robots).
 pub struct RobotsBuilder(pub(crate) Robots);
 
 impl RobotsBuilder {
-    /// Sets whether search engines may show the page in their results.
+    /// Chooses whether search engines should list the page in results.
     ///
-    /// `index(false)` renders `noindex`.
+    /// Pass `false` to add `noindex` to the robots tag.
     #[must_use]
     pub fn index(mut self, index: bool) -> Self {
         self.0.index = Field::Set(index);
         self
     }
 
-    /// Sets whether search engines may follow the links on the page.
+    /// Chooses whether search engines should follow the page's links.
     ///
-    /// `follow(false)` renders `nofollow`.
+    /// Pass `false` to add `nofollow` to the robots tag.
     #[must_use]
     pub fn follow(mut self, follow: bool) -> Self {
         self.0.follow = Field::Set(follow);

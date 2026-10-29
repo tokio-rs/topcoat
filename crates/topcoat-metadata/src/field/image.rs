@@ -5,27 +5,27 @@ use topcoat_asset::Asset;
 
 use crate::{Text, Url};
 
-/// An image in a page's metadata, such as the preview social networks show
-/// for links to the page.
+/// A metadata image that can appear in a social link preview.
 ///
-/// Create it from its URL with [`new`](Self::new) or [`From`], then describe
-/// it with [`size`](Self::size) and [`alt`](Self::alt()). With a size, social
-/// networks can lay out the preview before the image loads.
+/// Pass its URL to [`new`](Self::new) or convert it with [`From`]. Add its
+/// dimensions with [`size`](Self::size) and a text description with
+/// [`alt`](Self::alt()). Dimensions help social networks reserve space
+/// before the image loads.
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct Image {
-    /// Where the image is hosted.
+    /// The URL used to load the image.
     pub url: Url,
-    /// The width of the image in pixels.
+    /// The image's width in pixels, if known.
     pub width: Option<u32>,
-    /// The height of the image in pixels.
+    /// The image's height in pixels, if known.
     pub height: Option<u32>,
-    /// A description of the image for people who cannot see it.
+    /// Text that describes the image for people who cannot see it.
     pub alt: Option<Text>,
 }
 
 impl Image {
-    /// Creates an image hosted at `url`.
+    /// Creates metadata for the image at `url`.
     #[must_use]
     pub fn new(url: impl Into<Url>) -> Self {
         Self {
@@ -36,7 +36,7 @@ impl Image {
         }
     }
 
-    /// Sets the width and height of the image in pixels.
+    /// Records the image's dimensions in pixels.
     #[must_use]
     pub fn size(mut self, width: u32, height: u32) -> Self {
         self.width = Some(width);
@@ -44,7 +44,7 @@ impl Image {
         self
     }
 
-    /// Sets a description of the image for people who cannot see it.
+    /// Adds text that describes the image for people who cannot see it.
     #[must_use]
     pub fn alt(mut self, alt: impl Into<Text>) -> Self {
         self.alt = Some(alt.into());

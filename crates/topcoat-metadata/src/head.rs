@@ -4,12 +4,13 @@ use topcoat_view_macro::{component, view};
 
 use crate::{metadata, tag};
 
-/// Renders the metadata of the current page as tags for `<head>`.
+/// Writes the current page's metadata as HTML tags inside `<head>`.
 ///
-/// Render it at the start of `<head>`, because it begins with
-/// [`<meta charset>`](tag::charset). It reads the metadata once and passes
-/// it to every component of [`tag`]. To leave out a tag or write it
-/// yourself, render the components you need instead.
+/// Place this component first in `<head>` so its
+/// [`<meta charset>`](tag::charset) tag appears early in the document.
+/// It reads the page metadata once and renders the components in [`tag`].
+/// To choose which tags to include or supply your own markup, use those
+/// components individually.
 ///
 /// ```
 /// use topcoat::{
@@ -35,7 +36,7 @@ use crate::{metadata, tag};
 ///
 /// # Errors
 ///
-/// Returns the error of [`metadata`] when reading the metadata fails.
+/// Returns any error from loading the page's [`metadata`].
 #[component]
 pub async fn tags(cx: &Cx) -> Result<impl View> {
     let metadata = metadata(cx).await?;

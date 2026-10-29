@@ -112,16 +112,17 @@ impl AssetConfig {
         }
     }
 
-    /// Writes the URL `asset` is hosted at, `{base_url}/{bundled-filename}`,
-    /// into `write`, percent-encoding the filename as a single path segment.
+    /// Writes the hosted URL of `asset` into `write` as
+    /// `{base_url}/{bundled-filename}`. The filename is percent-encoded as
+    /// one path segment.
     ///
-    /// The URL is written in the [form](url_form) set on `cx`. In the absolute
-    /// form, assets hosted relative to the site root, such as those the
-    /// application serves itself, get the application's
-    /// [base URL](topcoat_core::base_url::base_url) in front.
+    /// Uses the [URL form](url_form) in `cx`. When absolute URLs are requested,
+    /// an asset path relative to the site root gets the application's
+    /// [base URL](topcoat_core::base_url::base_url) added before it. This
+    /// includes assets served by the application.
     ///
-    /// This is how [`Asset`] values render in views; [`resolve`](Self::resolve)
-    /// returns the same URL as a `String`.
+    /// Views use this method to render [`Asset`] values.
+    /// [`resolve`](Self::resolve) returns the same URL as a `String`.
     ///
     /// # Errors
     ///
@@ -129,8 +130,8 @@ impl AssetConfig {
     ///
     /// # Panics
     ///
-    /// Panics if the catalog does not contain `asset`, or if the URL needs the
-    /// application's base URL and `cx` has none.
+    /// Panics if `asset` is missing from the catalog, or if resolving its URL
+    /// requires an application base URL that is missing from `cx`.
     #[track_caller]
     pub fn fmt_url(&self, cx: &Cx, asset: Asset, write: &mut dyn fmt::Write) -> fmt::Result {
         let Some(bundled) = self.get(asset) else {
@@ -146,13 +147,13 @@ impl AssetConfig {
         write!(write, "{}", bundled.encoded_name())
     }
 
-    /// Returns the URL `asset` is hosted at, `{base_url}/{bundled-filename}`,
-    /// in the [form](url_form) set on `cx`.
+    /// Returns the hosted URL of `asset` as `{base_url}/{bundled-filename}`,
+    /// using the [URL form](url_form) in `cx`.
     ///
     /// # Panics
     ///
-    /// Panics if the catalog does not contain `asset`, or if the URL needs the
-    /// application's base URL and `cx` has none.
+    /// Panics if `asset` is missing from the catalog, or if resolving its URL
+    /// requires an application base URL that is missing from `cx`.
     #[must_use]
     #[track_caller]
     pub fn resolve(&self, cx: &Cx, asset: Asset) -> String {
@@ -303,7 +304,7 @@ content_type = "image/png"
         }
     }
 
-    /// Returns an asset and a manifest that bundles it as
+    /// Creates a test asset whose manifest names the bundled file
     /// `logo-1a2b3c4d5e6f7a8b.png`.
     fn logo() -> (Asset, Manifest) {
         const OPTIONS: AssetOptions = AssetOptions::NONE;
@@ -327,7 +328,7 @@ content_type = "image/png"
         (Asset::new(&ENCODED), manifest)
     }
 
-    /// Returns a context that asks for absolute URLs on `https://example.com`.
+    /// Creates a test context with absolute URLs based at `https://example.com`.
     fn absolute() -> Cx {
         Cx::new()
             .with(UrlForm::Absolute)

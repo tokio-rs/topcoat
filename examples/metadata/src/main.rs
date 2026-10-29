@@ -11,8 +11,7 @@ use topcoat::{
 async fn main() {
     topcoat::start(
         module_router!()
-            // Canonical URLs are absolute, so the router needs to know where
-            // the application is reachable.
+            // Set the site's base URL so canonical links can use absolute URLs.
             .base_url("http://localhost:3000")
             .build(),
     )
@@ -20,8 +19,7 @@ async fn main() {
     .unwrap();
 }
 
-// Every page starts with this metadata. A page only sets the fields it wants
-// to change.
+// These values are defaults for all pages. Each page can replace individual fields.
 #[layout(with(
     Metadata::new()
         .title("Acme")
@@ -53,7 +51,7 @@ async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
     })
 }
 
-// Keeps all of the layout's metadata.
+// Inherits every metadata field from the layout.
 #[page]
 async fn home() -> Result<impl View> {
     Ok(view! {
@@ -71,10 +69,10 @@ mod about {
         view::{View, view},
     };
 
-    // Sets its own title and removes the layout's description.
+    // Overrides the title and omits the inherited description.
     #[page(with(Metadata::new().title("About").no_description()))]
     pub async fn page(cx: &Cx) -> Result<impl View> {
-        // Code can read the metadata of the current page too.
+        // Read the combined metadata to use the same title in the page body.
         let metadata = metadata(cx).await?;
 
         Ok(view! {

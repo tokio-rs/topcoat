@@ -1,18 +1,20 @@
 # Metadata
 
-This example sets page metadata such as titles, descriptions, canonical URLs, and link previews for social networks. The root layout sets defaults for every page and renders them in `<head>` with `metadata::tags()`. Pages override single fields, the about page removes the description, and product pages load their title, description, and preview image from the product they show.
+This example shows how to set page titles, descriptions, canonical URLs, and social link previews. The root layout provides defaults for all pages and calls `metadata::tags()` to render them in `<head>`.
 
-Clone the Topcoat repository:
+Each page can replace the fields it needs to change. The about page removes the default description. Product pages load their title, description, and preview image from the selected product.
+
+Clone the repository and open its directory:
 
 ```sh
 git clone https://github.com/tokio-rs/topcoat.git
 cd topcoat
 ```
 
-Then run it with:
+Start the example:
 
 ```sh
 cargo topcoat dev -p metadata
 ```
 
-View the page source to see the rendered tags.
+Open the page source in your browser to see the generated tags.

@@ -31,10 +31,10 @@ pub(crate) const PRODUCTS: &[Product] = &[
     },
 ];
 
-/// Finds the product of the current request, or responds 404.
+/// Looks up the requested product, returning a 404 error if it does not exist.
 ///
-/// The metadata and the page both call it. `#[memoize]` makes them share one
-/// lookup, which matters once it queries a database.
+/// Both the metadata loader and the page call this function. `#[memoize]`
+/// shares the result so a database query added here would run only once.
 #[memoize(as_ref)]
 async fn find_product(cx: &Cx) -> Result<Product> {
     let id = *path_param::<ProductId>(cx)?;
@@ -45,9 +45,8 @@ async fn find_product(cx: &Cx) -> Result<Product> {
         .ok_or_not_found()?)
 }
 
-// The title, description, and image depend on the product, so they are
-// loaded for each request. The head waits for them before the page starts
-// streaming.
+// Load the selected product's title, description, and preview image for each
+// request. The metadata tags wait for these values before they render.
 #[page(with(Metadata::from_fn(async |cx| {
     let product = find_product(cx).await?;
     Ok(Metadata::new()

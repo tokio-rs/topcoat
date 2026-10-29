@@ -1,9 +1,9 @@
-//! Components that each render one kind of metadata tag.
+//! Components for rendering individual kinds of metadata tags.
 //!
-//! [`tags`](crate::tags) renders all of them. Use these instead to pick the
-//! tags to render, for example to write one of them yourself. Read the
-//! metadata once with [`metadata`](crate::metadata) and pass it to each
-//! component.
+//! Use [`tags`](crate::tags) to render the full set, or call these components
+//! individually to choose the tags you need. This also lets you replace a
+//! tag with your own markup. Read [`metadata`](crate::metadata) once and pass
+//! the result to each component.
 
 use topcoat_core::{context::Cx, error::Result, url_form::UrlForm};
 use topcoat_view::View;
@@ -11,19 +11,19 @@ use topcoat_view_macro::{component, view};
 
 use crate::PageMetadata;
 
-/// Renders `<meta charset="utf-8">`.
+/// Declares UTF-8 with `<meta charset="utf-8">`.
 ///
-/// Browsers only look for it in the first 1024 bytes of a document, so
-/// render it at the start of `<head>`.
+/// Put this tag first in `<head>`. Browsers look for the charset declaration
+/// within the document's first 1024 bytes.
 #[component]
 pub async fn charset() -> Result<impl View> {
     Ok(view! { <meta charset="utf-8"> })
 }
 
-/// Renders the [viewport](crate::Metadata::viewport) of a page.
+/// Writes the page's [viewport tag](crate::Metadata::viewport), if present.
 #[component]
 pub async fn viewport(
-    /// The metadata of the page.
+    /// The combined metadata to render.
     metadata: &PageMetadata,
 ) -> Result<impl View> {
     Ok(view! {
@@ -33,10 +33,10 @@ pub async fn viewport(
     })
 }
 
-/// Renders the [title](crate::Metadata::title) of a page.
+/// Writes a `<title>` tag for the page's [title](crate::Metadata::title), if set.
 #[component]
 pub async fn title(
-    /// The metadata of the page.
+    /// The combined metadata to render.
     metadata: &PageMetadata,
 ) -> Result<impl View> {
     Ok(view! {
@@ -46,10 +46,10 @@ pub async fn title(
     })
 }
 
-/// Renders the [description](crate::Metadata::description) of a page.
+/// Writes a meta tag for the page's [description](crate::Metadata::description), if set.
 #[component]
 pub async fn description(
-    /// The metadata of the page.
+    /// The combined metadata to render.
     metadata: &PageMetadata,
 ) -> Result<impl View> {
     Ok(view! {
@@ -59,12 +59,12 @@ pub async fn description(
     })
 }
 
-/// Renders the [canonical URL](crate::Metadata::canonical) of a page, always
-/// in the absolute form.
+/// Writes a canonical link tag if the page has a
+/// [canonical URL](crate::Metadata::canonical). Requests the absolute URL form.
 #[component]
 pub async fn canonical(
     cx: &Cx,
-    /// The metadata of the page.
+    /// The combined metadata to render.
     metadata: &PageMetadata,
 ) -> Result<impl View> {
     let absolute = cx.with(UrlForm::Absolute);
@@ -75,13 +75,13 @@ pub async fn canonical(
     })
 }
 
-/// Renders the [robots directives](crate::Robots) of a page.
+/// Writes the page's [search engine instructions](crate::Robots) in a robots tag.
 ///
-/// Renders nothing when they allow everything, which is what search engines
-/// assume without the tag.
+/// Omits the tag when indexing and following links are both allowed, since
+/// those are the defaults without a tag.
 #[component]
 pub async fn robots(
-    /// The metadata of the page.
+    /// The combined metadata to render.
     metadata: &PageMetadata,
 ) -> Result<impl View> {
     let robots = metadata.robots();
@@ -98,10 +98,10 @@ pub async fn robots(
     })
 }
 
-/// Renders the [theme color](crate::Metadata::theme_color) of a page.
+/// Writes a meta tag for the page's [theme color](crate::Metadata::theme_color), if set.
 #[component]
 pub async fn theme_color(
-    /// The metadata of the page.
+    /// The combined metadata to render.
     metadata: &PageMetadata,
 ) -> Result<impl View> {
     Ok(view! {
@@ -111,13 +111,12 @@ pub async fn theme_color(
     })
 }
 
-/// Renders the [Open Graph metadata](crate::OpenGraph) of a page, which
-/// social networks use for link previews. URLs are always in the absolute
-/// form.
+/// Writes [Open Graph tags](crate::OpenGraph) for social link previews.
+/// Requests the absolute form for page and image URLs.
 #[component]
 pub async fn open_graph(
     cx: &Cx,
-    /// The metadata of the page.
+    /// The combined metadata to render.
     metadata: &PageMetadata,
 ) -> Result<impl View> {
     let og = metadata.open_graph();
@@ -154,11 +153,11 @@ pub async fn open_graph(
     })
 }
 
-/// Renders the [X metadata](crate::Twitter) of a page, which X uses for link
-/// previews together with the [Open Graph metadata](open_graph).
+/// Writes the page's [X preview tags](crate::Twitter). X also uses the
+/// [Open Graph tags](open_graph) for the preview's content.
 #[component]
 pub async fn twitter(
-    /// The metadata of the page.
+    /// The combined metadata to render.
     metadata: &PageMetadata,
 ) -> Result<impl View> {
     let x = metadata.twitter();

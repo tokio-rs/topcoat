@@ -6,22 +6,23 @@ use topcoat_l10n::Translation;
 #[cfg(feature = "view")]
 use topcoat_view::{AttributeValueViewParts, NodeViewParts, PartsWriter};
 
-/// Text in a page's metadata, such as its title or description.
+/// A text value used in page metadata, such as a title or description.
 ///
-/// Create it from a string, or from a [`Translation`] with the `l10n`
-/// feature. Call [`resolve`](Self::resolve) to get the text for a request.
+/// Convert a string into this type, or use a [`Translation`] when the `l10n`
+/// feature is enabled. [`resolve`](Self::resolve) returns the text to use
+/// for the current request.
 #[derive(Clone)]
 #[non_exhaustive]
 pub enum Text {
-    /// Text that is the same for every request.
+    /// A string used unchanged across requests.
     Str(Cow<'static, str>),
-    /// A translation, resolved in the locale of the request.
+    /// Text translated into the request's locale.
     #[cfg(feature = "l10n")]
     Translation(Translation<'static>),
 }
 
 impl Text {
-    /// Returns the text for the request of `cx`.
+    /// Returns the text using the locale in `cx` if translation is needed.
     #[must_use]
     #[cfg_attr(not(feature = "l10n"), allow(unused_variables))]
     pub fn resolve(&self, cx: &Cx) -> Cow<'_, str> {
@@ -32,7 +33,7 @@ impl Text {
         }
     }
 
-    /// Resolves the text for the request of `cx` and appends it to the view.
+    /// Adds the text to the view, translating it with `cx` if needed.
     #[cfg(feature = "view")]
     #[cfg_attr(not(feature = "l10n"), allow(unused_variables))]
     fn push(&self, cx: &Cx, parts: &mut PartsWriter<'_>) {
@@ -73,7 +74,7 @@ impl From<Translation<'static>> for Text {
     }
 }
 
-/// Displays the text, resolved for the view's context, as escaped content.
+/// Renders escaped text using the view's context to resolve translations.
 #[cfg(feature = "view")]
 impl NodeViewParts for &Text {
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
@@ -81,8 +82,8 @@ impl NodeViewParts for &Text {
     }
 }
 
-/// Displays the text, resolved for the view's context, in an attribute
-/// value, as in `<meta name="description" content=(description)>`.
+/// Renders text in an HTML attribute, resolving translations with the view's
+/// context. For example, `<meta name="description" content=(description)>`.
 #[cfg(feature = "view")]
 impl AttributeValueViewParts for &Text {
     fn attribute_present(&self) -> bool {

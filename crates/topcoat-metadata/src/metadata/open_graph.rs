@@ -5,19 +5,19 @@ use crate::{
     field::{Field, fill_fields},
 };
 
-/// The kind of object a page describes, rendered as `og:type`.
+/// The page's content type for Open Graph's `og:type` tag.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum OpenGraphType {
-    /// A general page. Pages are websites unless they set another type.
+    /// A general web page. This is the default type.
     #[default]
     Website,
-    /// An article, such as a blog post or a news story.
+    /// Written content such as a blog post or news article.
     Article,
 }
 
 impl OpenGraphType {
-    /// Returns the value of `og:type` for this type.
+    /// Returns the string to put in the `og:type` tag.
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
@@ -27,8 +27,7 @@ impl OpenGraphType {
     }
 }
 
-/// The Open Graph fields of one level of metadata, or of a whole page once
-/// combined.
+/// Open Graph values from one metadata entry or from the combined page metadata.
 #[derive(Default)]
 pub(crate) struct OpenGraphFields {
     pub(crate) title: Field<Text>,
@@ -48,57 +47,59 @@ fill_fields!(OpenGraphFields {
     images,
 });
 
-/// Sets the Open Graph fields in
+/// A builder for setting fields through
 /// [`Metadata::open_graph`](crate::Metadata::open_graph).
 pub struct OpenGraphBuilder(pub(crate) OpenGraphFields);
 
 impl OpenGraphBuilder {
-    /// Sets the title social networks show for links to the page.
+    /// Sets the title for social link previews.
     ///
-    /// Defaults to the [title](crate::Metadata::title) of the page.
+    /// Uses the page's [title](crate::Metadata::title) if no Open Graph title
+    /// is set or inherited.
     #[must_use]
     pub fn title(mut self, title: impl Into<Text>) -> Self {
         self.0.title = Field::Set(title.into());
         self
     }
 
-    /// Sets the description social networks show for links to the page.
+    /// Sets the description for social link previews.
     ///
-    /// Defaults to the [description](crate::Metadata::description) of the
-    /// page.
+    /// Uses the page's [description](crate::Metadata::description) if no
+    /// Open Graph description is set or inherited.
     #[must_use]
     pub fn description(mut self, description: impl Into<Text>) -> Self {
         self.0.description = Field::Set(description.into());
         self
     }
 
-    /// Sets the URL that identifies the page on social networks.
+    /// Sets the page URL used by social networks.
     ///
-    /// Defaults to the [canonical URL](crate::Metadata::canonical) of the
-    /// page.
+    /// Uses the page's [canonical URL](crate::Metadata::canonical) if no
+    /// Open Graph URL is set or inherited.
     #[must_use]
     pub fn url(mut self, url: impl Into<Url>) -> Self {
         self.0.url = Field::Set(url.into());
         self
     }
 
-    /// Sets the name of the website the page belongs to.
+    /// Sets the website's name for link previews.
     #[must_use]
     pub fn site_name(mut self, site_name: impl Into<Text>) -> Self {
         self.0.site_name = Field::Set(site_name.into());
         self
     }
 
-    /// Sets the kind of object the page describes.
+    /// Sets the page's Open Graph content type.
     #[must_use]
     pub fn kind(mut self, kind: OpenGraphType) -> Self {
         self.0.kind = Field::Set(kind);
         self
     }
 
-    /// Adds an image that social networks may show for links to the page.
+    /// Adds an image for social link previews.
     ///
-    /// The images of a level replace all images set further up.
+    /// Repeated calls add images to this metadata entry. This list replaces
+    /// the entire inherited image list.
     #[must_use]
     pub fn image(mut self, image: impl Into<Image>) -> Self {
         let mut images = match self.0.images {
@@ -110,7 +111,7 @@ impl OpenGraphBuilder {
         self
     }
 
-    /// Removes the images set further up, so the page has none.
+    /// Clears the preview images and prevents inheriting an image list.
     #[must_use]
     pub fn no_images(mut self) -> Self {
         self.0.images = Field::Removed;
@@ -118,29 +119,29 @@ impl OpenGraphBuilder {
     }
 }
 
-/// Reads the Open Graph metadata of a page, which social networks use for
-/// link previews.
+/// The page's Open Graph values for social link previews.
 ///
-/// Get it with [`PageMetadata::open_graph`]. The title, description, and URL
-/// fall back to the page's own when no level sets them for Open Graph.
+/// Call [`PageMetadata::open_graph`] to read these values. If no metadata
+/// sets an Open Graph title, description, or URL, the corresponding page
+/// value is used.
 #[derive(Clone, Copy)]
 pub struct OpenGraph<'a> {
     page: &'a PageMetadata,
 }
 
 impl<'a> OpenGraph<'a> {
-    /// Creates a reader for the Open Graph metadata of `page`.
+    /// Provides access to the Open Graph values in `page`.
     pub(crate) fn new(page: &'a PageMetadata) -> Self {
         Self { page }
     }
 
-    /// Returns the title, or the page's title.
+    /// Returns the Open Graph title, falling back to the page title.
     #[must_use]
     pub fn title(self) -> Option<&'a Text> {
         self.page.open_graph.title.value_or(self.page.title())
     }
 
-    /// Returns the description, or the page's description.
+    /// Returns the Open Graph description, falling back to the page description.
     #[must_use]
     pub fn description(self) -> Option<&'a Text> {
         self.page
@@ -149,19 +150,19 @@ impl<'a> OpenGraph<'a> {
             .value_or(self.page.description())
     }
 
-    /// Returns the URL, or the page's canonical URL.
+    /// Returns the Open Graph URL, falling back to the canonical URL.
     #[must_use]
     pub fn url(self) -> Option<&'a Url> {
         self.page.open_graph.url.value_or(self.page.canonical())
     }
 
-    /// Returns the name of the website the page belongs to.
+    /// Returns the website name used in link previews.
     #[must_use]
     pub fn site_name(self) -> Option<&'a Text> {
         self.page.open_graph.site_name.value()
     }
 
-    /// Returns the kind of object the page describes.
+    /// Returns the Open Graph content type, defaulting to a website.
     #[must_use]
     pub fn kind(self) -> OpenGraphType {
         self.page
@@ -172,7 +173,7 @@ impl<'a> OpenGraph<'a> {
             .unwrap_or_default()
     }
 
-    /// Returns the images social networks may show for links to the page.
+    /// Returns the page's preview images, or an empty slice if there are none.
     #[must_use]
     pub fn images(self) -> &'a [Image] {
         self.page

@@ -5,18 +5,18 @@ use crate::{
     field::{Field, fill_fields},
 };
 
-/// The layout X uses for link previews, rendered as `twitter:card`.
+/// The link preview format requested from X through `twitter:card`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum TwitterCard {
-    /// A small square image next to the title and description.
+    /// A preview with a small square image beside the title and description.
     Summary,
-    /// A large image above the title and description.
+    /// A preview with a large image above the title and description.
     SummaryLargeImage,
 }
 
 impl TwitterCard {
-    /// Returns the value of `twitter:card` for this card.
+    /// Returns the string to put in the `twitter:card` tag.
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
@@ -26,7 +26,7 @@ impl TwitterCard {
     }
 }
 
-/// The X fields of one level of metadata, or of a whole page once combined.
+/// X preview settings from one metadata entry or from the combined page metadata.
 #[derive(Default)]
 pub(crate) struct TwitterFields {
     pub(crate) card: Field<TwitterCard>,
@@ -40,29 +40,29 @@ fill_fields!(TwitterFields {
     creator,
 });
 
-/// Sets the X fields in [`Metadata::twitter`](crate::Metadata::twitter).
+/// A builder for X preview settings in [`Metadata::twitter`](crate::Metadata::twitter).
 pub struct TwitterBuilder(pub(crate) TwitterFields);
 
 impl TwitterBuilder {
-    /// Sets the layout X uses for link previews.
+    /// Chooses the format of link previews on X.
     ///
-    /// Defaults to [`SummaryLargeImage`](TwitterCard::SummaryLargeImage)
-    /// when the page has [Open Graph images](crate::OpenGraphBuilder::image),
-    /// and to [`Summary`](TwitterCard::Summary) otherwise.
+    /// Pages with [Open Graph images](crate::OpenGraphBuilder::image) default
+    /// to [`SummaryLargeImage`](TwitterCard::SummaryLargeImage). Pages
+    /// without images default to [`Summary`](TwitterCard::Summary).
     #[must_use]
     pub fn card(mut self, card: TwitterCard) -> Self {
         self.0.card = Field::Set(card);
         self
     }
 
-    /// Sets the X handle of the website, such as `@acme`.
+    /// Sets the website's account on X, including `@`, for example `@acme`.
     #[must_use]
     pub fn site(mut self, site: impl Into<Cow<'static, str>>) -> Self {
         self.0.site = Field::Set(site.into());
         self
     }
 
-    /// Sets the X handle of the page's author, such as `@ada`.
+    /// Sets the author's account on X, including `@`, for example `@ada`.
     #[must_use]
     pub fn creator(mut self, creator: impl Into<Cow<'static, str>>) -> Self {
         self.0.creator = Field::Set(creator.into());
@@ -70,23 +70,23 @@ impl TwitterBuilder {
     }
 }
 
-/// Reads the X metadata of a page, which X uses for link previews.
+/// The page's settings for link previews on X.
 ///
-/// Get it with [`PageMetadata::twitter`]. X takes the title, description,
-/// and image of a preview from the [Open Graph metadata](crate::OpenGraph).
+/// Call [`PageMetadata::twitter`] to read these settings. Preview titles,
+/// descriptions, and images come from the [Open Graph metadata](crate::OpenGraph).
 #[derive(Clone, Copy)]
 pub struct Twitter<'a> {
     page: &'a PageMetadata,
 }
 
 impl<'a> Twitter<'a> {
-    /// Creates a reader for the X metadata of `page`.
+    /// Provides access to the X preview settings in `page`.
     pub(crate) fn new(page: &'a PageMetadata) -> Self {
         Self { page }
     }
 
-    /// Returns the layout of link previews, or the default for the page's
-    /// images.
+    /// Returns the chosen preview format. By default, pages with Open Graph
+    /// images use a large image card, and other pages use a summary card.
     #[must_use]
     pub fn card(self) -> TwitterCard {
         match self.page.twitter.card.value() {
@@ -96,13 +96,13 @@ impl<'a> Twitter<'a> {
         }
     }
 
-    /// Returns the X handle of the website.
+    /// Returns the website's account name on X.
     #[must_use]
     pub fn site(self) -> Option<&'a str> {
         self.page.twitter.site.value().map(|site| &**site)
     }
 
-    /// Returns the X handle of the page's author.
+    /// Returns the page author's account name on X.
     #[must_use]
     pub fn creator(self) -> Option<&'a str> {
         self.page.twitter.creator.value().map(|creator| &**creator)
