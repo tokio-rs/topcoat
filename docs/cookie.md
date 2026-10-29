@@ -100,22 +100,25 @@ async fn report(cx: &Cx) -> Result<impl View> {
 
 # Building cookies with `cookie!`
 
-For cookies with several attributes, the [`cookie!`] macro is more compact than the builder. It mirrors the [`Set-Cookie`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie) header: the `name = value` pair first, then any number of `;`-separated attributes.
+For cookies with several attributes, the [`cookie!`] macro is more compact than the builder. It uses the syntax of the [`Set-Cookie`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie) header: the `name = value` pair first, then any number of `;`-separated attributes, spelled as in the header.
 
 ```rust
-use topcoat::cookie::{Cookie, SameSite, cookie, time::Duration};
+use topcoat::cookie::{Cookie, cookie};
 
-let plain: Cookie = cookie!("theme" = "dark");
+let plain: Cookie = cookie!(theme = "dark");
 
+let token = String::from("abc123");
 let session: Cookie = cookie! {
-    "session" = "abc123";
+    session = (token);
     Path = "/";
+    Max-Age = 3600;
     Secure;
     HttpOnly;
     SameSite = Lax;
-    MaxAge = Duration::hours(1)
 };
 ```
+
+As in [`view!`](crate::view::view), literals are written as they are and Rust expressions go in parentheses, as in `session = (token)` or `Secure = (is_production)`. An integer `Max-Age` counts seconds. Use a string literal for a cookie name that Rust cannot read as tokens, such as `"my.cookie" = "x"`.
 
 # Default and override attributes
 
@@ -135,7 +138,7 @@ let jar = cookies(cx)
     .default_path("/");
 
 // Picks up Secure, HttpOnly, SameSite=Lax, Path=/ from the defaults above.
-jar.add(cookie!("session" = "abc123"));
+jar.add(cookie!(session = "abc123"));
 # }
 ```
 
@@ -186,7 +189,7 @@ use topcoat::cookie::{Cookies, cookie, cookies};
 let jar = cookies(cx).override_prefix_host();
 
 // Stored as `__Host-session`, forced Secure + Path=/, no Domain.
-jar.add(cookie!("session" = "abc123"));
+jar.add(cookie!(session = "abc123"));
 
 // Looked up under the prefixed name; returns it with the prefix stripped.
 let session = jar.get("session");
@@ -208,7 +211,7 @@ use topcoat::cookie::{Cookies, Key, cookie, cookies};
 let key = Key::generate();
 let jar = cookies(cx).signed(&key);
 
-jar.add(cookie!("user_id" = "42"));
+jar.add(cookie!(user_id = "42"));
 
 // Returns the cookie only if the signature checks out.
 let user_id = jar.get("user_id");
@@ -226,7 +229,7 @@ use topcoat::cookie::{Cookies, Key, cookie, cookies};
 let key = Key::generate();
 let jar = cookies(cx).private(&key);
 
-jar.add(cookie!("session" = "secret-token"));
+jar.add(cookie!(session = "secret-token"));
 
 let session = jar.get("session"); // None if missing or it fails to decrypt
 # }
@@ -266,7 +269,7 @@ use topcoat::{
 
 #[route(POST)]
 async fn login(cx: &Cx) -> Result<&'static str> {
-    private_cookies(cx).add(cookie!("session" = "secret-token"; Path = "/"));
+    private_cookies(cx).add(cookie!(session = "secret-token"; Path = "/"));
     Ok("logged in")
 }
 ```
