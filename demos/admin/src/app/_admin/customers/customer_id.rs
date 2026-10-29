@@ -72,7 +72,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                     detail(
                         data: iconify_icon!("lucide:calendar"),
                         <time datetime=(customer.joined_at.to_string())>
-                            (t!(customer_since, date = customer.joined_at))
+                            (t!(customer_since, date: customer.joined_at))
                         </time>
                     )
                 </div>

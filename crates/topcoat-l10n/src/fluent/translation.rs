@@ -57,7 +57,7 @@ impl<'a> Translation<'a> {
     /// [`Catalog::format`](crate::Catalog::format).
     ///
     /// If the message is unavailable, returns its key and arguments as a placeholder,
-    /// such as `password-field.placeholder(min = 8)`. String arguments appear in
+    /// such as `password-field.placeholder(min: 8)`. String arguments appear in
     /// quotes. Numbers appear without locale formatting.
     ///
     /// Borrows the text from the catalog when no formatting is needed.
@@ -78,7 +78,7 @@ impl<'a> Translation<'a> {
         for (index, (name, value)) in self.args.iter().enumerate() {
             text.push_str(if index == 0 { "(" } else { ", " });
             text.push_str(name);
-            text.push_str(" = ");
+            text.push_str(": ");
             value.write_placeholder(&mut text);
         }
         if !self.args.is_empty() {
@@ -222,7 +222,7 @@ greeting = Hallo, { $name }!
         let cx = Cx::new().with(locale!("en"));
         assert_eq!(
             missing.resolve(&cx),
-            r#"missing.label(name = "Ada", count = 8)"#
+            r#"missing.label(name: "Ada", count: 8)"#
         );
     }
 

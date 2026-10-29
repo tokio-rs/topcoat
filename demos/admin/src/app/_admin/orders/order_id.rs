@@ -58,13 +58,13 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
             <div class="flex flex-col gap-1">
                 <div class="flex items-center gap-3">
                     <h1 class="text-2xl font-semibold tracking-tight">
-                        (t!(order_title, id = order.id.to_string()))
+                        (t!(order_title, id: order.id.to_string()))
                     </h1>
                     status_badge(status: order.status)
                 </div>
                 <p class="text-sm text-muted-foreground">
                     <time datetime=(order.placed_at.to_string())>
-                        (t!(placed_on, date = order.placed_at))
+                        (t!(placed_on, date: order.placed_at))
                     </time>
                 </p>
             </div>
@@ -101,7 +101,7 @@ async fn order_items(cx: &Cx, id: u64, total: Money) -> Result<impl View> {
     Ok(view! {
         card_header(
             card_title((t!(items)))
-            card_description((t!(unit_count, count = units)))
+            card_description((t!(unit_count, count: units)))
         )
         table(
             order_item_columns()
@@ -353,9 +353,9 @@ async fn status_actions(cx: &Cx, id: u64, next: &'static [OrderStatus]) -> Resul
                     dialog_header(
                         dialog_title(
                             attrs: attributes! { id=(&title_id) },
-                            (t!(confirm_status, status = status.slug()))
+                            (t!(confirm_status, status: status.slug()))
                         )
-                        dialog_description((t!(final_status, id = id.to_string())))
+                        dialog_description((t!(final_status, id: id.to_string())))
                     )
                     dialog_footer(
                         button(

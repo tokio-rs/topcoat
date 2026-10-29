@@ -93,9 +93,9 @@ pub async fn list_pagination(
             <p class="shrink-0 text-sm text-muted-foreground tabular-nums">
                 (t!(
                     pagination_summary,
-                    first = page.first(),
-                    last = page.last(),
-                    count = page.count,
+                    first: page.first(),
+                    last: page.last(),
+                    count: page.count,
                 ))
             </p>
             // Offset the Next link's padding to align its arrow with the table content.

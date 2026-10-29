@@ -50,7 +50,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <header class="flex flex-col gap-1">
             <h1 class="text-2xl font-semibold tracking-tight">
-                (t!(welcome, name = first_name))
+                (t!(welcome, name: first_name))
             </h1>
             <p class="text-muted-foreground">(t!(welcome.description))</p>
         </header>
@@ -233,11 +233,11 @@ async fn figure_details(figure: &Figure, accent: StaticClass) -> Result<impl Vie
             >
                 if change >= 0 {
                     <span class="font-medium text-emerald-600">
-                        (t!(increase, percent = percent(change)))
+                        (t!(increase, percent: percent(change)))
                     </span>
                 } else {
                     <span class="font-medium text-rose-600">
-                        (t!(decrease, percent = percent(change)))
+                        (t!(decrease, percent: percent(change)))
                     </span>
                 }
                 (t!(compared_to_yesterday))

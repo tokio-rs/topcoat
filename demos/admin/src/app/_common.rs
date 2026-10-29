@@ -16,7 +16,7 @@ messages!("{mod}/l10n/{locale}.ftl");
 
 /// Formats an amount in the request's language, such as `$1,234.50`.
 pub fn money(amount: Money) -> Translation<'static> {
-    t!(money, amount = amount.dollars())
+    t!(money, amount: amount.dollars())
 }
 
 /// Formats an amount for a form field, such as `1234.50` in English. It has no currency

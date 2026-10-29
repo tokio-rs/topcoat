@@ -15,7 +15,7 @@ pub async fn page() -> Result<impl View> {
         <p>(t!(intro))</p>
 
         // Arguments fill in the `{ $name }` in the message.
-        <p>(t!(greeting, name = "Ada"))</p>
+        <p>(t!(greeting, name: "Ada"))</p>
 
         // Fluent picks the plural form, like "One item" or "5 items", and formats the
         // number for the locale, like 1,234 or 1.234.
@@ -28,7 +28,7 @@ pub async fn page() -> Result<impl View> {
 
         // `jiff` values format as dates. `Zoned::now` is the current date and time in
         // the server's time zone.
-        <p>(t!(today, date = Zoned::now()))</p>
+        <p>(t!(today, date: Zoned::now()))</p>
 
         // `search.placeholder` is the `.placeholder` attribute of the `search` message.
         <input

@@ -18,7 +18,7 @@ fn calls() -> Vec<(u32, Translation<'static>)> {
         // Does not pass `name`.
         (line!(), t!(greeting)),
         // Passes `extra`, which no locale uses.
-        (line!(), t!(greeting, name = "Ada", extra = 1)),
+        (line!(), t!(greeting, name: "Ada", extra: 1)),
         // German lacks the attribute.
         (line!(), t!(search.placeholder)),
         // A typo of `title`.

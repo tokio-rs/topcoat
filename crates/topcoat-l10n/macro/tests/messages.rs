@@ -34,8 +34,8 @@ fn a_missing_message_renders_the_placeholder() {
     assert_eq!(t!(only - english).resolve(&de), "only-english");
     // German has the message, but not the attribute.
     assert_eq!(
-        t!(login - input.title, user - name = "Ada").resolve(&de),
-        r#"login-input.title(user-name = "Ada")"#
+        t!(login-input.title, user-name: "Ada").resolve(&de),
+        r#"login-input.title(user-name: "Ada")"#
     );
     // A locale without files has no messages at all.
     assert_eq!(t!(title).resolve(&scope(locale!("fr"))), "title");
@@ -46,13 +46,13 @@ fn a_missing_message_renders_the_placeholder() {
 #[test]
 fn formats_numbers_and_plurals_for_the_locale() {
     let de = scope(locale!("de"));
-    assert_eq!(t!(items, count = 1).resolve(&de), "Ein Artikel");
+    assert_eq!(t!(items, count: 1).resolve(&de), "Ein Artikel");
     assert_eq!(
-        t!(items, count = 1234).resolve(&de),
+        t!(items, count: 1234).resolve(&de),
         "\u{2068}1.234\u{2069} Artikel"
     );
     assert_eq!(
-        t!(items, count = 1234).resolve(&scope(locale!("en"))),
+        t!(items, count: 1234).resolve(&scope(locale!("en"))),
         "\u{2068}1,234\u{2069} items"
     );
 }
@@ -62,11 +62,11 @@ fn passes_arguments_by_name_or_shorthand() {
     let en = scope(locale!("en"));
     let name = String::from("Ada");
     assert_eq!(
-        t!(greeting, name = "Bob").resolve(&en),
+        t!(greeting, name: "Bob").resolve(&en),
         "Hello, \u{2068}Bob\u{2069}!"
     );
     assert_eq!(
-        t!(login - input.title, user - name = &name).resolve(&en),
+        t!(login-input.title, user-name: &name).resolve(&en),
         "Log in as \u{2068}Ada\u{2069}"
     );
     assert_eq!(
@@ -80,7 +80,7 @@ fn the_values_do_not_see_the_locals_of_the_expansion() {
     let en = scope(locale!("en"));
     let args = [1, 2];
     assert_eq!(
-        t!(items, count = args.len()).resolve(&en),
+        t!(items, count: args.len()).resolve(&en),
         "\u{2068}2\u{2069} items"
     );
 }
@@ -89,7 +89,7 @@ fn the_values_do_not_see_the_locals_of_the_expansion() {
 fn a_referenced_message_shares_the_arguments() {
     let en = scope(locale!("en"));
     assert_eq!(
-        t!(welcome, name = "Ada", count = 2).resolve(&en),
+        t!(welcome, name: "Ada", count: 2).resolve(&en),
         "Hello, \u{2068}Ada\u{2069}! You have \u{2068}2\u{2069} items."
     );
 }
@@ -98,7 +98,7 @@ fn a_referenced_message_shares_the_arguments() {
 fn keywords_can_be_keys_and_arguments() {
     let en = scope(locale!("en"));
     assert_eq!(
-        t!(type, r#type = "raw").resolve(&en),
+        t!(type, r#type: "raw").resolve(&en),
         "Type: \u{2068}raw\u{2069}"
     );
     let r#type = "shorthand";

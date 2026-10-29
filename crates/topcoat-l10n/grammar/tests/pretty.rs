@@ -54,12 +54,12 @@ fn joins_the_parts_of_a_key() {
 #[test]
 fn spaces_the_arguments() {
     assert_print::<Translate>(
-        "(greeting,name=user . name,count)",
-        "(greeting, name = user.name, count)",
+        "(greeting,name :user . name,count)",
+        "(greeting, name: user.name, count)",
     );
     assert_print::<Translate>(
-        r#"(greeting, "user-name"=name)"#,
-        r#"(greeting, "user-name" = name)"#,
+        r#"(greeting, "user-name"  :name)"#,
+        r#"(greeting, "user-name": name)"#,
     );
 }
 
@@ -72,11 +72,11 @@ fn drops_a_trailing_comma_on_one_line() {
 #[test]
 fn puts_each_argument_on_its_own_line_when_too_long() {
     assert_print::<Translate>(
-        "(order-confirmation-summary, customer_name = order.customer.name(), total = order.total(), count)",
+        "(order-confirmation-summary, customer_name: order.customer.name(), total: order.total(), count)",
         "(
     order-confirmation-summary,
-    customer_name = order.customer.name(),
-    total = order.total(),
+    customer_name: order.customer.name(),
+    total: order.total(),
     count,
 )",
     );
@@ -84,10 +84,10 @@ fn puts_each_argument_on_its_own_line_when_too_long() {
 
 #[test]
 fn copies_incomplete_values() {
-    assert_print::<Translate>("(greeting, name =)", "(greeting, name =)");
+    assert_print::<Translate>("(greeting, name:)", "(greeting, name:)");
     assert_print::<Translate>(
-        "(greeting, name = a +, count)",
-        "(greeting, name = a +, count)",
+        "(greeting, name: a +, count)",
+        "(greeting, name: a +, count)",
     );
 }
 
@@ -98,13 +98,13 @@ fn keeps_doc_comments_on_their_own_lines() {
     /// Shown inside the empty field.
     password - field . placeholder,
     /// Minimum number of characters.
-    min=8
+    min:8
 )",
         "(
     /// Shown inside the empty field.
     password-field.placeholder,
     /// Minimum number of characters.
-    min = 8,
+    min: 8,
 )",
     );
 }

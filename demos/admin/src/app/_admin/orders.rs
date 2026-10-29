@@ -397,11 +397,11 @@ pub(super) async fn time_ago(timestamp: Timestamp) -> Result<impl View> {
         if minutes < 1 {
             (t!(just_now))
         } else if minutes < 60 {
-            (t!(minutes_ago, count = minutes))
+            (t!(minutes_ago, count: minutes))
         } else if minutes < 24 * 60 {
-            (t!(hours_ago, count = minutes / 60))
+            (t!(hours_ago, count: minutes / 60))
         } else if minutes < 7 * 24 * 60 {
-            (t!(days_ago, count = minutes / (24 * 60)))
+            (t!(days_ago, count: minutes / (24 * 60)))
         } else {
             (DateTime::from(timestamp).date_style(DateTimeStyle::Medium))
         }

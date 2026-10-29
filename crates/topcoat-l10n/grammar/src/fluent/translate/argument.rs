@@ -83,11 +83,11 @@ impl topcoat_core_grammar::pretty::PrettyPrint for TranslateArguments {
     }
 }
 
-/// A named message argument, written as `name = value` or just `name` to use a Rust
+/// A named message argument, written as `name: value` or just `name` to use a Rust
 /// variable with that name.
 ///
 /// Names identify Fluent variables, so `user_name` supplies `$user_name`. Use a string
-/// literal for names that are not Rust identifiers, such as `"user-name" = name`. The
+/// literal for names that are not Rust identifiers, such as `"user-name": name`. The
 /// shorthand requires a Rust identifier. A raw identifier such as `r#type` supplies
 /// `$type`.
 pub struct TranslateArgument {
@@ -103,15 +103,15 @@ impl TranslateArgument {
     /// Returns the supplied value expression, or the variable name for shorthand
     /// arguments.
     ///
-    /// An incomplete value produces a compile error at `=` while preserving the
+    /// An incomplete value produces a compile error at `:` while preserving the
     /// argument's place in the expansion.
     #[must_use]
     pub fn value(&self) -> TokenStream {
         match &self.value {
             None => self.name.to_token_stream(),
             Some(value) if value.tokens.is_empty() => syn::Error::new(
-                value.eq_token.span,
-                format!("expected a value for `{}` after `=`", self.name.value()),
+                value.colon_token.span,
+                format!("expected a value for `{}` after `:`", self.name.value()),
             )
             .to_compile_error(),
             Some(value) => value.tokens.clone(),
@@ -134,7 +134,7 @@ impl Parse for TranslateArgument {
             return Err(syn::Error::new_spanned(
                 &argument.name,
                 format!(
-                    "the shorthand only accepts a Rust identifier; write `{} = value`",
+                    "the shorthand only accepts a Rust identifier; write `{}: value`",
                     argument.name.to_token_stream()
                 ),
             ));
@@ -152,7 +152,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for TranslateArgument {
     }
 }
 
-/// An explicit value in a [`TranslateArgument`], including its leading `=`.
+/// An explicit value in a [`TranslateArgument`], including its leading `:`.
 ///
 /// Stores tokens up to the next argument separator, even if the expression is
 /// incomplete. Commas inside brackets, `::<...>` generics or a leading closure's
@@ -160,8 +160,8 @@ impl topcoat_core_grammar::pretty::PrettyPrint for TranslateArgument {
 /// `<HashMap<K, V> as Default>::default()` in parentheses to keep their commas inside
 /// the value.
 pub struct TranslateArgumentValue {
-    /// The assignment sign before the expression.
-    pub eq_token: Token![=],
+    /// The colon before the expression.
+    pub colon_token: Token![:],
     /// Original value tokens up to the argument separator. May be empty while the user
     /// types.
     pub tokens: TokenStream,
@@ -170,7 +170,7 @@ pub struct TranslateArgumentValue {
 impl Parse for TranslateArgumentValue {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
-            eq_token: input.parse()?,
+            colon_token: input.parse()?,
             tokens: {
                 let mut tokens = TokenStream::new();
                 let mut scanner = ValueScanner::default();
@@ -187,7 +187,8 @@ impl Parse for TranslateArgumentValue {
 
 impl ParseOption for TranslateArgumentValue {
     fn peek(input: ParseStream) -> bool {
-        input.peek(Token![=])
+        // `name::x` is a path, not an argument value.
+        input.peek(Token![:]) && !input.peek(Token![::])
     }
 }
 
@@ -199,8 +200,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for TranslateArgumentValue {
         use syn::spanned::Spanned;
         use topcoat_core_grammar::pretty::TextMode;
 
-        " ".pretty_print(printer);
-        self.eq_token.pretty_print(printer);
+        self.colon_token.pretty_print(printer);
         if self.tokens.is_empty() {
             return;
         }
@@ -352,7 +352,7 @@ mod tests {
     #[test]
     fn parses_values_and_shorthands() {
         assert_eq!(
-            arguments(", count = n + 1, name,"),
+            arguments(", count: n + 1, name,"),
             [
                 ("count".to_owned(), Some(tokens("n + 1"))),
                 ("name".to_owned(), None),
@@ -363,7 +363,7 @@ mod tests {
     #[test]
     fn keeps_commas_inside_groups_in_the_value() {
         assert_eq!(
-            arguments(", count = max(a, b), items = [1, 2]"),
+            arguments(", count: max(a, b), items: [1, 2]"),
             [
                 ("count".to_owned(), Some(tokens("max(a, b)"))),
                 ("items".to_owned(), Some(tokens("[1, 2]"))),
@@ -374,7 +374,7 @@ mod tests {
     #[test]
     fn keeps_commas_inside_turbofish_generics() {
         assert_eq!(
-            arguments(", map = HashMap::<K, V>::new(), f = call::<Box<dyn Fn(u8) -> u8>, u8>(x)"),
+            arguments(", map: HashMap::<K, V>::new(), f: call::<Box<dyn Fn(u8) -> u8>, u8>(x)"),
             [
                 ("map".to_owned(), Some(tokens("HashMap::<K, V>::new()"))),
                 (
@@ -388,7 +388,7 @@ mod tests {
     #[test]
     fn splits_after_comparisons() {
         assert_eq!(
-            arguments(", a = x < y, b = z > w"),
+            arguments(", a: x < y, b: z > w"),
             [
                 ("a".to_owned(), Some(tokens("x < y"))),
                 ("b".to_owned(), Some(tokens("z > w"))),
@@ -399,9 +399,7 @@ mod tests {
     #[test]
     fn keeps_commas_inside_closure_signatures() {
         assert_eq!(
-            arguments(
-                ", f = move |a, b| a + b, g = |a, b| -> Result<A, B> { Ok(a) }, h = || 1, name"
-            ),
+            arguments(", f: move |a, b| a + b, g: |a, b| -> Result<A, B> { Ok(a) }, h: || 1, name"),
             [
                 ("f".to_owned(), Some(tokens("move |a, b| a + b"))),
                 (
@@ -417,7 +415,7 @@ mod tests {
     #[test]
     fn splits_after_a_logical_or() {
         assert_eq!(
-            arguments(", a = x || y, b = z"),
+            arguments(", a: x || y, b: z"),
             [
                 ("a".to_owned(), Some(tokens("x || y"))),
                 ("b".to_owned(), Some(tokens("z"))),
@@ -428,11 +426,11 @@ mod tests {
     #[test]
     fn keeps_the_rest_in_an_unclosed_value() {
         assert_eq!(
-            arguments(", map = HashMap::<String, name"),
+            arguments(", map: HashMap::<String, name"),
             [("map".to_owned(), Some(tokens("HashMap::<String, name")))]
         );
         assert_eq!(
-            arguments(", f = |a, name"),
+            arguments(", f: |a, name"),
             [("f".to_owned(), Some(tokens("|a, name")))]
         );
     }
@@ -440,7 +438,7 @@ mod tests {
     #[test]
     fn accepts_a_value_being_typed() {
         assert_eq!(
-            arguments(", count =, name = user"),
+            arguments(", count:, name: user"),
             [
                 ("count".to_owned(), Some(String::new())),
                 ("name".to_owned(), Some(tokens("user"))),
@@ -461,14 +459,14 @@ mod tests {
     #[test]
     fn a_shorthand_is_its_own_value() {
         assert_eq!(
-            values(", count = n + 1, name"),
+            values(", count: n + 1, name"),
             [tokens("n + 1"), tokens("name")]
         );
     }
 
     #[test]
     fn a_value_being_typed_is_a_compile_error() {
-        let values = values(", count =, name");
+        let values = values(", count:, name");
         assert!(values[0].contains("compile_error"), "{}", values[0]);
         assert!(
             values[0].contains("expected a value for `count`"),
@@ -485,14 +483,19 @@ mod tests {
     }
 
     #[test]
+    fn rejects_a_path_after_the_name() {
+        assert!(parse(", name::value").is_err());
+    }
+
+    #[test]
     fn rejects_arguments_without_a_comma() {
-        assert!(parse("count = 5").is_err());
+        assert!(parse("count: 5").is_err());
     }
 
     #[test]
     fn parses_names_that_are_not_rust_identifiers() {
         assert_eq!(
-            arguments(r#", "userName" = a, user-name = b, "x-1e" = c"#),
+            arguments(r#", "userName": a, user-name: b, "x-1e": c"#),
             [
                 ("userName".to_owned(), Some(tokens("a"))),
                 ("user-name".to_owned(), Some(tokens("b"))),
@@ -504,7 +507,7 @@ mod tests {
     #[test]
     fn keeps_underscores_in_names() {
         assert_eq!(
-            arguments(", user_name = a"),
+            arguments(", user_name: a"),
             [("user_name".to_owned(), Some(tokens("a")))]
         );
     }
@@ -527,10 +530,10 @@ mod tests {
     #[test]
     fn rejects_a_name_passed_twice() {
         for input in [
-            ", count = 1, count = 2",
-            ", name, name = x",
-            ", r#type, type = x",
-            r#", user-name = a, "user-name" = b"#,
+            ", count: 1, count: 2",
+            ", name, name: x",
+            ", r#type, type: x",
+            r#", user-name: a, "user-name": b"#,
         ] {
             assert!(parse(input).is_err(), "{input}");
         }
@@ -538,7 +541,7 @@ mod tests {
 
     #[test]
     fn parses_doc_comments_before_a_name() {
-        let parsed = parse(", /// The minimum length.\n min = 8, /// The user.\n name").unwrap();
+        let parsed = parse(", /// The minimum length.\n min: 8, /// The user.\n name").unwrap();
         for argument in &parsed.arguments {
             assert_eq!(argument.docs.attrs.len(), 1);
         }

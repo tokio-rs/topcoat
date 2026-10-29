@@ -16,12 +16,12 @@ use crate::fluent::{DocComments, FluentKey};
 ///
 /// ```text
 /// t!(greeting)
-/// t!(password-field.placeholder, min = 8)
+/// t!(password-field.placeholder, min: 8)
 /// t!(
 ///     /// Shown inside the empty password field.
 ///     password-field.placeholder,
 ///     /// Minimum number of characters.
-///     min = 8,
+///     min: 8,
 /// )
 /// ```
 pub struct Translate {
@@ -164,7 +164,7 @@ mod tests {
             "/// Shown inside the empty password field.
             password-field.placeholder,
             /// Minimum number of characters.
-            min = 8,
+            min: 8,
             name",
         )
         .unwrap();
@@ -181,6 +181,6 @@ mod tests {
 
     #[test]
     fn rejects_arguments_without_a_comma() {
-        assert!(parse("items count = 5").is_err());
+        assert!(parse("items count: 5").is_err());
     }
 }
