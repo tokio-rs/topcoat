@@ -38,7 +38,7 @@ impl Text {
     #[cfg_attr(not(feature = "l10n"), allow(unused_variables))]
     fn push(&self, cx: &Cx, parts: &mut PartsWriter<'_>) {
         match self {
-            Self::Str(Cow::Borrowed(text)) => parts.push_static_str(*text),
+            Self::Str(Cow::Borrowed(text)) => parts.push_static_str(text),
             Self::Str(Cow::Owned(text)) => parts.push_str(text),
             #[cfg(feature = "l10n")]
             Self::Translation(translation) => match translation.resolve(cx) {

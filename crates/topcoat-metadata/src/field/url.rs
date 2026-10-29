@@ -105,7 +105,7 @@ impl AttributeValueViewParts for &Url {
         match self {
             Url::Str(Cow::Borrowed(url)) => {
                 push_base(cx, url, parts);
-                parts.push_static_str(*url);
+                parts.push_static_str(url);
             }
             Url::Str(Cow::Owned(url)) => {
                 push_base(cx, url, parts);
