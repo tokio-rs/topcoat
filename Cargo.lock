@@ -5231,6 +5231,7 @@ dependencies = [
  "topcoat-l10n-macro",
  "topcoat-mail",
  "topcoat-mail-macro",
+ "topcoat-metadata",
  "topcoat-router",
  "topcoat-router-macro",
  "topcoat-runtime",
@@ -5565,6 +5566,7 @@ dependencies = [
  "topcoat-l10n",
  "topcoat-router",
  "topcoat-view",
+ "topcoat-view-macro",
 ]
 
 [[package]]

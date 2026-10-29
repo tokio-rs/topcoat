@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use topcoat_core::{
     context::{Cx, iter_context},
     error::Result,
@@ -54,9 +56,13 @@ pub struct PageMetadata {
     title: Field<Text>,
     description: Field<Text>,
     canonical: Field<Url>,
+    viewport: Field<Cow<'static, str>>,
 }
 
 impl PageMetadata {
+    /// The viewport of a page when no level sets one.
+    const DEFAULT_VIEWPORT: &str = "width=device-width, initial-scale=1";
+
     /// Returns the title of the page.
     #[must_use]
     pub fn title(&self) -> Option<&Text> {
@@ -75,6 +81,17 @@ impl PageMetadata {
         self.canonical.value()
     }
 
+    /// Returns the viewport of the page, or the default
+    /// `width=device-width, initial-scale=1` when no level sets one.
+    #[must_use]
+    pub fn viewport(&self) -> Option<&str> {
+        match &self.viewport {
+            Field::Inherit => Some(Self::DEFAULT_VIEWPORT),
+            Field::Set(viewport) => Some(viewport),
+            Field::Removed => None,
+        }
+    }
+
     /// Fills the fields that are still unset from metadata stored in the
     /// context, cloning its values.
     fn fill_from(&mut self, metadata: &Metadata) {
@@ -83,6 +100,8 @@ impl PageMetadata {
             .fill(metadata.description.as_ref().map(Text::clone));
         self.canonical
             .fill(metadata.canonical.as_ref().map(Url::clone));
+        self.viewport
+            .fill(metadata.viewport.as_ref().map(Cow::clone));
     }
 
     /// Fills the fields that are still unset from loaded metadata, taking
@@ -91,5 +110,6 @@ impl PageMetadata {
         self.title.fill(metadata.title);
         self.description.fill(metadata.description);
         self.canonical.fill(metadata.canonical);
+        self.viewport.fill(metadata.viewport);
     }
 }

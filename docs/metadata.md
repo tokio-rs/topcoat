@@ -1,0 +1,1 @@
+Metadata describes a page to browsers, search engines, and social networks: its title, description, canonical URL, and more. Attach [`Metadata`] to layouts and pages, then render it in `<head>` with [`tags`].

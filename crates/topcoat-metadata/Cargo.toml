@@ -23,6 +23,8 @@ router = [
 ]
 view = [
 	"dep:topcoat-view",
+	"dep:topcoat-view-macro",
+	"topcoat-asset?/view",
 ]
 
 [dependencies]
@@ -32,9 +34,10 @@ topcoat-core-macro.workspace = true
 topcoat-l10n = { workspace = true, optional = true }
 topcoat-router = { workspace = true, optional = true }
 topcoat-view = { workspace = true, optional = true }
+topcoat-view-macro = { workspace = true, optional = true }
 
 [dev-dependencies]
-topcoat.workspace = true
+topcoat = { workspace = true, features = ["metadata"] }
 
 [lints]
 workspace = true

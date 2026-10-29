@@ -44,6 +44,9 @@ pub mod l10n;
 #[cfg(feature = "mail")]
 pub mod mail;
 
+#[cfg(feature = "metadata")]
+pub mod metadata;
+
 #[cfg(feature = "router")]
 pub mod router;
 

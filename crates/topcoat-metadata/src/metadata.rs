@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use topcoat_core::{
     context::{AsyncCxFn, BoxCxFn},
     error::Result,
@@ -14,10 +16,10 @@ use crate::{Text, Url};
 /// ```
 /// use topcoat::{
 ///     Result,
+///     metadata::Metadata,
 ///     router::{Slot, layout, page},
 ///     view::{View, view},
 /// };
-/// use topcoat_metadata::Metadata;
 ///
 /// #[layout("/", with(Metadata::new().description("Acme sells everything.")))]
 /// async fn shell(slot: Slot<'_>) -> Result<impl View> {
@@ -37,6 +39,7 @@ pub struct Metadata {
     pub(crate) title: Field<Text>,
     pub(crate) description: Field<Text>,
     pub(crate) canonical: Field<Url>,
+    pub(crate) viewport: Field<Cow<'static, str>>,
     /// Loads more fields for each request. Fields set on this value take
     /// precedence over the loaded ones.
     pub(crate) load: Option<BoxCxFn<Result<Metadata>>>,
@@ -56,8 +59,8 @@ impl Metadata {
     /// overrides the one `f` loads, which lets you adjust shared metadata
     /// for one page.
     ///
-    /// Calls are not memoized, so load data through `#[memoize]` functions
-    /// that the page uses too.
+    /// Load data through `#[memoize]` functions that the page uses too, so
+    /// both share one load.
     #[must_use]
     pub fn from_fn(f: impl AsyncCxFn<Result<Metadata>>) -> Self {
         Self {
@@ -101,6 +104,24 @@ impl Metadata {
     #[must_use]
     pub fn no_canonical(mut self) -> Self {
         self.canonical = Field::Removed;
+        self
+    }
+
+    /// Sets the viewport of the page, which tells mobile browsers how to
+    /// size and scale it.
+    ///
+    /// Defaults to `width=device-width, initial-scale=1` when no level sets
+    /// it.
+    #[must_use]
+    pub fn viewport(mut self, viewport: impl Into<Cow<'static, str>>) -> Self {
+        self.viewport = Field::Set(viewport.into());
+        self
+    }
+
+    /// Removes the viewport, including the default, so the page has none.
+    #[must_use]
+    pub fn no_viewport(mut self) -> Self {
+        self.viewport = Field::Removed;
         self
     }
 }

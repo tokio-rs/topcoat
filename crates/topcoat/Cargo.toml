@@ -46,6 +46,7 @@ full = [
 	"l10n-number",
 	"mail",
 	"mail-smtp",
+	"metadata",
 	"multipart",
 	"router",
 	"runtime",
@@ -70,6 +71,7 @@ asset = [
 	"dep:topcoat-asset",
 	"topcoat-font?/asset",
 	"topcoat-font-macro?/asset",
+	"topcoat-metadata?/asset",
 ]
 compression = [
 	"router",
@@ -133,6 +135,7 @@ l10n-fluent = [
 	"dep:topcoat-l10n-macro",
 	"topcoat-l10n/fluent",
 	"topcoat-l10n-macro/fluent",
+	"topcoat-metadata?/l10n",
 ]
 l10n-number = [
 	"l10n",
@@ -147,6 +150,10 @@ mail-smtp = [
 	"mail",
 	"topcoat-mail/smtp",
 ]
+metadata = [
+	"dep:topcoat-metadata",
+	"view",
+]
 multipart = [
 	"router",
 	"topcoat-router/multipart",
@@ -159,6 +166,7 @@ router = [
 	"topcoat-cookie?/router",
 	"topcoat-font?/router",
 	"topcoat-mail?/router",
+	"topcoat-metadata?/router",
 	"topcoat-runtime?/router",
 	"topcoat-session?/router",
 ]
@@ -201,6 +209,7 @@ view = [
 	"topcoat-asset?/view",
 	"topcoat-font?/view",
 	"topcoat-l10n?/view",
+	"topcoat-metadata?/view",
 ]
 websocket = [
 	"serve",
@@ -223,6 +232,7 @@ topcoat-l10n = { workspace = true, optional = true }
 topcoat-l10n-macro = { workspace = true, optional = true }
 topcoat-mail = { workspace = true, optional = true }
 topcoat-mail-macro = { workspace = true, optional = true }
+topcoat-metadata = { workspace = true, optional = true }
 topcoat-router = { workspace = true, optional = true }
 topcoat-router-macro = { workspace = true, optional = true }
 topcoat-runtime = { workspace = true, optional = true }
