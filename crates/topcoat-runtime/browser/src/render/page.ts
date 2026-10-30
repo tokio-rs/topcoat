@@ -60,6 +60,9 @@ export class PageUnit extends RenderUnit {
 	 * Displays `next` as the new page and associates it with `render`.
 	 * Signals declared on both pages keep their values. Stops the previous
 	 * page's render over the WebSocket connection.
+	 *
+	 * Comments outside the root element are replaced too, because a page
+	 * declares the signals its page function creates before the doctype.
 	 */
 	replaceDocument(next: Document, render: RenderToken): void {
 		if (this.isDisposed) return;
@@ -77,6 +80,7 @@ export class PageUnit extends RenderUnit {
 				root.setAttribute(attr.name, attr.value);
 			}
 			morph(root, null, null, fresh.childNodes);
+			replaceOuterComments(next);
 			this.runtime.hydrate(document, null, null, scope, adoptable);
 		}, render);
 	}
@@ -124,6 +128,27 @@ export class PageUnit extends RenderUnit {
 		// The whole document, so declarations outside the body are adopted
 		// again.
 		this.runtime.hydrate(document, null, null, scope, adoptable);
+	}
+}
+
+/**
+ * Replaces the comments outside the document's root element with those of
+ * `next`, keeping their positions relative to the doctype and root element.
+ */
+function replaceOuterComments(next: Document): void {
+	for (const node of Array.from(document.childNodes)) {
+		if (node.nodeType === Node.COMMENT_NODE) node.remove();
+	}
+	// Walk backwards so each comment is inserted before the node it precedes.
+	let before: Node | null = null;
+	for (const node of Array.from(next.childNodes).reverse()) {
+		if (node.nodeType === Node.COMMENT_NODE) {
+			before = document.insertBefore(document.importNode(node), before);
+		} else if (node === next.doctype) {
+			before = document.doctype;
+		} else if (node === next.documentElement) {
+			before = document.documentElement;
+		}
 	}
 }
 

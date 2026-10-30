@@ -23,12 +23,26 @@ afterEach(() => {
 	runtime?.navigation.dispose();
 	runtime?.page.dispose();
 	runtime = null;
+	// Remove the doctype and comments a test placed outside the root element.
+	for (const node of Array.from(document.childNodes)) {
+		if (node !== document.documentElement) document.removeChild(node);
+	}
 	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
 });
 
 const declaration = (id: string, value: number) =>
 	`<!--::topcoat::signal({"t":"signal","id":"${id}","v":${value}})-->`;
+
+/** A paragraph showing the value of signal `id`, as rendered by the server. */
+const shows = (id: string, value: number) =>
+	`<p><!--::topcoat::expr::start("cx.signal('${id}').get()")-->${value}<!--::topcoat::expr::end--></p>`;
+
+/** The comments of the document outside its root element. */
+const outerComments = () =>
+	Array.from(document.childNodes).filter(
+		(node) => node.nodeType === Node.COMMENT_NODE,
+	);
 
 /** Converts a frame to JSON followed by a newline, matching the server format. */
 const line = (frame: ServerMessage) => `${JSON.stringify(frame)}\n`;
@@ -80,9 +94,21 @@ function stubFetch(respond: (path: string) => Response | Promise<Response>) {
 	return calls;
 }
 
-/** Sets up a document with `body` and starts the runtime. */
-function mount(body: string): Runtime {
+/**
+ * Sets up a document with `body` and starts the runtime. `prologue` is
+ * markup placed before the root element, such as a doctype and the
+ * declarations of signals a page function creates.
+ */
+function mount(body: string, prologue = ""): Runtime {
 	document.documentElement.innerHTML = `<head><title>Home</title></head><body>${body}</body>`;
+	const parsed = new DOMParser().parseFromString(
+		`${prologue}<html></html>`,
+		"text/html",
+	);
+	for (const node of Array.from(parsed.childNodes)) {
+		if (node === parsed.documentElement) break;
+		document.insertBefore(document.importNode(node), document.documentElement);
+	}
 	runtime = new Runtime();
 	runtime.start(document);
 	return runtime;
@@ -155,6 +181,76 @@ it("follows a link in place, keeping the signals the destination declares again"
 	// Keep the browser's signal value instead of the new page's initial value.
 	expect(rt.registry.read("a")).toEqual(new F64(5));
 	expect(rt.registry.has("b")).toBe(false);
+});
+
+it("follows a link in place to a page declaring signals before its doctype", async () => {
+	const calls = stubFetch(() =>
+		snapshot(
+			`${declaration("b", 2)}<!DOCTYPE html>${page("Next", shows("b", 2))}`,
+		),
+	);
+	const rt = mount(
+		`${shows("a", 1)}<a data-topcoat-link="never" href="/next">next</a>`,
+		`${declaration("a", 1)}<!DOCTYPE html>`,
+	);
+
+	click(link());
+	await settle();
+
+	expect(calls).toHaveLength(1);
+	expect(location.assign).not.toHaveBeenCalled();
+	expect(location.replace).not.toHaveBeenCalled();
+	expect(location.pathname).toBe("/next");
+	expect(document.querySelector("p")?.textContent).toBe("2");
+	// The previous page's declaration does not keep its signal alive.
+	expect(rt.registry.has("a")).toBe(false);
+	expect(outerComments()).toHaveLength(1);
+
+	rt.context.signal("b").set(new F64(3));
+	flushEffects();
+	expect(document.querySelector("p")?.textContent).toBe("3");
+});
+
+it("goes back in place to a page declaring signals before its doctype", async () => {
+	stubFetch((path) =>
+		path === "/next"
+			? snapshot(
+					`${declaration("b", 2)}<!DOCTYPE html>${page("Next", shows("b", 2))}`,
+				)
+			: snapshot(
+					`${declaration("a", 1)}<!DOCTYPE html>${page("Home", shows("a", 1))}`,
+				),
+	);
+	const rt = mount(
+		`${shows("a", 1)}<a data-topcoat-link="never" href="/next">next</a>`,
+		`${declaration("a", 1)}<!DOCTYPE html>`,
+	);
+
+	click(link());
+	await settle();
+	history.back();
+	await settle();
+
+	expect(location.assign).not.toHaveBeenCalled();
+	expect(location.replace).not.toHaveBeenCalled();
+	expect(location.pathname).toBe("/");
+	expect(document.querySelector("p")?.textContent).toBe("1");
+	expect(rt.registry.has("a")).toBe(true);
+	expect(rt.registry.has("b")).toBe(false);
+});
+
+it("reports why a destination could not be displayed before loading it in the browser", async () => {
+	stubFetch(() => snapshot(page("Next", shows("undeclared", 1))));
+	const rt = mount(`<a data-topcoat-link="never" href="/next">next</a>`);
+	const reportError = vi
+		.spyOn(rt, "reportError")
+		.mockImplementation(() => undefined);
+
+	click(link());
+	await settle();
+
+	expect(reportError).toHaveBeenCalledTimes(1);
+	expect(location.assign).toHaveBeenCalledWith(`${location.origin}/next`);
 });
 
 it.each([
