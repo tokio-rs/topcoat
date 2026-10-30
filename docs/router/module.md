@@ -28,7 +28,7 @@ src/
       profile.rs
 ```
 
-Every module-derived `#[page]`, `#[layout]`, `#[layer]`, and `#[route]` under the module containing `module_router!()` is registered.
+Every non-generic module-derived `#[page]`, `#[layout]`, `#[layer]`, and `#[route]` under the module containing `module_router!()` is registered. [Generic pages](attr.page.html#generic-pages) are excluded from discovery because their type/const arguments must be chosen explicitly; prefer absolute paths and manual registration for them.
 
 # Registering everything else
 
