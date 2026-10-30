@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
 use syn::{
-    FnArg, ItemFn, Pat, ReturnType, Token,
+    FnArg, GenericParam, ItemFn, Pat, ReturnType, Token,
     parse::{Parse, ParseStream},
     parse_quote,
     punctuated::Punctuated,
@@ -67,6 +67,13 @@ impl Parse for PageItem {
             ));
         }
 
+        if let Some(lifetime) = item.sig.generics.lifetimes().next() {
+            return Err(syn::Error::new_spanned(
+                lifetime,
+                "page functions cannot declare lifetime parameters; use elided lifetimes for request borrows",
+            ));
+        }
+
         let args = HandlerArgs::parse(&item, "page")?;
         for (arg, input) in args.iter().zip(&item.sig.inputs) {
             let (HandlerArg::Cx, FnArg::Typed(pat_type)) = (arg, input) else {
@@ -110,6 +117,47 @@ impl ToTokens for Page {
         let item = &self.1.item;
         let args = &self.1.args;
         let ident = &item.sig.ident;
+        let is_generic = item
+            .sig
+            .generics
+            .params
+            .iter()
+            .any(|param| matches!(param, GenericParam::Type(_) | GenericParam::Const(_)));
+        let mut generics = item.sig.generics.clone();
+        if is_generic {
+            // Page/ModulePage are Send + Sync + 'static. HrefTarget needs the
+            // same bound so it looks up the identical specialization.
+            generics.make_where_clause().predicates.push(parse_quote! {
+                Self: ::core::marker::Send + ::core::marker::Sync + 'static
+            });
+        }
+        let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+        // Rust statics inside generic functions are shared by all
+        // monomorphizations. Key the IDs by the complete marker type instead
+        // so home<A> and home<B> cannot resolve each other's links.
+        let (identity_static, identity) = if is_generic {
+            (
+                quote! {
+                    static IDS: ::std::sync::LazyLock<
+                        ::std::sync::Mutex<::std::collections::HashMap<::core::any::TypeId, #topcoat_router::RouteId>>
+                    > = ::std::sync::LazyLock::new(|| ::std::sync::Mutex::new(::std::collections::HashMap::new()));
+                },
+                quote! {{
+                    let mut ids = IDS.lock().unwrap_or_else(::std::sync::PoisonError::into_inner);
+                    *ids.entry(::core::any::TypeId::of::<Self>())
+                        .or_insert_with(#topcoat_router::RouteId::new)
+                }},
+            )
+        } else {
+            (
+                quote! {
+                    static ID: ::std::sync::LazyLock<#topcoat_router::RouteId> =
+                        ::std::sync::LazyLock::new(#topcoat_router::RouteId::new);
+                },
+                quote! { *ID },
+            )
+        };
 
         // The component takes the request body as its `body` prop, so a body
         // parameter bound to another pattern is rebound from `body` inside.
@@ -149,11 +197,11 @@ impl ToTokens for Page {
                 ::std::boxed::Box::pin(#topcoat_view::HoistView::new(
                     #topcoat_view::internal::ThenView::new(async move {
                         #parse_request
-                        let props = <#ident as #topcoat_view::Component>::props_builder()
+                        let props = <Self as #topcoat_view::Component>::props_builder()
                             #body_prop
                             .build();
-                        <#ident as #topcoat_view::Component>::render(
-                            #ident, cx, props,
+                        <Self as #topcoat_view::Component>::render(
+                            <Self as ::core::default::Default>::default(), cx, props,
                         )
                         .await
                     })
@@ -167,7 +215,7 @@ impl ToTokens for Page {
         let context = RouteContext::context_method(&attr.context);
         let id = quote! {
             fn id(&self) -> #topcoat_router::RouteId {
-                *ID
+                #identity
             }
         };
         let methods = quote! {
@@ -176,56 +224,57 @@ impl ToTokens for Page {
                 METHODS
             }
         };
-        let (page, submit_as) =
-            if let Some(path) = attr.path.as_ref().and_then(HandlerPath::absolute) {
-                let page = quote! {
-                    impl #topcoat_router::Page for #ident {
-                        #id
+        let (page, submit_as) = if let Some(path) =
+            attr.path.as_ref().and_then(HandlerPath::absolute)
+        {
+            let page = quote! {
+                impl #impl_generics #topcoat_router::Page for #ident #ty_generics #where_clause {
+                    #id
 
-                        #methods
+                    #methods
 
-                        fn path(&self) -> &#topcoat_router::Path {
-                            const PATH: &#topcoat_router::Path = #topcoat_router::Path::new(#path);
-                            PATH
-                        }
-
-                        #context
-
-                        #render
+                    fn path(&self) -> &#topcoat_router::Path {
+                        const PATH: &#topcoat_router::Path = #topcoat_router::Path::new(#path);
+                        PATH
                     }
-                };
-                (page, quote! { #topcoat_router::Page })
-            } else {
-                let relative_path = attr
-                    .path
-                    .as_ref()
-                    .and_then(HandlerPath::relative_path_method);
-                let page = quote! {
-                    impl #topcoat_router::ModulePage for #ident {
-                        #id
 
-                        #methods
+                    #context
 
-                        fn module_path(&self) -> &'static str {
-                            ::core::module_path!()
-                        }
-
-                        #relative_path
-
-                        #context
-
-                        #render
-                    }
-                };
-                (page, quote! { #topcoat_router::ModulePage })
+                    #render
+                }
             };
+            (page, quote! { #topcoat_router::Page })
+        } else {
+            let relative_path = attr
+                .path
+                .as_ref()
+                .and_then(HandlerPath::relative_path_method);
+            let page = quote! {
+                impl #impl_generics #topcoat_router::ModulePage for #ident #ty_generics #where_clause {
+                    #id
+
+                    #methods
+
+                    fn module_path(&self) -> &'static str {
+                        ::core::module_path!()
+                    }
+
+                    #relative_path
+
+                    #context
+
+                    #render
+                }
+            };
+            (page, quote! { #topcoat_router::ModulePage })
+        };
 
         // href! resolves the marker to the URL path it is served at, through
         // the router that dispatched the current request.
         let href_target = quote! {
-            impl #topcoat_router::HrefTarget for #ident {
+            impl #impl_generics #topcoat_router::HrefTarget for #ident #ty_generics #where_clause {
                 fn path<'cx>(&self, cx: &'cx #topcoat_context::Cx) -> &'cx #topcoat_router::Path {
-                    match #topcoat_router::route_endpoint(cx, *ID) {
+                    match #topcoat_router::route_endpoint(cx, #identity) {
                         ::core::option::Option::Some(endpoint) => endpoint.path(),
                         ::core::option::Option::None => ::core::panic!(::core::concat!(
                             "page `",
@@ -237,8 +286,9 @@ impl ToTokens for Page {
             }
         };
 
-        // Discovery collects the marker erased behind its trait.
-        let submit = cfg!(feature = "discover").then(|| {
+        // Discovery cannot choose type/const arguments. Generic pages are
+        // registered explicitly with a concrete marker's Default instance.
+        let submit = (cfg!(feature = "discover") && !is_generic).then(|| {
             quote! { #topcoat_inventory::submit! { &#ident as &'static dyn #submit_as } }
         });
 
@@ -246,8 +296,7 @@ impl ToTokens for Page {
             #component
 
             const _: () = {
-                static ID: ::std::sync::LazyLock<#topcoat_router::RouteId> =
-                    ::std::sync::LazyLock::new(#topcoat_router::RouteId::new);
+                #identity_static
 
                 #page
 
@@ -375,6 +424,12 @@ mod tests {
             "async fn search(body: Form<Search>, cx: &Cx) -> Result { todo!() }",
         )
         .unwrap();
+    }
+
+    #[test]
+    fn rejects_named_lifetimes_with_a_clear_diagnostic() {
+        let error = parse_err("async fn home<'a>(cx: &'a Cx) -> Result { todo!() }");
+        assert!(error.contains("cannot declare lifetime parameters"));
     }
 
     #[test]
