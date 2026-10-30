@@ -183,6 +183,36 @@ impl ToTokens for Component {
             })
             .collect::<Vec<_>>();
 
+        // A type parameter may only be used inside the component body (for
+        // example, context::<T>(cx)), not in a prop. Keep it represented in
+        // the props and their builder without requiring T: Default or owning T.
+        if !phantom_args.is_empty() {
+            fields.push(quote! {
+                #[doc(hidden)]
+                #[default]
+                #vis __component_marker: ::core::marker::PhantomData<fn() -> (#(#phantom_args,)*)>
+            });
+        }
+
+        // The inner function cannot infer body-only type or const parameters
+        // from its arguments. Forward the explicitly declared parameters;
+        // elided lifetimes and lifted `impl Trait` parameters remain inferred.
+        let function_args = self
+            .item
+            .item()
+            .sig
+            .generics
+            .params
+            .iter()
+            .filter_map(|param| match param {
+                GenericParam::Lifetime(_) => None,
+                GenericParam::Type(param) => Some(param.ident.to_token_stream()),
+                GenericParam::Const(param) => Some(param.ident.to_token_stream()),
+            })
+            .collect::<Vec<_>>();
+        let function_turbofish =
+            (!function_args.is_empty()).then(|| quote! { ::<#(#function_args),*> });
+
         // A type parameter must appear in the body, so generic markers carry
         // a `PhantomData` field. Markers with no such parameters are emitted
         // as unit structs, which makes the marker's bare name a value
@@ -226,7 +256,7 @@ impl ToTokens for Component {
                 Self::Props<'__props>: '__a,
             {
                 #item
-                #ident(cx, #(#args),*)
+                #ident #function_turbofish (cx, #(#args),*)
             }
         };
 

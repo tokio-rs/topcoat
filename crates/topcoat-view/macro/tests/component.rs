@@ -218,6 +218,62 @@ async fn generic_component_renders() {
     );
 }
 
+trait TitleSource: Send + Sync + 'static {
+    fn title(&self) -> &str;
+}
+
+// Deliberately not Default: a context-only type must not add a default bound.
+struct SiteTitle(&'static str);
+
+impl TitleSource for SiteTitle {
+    fn title(&self) -> &str {
+        self.0
+    }
+}
+
+#[component]
+async fn context_title<T>(cx: &Cx) -> Result<impl View>
+where
+    T: TitleSource,
+{
+    let state = topcoat::context::context::<T>(cx);
+    Ok(view! { <h1>(state.title())</h1> })
+}
+
+#[component]
+async fn labeled_title<T, const N: usize>(cx: &Cx, label: &str) -> Result<impl View>
+where
+    T: TitleSource,
+{
+    Ok(view! {
+        <p>
+            (label)
+            (topcoat::context::context::<T>(cx).title())
+            (N)
+        </p>
+    })
+}
+
+#[component]
+async fn constant_only<const N: usize>() -> Result<impl View> {
+    Ok(view! { <p>(N)</p> })
+}
+
+#[tokio::test]
+async fn generic_parameters_used_only_in_the_body_are_forwarded() {
+    let cx = empty_cx().with(SiteTitle("test"));
+    let __cx = &cx;
+    let result = view! {
+        context_title::<SiteTitle>()
+        labeled_title::<SiteTitle, 3>(label: "title: ")
+        constant_only::<7>()
+    };
+    assert_eq!(
+        result.single().await.unwrap().render(__cx),
+        "<h1>test</h1><p>title: test3</p><p>7</p>",
+    );
+}
+
 struct TreeNode {
     label: &'static str,
     children: Vec<TreeNode>,
