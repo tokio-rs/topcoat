@@ -12,6 +12,47 @@ Path strings follow the [`Path`](struct.Path.html) syntax.
 
 The function must be `async` and return a [`Result`](../type.Result.html) containing a [`View`](../view/trait.View.html). It may take [`cx: &Cx`](../context/struct.Cx.html) and one body parameter implementing [`FromRequest`](request/trait.FromRequest.html). Both are optional and may appear in either order. The body parameter may use a pattern such as `Json(input): Json<T>`.
 
+# Generic pages
+
+Pages can have type and const parameters. Choose their arguments when explicitly registering the generated marker with `.page(home::<MyState>::default())`. The page can depend on a trait rather than the concrete state type chosen by the application:
+
+```rust
+use topcoat::{
+    Result,
+    context::{Cx, context},
+    router::{Router, href, page},
+    view::{View, view},
+};
+
+trait SiteState: Send + Sync + 'static {
+    fn title(&self) -> &str;
+}
+
+#[page("/")]
+async fn home<T: SiteState>(cx: &Cx) -> Result<impl View> {
+    let state = context::<T>(cx);
+    Ok(view! {
+        <h1>(state.title())</h1>
+        <a href=(href!(home::<T>::default()))>"Home"</a>
+    })
+}
+
+fn site_router<T: SiteState>(state: T) -> Router {
+    Router::builder()
+        .with(state)
+        .page(home::<T>::default())
+        .build()
+}
+```
+
+The marker's `Default` implementation does not require the state type to implement `Default`. Constructing it does not create any state; `.with(state)` supplies the value that `context::<T>(cx)` reads. The context type must exactly match the registered value, and a missing value still causes a runtime panic.
+
+Bounds in a `where` clause are preserved. Type parameters may appear only in the function body, in the request body type, or in route-context expressions such as `with(Title(T::TITLE))`. The specialized page marker must be `Send + Sync + 'static`. Use elided lifetimes for request borrows; page functions cannot declare lifetime parameters.
+
+Each type/const specialization has its own stable route identity. Use a concrete marker value with `href!`, as above, to link to that specialization. Generic pages remain callable inside `view!`, for example `home::<MyState>()`.
+
+Generic pages are **not automatically discovered**, even when `discover` is enabled: discovery cannot choose their generic arguments. Prefer an explicit absolute path and manual registration. Generic module-derived pages implement `ModulePage` and can be registered through `ModuleRouterBuilder`, but `module_router!()` does not collect them automatically. Two specializations registered at the same path and method still conflict like any other pair of pages.
+
 # Route context
 
 Attach metadata with `with(...)`, such as `#[page(with(Title("Products")))]` or `#[page("/products", with(Title("Products")))]`. You can add multiple `with(...)` entries, separated by commas, after any methods and path. The values are initialized when the router is built, so an outer layout can read the page's title before the page runs. See [route context](../context/index.html#route-context) for a complete example.

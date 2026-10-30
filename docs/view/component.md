@@ -109,6 +109,34 @@ async fn count<T: Send + Sync>(items: Vec<T>) -> Result<impl View> {
 }
 ```
 
+A type parameter can also be used only in the body, for example to read a context value. Supply it explicitly at the call site:
+
+```rust
+use topcoat::{
+    Result,
+    context::{Cx, context},
+    view::{View, component, view},
+};
+
+trait SiteState: Send + Sync + 'static {
+    fn title(&self) -> &str;
+}
+
+#[component]
+async fn title<T: SiteState>(cx: &Cx) -> Result<impl View> {
+    Ok(view! { <h1>(context::<T>(cx).title())</h1> })
+}
+
+# struct MyState;
+# impl SiteState for MyState { fn title(&self) -> &str { "My site" } }
+#[component]
+async fn header() -> Result<impl View> {
+    Ok(view! { title::<MyState>() })
+}
+```
+
+This does not require `T: Default`. Const parameters used only in the body are also supported and must be supplied explicitly, such as `heading::<3>()`.
+
 `impl Trait` parameters work too:
 
 ```rust
