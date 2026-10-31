@@ -13,7 +13,71 @@ use crate::build::{BuildError, Command, Result};
 const REPO: &str = "tailwindlabs/tailwindcss";
 
 /// The Tailwind CLI release downloaded by default (without the leading `v`).
+///
+/// Its download is verified against a checksum that ships with Topcoat.
 pub const DEFAULT_VERSION: &str = "4.3.2";
+
+/// A standalone Tailwind CLI release asset and the host platform it runs on.
+struct Asset {
+    /// The host's [`std::env::consts::OS`].
+    os: &'static str,
+    /// The host's [`std::env::consts::ARCH`].
+    arch: &'static str,
+    /// The file name of the asset in a GitHub release.
+    name: &'static str,
+    /// The SHA-256 of the asset in the [`DEFAULT_VERSION`] release as lowercase hex, or `None`
+    /// if that release does not publish the asset.
+    default_sha256: Option<&'static str>,
+}
+
+/// Every asset Topcoat can download, by host platform.
+///
+/// When changing [`DEFAULT_VERSION`], replace each `default_sha256` with the asset's `digest` from
+/// `gh api repos/tailwindlabs/tailwindcss/releases/tags/v<version>`.
+const ASSETS: &[Asset] = &[
+    Asset {
+        os: "macos",
+        arch: "x86_64",
+        name: "tailwindcss-macos-x64",
+        default_sha256: Some("cef8f110471e889c3c4409055cf8aff33076f58a081867b0dfc6534b290bfbb0"),
+    },
+    Asset {
+        os: "macos",
+        arch: "aarch64",
+        name: "tailwindcss-macos-arm64",
+        default_sha256: Some("b800b0659dc64b9f03ede5660244d9415d777d5739ae2889280877ca37be742a"),
+    },
+    Asset {
+        os: "linux",
+        arch: "x86_64",
+        name: "tailwindcss-linux-x64",
+        default_sha256: Some("5036c4fb4328e0bcdbb6065c70d8ac9452e0d4c947113a788a8f94fd390425c1"),
+    },
+    Asset {
+        os: "linux",
+        arch: "aarch64",
+        name: "tailwindcss-linux-arm64",
+        default_sha256: Some("394ddccc2402cfa3abd97dfba56f3587781a3d6e6ce66e65ceada14beb7664b8"),
+    },
+    Asset {
+        os: "linux",
+        arch: "arm",
+        name: "tailwindcss-linux-armv7",
+        default_sha256: None,
+    },
+    Asset {
+        os: "windows",
+        arch: "x86_64",
+        name: "tailwindcss-windows-x64.exe",
+        default_sha256: Some("224a62a8351d3b8da9d950a4eb1d7176dc901dc4735b47f816f3dfcbc67d8654"),
+    },
+    Asset {
+        os: "windows",
+        arch: "aarch64",
+        name: "tailwindcss-windows-arm64.exe",
+        default_sha256: None,
+    },
+];
 
 /// Where the Tailwind CLI executable comes from.
 #[derive(Debug, Clone)]
@@ -25,8 +89,9 @@ pub enum ExecutableSource {
         version: String,
         /// Expected hash of the downloaded binary as an `algorithm:hex`
         /// string. Only `sha256` is currently supported, e.g.
-        /// `"sha256:b800b065..."`. Verified once after download; `None` skips
-        /// verification.
+        /// `"sha256:b800b065..."`. Verified once after download. `None`
+        /// verifies the [`DEFAULT_VERSION`] release against a checksum that
+        /// ships with Topcoat and skips verification for other releases.
         checksum: Option<String>,
     },
     /// Use an existing executable. A bare command name like `"tailwindcss"`
@@ -70,21 +135,13 @@ impl ExecutableSource {
     ///
     /// Cache entries are specific to the version and host platform. A file
     /// lock prevents concurrent downloads from overwriting one another.
-    /// When supplied, `checksum` must use the `sha256:` prefix and is checked
-    /// before the downloaded file enters the cache. Cached files are reused
-    /// without verification. On Unix, the downloaded file is made executable.
+    /// The download is checked against [`Self::expected_digest`] before it
+    /// enters the cache. Cached files are reused without verification. On
+    /// Unix, the downloaded file is made executable.
     fn download_from_github(version: &str, checksum: Option<&str>) -> Result<Executable> {
-        // Parse the algorithm prefix up front so a malformed checksum fails
-        // before anything is downloaded.
-        let expected_digest = checksum
-            .map(|checksum| {
-                checksum
-                    .strip_prefix("sha256:")
-                    .ok_or_else(|| BuildError::UnsupportedChecksum {
-                        checksum: checksum.to_owned(),
-                    })
-            })
-            .transpose()?;
+        // Resolve the digest up front so a malformed checksum fails before
+        // anything is downloaded.
+        let expected_digest = Self::expected_digest(version, checksum)?;
 
         let dir = Self::cache_dir()?;
         // The platform is baked into the file name so a cache directory shared
@@ -97,7 +154,7 @@ impl ExecutableSource {
         let dest = dir.join(&file_name);
 
         // Cached files are complete downloads. Verification only happens
-        // during the download, when a checksum was supplied.
+        // during the download, when a digest is known.
         if dest.exists() {
             return Ok(Executable::new(dest));
         }
@@ -136,7 +193,7 @@ impl ExecutableSource {
 
         let url = format!(
             "https://github.com/{REPO}/releases/download/v{version}/{name}",
-            name = Self::asset_name()?,
+            name = Self::asset()?.name,
         );
 
         let mut body = ureq::get(&url)
@@ -199,26 +256,35 @@ impl ExecutableSource {
         Ok(Executable::new(dest))
     }
 
-    /// Returns the GitHub release asset name for the host platform.
-    fn asset_name() -> Result<&'static str> {
+    /// The SHA-256 hex digest the download of `version` must match: the one in
+    /// `checksum`, which must use the `sha256:` prefix, or the one Topcoat
+    /// ships for the [`DEFAULT_VERSION`] release. `None` skips verification.
+    fn expected_digest<'a>(version: &str, checksum: Option<&'a str>) -> Result<Option<&'a str>> {
+        match checksum {
+            Some(checksum) => checksum.strip_prefix("sha256:").map(Some).ok_or_else(|| {
+                BuildError::UnsupportedChecksum {
+                    checksum: checksum.to_owned(),
+                }
+            }),
+            None if version == DEFAULT_VERSION => Ok(Self::asset()?.default_sha256),
+            None => Ok(None),
+        }
+    }
+
+    /// Returns the GitHub release asset for the host platform.
+    fn asset() -> Result<&'static Asset> {
         let os = std::env::consts::OS;
         let arch = std::env::consts::ARCH;
-        Ok(match (os, arch) {
-            ("macos", "x86_64") => "tailwindcss-macos-x64",
-            ("macos", "aarch64") => "tailwindcss-macos-arm64",
-            ("linux", "x86_64") => "tailwindcss-linux-x64",
-            ("linux", "aarch64") => "tailwindcss-linux-arm64",
-            ("linux", "arm") => "tailwindcss-linux-armv7",
-            ("windows", "x86_64") => "tailwindcss-windows-x64.exe",
-            ("windows", "aarch64") => "tailwindcss-windows-arm64.exe",
-            _ => return Err(BuildError::UnsupportedPlatform { os, arch }),
-        })
+        ASSETS
+            .iter()
+            .find(|asset| asset.os == os && asset.arch == arch)
+            .ok_or(BuildError::UnsupportedPlatform { os, arch })
     }
 
     /// The host platform suffix used in cache filenames.
     fn platform() -> Result<&'static str> {
-        let asset = Self::asset_name()?;
-        Ok(asset.strip_prefix("tailwindcss-").unwrap_or(asset))
+        let name = Self::asset()?.name;
+        Ok(name.strip_prefix("tailwindcss-").unwrap_or(name))
     }
 
     /// The directory the downloaded CLI is cached in: the shared Topcoat cache
@@ -342,6 +408,64 @@ impl Drop for ScratchDir {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_default_release_is_verified_against_the_shipped_digest() {
+        let Ok(asset) = ExecutableSource::asset() else {
+            return;
+        };
+        let digest = ExecutableSource::expected_digest(DEFAULT_VERSION, None).unwrap();
+        assert_eq!(digest, asset.default_sha256);
+    }
+
+    #[test]
+    fn other_releases_are_only_verified_against_a_given_checksum() {
+        assert_eq!(
+            ExecutableSource::expected_digest("4.0.0", None).unwrap(),
+            None
+        );
+        assert_eq!(
+            ExecutableSource::expected_digest("4.0.0", Some("sha256:abc")).unwrap(),
+            Some("abc"),
+        );
+    }
+
+    #[test]
+    fn a_given_checksum_replaces_the_shipped_digest() {
+        let digest = ExecutableSource::expected_digest(DEFAULT_VERSION, Some("sha256:abc"));
+        assert_eq!(digest.unwrap(), Some("abc"));
+    }
+
+    #[test]
+    fn a_checksum_without_the_sha256_prefix_is_rejected() {
+        let error = ExecutableSource::expected_digest(DEFAULT_VERSION, Some("md5:abc"));
+        assert!(matches!(
+            error,
+            Err(BuildError::UnsupportedChecksum { checksum }) if checksum == "md5:abc",
+        ));
+    }
+
+    #[test]
+    fn the_shipped_digests_are_distinct_sha256_hex() {
+        let digests: Vec<_> = ASSETS
+            .iter()
+            .filter_map(|asset| asset.default_sha256)
+            .collect();
+        for digest in &digests {
+            assert!(
+                digest.len() == 64
+                    && digest
+                        .bytes()
+                        .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')),
+                "malformed digest {digest:?}",
+            );
+        }
+        // Different binaries never share a digest, so a repeat is a copy and paste mistake.
+        let mut unique = digests.clone();
+        unique.sort_unstable();
+        unique.dedup();
+        assert_eq!(unique.len(), digests.len(), "a digest is listed twice");
+    }
 
     #[test]
     fn scratch_dirs_get_distinct_paths() {
