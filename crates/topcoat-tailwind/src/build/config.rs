@@ -55,6 +55,8 @@ impl BuildConfig {
     }
 
     /// Pin the Tailwind CLI release to download (without the leading `v`).
+    /// Only the [`DEFAULT_VERSION`](crate::build::DEFAULT_VERSION) release is
+    /// verified; use [`version_checksum`](Self::version_checksum) for another.
     ///
     /// Shorthand for [`ExecutableSource::Github`] without a checksum.
     #[must_use]
