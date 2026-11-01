@@ -71,7 +71,9 @@ pub fn register(registry: &mut Registry, name: &str) -> bool {
         "fontsource_font_face" => {
             registry.register_function_like::<fontsource::font_face::FontsourceFontFace>(name)
         }
-        "fontsource_font" => registry.register_function_like::<fontsource::font::FontsourceFont>(name),
+        "fontsource_font" => {
+            registry.register_function_like::<fontsource::font::FontsourceFont>(name)
+        }
         "include" => registry.register_function_like::<Include>(name),
         "iconify_icon" => registry.register_function_like::<IconifyIcon>(name),
         "mail" => registry.register_function_like::<Mail>(name),

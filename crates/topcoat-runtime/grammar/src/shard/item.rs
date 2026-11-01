@@ -13,6 +13,7 @@ pub struct ShardItem {
 }
 
 impl ShardItem {
+    #[must_use]
     pub fn item(&self) -> &ItemFn {
         &self.item
     }

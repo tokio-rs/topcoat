@@ -28,10 +28,7 @@ fn assert_format(input: &str, expected: &str) {
 #[test]
 fn formats_without_staged_icon_sets() {
     // No build script staged these sets, and formatting must not need them.
-    assert_format(
-        "include!(pub   \"feather\");",
-        "include!(pub \"feather\");",
-    );
+    assert_format("include!(pub   \"feather\");", "include!(pub \"feather\");");
     assert_format(
         "include!(pub(crate)\"mdi:delete\");",
         "include!(pub(crate) \"mdi:delete\");",

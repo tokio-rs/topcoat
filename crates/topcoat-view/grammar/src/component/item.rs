@@ -13,6 +13,7 @@ pub struct ComponentItem {
 }
 
 impl ComponentItem {
+    #[must_use]
     pub fn item(&self) -> &ItemFn {
         &self.item
     }

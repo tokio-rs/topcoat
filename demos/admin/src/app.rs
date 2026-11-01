@@ -45,7 +45,9 @@ async fn set_locale(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
     next.run(&cx.with(locale), body).await
 }
 
-#[layout(with(Metadata::new().title("Backroom").robots(|r| r.index(false).follow(false))))]
+#[layout(
+    with(Metadata::new().title("Backroom").robots(|r| r.index(false).follow(false)))
+)]
 async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     let theme = theme(cx);
 
