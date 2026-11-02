@@ -25,6 +25,10 @@ topcoat-core-grammar = { workspace = true, features = ["testing"] }
 
 tempfile.workspace = true
 
+[[test]]
+name = "pretty"
+required-features = ["pretty"]
+
 [lints]
 workspace = true
 
