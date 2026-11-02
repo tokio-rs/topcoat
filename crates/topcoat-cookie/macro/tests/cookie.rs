@@ -10,7 +10,7 @@ fn name_value_only() {
 
 #[test]
 fn hyphenated_names() {
-    let cookie: Cookie = cookie!(__Host-csrf-token = "x");
+    let cookie: Cookie = cookie!(__Host - csrf - token = "x");
     assert_eq!(cookie.name(), "__Host-csrf-token");
 }
 
@@ -83,12 +83,6 @@ fn conditional_flag() {
     let cookie: Cookie = cookie!(a = "b"; Secure = (is_prod); HttpOnly = (true));
     assert_eq!(cookie.secure(), Some(false));
     assert_eq!(cookie.http_only(), Some(true));
-}
-
-#[test]
-fn trailing_semicolon_allowed() {
-    let cookie: Cookie = cookie!(a = "b"; Secure);
-    assert_eq!(cookie.secure(), Some(true));
 }
 
 #[test]

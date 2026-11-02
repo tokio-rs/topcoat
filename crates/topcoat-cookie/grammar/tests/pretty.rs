@@ -46,7 +46,10 @@ fn formats_expressions_inside_parentheses() {
 
 #[test]
 fn drops_a_trailing_semicolon_on_one_line() {
-    assert_print(r#"(theme = "dark"; Secure;)"#, r#"(theme = "dark"; Secure)"#);
+    assert_print(
+        r#"(theme = "dark"; Secure;)"#,
+        r#"(theme = "dark"; Secure)"#,
+    );
     assert_print(r#"(theme = "dark";)"#, r#"(theme = "dark")"#);
 }
 
@@ -75,10 +78,10 @@ fn copies_attributes_being_typed() {
 fn formats_calls_in_a_file() {
     let mut registry = Registry::new();
     registry.register_function_like::<Cookie>("cookie");
-    let formatted = pretty_print_str(
-        &registry,
-        r#"let cookie = cookie!(theme="dark";Secure);"#,
-    )
-    .unwrap_or_else(|errors| panic!("failed to format: {}", errors[0]));
-    assert_eq!(formatted, r#"let cookie = cookie!(theme = "dark"; Secure);"#);
+    let formatted = pretty_print_str(&registry, r#"let cookie = cookie!(theme="dark";Secure);"#)
+        .unwrap_or_else(|errors| panic!("failed to format: {}", errors[0]));
+    assert_eq!(
+        formatted,
+        r#"let cookie = cookie!(theme = "dark"; Secure);"#
+    );
 }

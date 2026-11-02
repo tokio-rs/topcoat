@@ -1,8 +1,9 @@
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::{
-    Ident, Lit, LitStr, parenthesized,
+    Ident, Lit, LitStr,
     ext::IdentExt,
+    parenthesized,
     parse::{Parse, ParseStream},
     token::Paren,
 };
@@ -25,7 +26,7 @@ impl CookieName {
         match self {
             Self::Header(name) => LitStr::new(&name.value(), name.span()).to_token_stream(),
             Self::Lit(lit) => lit.to_token_stream(),
-            Self::Expr(expr) => expr.to_token_stream(),
+            Self::Expr(expr) => expr.tokens.clone(),
         }
     }
 }
@@ -73,7 +74,7 @@ impl CookieValue {
     pub fn expr(&self) -> syn::Result<TokenStream> {
         match self {
             Self::Lit(lit) => Ok(lit.to_token_stream()),
-            Self::Expr(expr) => Ok(expr.to_token_stream()),
+            Self::Expr(expr) => Ok(expr.tokens.clone()),
             Self::Name(name) => Err(syn::Error::new(
                 name.span(),
                 "expected a literal or a parenthesized expression",
@@ -128,13 +129,6 @@ impl Parse for ParenExpr {
             paren_token: parenthesized!(content in input),
             tokens: content.parse()?,
         })
-    }
-}
-
-impl ToTokens for ParenExpr {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.paren_token
-            .surround(tokens, |tokens| self.tokens.to_tokens(tokens));
     }
 }
 

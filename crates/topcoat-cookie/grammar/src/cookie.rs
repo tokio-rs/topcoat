@@ -39,7 +39,10 @@ impl ToTokens for Cookie {
             let error = error.to_compile_error();
             quote! {{ #error; "" }}
         });
-        let attributes = self.attributes.iter().map(|attribute| attribute.apply(&cookie));
+        let attributes = self
+            .attributes
+            .iter()
+            .map(|attribute| attribute.apply(&cookie));
         tokens.extend(quote! {{
             #[allow(unused_mut)]
             let mut #cookie = #topcoat_cookie::Cookie::new(#name, #value);
@@ -130,7 +133,9 @@ mod tests {
     #[test]
     fn parses_the_name_value_and_attributes() {
         let cookie = parse(r#"__Host-session = (token); Path = "/"; Secure;"#).unwrap();
-        assert!(matches!(&cookie.name, CookieName::Header(name) if name.value() == "__Host-session"));
+        assert!(
+            matches!(&cookie.name, CookieName::Header(name) if name.value() == "__Host-session")
+        );
         assert!(matches!(cookie.value, CookieValue::Expr(_)));
         let names: Vec<_> = cookie
             .attributes
@@ -142,13 +147,23 @@ mod tests {
 
     #[test]
     fn parses_literal_and_expression_names() {
-        assert!(matches!(parse(r#""my.cookie" = "x""#).unwrap().name, CookieName::Lit(_)));
-        assert!(matches!(parse(r#"(name()) = "x""#).unwrap().name, CookieName::Expr(_)));
+        assert!(matches!(
+            parse(r#""my.cookie" = "x""#).unwrap().name,
+            CookieName::Lit(_)
+        ));
+        assert!(matches!(
+            parse(r#"(name()) = "x""#).unwrap().name,
+            CookieName::Expr(_)
+        ));
     }
 
     #[test]
     fn parses_attributes_being_typed() {
-        for input in [r#"a = "b"; Pa"#, r#"a = "b"; Path ="#, r#"a = "b"; Path =; Secure"#] {
+        for input in [
+            r#"a = "b"; Pa"#,
+            r#"a = "b"; Path ="#,
+            r#"a = "b"; Path =; Secure"#,
+        ] {
             assert!(parse(input).is_ok(), "{input}");
         }
     }
@@ -180,8 +195,15 @@ mod tests {
     }
 
     #[test]
-    fn passes_expressions_on_with_their_parentheses() {
-        assert!(expand(r#"a = (token); Path = (path)"#).contains(&tokens("set_path ((path))")));
+    fn passes_expressions_on_without_their_parentheses() {
+        // Parentheses around an argument trigger the `unused_parens` lint in the
+        // caller's code.
+        let expanded = expand("a = (token); Path = (path)");
+        assert!(
+            expanded.contains(&tokens("Cookie :: new (\"a\" , token)")),
+            "{expanded}"
+        );
+        assert!(expanded.contains(&tokens("set_path (path)")), "{expanded}");
     }
 
     #[test]
@@ -191,7 +213,7 @@ mod tests {
             r#"a = "b"; Path"#,
             r#"a = "b"; Path ="#,
             r#"a = "b"; Path = root"#,
-            r#"a = b"#,
+            "a = b",
         ] {
             let expanded = expand(input);
             assert!(expanded.contains("compile_error"), "{input}");
