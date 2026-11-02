@@ -1,9 +1,9 @@
 use quote::quote;
 use syn::{
-    Attribute, Expr, ExprBreak, ExprContinue, Pat, Token,
+    Attribute, ExprBreak, ExprContinue, Pat, Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::parse::ParseOption;
+use topcoat_core_grammar::parse::{ParseOption, UnparsedExpr};
 
 use crate::{
     attributes::hir::{AttributeBuilder, LowerAttribute},
@@ -18,7 +18,7 @@ pub struct TemplateForLoop<T> {
     pub for_token: Token![for],
     pub pat: Box<Pat>,
     pub in_token: Token![in],
-    pub expr: Box<Expr>,
+    pub expr: UnparsedExpr,
     pub body: TemplateBlock<T>,
 }
 
@@ -45,7 +45,7 @@ impl<T: Parse> Parse for TemplateForLoop<T> {
             for_token: input.parse()?,
             pat: Box::new(input.call(Pat::parse_single)?),
             in_token: input.parse()?,
-            expr: Box::new(input.call(Expr::parse_without_eager_brace)?),
+            expr: input.call(UnparsedExpr::parse_without_eager_brace)?,
             body: input.parse()?,
         })
     }

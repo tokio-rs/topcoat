@@ -1,12 +1,16 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
-    Expr, Token, parenthesized,
+    Token, parenthesized,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     token::Paren,
 };
-use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_font, quote_option::QuoteOption};
+use topcoat_core_grammar::{
+    parse::{ParseOption, UnparsedExpr},
+    paths::topcoat_font,
+    quote_option::QuoteOption,
+};
 
 use crate::font_face::{FontFormatHint, FontTechHint};
 
@@ -85,7 +89,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontSourcesKey {
 }
 
 pub enum FontSourcesValue {
-    Expr(Box<Expr>),
+    Expr(UnparsedExpr),
     Css(Punctuated<FontSource, Token![,]>),
 }
 
@@ -131,7 +135,7 @@ pub enum FontSource {
     Url {
         url_kw: kw::url,
         paren_token: Paren,
-        expr: Expr,
+        expr: UnparsedExpr,
 
         tech: Option<Box<FontTechHint>>,
         format: Option<Box<FontFormatHint>>,
@@ -139,7 +143,7 @@ pub enum FontSource {
     Local {
         local_kw: kw::local,
         paren_token: Paren,
-        expr: Expr,
+        expr: UnparsedExpr,
     },
 }
 

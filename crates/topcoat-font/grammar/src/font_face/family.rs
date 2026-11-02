@@ -1,10 +1,10 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::ToTokens;
 use syn::{
-    Expr, Lit, Token,
+    Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::parse::ParseOption;
+use topcoat_core_grammar::parse::{ParseOption, UnparsedExpr};
 
 mod kw {
     use syn::custom_keyword;
@@ -83,7 +83,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontFamilyKey {
     }
 }
 
-pub struct FontFamilyValue(pub Expr);
+pub struct FontFamilyValue(pub UnparsedExpr);
 
 impl Parse for FontFamilyValue {
     fn parse(input: ParseStream) -> syn::Result<Self> {
@@ -93,14 +93,7 @@ impl Parse for FontFamilyValue {
 
 impl ToTokens for FontFamilyValue {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let expr = &self.0;
-        if let Expr::Lit(lit) = expr
-            && let Lit::Str(lit_str) = &lit.lit
-        {
-            quote! { #lit_str }.to_tokens(tokens);
-        } else {
-            expr.to_tokens(tokens);
-        }
+        self.0.to_tokens(tokens);
     }
 }
 

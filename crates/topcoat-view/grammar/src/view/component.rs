@@ -110,12 +110,6 @@ impl Parse for Component {
                     }
                     let colon: Token![:] = content.parse()?;
                     let value: NamedArgValue = content.parse()?;
-                    if matches!(&value, NamedArgValue::Expr(expr) if expr.is_empty()) {
-                        return Err(syn::Error::new_spanned(
-                            colon,
-                            format!("expected a value for `{ident}`"),
-                        ));
-                    }
                     named_args.push(NamedArg {
                         ident,
                         colon,
@@ -271,13 +265,15 @@ mod tests {
 
     #[test]
     fn children_need_a_comma_after_the_last_named_arg() {
-        assert!(parse(r#"card(title: name "child")"#).children.is_empty());
+        assert!(syn::parse_str::<Component>(r#"card(title: name "child")"#).is_err());
         assert!(syn::parse_str::<Component>(r#"card(title: $(name) "child")"#).is_err());
     }
 
     #[test]
-    fn rejects_a_missing_named_arg_value() {
-        assert!(syn::parse_str::<Component>(r#"card(title:, "child")"#).is_err());
+    fn parses_a_missing_named_arg_value() {
+        let component = parse(r#"card(title:, "child")"#);
+        assert_eq!(component.named_args.len(), 1);
+        assert_eq!(component.children.len(), 1);
     }
 
     #[test]

@@ -1,5 +1,6 @@
 use proc_macro2::TokenStream;
-use syn::{Expr, Pat};
+use syn::Pat;
+use topcoat_core_grammar::parse::UnparsedExpr;
 
 use super::Scope;
 
@@ -19,18 +20,18 @@ pub(crate) enum Node {
     /// A `for` loop whose body is lowered into a nested scope.
     For {
         pat: Pat,
-        expr: Box<Expr>,
+        expr: UnparsedExpr,
         body: Scope,
     },
     /// An `if`/`else` whose branches are lowered into nested scopes.
     If {
-        cond: Expr,
+        cond: UnparsedExpr,
         then_branch: Scope,
         else_branch: Scope,
     },
     /// A `match` whose arm bodies are lowered into nested scopes.
     Match {
-        expr: Box<Expr>,
+        expr: UnparsedExpr,
         arms: Vec<MatchArm>,
     },
 }
@@ -58,6 +59,6 @@ impl Node {
 /// A single `pat (if guard)? => body` arm of a [`Node::Match`].
 pub(crate) struct MatchArm {
     pub pat: Pat,
-    pub guard: Option<Expr>,
+    pub guard: Option<UnparsedExpr>,
     pub body: Scope,
 }

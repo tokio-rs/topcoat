@@ -1,10 +1,13 @@
 use proc_macro2::{Literal, Span, TokenStream};
 use quote::{ToTokens, quote};
 use syn::{
-    Expr, LitFloat, LitInt, Token,
+    LitFloat, LitInt, Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_font};
+use topcoat_core_grammar::{
+    parse::{ParseOption, UnparsedExpr},
+    paths::topcoat_font,
+};
 
 mod kw {
     use syn::custom_keyword;
@@ -87,7 +90,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontStyleKey {
 }
 
 pub enum FontStyleValue {
-    Expr(Box<Expr>),
+    Expr(UnparsedExpr),
     Css(FontStyleKind),
 }
 

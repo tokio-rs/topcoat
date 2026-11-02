@@ -96,6 +96,7 @@ impl Parse for AssetOption {
             Some(_) => input.parse()?,
             None => UnparsedExpr {
                 tokens: TokenStream::new(),
+                span: input.span(),
             },
         };
         Ok(Self {

@@ -27,7 +27,7 @@ pub struct Font {
 impl Parse for Font {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
-            family: input.call(UnparsedExpr::parse_non_empty)?,
+            family: input.parse()?,
             comma_token: input.parse()?,
             faces: input.parse()?,
         })
@@ -82,7 +82,7 @@ impl Parse for FontFaces {
             let _: Option<Token![,]> = input.parse()?;
             Ok(Self::Css(blocks))
         } else {
-            Ok(Self::Expr(input.call(UnparsedExpr::parse_non_empty)?))
+            Ok(Self::Expr(input.parse()?))
         }
     }
 }
@@ -181,12 +181,9 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_missing_family() {
-        assert!(syn::parse_str::<Font>(", faces").is_err());
-    }
-
-    #[test]
-    fn rejects_missing_faces() {
-        assert!(syn::parse_str::<Font>(r#""Inter","#).is_err());
+    fn parses_missing_expressions() {
+        let font: Font = syn::parse_str(",").unwrap();
+        assert!(font.family.is_empty());
+        assert!(matches!(font.faces, FontFaces::Expr(faces) if faces.is_empty()));
     }
 }

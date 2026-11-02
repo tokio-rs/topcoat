@@ -114,6 +114,7 @@ fixture_test!(if_else_if_else);
 fixture_test!(for_loop);
 fixture_test!(keyed_for_loop);
 fixture_test!(match_expr);
+fixture_test!(match_guard);
 
 // -- Components --------------------------------------------------------------
 

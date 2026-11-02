@@ -1,13 +1,16 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
 use syn::{
-    Expr, Token,
+    Token,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
     token::Paren,
 };
-use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_router};
+use topcoat_core_grammar::{
+    parse::{ParseOption, UnparsedExpr},
+    paths::topcoat_router,
+};
 
 mod kw {
     syn::custom_keyword!(bad_request);
@@ -127,7 +130,7 @@ impl Parse for ErrorKind {
 /// The parenthesized arguments passed to an error constructor.
 pub struct ErrorArgs {
     pub paren_token: Paren,
-    pub args: Punctuated<Expr, Token![,]>,
+    pub args: Punctuated<UnparsedExpr, Token![,]>,
 }
 
 impl Parse for ErrorArgs {

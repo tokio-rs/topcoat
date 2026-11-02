@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{Expr, Ident, Pat, Token};
-use topcoat_core_grammar::paths::topcoat_view;
+use topcoat_core_grammar::{parse::UnparsedExpr, paths::topcoat_view};
 
 /// The bindings a control-flow pattern introduces into its body's scope.
 ///
@@ -25,10 +25,13 @@ impl Bindings {
     }
 
     /// Collects the bindings of an `if` condition: the patterns of its
-    /// `let`s, walking `&&` chains.
-    pub(crate) fn of_condition(expr: &Expr) -> Self {
+    /// `let`s, walking `&&` chains. A condition that is not a complete
+    /// expression yet binds nothing.
+    pub(crate) fn of_condition(cond: &UnparsedExpr) -> Self {
         let mut bindings = Self::empty();
-        bindings.collect_condition(expr);
+        if let Ok(expr) = syn::parse2::<Expr>(cond.tokens.clone()) {
+            bindings.collect_condition(&expr);
+        }
         bindings
     }
 
@@ -163,8 +166,8 @@ mod tests {
         bindings.idents().map(Ident::to_string).collect()
     }
 
-    fn condition_idents(expr: &Expr) -> Vec<String> {
-        let bindings = Bindings::of_condition(expr);
+    fn condition_idents(cond: &UnparsedExpr) -> Vec<String> {
+        let bindings = Bindings::of_condition(cond);
         bindings.idents().map(Ident::to_string).collect()
     }
 
@@ -215,6 +218,12 @@ mod tests {
     #[test]
     fn a_plain_condition_has_no_bindings() {
         let expr = syn::parse_quote! { items.len() > 2 };
+        assert!(Bindings::of_condition(&expr).is_empty());
+    }
+
+    #[test]
+    fn an_incomplete_condition_has_no_bindings() {
+        let expr = syn::parse_quote! { let Some(a) = user. };
         assert!(Bindings::of_condition(&expr).is_empty());
     }
 }

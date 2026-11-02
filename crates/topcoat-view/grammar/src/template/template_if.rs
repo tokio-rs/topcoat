@@ -2,7 +2,7 @@ use syn::{
     Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::parse::ParseOption;
+use topcoat_core_grammar::parse::{ParseOption, UnparsedExpr};
 
 use crate::{
     attributes::hir::{AttributeBuilder, LowerAttribute},
@@ -13,7 +13,7 @@ use crate::{
 /// An `if cond { ... } else { ... }` chain in view-body position.
 pub struct TemplateIf<T> {
     pub if_token: Token![if],
-    pub cond: syn::Expr,
+    pub cond: UnparsedExpr,
     pub then_branch: TemplateBlock<T>,
     pub else_branch: Option<TemplateElse<T>>,
 }
@@ -44,7 +44,7 @@ impl<T: Parse> Parse for TemplateIf<T> {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
             if_token: input.parse()?,
-            cond: input.call(syn::Expr::parse_without_eager_brace)?,
+            cond: input.call(UnparsedExpr::parse_without_eager_brace)?,
             then_branch: input.parse()?,
             else_branch: input.call(TemplateElse::parse_option)?,
         })
