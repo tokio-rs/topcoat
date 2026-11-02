@@ -39,6 +39,8 @@ changelog_include = [
     "topcoat-asset-macro",
     "topcoat-cli",
     "topcoat-cookie",
+    "topcoat-cookie-grammar",
+    "topcoat-cookie-macro",
     "topcoat-core",
     "topcoat-core-grammar",
     "topcoat-core-macro",
@@ -99,6 +101,16 @@ version_group = "topcoat"
 
 [[package]]
 name = "topcoat-cookie"
+release = true
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-cookie-grammar"
+release = true
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-cookie-macro"
 release = true
 version_group = "topcoat"
 

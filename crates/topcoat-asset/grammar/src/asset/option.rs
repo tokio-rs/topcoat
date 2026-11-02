@@ -27,16 +27,21 @@ impl AssetOption {
     /// The option as a field of an `AssetOptions` struct literal.
     ///
     /// The field name keeps its span, so the compiler reports unknown and repeated
-    /// names, and editors complete and document them. An option without a value
-    /// sets the field to `None` and reports the missing value.
+    /// names, and editors complete and document them. A name without a colon is a
+    /// shorthand field, as in Rust while the name is being typed, and the compiler
+    /// reports the missing value. A colon without a value sets the field to `None`
+    /// and reports the missing value at the colon.
     pub(crate) fn field(&self) -> TokenStream {
         let field = self.field_name();
+        let Some(colon_token) = self.colon_token else {
+            return quote! { #field };
+        };
         if self.value.is_empty() {
-            let span = self
-                .colon_token
-                .map_or(self.name.span(), |colon| colon.span);
-            let error = syn::Error::new(span, format!("expected a value for `{}`", self.name()))
-                .to_compile_error();
+            let error = syn::Error::new(
+                colon_token.span,
+                format!("expected a value for `{}`", self.name()),
+            )
+            .to_compile_error();
             return quote! { #field: { #error; ::core::option::Option::None } };
         }
 

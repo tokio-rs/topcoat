@@ -1,0 +1,33 @@
+[package]
+name = "topcoat-cookie-macro"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+topcoat-cookie-grammar.workspace = true
+
+quote.workspace = true
+syn.workspace = true
+
+[dev-dependencies]
+topcoat = { workspace = true, features = ["cookie"] }
+
+[lints]
+workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[package.metadata.cargo-udeps.ignore]
+development = ["topcoat"]

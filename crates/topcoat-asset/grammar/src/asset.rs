@@ -236,13 +236,20 @@ mod tests {
     }
 
     #[test]
-    fn a_missing_value_is_an_error() {
+    fn a_missing_value_after_a_colon_is_an_error() {
         let dir = crate_with(&["a.png"]);
-        for input in [r#""a.png", rename:"#, r#""a.png", rename"#] {
-            let expanded = expand(&dir, input);
-            assert!(expanded.contains("rename :"), "{expanded}");
-            assert!(expanded.contains("compile_error"), "{expanded}");
-        }
+        let expanded = expand(&dir, r#""a.png", rename:"#);
+        assert!(expanded.contains("rename :"), "{expanded}");
+        assert!(expanded.contains("compile_error"), "{expanded}");
+    }
+
+    #[test]
+    fn a_name_without_a_colon_is_a_shorthand_field() {
+        // Only the name keeps its span, so editors complete it as a field name.
+        let dir = crate_with(&["a.png"]);
+        let expanded = expand(&dir, r#""a.png", ren"#);
+        assert!(expanded.contains("ren ,"), "{expanded}");
+        assert!(!expanded.contains("compile_error"), "{expanded}");
     }
 
     #[test]

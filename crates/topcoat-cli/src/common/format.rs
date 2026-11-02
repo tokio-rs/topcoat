@@ -6,6 +6,7 @@ use topcoat_core_grammar::pretty::Registry;
 /// attribute macros.
 pub const MACROS: &[&str] = &[
     "asset",
+    "cookie",
     "view",
     "attributes",
     "class",
@@ -41,6 +42,7 @@ pub const MACROS: &[&str] = &[
 /// [`MACROS`].
 pub fn register(registry: &mut Registry, name: &str) -> bool {
     use topcoat_asset_grammar::asset::Asset;
+    use topcoat_cookie_grammar::cookie::Cookie;
     use topcoat_core_grammar::memoize::MemoizeAttr;
     use topcoat_font_grammar::{font::Font, font_face::FontFace, fontsource};
     use topcoat_icon_grammar::iconify::{IconifyIcon, Include};
@@ -64,6 +66,7 @@ pub fn register(registry: &mut Registry, name: &str) -> bool {
 
     match name {
         "asset" => registry.register_function_like::<Asset>(name),
+        "cookie" => registry.register_function_like::<Cookie>(name),
         "view" => registry.register_function_like::<View>(name),
         "attributes" => registry.register_function_like::<Attributes>(name),
         "class" => registry.register_function_like::<Class>(name),

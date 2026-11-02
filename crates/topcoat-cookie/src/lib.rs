@@ -1,7 +1,6 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod jar;
-mod macros;
 mod map;
 mod prefix;
 mod private;

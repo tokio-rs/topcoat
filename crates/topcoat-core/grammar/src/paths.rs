@@ -133,6 +133,10 @@ pub const topcoat_asset: Crate = Crate::new("asset", "topcoat-asset", "");
 #[allow(non_upper_case_globals)]
 pub const topcoat_asset_macro: Crate = Crate::new("asset", "topcoat-asset-macro", "");
 
+/// `::topcoat::cookie`, or `topcoat_cookie` standalone.
+#[allow(non_upper_case_globals)]
+pub const topcoat_cookie: Crate = Crate::new("cookie", "topcoat-cookie", "");
+
 /// `::topcoat::context`, or `topcoat_core::context` standalone.
 #[allow(non_upper_case_globals)]
 pub const topcoat_context: Crate = Crate::new("context", "topcoat-core", "context");
