@@ -203,7 +203,11 @@ mod tests {
 
     #[test]
     fn parses_options_being_typed() {
-        for input in [r#""a.png", ren"#, r#""a.png", rename:"#, r#""a.png", rename:, extension: "x""#] {
+        for input in [
+            r#""a.png", ren"#,
+            r#""a.png", rename:"#,
+            r#""a.png", rename:, extension: "x""#,
+        ] {
             assert!(parse(input).is_ok(), "{input}");
         }
     }
@@ -219,7 +223,10 @@ mod tests {
     #[test]
     fn passes_option_values_on_as_written() {
         let dir = crate_with(&["a.png"]);
-        let expanded = expand(&dir, r#""a.png", rename: NAME, extension: concat!("w", "off2")"#);
+        let expanded = expand(
+            &dir,
+            r#""a.png", rename: NAME, extension: concat!("w", "off2")"#,
+        );
         assert!(expanded.contains(&tokens("Borrowed (NAME)")), "{expanded}");
         assert!(
             expanded.contains(&tokens(r#"Borrowed (concat!("w", "off2"))"#)),
@@ -254,7 +261,11 @@ mod tests {
         let dir = crate_with(&["assets/a.png", "src/b.png"]);
         let root = std::path::absolute(dir.path()).unwrap();
         for (input, path, location) in [
-            (r#""assets/a.png""#, root.join("assets/a.png"), "assets/a.png"),
+            (
+                r#""assets/a.png""#,
+                root.join("assets/a.png"),
+                "assets/a.png",
+            ),
             (r#""./b.png""#, root.join("src/b.png"), "src/b.png"),
         ] {
             let asset = parse(input).unwrap();

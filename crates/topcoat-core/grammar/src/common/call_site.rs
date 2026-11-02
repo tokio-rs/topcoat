@@ -82,13 +82,12 @@ impl CallSite {
 
     /// Turns a path written in the macro call into an absolute path.
     ///
-    /// - A leading `{mod}` is the directory where the current module's child modules
-    ///   belong. For both `src/about.rs` and `src/about/mod.rs`, this is `src/about/`.
+    /// - A leading `{mod}` is the directory where the current module's child modules belong. For
+    ///   both `src/about.rs` and `src/about/mod.rs`, this is `src/about/`.
     /// - A leading `{out_dir}` is the crate's build script output directory.
     /// - Paths starting with `./` or `../` are relative to the source file's directory.
     /// - Absolute paths are used as written.
-    /// - Other paths are relative to the directory containing the crate's
-    ///   `Cargo.toml`.
+    /// - Other paths are relative to the directory containing the crate's `Cargo.toml`.
     ///
     /// `.` and `..` components are removed from the result.
     ///
@@ -104,11 +103,13 @@ impl CallSite {
         };
 
         let (first, rest) = path.split_once('/').unwrap_or((path, ""));
-        if let Some(placeholder) = BASE_PLACEHOLDERS
-            .iter()
-            .find(|placeholder| rest.contains(**placeholder) || (first != **placeholder && first.contains(**placeholder)))
-        {
-            return Err(format!("`{placeholder}` must be the whole first path component"));
+        if let Some(placeholder) = BASE_PLACEHOLDERS.iter().find(|placeholder| {
+            rest.contains(**placeholder)
+                || (first != **placeholder && first.contains(**placeholder))
+        }) {
+            return Err(format!(
+                "`{placeholder}` must be the whole first path component"
+            ));
         }
 
         let resolved = match first {
@@ -191,7 +192,7 @@ mod tests {
     }
 
     fn absolute(path: &str) -> Result<PathBuf, String> {
-        Ok(std::path::absolute(path).unwrap())
+        std::path::absolute(path).map_err(|err| err.to_string())
     }
 
     #[test]
@@ -221,10 +222,16 @@ mod tests {
     #[test]
     fn resolves_the_module_directory_of_a_module_file() {
         let module = |file| resolve(Some(file), "{mod}/a.png");
-        assert_eq!(module("src/pages/about.rs"), absolute("/app/src/pages/about/a.png"));
+        assert_eq!(
+            module("src/pages/about.rs"),
+            absolute("/app/src/pages/about/a.png")
+        );
         assert_eq!(module("src/pages/mod.rs"), absolute("/app/src/pages/a.png"));
         // A module that happens to be named `main` is not a crate root.
-        assert_eq!(module("src/pages/main.rs"), absolute("/app/src/pages/main/a.png"));
+        assert_eq!(
+            module("src/pages/main.rs"),
+            absolute("/app/src/pages/main/a.png")
+        );
     }
 
     #[test]
@@ -233,7 +240,10 @@ mod tests {
         assert_eq!(module("src/lib.rs"), absolute("/app/src/a.png"));
         assert_eq!(module("src/main.rs"), absolute("/app/src/a.png"));
         assert_eq!(module("src/bin/cli.rs"), absolute("/app/src/bin/a.png"));
-        assert_eq!(module("src/bin/tool/main.rs"), absolute("/app/src/bin/tool/a.png"));
+        assert_eq!(
+            module("src/bin/tool/main.rs"),
+            absolute("/app/src/bin/tool/a.png")
+        );
         assert_eq!(module("tests/smoke.rs"), absolute("/app/tests/a.png"));
     }
 

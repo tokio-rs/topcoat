@@ -12,10 +12,9 @@ use crate::common::{BASE_PLACEHOLDERS, CallSite};
 /// The pattern is split into components at `/`.
 ///
 /// - `*` matches any characters within one component.
-/// - `**` matches any number of directories, including none. It must be a whole
-///   component.
-/// - An optional capture placeholder, such as `{locale}`, matches a non-empty part of
-///   one component and records it. It cannot share a component with `*`.
+/// - `**` matches any number of directories, including none. It must be a whole component.
+/// - An optional capture placeholder, such as `{locale}`, matches a non-empty part of one component
+///   and records it. It cannot share a component with `*`.
 ///
 /// The start of the pattern is resolved like other paths in a macro call, so it may
 /// begin with a placeholder such as `{mod}`. See [`CallSite::resolve`].
@@ -42,7 +41,11 @@ impl Glob {
         let placeholder = capture.map(|name| format!("{{{name}}}"));
         if let Some(placeholder) = &placeholder {
             match pattern.matches(placeholder.as_str()).count() {
-                0 => return Err(format!("expected a `{placeholder}` placeholder in the path")),
+                0 => {
+                    return Err(format!(
+                        "expected a `{placeholder}` placeholder in the path"
+                    ));
+                }
                 1 => {}
                 _ => {
                     return Err(format!(
@@ -431,7 +434,11 @@ mod tests {
         let dir = crate_with(&["data/b/2.txt", "data/b/1.txt", "data/a/3.txt"]);
         assert_eq!(
             found(&dir, Some("name"), "data/{name}/*.txt"),
-            expected(&[("a", "data/a/3.txt"), ("b", "data/b/1.txt"), ("b", "data/b/2.txt")])
+            expected(&[
+                ("a", "data/a/3.txt"),
+                ("b", "data/b/1.txt"),
+                ("b", "data/b/2.txt")
+            ])
         );
     }
 
@@ -464,7 +471,11 @@ mod tests {
 
     #[test]
     fn skips_hidden_entries_unless_the_pattern_names_them() {
-        let dir = crate_with(&["data/a/main.txt", "data/a/.cache/main.txt", "data/a/.draft.txt"]);
+        let dir = crate_with(&[
+            "data/a/main.txt",
+            "data/a/.cache/main.txt",
+            "data/a/.draft.txt",
+        ]);
         assert_eq!(
             found(&dir, Some("name"), "data/{name}/**/*.txt"),
             expected(&[("a", "data/a/main.txt")])

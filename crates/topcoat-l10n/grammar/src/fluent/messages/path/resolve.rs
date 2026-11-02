@@ -37,9 +37,7 @@ impl PathPattern {
         // files of each group are too.
         let mut matches: BTreeMap<String, Vec<PathBuf>> = BTreeMap::new();
         for found in self.glob.find(call_site).map_err(error)? {
-            let spelling = found
-                .capture
-                .expect("the pattern has a `{locale}` placeholder");
+            let spelling = found.capture.unwrap_or_default();
             matches.entry(spelling).or_default().push(found.path);
         }
         if matches.is_empty() {

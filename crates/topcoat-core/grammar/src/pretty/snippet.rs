@@ -49,7 +49,12 @@ impl MacroSnippet {
     /// Rust code around it, laid out at the printer's current indentation.
     /// Returns `None` when the invocation has no source text to reprint from.
     pub(crate) fn from_macro(mac: &syn::Macro, initial_indent: isize) -> Option<Self> {
-        Self::nested(MacroKind::FunctionLike, &mac.path, &mac.delimiter, initial_indent)
+        Self::nested(
+            MacroKind::FunctionLike,
+            &mac.path,
+            &mac.delimiter,
+            initial_indent,
+        )
     }
 
     /// Builds a snippet for the arguments of an attribute encountered while
@@ -188,7 +193,12 @@ impl<'ast> Visit<'ast> for Visitor {
             && Punctuated::<Expr, Token![,]>::parse_terminated
                 .parse2(i.tokens.clone())
                 .is_ok();
-        self.push(MacroKind::FunctionLike, &i.path, &i.delimiter, laid_out_by_rustfmt);
+        self.push(
+            MacroKind::FunctionLike,
+            &i.path,
+            &i.delimiter,
+            laid_out_by_rustfmt,
+        );
 
         syn::visit::visit_macro(self, i);
     }
@@ -310,7 +320,9 @@ mod tests {
         assert!(!laid_out_by_rustfmt(
             "#[page(with(Head::new().title(\"About\")))]"
         ));
-        assert!(!laid_out_by_rustfmt("#[page(with(Title(format!(\"{x}\"))))]"));
+        assert!(!laid_out_by_rustfmt(
+            "#[page(with(Title(format!(\"{x}\"))))]"
+        ));
         assert!(!laid_out_by_rustfmt("#[limit(-1)]"));
         // A delimiter other than parentheses.
         assert!(!laid_out_by_rustfmt("#[page[\"/\"]]"));

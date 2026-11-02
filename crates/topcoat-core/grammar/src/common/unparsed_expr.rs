@@ -205,10 +205,7 @@ mod tests {
 
     #[test]
     fn splits_after_comparisons() {
-        assert_eq!(
-            split("x < y, z > w"),
-            [tokens("x < y"), tokens("z > w")]
-        );
+        assert_eq!(split("x < y, z > w"), [tokens("x < y"), tokens("z > w")]);
     }
 
     #[test]

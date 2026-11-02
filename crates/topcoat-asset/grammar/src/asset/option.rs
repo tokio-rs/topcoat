@@ -32,7 +32,9 @@ impl AssetOption {
     pub(crate) fn field(&self) -> TokenStream {
         let field = self.field_name();
         if self.value.is_empty() {
-            let span = self.colon_token.map_or(self.name.span(), |colon| colon.span);
+            let span = self
+                .colon_token
+                .map_or(self.name.span(), |colon| colon.span);
             let error = syn::Error::new(span, format!("expected a value for `{}`", self.name()))
                 .to_compile_error();
             return quote! { #field: { #error; ::core::option::Option::None } };
