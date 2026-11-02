@@ -1,8 +1,9 @@
 use syn::{
-    Expr, Ident,
+    Ident,
     parse::{Parse, ParseStream},
     token::Brace,
 };
+use topcoat_core_grammar::parse::UnparsedExpr;
 use topcoat_view_grammar::view::View;
 
 /// The value of a [`MailField`](super::MailField), shaped by the field's
@@ -10,8 +11,8 @@ use topcoat_view_grammar::view::View;
 pub enum FieldValue {
     /// A braced `view!` body: the value of the `html` field.
     Html(HtmlValue),
-    /// An expression: every other value.
-    Expr(Box<Expr>),
+    /// An expression, ending at the next `,`: every other value.
+    Expr(UnparsedExpr),
 }
 
 impl FieldValue {

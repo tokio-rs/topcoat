@@ -214,6 +214,13 @@ mod tests {
     }
 
     #[test]
+    fn incomplete_value_keeps_the_other_fields() {
+        let tokens = expand(r#"to: user., subject: "Hi""#);
+        assert!(tokens.contains("user ."), "{tokens}");
+        assert!(tokens.contains(". subject ("), "{tokens}");
+    }
+
+    #[test]
     fn keyword_field_name_is_escaped() {
         // `ref` on the way to `references` is a keyword; the expansion
         // escapes it to stay valid Rust.

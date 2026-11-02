@@ -21,6 +21,19 @@ impl UnparsedExpr {
     pub fn is_empty(&self) -> bool {
         self.tokens.is_empty()
     }
+
+    /// Parses an expression that must contain at least one token.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no expression was written.
+    pub fn parse_non_empty(input: ParseStream) -> syn::Result<Self> {
+        let expr: Self = input.parse()?;
+        if expr.is_empty() {
+            return Err(input.error("expected an expression"));
+        }
+        Ok(expr)
+    }
 }
 
 impl Parse for UnparsedExpr {

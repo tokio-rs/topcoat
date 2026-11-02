@@ -1,11 +1,11 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
-    Expr, Token, braced,
+    Token, braced,
     parse::{Parse, ParseStream},
     token::Brace,
 };
-use topcoat_core_grammar::paths::topcoat_font;
+use topcoat_core_grammar::{parse::UnparsedExpr, paths::topcoat_font};
 
 use crate::font_face::FontFace;
 
@@ -19,7 +19,7 @@ mod kw {
 /// A `font!` invocation: a family name followed by its faces, given either as
 /// CSS-like `@font-face` blocks or as a single expression.
 pub struct Font {
-    pub family: Expr,
+    pub family: UnparsedExpr,
     pub comma_token: Token![,],
     pub faces: FontFaces,
 }
@@ -27,7 +27,7 @@ pub struct Font {
 impl Parse for Font {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
-            family: input.parse()?,
+            family: input.call(UnparsedExpr::parse_non_empty)?,
             comma_token: input.parse()?,
             faces: input.parse()?,
         })
@@ -68,7 +68,7 @@ impl ToTokens for Font {
 /// [`FontFaces`](topcoat_font::FontFaces).
 pub enum FontFaces {
     Css(Vec<FontFaceBlock>),
-    Expr(Box<Expr>),
+    Expr(UnparsedExpr),
 }
 
 impl Parse for FontFaces {
@@ -82,7 +82,7 @@ impl Parse for FontFaces {
             let _: Option<Token![,]> = input.parse()?;
             Ok(Self::Css(blocks))
         } else {
-            Ok(Self::Expr(input.parse()?))
+            Ok(Self::Expr(input.call(UnparsedExpr::parse_non_empty)?))
         }
     }
 }
@@ -166,5 +166,27 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontFaceBlock {
             .pretty_print(printer, Some(BreakMode::Consistent), |printer| {
                 self.face.pretty_print(printer);
             });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_incomplete_expressions() {
+        let font: Font = syn::parse_str("theme., faces.").unwrap();
+        assert!(!font.family.is_empty());
+        assert!(matches!(font.faces, FontFaces::Expr(faces) if !faces.is_empty()));
+    }
+
+    #[test]
+    fn rejects_a_missing_family() {
+        assert!(syn::parse_str::<Font>(", faces").is_err());
+    }
+
+    #[test]
+    fn rejects_missing_faces() {
+        assert!(syn::parse_str::<Font>(r#""Inter","#).is_err());
     }
 }
