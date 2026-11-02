@@ -17,7 +17,7 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 #[cfg(feature = "asset")]
-use topcoat_core_grammar::paths::topcoat_asset;
+use topcoat_core_grammar::paths::{topcoat_asset, topcoat_asset_macro};
 use topcoat_core_grammar::{
     ParseOption,
     paths::{topcoat_font, topcoat_font_fontsource},
@@ -95,7 +95,7 @@ impl ToTokens for FontsourceFontFace {
             (runtime::Host::Asset, Some((family, weight, style, subset))) => {
                 let url = family.jsdelivr_url(*subset, *weight, *style);
                 quote! {{
-                    const ASSET: #topcoat_asset::Asset = #topcoat_asset::asset!(#url);
+                    const ASSET: #topcoat_asset::Asset = #topcoat_asset_macro::asset!(#url);
                     #topcoat_font::FontSources::new(::std::vec![
                         #topcoat_font::FontSource::url(
                             ASSET,

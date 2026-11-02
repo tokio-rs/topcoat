@@ -14,6 +14,7 @@ rust-version.workspace = true
 iconify = [
 	"topcoat-icon/iconify"
 ]
+pretty = ["topcoat-core-grammar/pretty"]
 
 [dependencies]
 topcoat-core-grammar.workspace = true
@@ -28,6 +29,10 @@ serde_json.workspace = true
 
 [dev-dependencies]
 topcoat-core-grammar = { workspace = true, features = ["testing"] }
+
+[[test]]
+name = "pretty"
+required-features = ["iconify", "pretty"]
 
 [lints]
 workspace = true

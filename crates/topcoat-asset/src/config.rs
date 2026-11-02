@@ -223,7 +223,7 @@ pub fn try_bundled_asset(cx: &Cx, asset: Asset) -> Option<&BundledAsset> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{AssetId, AssetOptions, ENCODED_ASSET_SIZE, Manifest, RawAsset};
+    use crate::{AssetId, AssetOptions, Manifest, RawAsset};
 
     #[test]
     fn hosted_at_trims_trailing_slashes() {
@@ -236,9 +236,9 @@ mod tests {
     #[test]
     fn resolves_urls_against_the_base_url() {
         const OPTIONS: AssetOptions = AssetOptions::NONE;
-        const ID: AssetId = AssetId::new("app", "src/lib.rs", "logo.png", &OPTIONS);
-        static ENCODED: [u8; ENCODED_ASSET_SIZE] =
-            RawAsset::encode(ID, "logo.png", "app", "/app", "src/lib.rs", &OPTIONS);
+        const ID: AssetId = AssetId::new("app", "logo.png", &OPTIONS);
+        static ENCODED: [u8; RawAsset::encoded_len("/app/logo.png", &OPTIONS)] =
+            RawAsset::encode(ID, "/app/logo.png", &OPTIONS);
         let asset = Asset::new(&ENCODED);
 
         let manifest = Manifest::parse(&format!(
@@ -267,15 +267,9 @@ content_type = "image/png"
     fn percent_encodes_hosted_filenames() {
         use crate::{MANIFEST_VERSION, ManifestEntry};
 
-        const ID: AssetId = AssetId::new("app", "src/lib.rs", "logo.svg", &AssetOptions::NONE);
-        static ENCODED: [u8; ENCODED_ASSET_SIZE] = RawAsset::encode(
-            ID,
-            "logo.svg",
-            "app",
-            "/app",
-            "src/lib.rs",
-            &AssetOptions::NONE,
-        );
+        const ID: AssetId = AssetId::new("app", "logo.svg", &AssetOptions::NONE);
+        static ENCODED: [u8; RawAsset::encoded_len("/app/logo.svg", &AssetOptions::NONE)] =
+            RawAsset::encode(ID, "/app/logo.svg", &AssetOptions::NONE);
         let asset = Asset::new(&ENCODED);
 
         for (filename, encoded) in [
@@ -308,9 +302,9 @@ content_type = "image/png"
     /// `logo-1a2b3c4d5e6f7a8b.png`.
     fn logo() -> (Asset, Manifest) {
         const OPTIONS: AssetOptions = AssetOptions::NONE;
-        const ID: AssetId = AssetId::new("app", "src/lib.rs", "logo.png", &OPTIONS);
-        static ENCODED: [u8; ENCODED_ASSET_SIZE] =
-            RawAsset::encode(ID, "logo.png", "app", "/app", "src/lib.rs", &OPTIONS);
+        const ID: AssetId = AssetId::new("app", "logo.png", &OPTIONS);
+        static ENCODED: [u8; RawAsset::encoded_len("/app/logo.png", &OPTIONS)] =
+            RawAsset::encode(ID, "/app/logo.png", &OPTIONS);
 
         let manifest = Manifest::parse(&format!(
             r#"

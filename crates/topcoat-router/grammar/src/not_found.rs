@@ -34,6 +34,13 @@ impl Parse for NotFound {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for NotFound {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.path.pretty_print(printer);
+    }
+}
+
 impl ToTokens for NotFound {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let result = quote! { #topcoat_error::Result<()> };

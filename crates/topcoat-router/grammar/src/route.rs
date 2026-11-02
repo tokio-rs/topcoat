@@ -40,6 +40,18 @@ impl Parse for RouteAttr {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for RouteAttr {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.methods.pretty_print(printer);
+        if self.path.is_some() {
+            " ".pretty_print(printer);
+        }
+        self.path.pretty_print(printer);
+        RouteContext::pretty_print_entries(printer, self.comma.as_ref(), &self.context);
+    }
+}
+
 pub struct RouteItem {
     item: ItemFn,
     args: HandlerArgs,

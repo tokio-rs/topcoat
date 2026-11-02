@@ -6,30 +6,24 @@ use crate::{ConstReader, ConstWriter};
 
 /// Options that control how an asset is bundled.
 ///
-/// Set these fields with [`asset!`](crate::asset) or
-/// [`asset_options!`](crate::asset_options).
+/// Set these fields with the options of `asset!`, such as
+/// `asset!("./logo.png", rename: "logo")`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AssetOptions {
-    /// Replace the file stem (everything before the final `.`) in the
-    /// bundled output. The extension and content-hash suffix are kept.
-    /// An empty string drops the stem entirely, leaving just the hash
-    /// (and extension, if any) as the filename.
+    /// Replaces the file stem (everything before the final `.`) in the bundled
+    /// output. The extension and content hash are kept. An empty string drops the
+    /// stem, leaving just the hash and extension as the filename.
     pub rename: Option<Cow<'static, str>>,
-    /// Override the output extension (without the leading dot). Useful
-    /// when the source has no extension or the wrong one. An empty
-    /// string drops the extension entirely.
+    /// Overrides the output extension, without the leading dot. Useful when the
+    /// source has no extension or the wrong one. An empty string drops the
+    /// extension.
     pub extension: Option<Cow<'static, str>>,
-    /// Expected hash of the raw, unbundled source file, as an
-    /// `algorithm:hex` string. Only `sha256` is currently supported, e.g.
-    /// `"sha256:e3b0c442..."`. The bundler fails with
-    /// [`AssetError::ChecksumMismatch`](crate::AssetError) if the source's
-    /// actual hash differs, or
-    /// [`AssetError::UnsupportedChecksum`](crate::AssetError) if the
-    /// algorithm prefix is missing or unsupported. Recommended for remote
-    /// assets.
+    /// The expected hash of the raw, unbundled source file, written as
+    /// `"sha256:<hex>"`. Bundling fails if the file's hash differs. Recommended
+    /// for remote assets.
     pub checksum: Option<Cow<'static, str>>,
-    /// Override the `Content-Type` the asset is served with. When unset, the
-    /// bundler guesses it from the bundled file's extension.
+    /// Overrides the `Content-Type` the asset is served with. When unset, it is
+    /// guessed from the bundled file's extension.
     pub content_type: Option<Cow<'static, str>>,
 }
 
@@ -64,6 +58,13 @@ impl AssetOptions {
     #[must_use]
     pub fn content_type(&self) -> Option<&str> {
         self.content_type.as_deref()
+    }
+
+    pub(crate) const fn encoded_len(&self) -> usize {
+        str_opt_len(cow_as_str(self.rename.as_ref()))
+            + str_opt_len(cow_as_str(self.extension.as_ref()))
+            + str_opt_len(cow_as_str(self.checksum.as_ref()))
+            + str_opt_len(cow_as_str(self.content_type.as_ref()))
     }
 
     pub(crate) const fn encode_into(&self, w: &mut ConstWriter<'_>) {
@@ -106,24 +107,10 @@ const fn hash_opt_str(h: Fnv1a<u64>, s: Option<&str>) -> Fnv1a<u64> {
     }
 }
 
-/// Build an [`AssetOptions`] from a comma-separated list of fields.
-///
-/// Each field is either `name: "literal"` to set that option, or a bare
-/// `name` (which expects a const string in scope of the same name).
-/// Omitted fields stay `None`.
-///
-/// ```rust
-/// use topcoat_asset::{AssetOptions, asset_options};
-///
-/// const OPTS: AssetOptions = asset_options!(rename: "primary", extension: "woff2");
-/// ```
-#[macro_export]
-macro_rules! asset_options {
-    ($($field:ident $(: $expr:expr)?),* $(,)?) => {{
-        #[allow(clippy::needless_update)]
-        $crate::AssetOptions {
-            $($field: ::core::option::Option::Some(::std::borrow::Cow::Borrowed($($expr)?)),)*
-            ..$crate::AssetOptions::NONE
-        }
-    }};
+/// The number of bytes [`ConstWriter::write_str_opt`] writes for `s`.
+const fn str_opt_len(s: Option<&str>) -> usize {
+    match s {
+        None => 1,
+        Some(s) => 1 + 2 + s.len(),
+    }
 }

@@ -4,7 +4,6 @@ use syn::{
     Visibility,
     parse::{Parse, ParseStream},
 };
-use topcoat_icon::iconify::IconSet;
 
 use crate::iconify::{
     Selected, Selection,
@@ -24,58 +23,61 @@ use crate::iconify::{
 /// Globs skip icons and aliases their set marks as hidden; naming a hidden
 /// one explicitly still works.
 pub struct Include {
-    vis: Visibility,
-    selection: Selection,
-    set: &'static IconSet,
+    pub vis: Visibility,
+    pub selection: Selection,
 }
 
-impl Parse for Include {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let vis: Visibility = input.parse()?;
-        let selection: Selection = input.parse()?;
-        let set = staged_set(&selection.prefix, selection.span())?;
-        if let Selected::Icon(name) = &selection.selected {
-            // Unknown and unsupported icons are reported while parsing;
-            // emission cannot fail afterwards.
-            resolve_icon(set, name, selection.span())?;
-        }
-        Ok(Self {
-            vis,
-            selection,
-            set,
-        })
-    }
-}
-
-impl ToTokens for Include {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        match &self.selection.selected {
+impl Include {
+    /// Expands to the selected icons. Fails when the icon set is not staged
+    /// or does not contain the selected icon.
+    fn expand(&self) -> syn::Result<TokenStream> {
+        let set = staged_set(&self.selection.prefix, self.selection.span())?;
+        Ok(match &self.selection.selected {
             Selected::Set => {
                 let doc = format!(
                     "Icons from the `{prefix}` Iconify icon set.",
-                    prefix = self.set.prefix,
+                    prefix = set.prefix,
                 );
                 let vis = &self.vis;
                 let module = self.selection.module_ident();
-                let consts = set_consts(&self.selection, self.set, &syn::parse_quote!(pub));
+                let consts = set_consts(&self.selection, set, &syn::parse_quote!(pub));
                 quote! {
                     #[doc = #doc]
                     #vis mod #module {
                         #consts
                     }
                 }
-                .to_tokens(tokens);
             }
-            Selected::Glob => {
-                set_consts(&self.selection, self.set, &self.vis).to_tokens(tokens);
-            }
+            Selected::Glob => set_consts(&self.selection, set, &self.vis),
             Selected::Icon(name) => {
-                // Validated during parse.
-                let Ok(icon) = resolve_icon(self.set, name, self.selection.span()) else {
-                    return;
-                };
-                const_item(&self.selection, name, &icon, &self.vis).to_tokens(tokens);
+                let icon = resolve_icon(set, name, self.selection.span())?;
+                const_item(&self.selection, name, &icon, &self.vis)
             }
-        }
+        })
+    }
+}
+
+impl Parse for Include {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        Ok(Self {
+            vis: input.parse()?,
+            selection: input.parse()?,
+        })
+    }
+}
+
+impl ToTokens for Include {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.expand()
+            .unwrap_or_else(|error| error.to_compile_error())
+            .to_tokens(tokens);
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for Include {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.vis.pretty_print(printer);
+        self.selection.pretty_print(printer);
     }
 }

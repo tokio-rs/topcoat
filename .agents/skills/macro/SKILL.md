@@ -8,7 +8,7 @@ description: Always use this skill before writing a macro for Topcoat or changin
 Every macro follows the same argument style, so users can guess the syntax of a macro they have not seen yet.
 
 * Attribute macros take options as `key = value`, like `#[serde(rename = "...")]`. Flags are bare words, and nested values use call syntax: `#[query_params(error = bad_request)]`, `#[memoize(as_ref)]`, `#[page("/about", with(Title("About")))]`.
-* Function-like macros take named options as `key: value`, the same as component props in `view!`: `asset!("./logo.png", rename: "logo")`, `t!(greeting, name: user.name)`. The value is a plain Rust expression without parentheses. A bare key is shorthand for a variable of the same name, like field init shorthand in a struct literal.
+* Function-like macros take named options as `key: value`, the same as component props in `view!`: `asset!("./logo.png", rename: "logo")`, `t!(greeting, name: user.name)`. The value is a plain Rust expression without parentheses.
 * A macro that copies a syntax people already know follows that syntax as closely as Rust's tokenizer allows: `view!` copies HTML, `font!` copies CSS `@font-face`, and `cookie!` copies the `Set-Cookie` header. Inside it, a literal that the copied syntax would contain is written as it is (`class="card"`, `Max-Age = 3600`, `SameSite = Lax`), and any Rust expression is wrapped in `(...)` (`hidden=(collapsed)`, `session = (token)`). Do not wrap literals in parentheses, since the macro can only handle a literal at compile time while it can see that it is one.
 * A visibility comes first: `messages!(pub "...")`, `path_param!(pub post_id: u64)`.
 * The main input comes first and has no name, such as the asset path, the message ID, or the link target.

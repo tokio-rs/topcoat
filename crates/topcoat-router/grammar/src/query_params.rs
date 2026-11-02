@@ -26,6 +26,13 @@ impl Parse for QueryParamsAttr {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for QueryParamsAttr {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.error.pretty_print(printer);
+    }
+}
+
 pub struct QueryParamsItem {
     item: DeriveInput,
 }

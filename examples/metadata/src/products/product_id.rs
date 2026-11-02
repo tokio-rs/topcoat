@@ -47,19 +47,27 @@ async fn find_product(cx: &Cx) -> Result<Product> {
 
 // Load the selected product's title, description, and preview image for each
 // request. The metadata tags wait for these values before they render.
-#[page(with(Metadata::from_fn(async |cx| {
-    let product = find_product(cx).await?;
-    Ok(Metadata::new()
-        .title(product.name)
-        .description(product.description)
-        .open_graph(|og| {
-            og.image(
-                Image::new(product.image)
-                    .size(1200, 630)
-                    .alt(product.name),
-            )
-        }))
-})))]
+#[page(
+    with(
+        Metadata::from_fn(
+            async |cx| {
+                let product = find_product(cx).await?;
+                Ok(
+                    Metadata::new()
+                        .title(product.name)
+                        .description(product.description)
+                        .open_graph(
+                            |og| {
+                                og.image(
+                                    Image::new(product.image).size(1200, 630).alt(product.name),
+                                )
+                            },
+                        ),
+                )
+            },
+        )
+    )
+)]
 pub(crate) async fn page(cx: &Cx) -> Result<impl View> {
     let product = find_product(cx).await?;
 

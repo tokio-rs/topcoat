@@ -15,8 +15,6 @@ use syn::{
 };
 use topcoat_core_grammar::paths::{topcoat_context, topcoat_view, topcoat_view_macro};
 
-use crate::component::{ComponentAttr, ComponentItem};
-
 /// A parsed `#[component] async fn ...`. Expands into:
 ///
 /// - a props struct named after the function in `PascalCase` plus `Props` (`button` becomes

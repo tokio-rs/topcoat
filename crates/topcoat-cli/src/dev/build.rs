@@ -206,15 +206,8 @@ mod tests {
             let source = root.join("logo.txt");
             fs::write(&source, "before").unwrap();
             let path = source.to_str().unwrap();
-            let id = AssetId::new("test", "src/main.rs", path, &AssetOptions::NONE);
-            let binary = RawAsset::encode(
-                id,
-                path,
-                "test",
-                root.to_str().unwrap(),
-                "src/main.rs",
-                &AssetOptions::NONE,
-            );
+            let id = AssetId::new("test", path, &AssetOptions::NONE);
+            let binary = RawAsset::encode_vec(id, path, &AssetOptions::NONE);
             let exe = root.join("app");
             fs::write(&exe, binary).unwrap();
             Self {

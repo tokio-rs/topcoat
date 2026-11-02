@@ -56,7 +56,7 @@ async fn self_linked(cx: &Cx) -> Result<String> {
 struct Title(&'static str);
 
 // A route with route context: each `with(...)` adds one value.
-#[route(GET "/report.csv", with(Title("first")), with(Title("second")),)]
+#[route(GET "/report.csv", with(Title("first")), with(Title("second")))]
 async fn report() -> Result<&'static str> {
     Ok("report")
 }

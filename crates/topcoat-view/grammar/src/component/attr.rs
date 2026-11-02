@@ -13,6 +13,11 @@ impl Parse for ComponentAttr {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for ComponentAttr {
+    fn pretty_print(&self, _printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {}
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -32,5 +37,21 @@ mod tests {
     #[test]
     fn rejects_any_argument() {
         assert!(parse_err("boxed").contains("takes no arguments"));
+    }
+
+    #[cfg(feature = "pretty")]
+    #[test]
+    fn formats_empty_arguments() {
+        use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
+
+        // `rustfmt` lays out the attribute at file level, so it is formatted
+        // inside a macro body that `rustfmt` does not reach.
+        let mut registry = Registry::new();
+        registry
+            .register_function_like::<syn::Item>("wrap")
+            .register_attribute::<ComponentAttr>("component");
+        let output =
+            pretty_print_str(&registry, "wrap! { #[component(   )] async fn card() {} }").unwrap();
+        assert!(output.contains("#[component()]"), "{output}");
     }
 }

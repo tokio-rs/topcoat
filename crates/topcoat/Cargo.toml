@@ -70,6 +70,7 @@ anyhow = [
 ]
 asset = [
 	"dep:topcoat-asset",
+	"dep:topcoat-asset-macro",
 	"topcoat-font?/asset",
 	"topcoat-font-macro?/asset",
 	"topcoat-metadata?/asset",
@@ -80,6 +81,7 @@ compression = [
 ]
 cookie = [
 	"dep:topcoat-cookie",
+	"dep:topcoat-cookie-macro",
 	"topcoat-session?/cookie",
 ]
 datastar = [
@@ -221,7 +223,9 @@ websocket = [
 [dependencies]
 topcoat-alpine-ajax = { workspace = true, optional = true }
 topcoat-asset = { workspace = true, optional = true }
+topcoat-asset-macro = { workspace = true, optional = true }
 topcoat-cookie = { workspace = true, optional = true }
+topcoat-cookie-macro = { workspace = true, optional = true }
 topcoat-core.workspace = true
 topcoat-core-macro.workspace = true
 topcoat-datastar = { workspace = true, optional = true }

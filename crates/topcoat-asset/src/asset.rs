@@ -1,4 +1,4 @@
-use std::path::{Component, Path, PathBuf};
+use std::path::PathBuf;
 
 use http::Uri;
 use memchr::memmem;
@@ -7,7 +7,7 @@ use topcoat_core::fnv1a::Fnv1a;
 
 use crate::{AssetOptions, ConstReader, ConstWriter, Source};
 
-/// A handle to a file declared with [`asset!`](crate::asset).
+/// A handle to a file declared with `asset!`.
 ///
 /// Rendering an asset in a view produces its bundled URL. Use
 /// [`id`](Self::id) to look it up in an asset catalog. Handles are cheap to copy.
@@ -26,7 +26,7 @@ impl Asset {
     /// # Panics
     ///
     /// Panics if the handle does not reference a valid encoded declaration;
-    /// handles returned by [`asset!`](crate::asset) are always valid.
+    /// handles returned by `asset!` are always valid.
     #[must_use]
     #[track_caller]
     pub fn id(&self) -> AssetId {
@@ -52,34 +52,27 @@ impl std::fmt::Debug for Asset {
     }
 }
 
-/// Compact identifier for an asset declared via [`asset!`](crate::asset).
+/// Compact identifier for an asset declared via `asset!`.
 ///
-/// The ID depends on the declaring crate name, source file path, asset path,
-/// and options. It stays the same while those inputs stay the same.
+/// The ID depends on the declaring crate name, the asset's location and its options.
+/// The location is the path relative to the crate's `Cargo.toml` directory, or the
+/// URL for remote assets. The ID stays the same while those inputs stay the same.
 /// Use [`Asset::id`] to get an asset's ID.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct AssetId(u64);
 
 impl AssetId {
-    /// Build an asset ID from the same inputs the [`asset!`](crate::asset)
-    /// macro uses.
+    /// Build an asset ID from the same inputs the `asset!` macro uses.
     ///
     /// Use this when reconstructing an ID from a declaration. Application code
     /// can get the ID directly from [`Asset::id`].
     #[must_use]
-    pub const fn new(
-        crate_name: &str,
-        source_file: &str,
-        path: &str,
-        options: &AssetOptions,
-    ) -> Self {
+    pub const fn new(crate_name: &str, location: &str, options: &AssetOptions) -> Self {
         let h = Fnv1a::<u64>::new()
             .write(crate_name.as_bytes())
             .write(b"\0")
-            .write(source_file.as_bytes())
-            .write(b"\0")
-            .write(path.as_bytes());
+            .write(location.as_bytes());
         Self(options.hash_into(h).finish())
     }
 
@@ -94,41 +87,51 @@ impl AssetId {
 
 /// An asset declaration recovered from a compiled binary.
 ///
-/// Contains the asset's ID, path, options, and the source location needed to
-/// resolve relative paths.
+/// Contains the asset's ID, its absolute path or URL, and its options.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RawAsset {
     id: AssetId,
     path: String,
-    crate_name: String,
-    manifest_dir: String,
-    source_file: String,
     options: AssetOptions,
 }
 
-/// Size in bytes of one encoded asset declaration embedded into the binary.
-pub const ENCODED_ASSET_SIZE: usize = 2048;
-
 impl RawAsset {
+    /// The number of bytes [`encode`](Self::encode) writes for a declaration.
+    #[doc(hidden)]
     #[must_use]
-    pub const fn encode(
+    pub const fn encoded_len(path: &str, options: &AssetOptions) -> usize {
+        SCRAMBLED_PREFIX.len() + 8 + 2 + path.len() + options.encoded_len()
+    }
+
+    /// Encodes a declaration into `N` bytes, where `N` is its
+    /// [`encoded_len`](Self::encoded_len).
+    #[doc(hidden)]
+    #[must_use]
+    pub const fn encode<const N: usize>(
         id: AssetId,
         path: &str,
-        crate_name: &str,
-        manifest_dir: &str,
-        source_file: &str,
         options: &AssetOptions,
-    ) -> [u8; ENCODED_ASSET_SIZE] {
-        let mut out = [0u8; ENCODED_ASSET_SIZE];
-        let mut w = ConstWriter::new(&mut out);
+    ) -> [u8; N] {
+        let mut out = [0u8; N];
+        Self::encode_into(id, path, options, &mut out);
+        out
+    }
+
+    /// Encodes a declaration into a new vector.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn encode_vec(id: AssetId, path: &str, options: &AssetOptions) -> Vec<u8> {
+        let mut out = vec![0u8; Self::encoded_len(path, options)];
+        Self::encode_into(id, path, options, &mut out);
+        out
+    }
+
+    const fn encode_into(id: AssetId, path: &str, options: &AssetOptions, out: &mut [u8]) {
+        let mut w = ConstWriter::new(out);
         w.write_bytes(&asset_prefix());
         w.write_u64_le(id.0);
         w.write_str(path);
-        w.write_str(crate_name);
-        w.write_str(manifest_dir);
-        w.write_str(source_file);
         options.encode_into(&mut w);
-        out
     }
 
     #[must_use]
@@ -138,9 +141,6 @@ impl RawAsset {
         Some(Self {
             id: AssetId(r.read_u64_le()?),
             path: r.read_str()?.to_owned(),
-            crate_name: r.read_str()?.to_owned(),
-            manifest_dir: r.read_str()?.to_owned(),
-            source_file: r.read_str()?.to_owned(),
             options: AssetOptions::decode_from(&mut r)?,
         })
     }
@@ -151,6 +151,9 @@ impl RawAsset {
     }
 
     /// Recover every embedded asset declaration from a compiled binary.
+    ///
+    /// Declarations without a path are skipped. The macro emits them when it
+    /// cannot resolve the path, such as in rust-analyzer.
     #[must_use]
     pub fn find_in_binary(binary: &[u8]) -> Vec<Self> {
         let prefix = asset_prefix();
@@ -167,6 +170,7 @@ impl RawAsset {
         self.id
     }
 
+    /// The asset's absolute path or URL.
     #[must_use]
     pub fn path(&self) -> &str {
         &self.path
@@ -180,157 +184,8 @@ impl RawAsset {
         {
             return Source::Url(uri);
         }
-        Source::Path(self.resolved_path())
+        Source::Path(PathBuf::from(&self.path))
     }
-
-    #[must_use]
-    pub fn crate_name(&self) -> &str {
-        &self.crate_name
-    }
-
-    /// Resolve the asset path to an absolute filesystem path.
-    ///
-    /// Paths starting with `./` or `../` are relative to the source file's
-    /// directory. Other relative paths start from the crate's manifest
-    /// directory. Absolute paths are unchanged.
-    pub fn resolved_path(&self) -> PathBuf {
-        let path = Path::new(&self.path);
-        if path.is_absolute() {
-            return normalize(path);
-        }
-
-        let anchor = match path.components().next() {
-            Some(Component::CurDir | Component::ParentDir) => {
-                let source = anchor_source_file(&self.manifest_dir, &self.source_file);
-                source
-                    .parent()
-                    .map_or_else(|| PathBuf::from(&self.manifest_dir), Path::to_path_buf)
-            }
-            _ => PathBuf::from(&self.manifest_dir),
-        };
-
-        normalize(&anchor.join(path))
-    }
-}
-
-/// Locates a source file by checking `manifest_dir` and its ancestors.
-/// Relative `file!()` paths may start at the crate or workspace root.
-/// Absolute paths are returned unchanged.
-fn anchor_source_file(manifest_dir: &str, source_file: &str) -> PathBuf {
-    let source = Path::new(source_file);
-    if source.is_absolute() {
-        return source.to_path_buf();
-    }
-    let mut cur = Path::new(manifest_dir);
-    loop {
-        let candidate = cur.join(source);
-        if candidate.exists() {
-            return candidate;
-        }
-        match cur.parent() {
-            Some(parent) => cur = parent,
-            None => return Path::new(manifest_dir).join(source),
-        }
-    }
-}
-
-fn normalize(path: &Path) -> PathBuf {
-    let mut out = PathBuf::new();
-    for comp in path.components() {
-        match comp {
-            Component::CurDir => {}
-            Component::ParentDir => {
-                if !out.pop() {
-                    out.push(comp);
-                }
-            }
-            other => out.push(other),
-        }
-    }
-    out
-}
-
-/// Declares a file and returns its [`Asset`] handle.
-///
-/// The first argument is the asset's source location, either a path or
-/// an `http(s)://` URL. Any remaining arguments configure
-/// [`AssetOptions`] using the same syntax as
-/// [`asset_options!`](crate::asset_options).
-///
-/// The path and options must be string literals or other const expressions.
-///
-/// # Discovery
-///
-/// The [`Bundler`](crate::Bundler) reads declarations from the compiled binary.
-/// Unused handles may be removed during compilation, leaving their assets
-/// out of the bundle.
-///
-/// # Path resolution
-///
-/// Local paths are resolved when the [`Bundler`](crate::Bundler) runs,
-/// not at macro-expansion time:
-///
-/// - Paths starting with `./` or `../` are anchored to the directory of the source file the macro
-///   was invoked in.
-/// - Other relative paths are anchored to the declaring crate's `CARGO_MANIFEST_DIR`.
-/// - Absolute paths are used as-is.
-/// - Strings parseable as `http://` or `https://` URIs are downloaded by the bundler and cached on
-///   disk.
-///
-/// # Options
-///
-/// Named arguments configure [`AssetOptions`]. For example, `rename: "logo"`
-/// changes the output stem, and `checksum: "sha256:<hex>"` verifies the source.
-///
-/// Output filenames include a content hash, such as
-/// `logo-1a2b3c4d5e6f7a8b.png`. Declarations that produce the same filename must
-/// agree on its content type. To serve one file with different content types,
-/// give the declarations different `rename` values.
-///
-/// # Returns
-///
-/// A `const`-compatible [`Asset`] handle. Its [`AssetId`] depends on the
-/// declaring crate, source file, path string, and options.
-///
-/// # Examples
-///
-/// ```rust
-/// use topcoat_asset::{Asset, asset};
-///
-/// // Anchored to the crate root.
-/// const LOGO: Asset = asset!("assets/logo.png");
-///
-/// // Anchored to this source file's directory.
-/// const SHADER: Asset = asset!("./shaders/frag.wgsl");
-///
-/// // Remote asset with a pinned hash and a custom output name.
-/// const FONT: Asset = asset!(
-///     "https://example.com/font.woff2",
-///     rename: "primary",
-///     checksum: "sha256:e3b0c44298fc1c149afbf4c8996fb924",
-/// );
-/// ```
-#[macro_export]
-macro_rules! asset {
-    ($path:expr $(, $($ao:tt)*)?) => {{
-        const PATH: &str = $path;
-        const CRATE_NAME: &str = env!("CARGO_CRATE_NAME");
-        const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
-        const SOURCE_FILE: &str = file!();
-        const OPTIONS: $crate::AssetOptions = $crate::asset_options!($($($ao)*)?);
-        const ID: $crate::AssetId = $crate::AssetId::new(CRATE_NAME, SOURCE_FILE, PATH, &OPTIONS);
-
-        pub static ENCODED_ASSET: [u8; $crate::ENCODED_ASSET_SIZE] = $crate::RawAsset::encode(
-            ID,
-            PATH,
-            CRATE_NAME,
-            MANIFEST_DIR,
-            SOURCE_FILE,
-            &OPTIONS,
-        );
-
-        $crate::Asset::new(ENCODED_ASSET.as_slice())
-    }};
 }
 
 const PREFIX_KEY: u8 = 0xA7;

@@ -15,3 +15,10 @@ impl Parse for ShardAttr {
         })
     }
 }
+
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for ShardAttr {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.path.pretty_print(printer);
+    }
+}

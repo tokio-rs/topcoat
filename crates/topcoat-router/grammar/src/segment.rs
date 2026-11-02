@@ -46,6 +46,15 @@ impl Parse for Segment {
     }
 }
 
+/// Prints the options on one line if they fit. Otherwise, puts each option on
+/// its own line, followed by a comma.
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for Segment {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.attrs.pretty_print(printer);
+    }
+}
+
 impl ToTokens for Segment {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         if cfg!(feature = "discover") {
@@ -142,6 +151,41 @@ impl Parse for SegmentAttr {
             })
         } else {
             Err(lookahead.error())
+        }
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for SegmentAttr {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        use topcoat_core_grammar::pretty::Printer;
+
+        let option = |printer: &mut Printer<'_>, name: &'static str, span: Span| {
+            printer.move_cursor(span.start());
+            name.pretty_print(printer);
+            printer.move_cursor(span.end());
+        };
+        match self {
+            Self::Kind {
+                kind_kw,
+                colon_token,
+                value,
+            } => {
+                option(printer, "kind", kind_kw.span);
+                colon_token.pretty_print(printer);
+                " ".pretty_print(printer);
+                value.pretty_print(printer);
+            }
+            Self::Rename {
+                rename_kw,
+                colon_token,
+                value,
+            } => {
+                option(printer, "rename", rename_kw.span);
+                colon_token.pretty_print(printer);
+                " ".pretty_print(printer);
+                value.pretty_print(printer);
+            }
         }
     }
 }

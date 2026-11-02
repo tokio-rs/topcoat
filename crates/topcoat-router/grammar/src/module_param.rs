@@ -31,6 +31,13 @@ impl Parse for ModuleParam {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for ModuleParam {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.param.pretty_print(printer);
+    }
+}
+
 impl ToTokens for ModuleParam {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let param = &self.param;

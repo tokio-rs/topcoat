@@ -39,6 +39,17 @@ impl Parse for MemoizeAttr {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl crate::pretty::PrettyPrint for MemoizeAttr {
+    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+        if let Some(as_ref) = &self.as_ref {
+            printer.move_cursor(as_ref.span.start());
+            "as_ref".pretty_print(printer);
+            printer.move_cursor(as_ref.span.end());
+        }
+    }
+}
+
 pub struct MemoizeItem {
     item: ItemFn,
 }
@@ -235,5 +246,21 @@ mod tests {
     #[test]
     fn rejects_unknown_argument() {
         assert!(syn::parse_str::<MemoizeAttr>("cloned").is_err());
+    }
+
+    #[cfg(feature = "pretty")]
+    #[test]
+    fn formats_the_arguments() {
+        use crate::pretty::{Registry, pretty_print_str};
+
+        // `rustfmt` lays out the attribute at file level, so it is formatted
+        // inside a macro body that `rustfmt` does not reach.
+        let mut registry = Registry::new();
+        registry
+            .register_function_like::<syn::Item>("wrap")
+            .register_attribute::<MemoizeAttr>("memoize");
+        let output =
+            pretty_print_str(&registry, "wrap! { #[memoize(  as_ref  )] fn f() {} }").unwrap();
+        assert!(output.contains("#[memoize(as_ref)]"), "{output}");
     }
 }

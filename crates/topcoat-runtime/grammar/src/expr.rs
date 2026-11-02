@@ -46,6 +46,26 @@ impl Parse for ExprInput {
     }
 }
 
+/// Formats the body as a Rust expression. A trailing comma is kept only when
+/// the call is split over several lines.
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for ExprInput {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        use topcoat_core_grammar::pretty::TextMode;
+
+        let Ok(expr) = syn::parse2::<Expr>(self.tokens.clone()) else {
+            syn::Expr::Verbatim(self.tokens.clone()).pretty_print(printer);
+            return;
+        };
+        expr.inner.pretty_print(printer);
+        if let Some(comma_token) = expr.comma_token {
+            printer.move_cursor(comma_token.span.start());
+            printer.scan_text(",".into(), TextMode::Break);
+            printer.move_cursor(comma_token.span.end());
+        }
+    }
+}
+
 impl ToTokens for ExprInput {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match syn::parse2::<Expr>(self.tokens.clone()).and_then(|expr| expr.expr_to_tokens()) {

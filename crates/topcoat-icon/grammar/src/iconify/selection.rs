@@ -73,6 +73,13 @@ impl Parse for Selection {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for Selection {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        self.lit.pretty_print(printer);
+    }
+}
+
 /// Adds a leading `_` when `name` starts with a digit.
 fn guard_leading_digit(name: String) -> String {
     if name.starts_with(|c: char| c.is_ascii_digit()) {

@@ -80,6 +80,23 @@ impl ParseOption for Methods {
     }
 }
 
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for Methods {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        use topcoat_core_grammar::pretty::{BreakMode, Delim};
+
+        match self {
+            Self::One(method) => method.pretty_print(printer),
+            Self::Set { bracket, items } => {
+                bracket.pretty_print(printer, Some(BreakMode::Consistent), |printer| {
+                    items.pretty_print(printer);
+                });
+            }
+            Self::Any(star) => star.pretty_print(printer),
+        }
+    }
+}
+
 impl ToTokens for Methods {
     /// Emits the `Methods` expression declaring this method set.
     fn to_tokens(&self, tokens: &mut TokenStream) {

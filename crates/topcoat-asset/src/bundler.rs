@@ -22,7 +22,7 @@ use crate::{
     AssetError, AssetId, MANIFEST_NAME, MANIFEST_VERSION, Manifest, ManifestEntry, RawAsset, Source,
 };
 
-/// Scans a built binary for [`asset!`](crate::asset) declarations and
+/// Scans a built binary for `asset!` declarations and
 /// writes the referenced files into a bundle directory.
 ///
 /// Local paths are copied; remote URLs are downloaded into `cache_dir`
@@ -318,7 +318,7 @@ mod tests {
     use std::{env, path::PathBuf};
 
     use super::*;
-    use crate::{AssetOptions, ENCODED_ASSET_SIZE};
+    use crate::AssetOptions;
 
     /// A fresh directory under the system temp directory.
     fn temp_dir(name: &str) -> PathBuf {
@@ -342,6 +342,8 @@ mod tests {
     struct Fixture {
         root: PathBuf,
         binary: Vec<u8>,
+        /// The length of `binary` after each declaration.
+        declaration_ends: Vec<usize>,
     }
 
     impl Fixture {
@@ -349,6 +351,7 @@ mod tests {
             Self {
                 root: temp_dir(name),
                 binary: Vec::new(),
+                declaration_ends: Vec::new(),
             }
         }
 
@@ -377,22 +380,21 @@ mod tests {
         }
 
         fn declare_path(&mut self, path: &str, options: &AssetOptions) -> AssetId {
-            let id = AssetId::new("test", "src/lib.rs", path, options);
-            self.binary.extend_from_slice(&RawAsset::encode(
-                id,
-                path,
-                "test",
-                "/test",
-                "src/lib.rs",
-                options,
-            ));
+            let id = AssetId::new("test", path, options);
+            self.binary
+                .extend_from_slice(&RawAsset::encode_vec(id, path, options));
+            self.declaration_ends.push(self.binary.len());
             id
         }
 
         /// Drop every declaration past the first `count`, as if the assets had
         /// been deleted from the source and the binary rebuilt.
         fn keep_declarations(&mut self, count: usize) {
-            self.binary.truncate(count * ENCODED_ASSET_SIZE);
+            let end = count
+                .checked_sub(1)
+                .map_or(0, |last| self.declaration_ends[last]);
+            self.binary.truncate(end);
+            self.declaration_ends.truncate(count);
         }
 
         fn bundle(&self, out: &Path, parallelism: usize) -> (BundleResult, Vec<BundleEvent>) {

@@ -33,11 +33,11 @@ fn diff(expected: &str, actual: &str) -> String {
 
 fn registry() -> Registry {
     let mut registry = Registry::new();
-    registry.register_macro::<View>("view");
-    registry.register_macro::<topcoat_view_grammar::attributes::Attributes>("attributes");
-    registry.register_macro::<topcoat_view_grammar::class::Class>("class");
-    registry.register_macro::<topcoat_view_grammar::live::Live>("live");
-    registry.register_macro::<topcoat_view_grammar::live::Emit>("emit");
+    registry.register_function_like::<View>("view");
+    registry.register_function_like::<topcoat_view_grammar::attributes::Attributes>("attributes");
+    registry.register_function_like::<topcoat_view_grammar::class::Class>("class");
+    registry.register_function_like::<topcoat_view_grammar::live::Live>("live");
+    registry.register_function_like::<topcoat_view_grammar::live::Emit>("emit");
     registry
 }
 
