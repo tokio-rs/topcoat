@@ -49,7 +49,7 @@ fn flags_and_values() {
         HttpOnly;
         Partitioned;
         SameSite = Strict;
-        Max-Age = (Duration::hours(2))
+        Max-Age = (Duration::hours(2));
     };
 
     assert_eq!(cookie.name(), "session");
@@ -87,7 +87,7 @@ fn conditional_flag() {
 
 #[test]
 fn trailing_semicolon_allowed() {
-    let cookie: Cookie = cookie!(a = "b"; Secure;);
+    let cookie: Cookie = cookie!(a = "b"; Secure);
     assert_eq!(cookie.secure(), Some(true));
 }
 

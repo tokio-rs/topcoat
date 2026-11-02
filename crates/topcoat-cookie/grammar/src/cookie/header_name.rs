@@ -51,7 +51,9 @@ impl topcoat_core_grammar::pretty::PrettyPrint for HeaderName {
     fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
         for pair in self.parts.pairs() {
             pair.value().pretty_print(printer);
-            pair.punct().pretty_print(printer);
+            if let Some(punct) = pair.punct() {
+                punct.pretty_print(printer);
+            }
         }
     }
 }
