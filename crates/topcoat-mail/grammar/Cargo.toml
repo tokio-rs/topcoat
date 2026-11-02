@@ -15,7 +15,6 @@ pretty = ["topcoat-core-grammar/pretty", "topcoat-view-grammar/pretty"]
 
 [dependencies]
 topcoat-core-grammar.workspace = true
-topcoat-mail.workspace = true
 topcoat-view-grammar.workspace = true
 
 proc-macro2.workspace = true
