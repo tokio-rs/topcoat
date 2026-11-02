@@ -129,6 +129,10 @@ fn crate_base(package: &str) -> Option<String> {
 #[allow(non_upper_case_globals)]
 pub const topcoat_asset: Crate = Crate::new("asset", "topcoat-asset", "");
 
+/// The `asset` macro: `::topcoat::asset`, or `topcoat_asset_macro` standalone.
+#[allow(non_upper_case_globals)]
+pub const topcoat_asset_macro: Crate = Crate::new("asset", "topcoat-asset-macro", "");
+
 /// `::topcoat::context`, or `topcoat_core::context` standalone.
 #[allow(non_upper_case_globals)]
 pub const topcoat_context: Crate = Crate::new("context", "topcoat-core", "context");

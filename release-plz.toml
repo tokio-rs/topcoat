@@ -35,6 +35,8 @@ git_release_name = "v{{ version }}"
 changelog_include = [
     "topcoat-alpine-ajax",
     "topcoat-asset",
+    "topcoat-asset-grammar",
+    "topcoat-asset-macro",
     "topcoat-cli",
     "topcoat-cookie",
     "topcoat-core",
@@ -77,6 +79,16 @@ version_group = "topcoat"
 
 [[package]]
 name = "topcoat-asset"
+release = true
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-asset-grammar"
+release = true
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-asset-macro"
 release = true
 version_group = "topcoat"
 

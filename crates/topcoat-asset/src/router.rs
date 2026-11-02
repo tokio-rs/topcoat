@@ -98,8 +98,8 @@ mod tests {
     use crate::{AssetBundle, AssetId, AssetOptions, Manifest, serve::ASSET_ROUTE_PREFIX};
 
     const OPTIONS: AssetOptions = AssetOptions::NONE;
-    const MAIN: AssetId = AssetId::new("app", "src/main.rs", "assets/mark.svg", &OPTIONS);
-    const OTHER: AssetId = AssetId::new("app", "src/other.rs", "assets/mark.svg", &OPTIONS);
+    const MAIN: AssetId = AssetId::new("app", "assets/mark.svg", &OPTIONS);
+    const OTHER: AssetId = AssetId::new("other", "assets/mark.svg", &OPTIONS);
     const FILE: &str = "mark-16313d41ffdefca4.svg";
 
     fn temp_dir(name: &str) -> PathBuf {
@@ -138,7 +138,7 @@ mod tests {
     }
 
     #[test]
-    fn one_file_declared_at_two_call_sites_serves_one_route() {
+    fn one_file_declared_by_two_crates_serves_one_route() {
         let dir = temp_dir("shared-file");
         fs::write(dir.join(FILE), "<svg></svg>").unwrap();
         let bundle = bundle(dir, &[(MAIN, "image/svg+xml"), (OTHER, "image/svg+xml")]);
@@ -167,24 +167,18 @@ mod tests {
     #[cfg(all(feature = "bundler", not(windows)))]
     #[test]
     fn serves_a_bundled_filename_with_url_delimiters() {
-        use crate::{Asset, Bundler, BundlerConfig, ENCODED_ASSET_SIZE, RawAsset};
+        use crate::{Asset, Bundler, BundlerConfig, RawAsset};
 
         const NAME: &str = "logo#dark?50%25.svg";
-        const ID: AssetId = AssetId::new("app", "src/lib.rs", NAME, &OPTIONS);
-        static ENCODED: [u8; ENCODED_ASSET_SIZE] =
-            RawAsset::encode(ID, NAME, "app", "/app", "src/lib.rs", &OPTIONS);
+        const ID: AssetId = AssetId::new("app", NAME, &OPTIONS);
+        static ENCODED: [u8; RawAsset::encoded_len(NAME, &OPTIONS)] =
+            RawAsset::encode(ID, NAME, &OPTIONS);
         let asset = Asset::new(&ENCODED);
         let dir = temp_dir("url-delimiters");
         let contents = "<svg><!-- logo --></svg>";
-        fs::write(dir.join(NAME), contents).unwrap();
-        let binary = RawAsset::encode(
-            ID,
-            NAME,
-            "app",
-            dir.to_str().unwrap(),
-            "src/lib.rs",
-            &OPTIONS,
-        );
+        let path = dir.join(NAME);
+        fs::write(&path, contents).unwrap();
+        let binary = RawAsset::encode_vec(ID, path.to_str().unwrap(), &OPTIONS);
         let out = dir.join("assets");
         Bundler::new(&BundlerConfig::new().cache_dir(dir.join("cache")))
             .bundle(&binary, &out)

@@ -40,6 +40,7 @@ pub use shard::*;
 pub use shard_scope::*;
 pub use signal::*;
 pub use surrogate::*;
-use topcoat_asset::{Asset, asset};
+use topcoat_asset::Asset;
+use topcoat_asset_macro::asset;
 
 pub const SCRIPT: Asset = asset!("browser/dist/index.js", rename: "topcoat");

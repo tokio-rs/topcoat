@@ -15,7 +15,10 @@ use syn::{
     Visibility,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::paths::{topcoat_inventory, topcoat_l10n, topcoat_l10n_fluent_macro};
+use topcoat_core_grammar::{
+    common::CallSite,
+    paths::{topcoat_inventory, topcoat_l10n, topcoat_l10n_fluent_macro},
+};
 
 /// Arguments to `messages!`: a file pattern, optionally preceded by a visibility.
 ///
@@ -266,7 +269,7 @@ mod tests {
     }
 
     fn call_site(source_file: Option<&str>) -> CallSite {
-        CallSite::new(Path::new("/app"), source_file.map(Path::new)).unwrap()
+        CallSite::new(Path::new("/app"), source_file.map(Path::new), None).unwrap()
     }
 
     #[test]

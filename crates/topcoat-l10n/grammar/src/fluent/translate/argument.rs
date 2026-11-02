@@ -1,11 +1,11 @@
-use proc_macro2::{Delimiter, Spacing, TokenStream, TokenTree};
+use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::{
     Token,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
 };
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::{ParseOption, common::UnparsedExpr};
 
 use crate::fluent::{DocComments, FluentIdent, FluentIdentToken};
 
@@ -109,12 +109,12 @@ impl TranslateArgument {
     pub fn value(&self) -> TokenStream {
         match &self.value {
             None => self.name.to_token_stream(),
-            Some(value) if value.tokens.is_empty() => syn::Error::new(
+            Some(value) if value.expr.is_empty() => syn::Error::new(
                 value.colon_token.span,
                 format!("expected a value for `{}` after `:`", self.name.value()),
             )
             .to_compile_error(),
-            Some(value) => value.tokens.clone(),
+            Some(value) => value.expr.tokens.clone(),
         }
     }
 }
@@ -153,34 +153,18 @@ impl topcoat_core_grammar::pretty::PrettyPrint for TranslateArgument {
 }
 
 /// An explicit value in a [`TranslateArgument`], including its leading `:`.
-///
-/// Stores tokens up to the next argument separator, even if the expression is
-/// incomplete. Commas inside brackets, `::<...>` generics or a leading closure's
-/// signature stay in the value. Other commas end it. Wrap expressions such as
-/// `<HashMap<K, V> as Default>::default()` in parentheses to keep their commas inside
-/// the value.
 pub struct TranslateArgumentValue {
     /// The colon before the expression.
     pub colon_token: Token![:],
-    /// Original value tokens up to the argument separator. May be empty while the user
-    /// types.
-    pub tokens: TokenStream,
+    /// The value. May be empty while the user types.
+    pub expr: UnparsedExpr,
 }
 
 impl Parse for TranslateArgumentValue {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
             colon_token: input.parse()?,
-            tokens: {
-                let mut tokens = TokenStream::new();
-                let mut scanner = ValueScanner::default();
-                while !input.is_empty() && (!scanner.ends_at_comma() || !input.peek(Token![,])) {
-                    let token: TokenTree = input.parse()?;
-                    scanner.push(&token);
-                    tokens.extend([token]);
-                }
-                tokens
-            },
+            expr: input.parse()?,
         })
     }
 }
@@ -192,126 +176,15 @@ impl ParseOption for TranslateArgumentValue {
     }
 }
 
-/// Formats the value as a Rust expression. A value that is not a complete expression
-/// is copied as written.
 #[cfg(feature = "pretty")]
 impl topcoat_core_grammar::pretty::PrettyPrint for TranslateArgumentValue {
     fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
-        use syn::spanned::Spanned;
-        use topcoat_core_grammar::pretty::TextMode;
-
         self.colon_token.pretty_print(printer);
-        if self.tokens.is_empty() {
-            return;
-        }
-        " ".pretty_print(printer);
-        if let Ok(expr) = syn::parse2::<syn::Expr>(self.tokens.clone()) {
-            expr.pretty_print(printer);
-        } else {
-            let span = self.tokens.span();
-            let text = span
-                .source_text()
-                .unwrap_or_else(|| self.tokens.to_string());
-            printer.move_cursor(span.start());
-            printer.scan_text(text.into(), TextMode::Always);
-            printer.move_cursor(span.end());
-            printer.skip_trivia();
+        if !self.expr.is_empty() {
+            " ".pretty_print(printer);
+            self.expr.pretty_print(printer);
         }
     }
-}
-
-/// Tracks argument tokens to decide which commas separate arguments.
-///
-/// Commas in `::<...>` generics and a leading closure's signature stay inside the
-/// value. An unclosed `::<` or `|` keeps the rest of the input in the value so
-/// incomplete expressions can still be parsed.
-#[derive(Default)]
-struct ValueScanner {
-    /// Current depth of angle brackets in `::<...>` generics.
-    angle_depth: usize,
-    /// Current position in a leading closure's signature.
-    closure: ClosureState,
-    /// The last two tokens, recorded only when they are punctuation.
-    previous: [Option<(char, Spacing)>; 2],
-}
-
-impl ValueScanner {
-    /// Checks whether a comma here would end the argument.
-    fn ends_at_comma(&self) -> bool {
-        self.angle_depth == 0
-            && !matches!(
-                self.closure,
-                ClosureState::Params | ClosureState::ReturnType
-            )
-    }
-
-    /// Updates the scanner after reading `token`.
-    fn push(&mut self, token: &TokenTree) {
-        let punct = match token {
-            TokenTree::Punct(punct) => Some((punct.as_char(), punct.spacing())),
-            _ => None,
-        };
-        let char = punct.map(|(char, _)| char);
-        let after_arrow = self.previous[1] == Some(('-', Spacing::Joint));
-
-        self.closure = match self.closure {
-            ClosureState::Start => match token {
-                TokenTree::Ident(ident) if ident == "move" || ident == "async" => {
-                    ClosureState::Start
-                }
-                _ if char == Some('|') => ClosureState::Params,
-                _ => ClosureState::None,
-            },
-            ClosureState::Params if char == Some('|') => ClosureState::AfterParams,
-            ClosureState::AfterParams if char == Some('-') => ClosureState::AfterParams,
-            ClosureState::AfterParams if char == Some('>') && after_arrow => {
-                ClosureState::ReturnType
-            }
-            ClosureState::AfterParams => ClosureState::None,
-            ClosureState::ReturnType => match token {
-                TokenTree::Group(group) if group.delimiter() == Delimiter::Brace => {
-                    ClosureState::None
-                }
-                _ => ClosureState::ReturnType,
-            },
-            state => state,
-        };
-
-        if !matches!(
-            self.closure,
-            ClosureState::Params | ClosureState::ReturnType
-        ) {
-            // The second `:` of `::<` is joint with the `<`, so only the first
-            // one's spacing tells a path separator apart from two colons.
-            let after_path_separator = self.previous[0] == Some((':', Spacing::Joint))
-                && matches!(self.previous[1], Some((':', _)));
-            match char {
-                Some('<') if after_path_separator || self.angle_depth > 0 => {
-                    self.angle_depth += 1;
-                }
-                Some('>') if self.angle_depth > 0 && !after_arrow => self.angle_depth -= 1,
-                _ => {}
-            }
-        }
-
-        self.previous = [self.previous[1], punct];
-    }
-}
-
-/// The scanner's position within a closure at the start of a value.
-#[derive(Default, Clone, Copy)]
-enum ClosureState {
-    /// At the start of the value, possibly after `move` or `async`.
-    #[default]
-    Start,
-    /// Reading parameters between the opening and closing `|`.
-    Params,
-    /// Finished reading parameters, but not yet in the return type or body.
-    AfterParams,
-    /// Reading a return type before the closure's block.
-    ReturnType,
-    /// Outside a closure signature.
-    None,
 }
 
 #[cfg(test)]
@@ -338,7 +211,7 @@ mod tests {
                     argument
                         .value
                         .as_ref()
-                        .map(|value| value.tokens.to_string()),
+                        .map(|value| value.expr.tokens.to_string()),
                 )
             })
             .collect()
@@ -357,81 +230,6 @@ mod tests {
                 ("count".to_owned(), Some(tokens("n + 1"))),
                 ("name".to_owned(), None),
             ]
-        );
-    }
-
-    #[test]
-    fn keeps_commas_inside_groups_in_the_value() {
-        assert_eq!(
-            arguments(", count: max(a, b), items: [1, 2]"),
-            [
-                ("count".to_owned(), Some(tokens("max(a, b)"))),
-                ("items".to_owned(), Some(tokens("[1, 2]"))),
-            ]
-        );
-    }
-
-    #[test]
-    fn keeps_commas_inside_turbofish_generics() {
-        assert_eq!(
-            arguments(", map: HashMap::<K, V>::new(), f: call::<Box<dyn Fn(u8) -> u8>, u8>(x)"),
-            [
-                ("map".to_owned(), Some(tokens("HashMap::<K, V>::new()"))),
-                (
-                    "f".to_owned(),
-                    Some(tokens("call::<Box<dyn Fn(u8) -> u8>, u8>(x)"))
-                ),
-            ]
-        );
-    }
-
-    #[test]
-    fn splits_after_comparisons() {
-        assert_eq!(
-            arguments(", a: x < y, b: z > w"),
-            [
-                ("a".to_owned(), Some(tokens("x < y"))),
-                ("b".to_owned(), Some(tokens("z > w"))),
-            ]
-        );
-    }
-
-    #[test]
-    fn keeps_commas_inside_closure_signatures() {
-        assert_eq!(
-            arguments(", f: move |a, b| a + b, g: |a, b| -> Result<A, B> { Ok(a) }, h: || 1, name"),
-            [
-                ("f".to_owned(), Some(tokens("move |a, b| a + b"))),
-                (
-                    "g".to_owned(),
-                    Some(tokens("|a, b| -> Result<A, B> { Ok(a) }"))
-                ),
-                ("h".to_owned(), Some(tokens("|| 1"))),
-                ("name".to_owned(), None),
-            ]
-        );
-    }
-
-    #[test]
-    fn splits_after_a_logical_or() {
-        assert_eq!(
-            arguments(", a: x || y, b: z"),
-            [
-                ("a".to_owned(), Some(tokens("x || y"))),
-                ("b".to_owned(), Some(tokens("z"))),
-            ]
-        );
-    }
-
-    #[test]
-    fn keeps_the_rest_in_an_unclosed_value() {
-        assert_eq!(
-            arguments(", map: HashMap::<String, name"),
-            [("map".to_owned(), Some(tokens("HashMap::<String, name")))]
-        );
-        assert_eq!(
-            arguments(", f: |a, name"),
-            [("f".to_owned(), Some(tokens("|a, name")))]
         );
     }
 

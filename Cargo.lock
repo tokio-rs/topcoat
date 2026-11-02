@@ -5226,6 +5226,7 @@ dependencies = [
  "tokio-tungstenite",
  "topcoat-alpine-ajax",
  "topcoat-asset",
+ "topcoat-asset-macro",
  "topcoat-cookie",
  "topcoat-core",
  "topcoat-core-macro",
@@ -5283,6 +5284,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "topcoat-asset-grammar"
+version = "0.11.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.6",
+ "tempfile",
+ "topcoat-core-grammar",
+]
+
+[[package]]
+name = "topcoat-asset-macro"
+version = "0.11.0"
+dependencies = [
+ "quote",
+ "syn 3.0.6",
+ "topcoat",
+ "topcoat-asset-grammar",
+]
+
+[[package]]
 name = "topcoat-cli"
 version = "0.11.0"
 dependencies = [
@@ -5304,6 +5326,7 @@ dependencies = [
  "toml_edit",
  "topcoat",
  "topcoat-asset",
+ "topcoat-asset-grammar",
  "topcoat-core",
  "topcoat-core-grammar",
  "topcoat-font",
@@ -5358,6 +5381,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.6",
+ "tempfile",
 ]
 
 [[package]]
@@ -5656,6 +5680,7 @@ dependencies = [
  "tokio",
  "topcoat",
  "topcoat-asset",
+ "topcoat-asset-macro",
  "topcoat-core",
  "topcoat-router",
  "topcoat-view",
