@@ -166,6 +166,7 @@ router = [
 	"topcoat-asset?/router",
 	"topcoat-cookie?/router",
 	"topcoat-font?/router",
+	"topcoat-l10n?/http",
 	"topcoat-mail?/router",
 	"topcoat-metadata?/router",
 	"topcoat-runtime?/router",
