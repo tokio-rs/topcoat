@@ -5,7 +5,7 @@ use syn::{
     ext::IdentExt,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::common::UnparsedExpr;
+use topcoat_core_grammar::parse::UnparsedExpr;
 
 /// A single `name: value` option in an `asset!` call.
 ///

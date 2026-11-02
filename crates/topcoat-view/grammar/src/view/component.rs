@@ -3,11 +3,11 @@ use std::collections::HashSet;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::{
-    Expr, Ident, Path, Token, parenthesized,
+    Ident, Path, Token, parenthesized,
     parse::{Parse, ParseStream},
     token::Paren,
 };
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::parse::{ParseOption, UnparsedExpr};
 
 use crate::{
     template::RuntimeExpr,
@@ -37,11 +37,11 @@ pub struct NamedArg {
     pub value: NamedArgValue,
 }
 
-/// The value of a [`NamedArg`]. Either a plain Rust expression or a `$(...)`
-/// runtime expression.
+/// The value of a [`NamedArg`]. Either a plain Rust expression, which ends at
+/// the next `,`, or a `$(...)` runtime expression.
 #[derive(Clone)]
 pub enum NamedArgValue {
-    Expr(Expr),
+    Expr(UnparsedExpr),
     Runtime(RuntimeExpr),
 }
 
@@ -110,16 +110,21 @@ impl Parse for Component {
                     }
                     let colon: Token![:] = content.parse()?;
                     let value: NamedArgValue = content.parse()?;
+                    if matches!(&value, NamedArgValue::Expr(expr) if expr.is_empty()) {
+                        return Err(syn::Error::new_spanned(
+                            colon,
+                            format!("expected a value for `{ident}`"),
+                        ));
+                    }
                     named_args.push(NamedArg {
                         ident,
                         colon,
                         value,
                     });
-                    if content.peek(Token![,]) {
-                        let _: Token![,] = content.parse()?;
-                    } else {
+                    if content.is_empty() {
                         break;
                     }
+                    let _: Token![,] = content.parse()?;
                 }
 
                 named_args
@@ -255,6 +260,24 @@ mod tests {
         let component = parse(r"button(prop1: 5, foo::checkbox())");
         assert_eq!(component.named_args.len(), 1);
         assert_eq!(component.children.len(), 1);
+    }
+
+    #[test]
+    fn parses_an_incomplete_named_arg_value() {
+        let component = parse(r#"card(title: user., <p>"child"</p>)"#);
+        assert_eq!(component.named_args.len(), 1);
+        assert_eq!(component.children.len(), 1);
+    }
+
+    #[test]
+    fn children_need_a_comma_after_the_last_named_arg() {
+        assert!(parse(r#"card(title: name "child")"#).children.is_empty());
+        assert!(syn::parse_str::<Component>(r#"card(title: $(name) "child")"#).is_err());
+    }
+
+    #[test]
+    fn rejects_a_missing_named_arg_value() {
+        assert!(syn::parse_str::<Component>(r#"card(title:, "child")"#).is_err());
     }
 
     #[test]

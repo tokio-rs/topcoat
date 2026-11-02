@@ -6,7 +6,7 @@ use syn::{
     parse_quote,
 };
 use topcoat_core_grammar::{
-    ParseOption,
+    parse::ParseOption,
     paths::{topcoat_context, topcoat_inventory, topcoat_router},
 };
 

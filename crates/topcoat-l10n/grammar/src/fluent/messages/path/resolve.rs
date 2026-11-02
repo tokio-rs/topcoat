@@ -8,7 +8,7 @@ use icu_locale::{
     fallback::{LocaleFallbackConfig, LocaleFallbacker},
 };
 use icu_locale_core::{DataLocale, LanguageIdentifier, Locale};
-use topcoat_core_grammar::common::CallSite;
+use topcoat_core_grammar::call_site::CallSite;
 
 use crate::fluent::PathPattern;
 

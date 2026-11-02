@@ -2,6 +2,7 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
+use topcoat_core_grammar::expand::item_with_error;
 
 #[doc = include_str!("../docs/expr.md")]
 #[proc_macro]
@@ -13,26 +14,26 @@ pub fn expr(tokens: TokenStream) -> TokenStream {
 #[doc = include_str!("../docs/procedure.md")]
 #[proc_macro_attribute]
 pub fn procedure(attr: TokenStream, item: TokenStream) -> TokenStream {
-    match topcoat_runtime_grammar::procedure::Procedure::parse(attr.into(), item.into()) {
+    match topcoat_runtime_grammar::procedure::Procedure::parse(attr.into(), item.clone().into()) {
         Ok(value) => quote! { #value }.into(),
-        Err(error) => error.to_compile_error().into(),
+        Err(error) => item_with_error(&error, item.into(), &[]).into(),
     }
 }
 
 #[doc = include_str!("../docs/record.md")]
 #[proc_macro_attribute]
 pub fn record(attr: TokenStream, item: TokenStream) -> TokenStream {
-    match topcoat_runtime_grammar::record::Record::parse(attr.into(), item.into()) {
+    match topcoat_runtime_grammar::record::Record::parse(attr.into(), item.clone().into()) {
         Ok(value) => quote! { #value }.into(),
-        Err(error) => error.to_compile_error().into(),
+        Err(error) => item_with_error(&error, item.into(), &[]).into(),
     }
 }
 
 #[doc = include_str!("../docs/shard.md")]
 #[proc_macro_attribute]
 pub fn shard(attr: TokenStream, item: TokenStream) -> TokenStream {
-    match topcoat_runtime_grammar::shard::Shard::parse(attr.into(), item.into()) {
+    match topcoat_runtime_grammar::shard::Shard::parse(attr.into(), item.clone().into()) {
         Ok(value) => quote! { #value }.into(),
-        Err(error) => error.to_compile_error().into(),
+        Err(error) => item_with_error(&error, item.into(), &[]).into(),
     }
 }

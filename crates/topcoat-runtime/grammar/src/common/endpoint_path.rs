@@ -5,7 +5,7 @@ use syn::{
     Ident, LitStr,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::parse::ParseOption;
 use topcoat_router::{Path, PathSegment};
 
 /// An absolute route path for a procedure or shard endpoint.

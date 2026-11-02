@@ -5597,7 +5597,6 @@ dependencies = [
  "quote",
  "syn 3.0.6",
  "topcoat-core-grammar",
- "topcoat-mail",
  "topcoat-view-grammar",
 ]
 
@@ -5687,6 +5686,7 @@ dependencies = [
  "syn 3.0.6",
  "tokio",
  "topcoat",
+ "topcoat-core-grammar",
  "topcoat-router-grammar",
 ]
 
@@ -5748,6 +5748,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "topcoat",
+ "topcoat-core-grammar",
  "topcoat-runtime-grammar",
 ]
 
@@ -5836,6 +5837,7 @@ dependencies = [
  "syn 3.0.6",
  "tokio",
  "topcoat",
+ "topcoat-core-grammar",
  "topcoat-view-grammar",
 ]
 

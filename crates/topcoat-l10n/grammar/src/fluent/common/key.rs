@@ -4,7 +4,7 @@ use syn::{
     parse::{Parse, ParseStream},
     spanned::Spanned,
 };
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::parse::ParseOption;
 
 use crate::fluent::FluentIdent;
 

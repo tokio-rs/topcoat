@@ -4,7 +4,7 @@ use syn::{
     parenthesized,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::parse::ParseOption;
 
 use crate::view::hir::{ExprKind, LowerView, ViewBuilder};
 

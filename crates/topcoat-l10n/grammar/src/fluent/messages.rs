@@ -16,7 +16,7 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 use topcoat_core_grammar::{
-    common::CallSite,
+    call_site::CallSite,
     paths::{topcoat_inventory, topcoat_l10n, topcoat_l10n_fluent_macro},
 };
 

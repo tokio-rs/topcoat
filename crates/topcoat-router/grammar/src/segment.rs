@@ -8,8 +8,8 @@ use syn::{
     punctuated::Punctuated,
 };
 use topcoat_core_grammar::{
-    QuoteOption,
     paths::{topcoat_inventory, topcoat_router},
+    quote_option::QuoteOption,
 };
 
 pub struct Segment {

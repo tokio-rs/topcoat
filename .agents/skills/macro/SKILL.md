@@ -29,7 +29,7 @@ Every macro follows the same argument style, so users can guess the syntax of a 
 
 ## Entry points
 
-The `macro/` crate only bridges `proc_macro::TokenStream` to the grammar crate that holds the AST and the codegen. Every entry point is a parse, a match, and a `to_compile_error()` on the error arm; no logic lives in `lib.rs`.
+The `macro/` crate only bridges `proc_macro::TokenStream` to the grammar crate that holds the AST and the codegen. Every entry point is a parse, a match, and an error arm; no logic lives in `lib.rs`.
 
 An attribute macro receives two token streams, so it gets three types: one `Parse` node per stream and a tuple struct pairing them, which is the node the codegen hangs off.
 
@@ -61,11 +61,13 @@ impl ToTokens for Procedure { ... }
 #[doc = include_str!("../docs/procedure.md")]
 #[proc_macro_attribute]
 pub fn procedure(attr: TokenStream, item: TokenStream) -> TokenStream {
-    match topcoat_runtime_grammar::procedure::Procedure::parse(attr.into(), item.into()) {
+    match topcoat_runtime_grammar::procedure::Procedure::parse(attr.into(), item.clone().into()) {
         Ok(value) => quote! { #value }.into(),
-        Err(error) => error.to_compile_error().into(),
+        Err(error) => item_with_error(&error, item.into(), &[]).into(),
     }
 }
 ```
+
+On error, an attribute macro emits the error followed by the original item with `topcoat_core_grammar::expand::item_with_error`, so the function or struct does not disappear for the rest of the crate and for rust-analyzer. Pass the names of the macro's helper attributes, such as `#[default]` on component parameters, so they are removed from the kept item instead of being reported as unknown.
 
 A function-like macro has a single input, so it needs no pairing type: `syn::parse_macro_input!` straight into its AST node, then expand.

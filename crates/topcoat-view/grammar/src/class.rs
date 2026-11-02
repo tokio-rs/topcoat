@@ -5,7 +5,7 @@ use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
 };
-use topcoat_core_grammar::{ParseOption, paths::topcoat_view};
+use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_view};
 
 /// The parsed body of a `class!` invocation. Lowers to a
 /// [`runtime::Class`](topcoat_view::Class).

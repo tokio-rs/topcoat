@@ -3,7 +3,7 @@ use syn::{
     Attribute, Expr, ExprBreak, ExprContinue, Pat, Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::parse::ParseOption;
 
 use crate::{
     attributes::hir::{AttributeBuilder, LowerAttribute},

@@ -6,7 +6,7 @@ use syn::{
     punctuated::Punctuated,
     token::Bracket,
 };
-use topcoat_core_grammar::{ParseOption, paths::topcoat_router};
+use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_router};
 
 /// The HTTP methods opening a route-like macro attribute: a single method
 /// (`GET`), a bracketed list (`[GET, POST]`), or `*` for every method.

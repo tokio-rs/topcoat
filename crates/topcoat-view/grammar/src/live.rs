@@ -5,7 +5,7 @@ use syn::{
     spanned::Spanned,
 };
 use topcoat_core_grammar::{
-    ParseOption,
+    parse::ParseOption,
     paths::{topcoat_context, topcoat_core, topcoat_view},
 };
 

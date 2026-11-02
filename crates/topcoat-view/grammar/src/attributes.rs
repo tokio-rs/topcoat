@@ -22,7 +22,7 @@ pub use event_handler::*;
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::parse::ParseOption;
 pub use visitor::*;
 
 use crate::{

@@ -21,7 +21,7 @@ pub use nodes::*;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
-use topcoat_core_grammar::{ParseOption, paths::topcoat_context};
+use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_context};
 
 use crate::{
     leading_cx::LeadingCx,

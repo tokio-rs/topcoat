@@ -8,7 +8,7 @@ use syn::{
     parse::{Parse, ParseStream},
     spanned::Spanned,
 };
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::parse::ParseOption;
 
 /// An HTML identifier: a sequence of identifier segments joined by `-`, `:`,
 /// or `.` with no intervening whitespace. Covers names like `data-foo`,

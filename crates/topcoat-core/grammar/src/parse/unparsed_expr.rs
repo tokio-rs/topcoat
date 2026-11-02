@@ -9,6 +9,7 @@ use syn::{
 ///
 /// Parsing stops at the first comma that is not part of the expression. The
 /// expression may be incomplete or empty.
+#[derive(Clone)]
 pub struct UnparsedExpr {
     /// The expression tokens. Empty when no expression was written.
     pub tokens: TokenStream,

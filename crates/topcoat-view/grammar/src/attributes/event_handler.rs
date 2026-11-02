@@ -4,7 +4,7 @@ use syn::{
     LitStr, Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::{ParseOption, paths::topcoat_runtime};
+use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_runtime};
 
 use crate::{
     attributes::{

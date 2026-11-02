@@ -5,7 +5,7 @@ use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
 };
-use topcoat_core_grammar::{ParseOption, common::UnparsedExpr};
+use topcoat_core_grammar::parse::{ParseOption, UnparsedExpr};
 
 use crate::fluent::{DocComments, FluentIdent, FluentIdentToken};
 

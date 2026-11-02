@@ -4,7 +4,7 @@ use syn::{
     Ident, Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::{ParseOption, paths::topcoat_font_fontsource};
+use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_font_fontsource};
 use topcoat_font::fontsource as runtime;
 
 mod kw {

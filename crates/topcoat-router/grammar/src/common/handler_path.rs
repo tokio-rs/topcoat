@@ -4,7 +4,7 @@ use syn::{
     LitStr,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::{ParseOption, paths::topcoat_router};
+use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_router};
 
 /// The path literal a handler attribute accepts, such as the `"/about"` in
 /// `#[page("/about")]`.

@@ -6,7 +6,7 @@ use syn::{
     punctuated::Punctuated,
     token::Paren,
 };
-use topcoat_core_grammar::{ParseOption, QuoteOption, paths::topcoat_font};
+use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_font, quote_option::QuoteOption};
 
 use crate::font_face::{FontFormatHint, FontTechHint};
 

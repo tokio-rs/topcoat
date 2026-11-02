@@ -4,7 +4,7 @@ use syn::{
     Ident, Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::{ParseOption, paths::topcoat_context};
+use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_context};
 
 /// The leading `cx =>` argument naming the request context a macro body
 /// renders against.

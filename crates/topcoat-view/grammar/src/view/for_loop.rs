@@ -2,7 +2,7 @@ use syn::{
     Expr,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::parse::ParseOption;
 
 use crate::{
     template::TemplateForLoop,

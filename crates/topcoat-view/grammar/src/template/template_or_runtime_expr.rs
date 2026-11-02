@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
-use topcoat_core_grammar::{ParseOption, paths::topcoat_runtime};
+use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_runtime};
 
 use crate::template::{RuntimeExpr, TemplateExpr};
 

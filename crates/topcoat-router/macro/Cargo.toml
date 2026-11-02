@@ -17,6 +17,7 @@ proc-macro = true
 discover = ["topcoat-router-grammar/discover"]
 
 [dependencies]
+topcoat-core-grammar.workspace = true
 topcoat-router-grammar.workspace = true
 
 quote.workspace = true

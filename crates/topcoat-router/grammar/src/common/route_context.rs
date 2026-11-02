@@ -5,7 +5,7 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Paren,
 };
-use topcoat_core_grammar::{ParseOption, paths::topcoat_context};
+use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_context};
 
 mod kw {
     syn::custom_keyword!(with);

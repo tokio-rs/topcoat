@@ -1,5 +1,5 @@
 use syn::parse::{Parse, ParseStream};
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::parse::ParseOption;
 
 use crate::{
     attributes::{

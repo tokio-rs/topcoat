@@ -5,7 +5,7 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Paren,
 };
-use topcoat_core_grammar::{ParseOption, paths::topcoat_view};
+use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_view};
 use topcoat_view::{Formatter, HtmlContext};
 
 use crate::{

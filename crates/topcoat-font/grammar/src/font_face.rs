@@ -19,7 +19,7 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 pub use tech::*;
-use topcoat_core_grammar::{ParseOption, paths::topcoat_font};
+use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_font};
 pub use unicode::*;
 pub use weight::*;
 

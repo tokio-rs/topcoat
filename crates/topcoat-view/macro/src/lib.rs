@@ -2,6 +2,7 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
+use topcoat_core_grammar::expand::item_with_error;
 
 #[doc = include_str!("../docs/view.md")]
 #[proc_macro]
@@ -41,9 +42,9 @@ pub fn class(tokens: TokenStream) -> TokenStream {
 #[doc = include_str!("../docs/component.md")]
 #[proc_macro_attribute]
 pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
-    match topcoat_view_grammar::component::Component::parse(attr.into(), item.into()) {
+    match topcoat_view_grammar::component::Component::parse(attr.into(), item.clone().into()) {
         Ok(value) => quote! { #value }.into(),
-        Err(error) => error.to_compile_error().into(),
+        Err(error) => item_with_error(&error, item.into(), &["default", "into"]).into(),
     }
 }
 

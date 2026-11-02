@@ -7,7 +7,7 @@ use syn::{
     spanned::Spanned,
     token::Paren,
 };
-use topcoat_core_grammar::{ParseOption, paths::topcoat_router};
+use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_router};
 
 mod kw {
     syn::custom_keyword!(bad_request);

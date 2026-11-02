@@ -4,7 +4,7 @@ use syn::{
     Expr, Lit, Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::parse::ParseOption;
 
 mod kw {
     use syn::custom_keyword;

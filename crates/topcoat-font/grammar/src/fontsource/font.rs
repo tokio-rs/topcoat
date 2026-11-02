@@ -13,7 +13,7 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 use topcoat_core_grammar::{
-    ParseOption,
+    parse::ParseOption,
     paths::{
         topcoat_font, topcoat_font_fontsource, topcoat_font_fontsource_macro, topcoat_font_macro,
     },

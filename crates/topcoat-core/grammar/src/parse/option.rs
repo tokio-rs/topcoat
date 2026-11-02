@@ -12,7 +12,7 @@ use syn::parse::{Parse, ParseStream};
 ///     Token,
 ///     parse::{Parse, ParseStream},
 /// };
-/// use topcoat_core_grammar::ParseOption;
+/// use topcoat_core_grammar::parse::ParseOption;
 ///
 /// struct MyStruct {
 ///     token: Token![as],

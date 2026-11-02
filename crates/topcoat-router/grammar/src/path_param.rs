@@ -7,7 +7,7 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 use topcoat_core_grammar::{
-    ParseOption,
+    parse::ParseOption,
     paths::{topcoat_context, topcoat_context_macro, topcoat_router},
 };
 
