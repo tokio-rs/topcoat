@@ -215,9 +215,9 @@ mod tests {
     #[test]
     fn writes_each_option_as_a_field() {
         let dir = crate_with(&["a.png"]);
-        let expanded = expand(&dir, r#""a.png", rename: "logo", ext"#);
+        let expanded = expand(&dir, r#""a.png", rename: "logo", extension: "svg""#);
         assert!(expanded.contains("rename :"), "{expanded}");
-        assert!(expanded.contains("ext :"), "{expanded}");
+        assert!(expanded.contains("extension :"), "{expanded}");
     }
 
     #[test]
