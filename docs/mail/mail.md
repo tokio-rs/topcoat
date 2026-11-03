@@ -1,16 +1,16 @@
 Declares a [`Mail`] as a list of `name: value` fields.
 
-Fields correspond to [`MailBuilder`] methods. The macro also accepts convenient forms such as address strings and inline [`view!`] markup. It returns `Result<Mail>`, so invalid field values return an error:
+Fields correspond to [`MailBuilder`] methods. The macro also accepts convenient forms such as address strings and [`view!`] markup. It returns `Result<Mail>`, so invalid field values return an error:
 
 ```rust
 # use topcoat::{Result, context::Cx};
-# use topcoat::mail::mail;
+# use topcoat::{mail::mail, view::view};
 # async fn example(cx: &Cx) -> Result<()> {
 let mail = mail! {
     from: ("Topcoat", "welcome@example.com"),
     to: "ada@example.com",
     subject: "Welcome, Ada!",
-    html: {
+    html: view! {
         <h1>"Welcome!"</h1>
         <p>"Your account is ready."</p>
     },
@@ -28,7 +28,7 @@ Fields may appear in any order. Repeating a field is a compile error.
 - `from`: the sender, a single address.
 - `to`, `cc`, `bcc`, `reply_to`: the recipients, single addresses or collections.
 - `subject`: the subject line.
-- `html`: the HTML body, a braced view body or a [`View`] expression.
+- `html`: the HTML body, a [`View`] such as [`view!`] markup.
 - `text`: the plain-text body, derived from the HTML body by default.
 - `attachments`: files carried by the mail, a single [`Attachment`] or a collection.
 - `headers`: custom headers, a single `(name, value)` pair or a collection.
@@ -55,16 +55,16 @@ let mail = mail! {
 
 # The HTML Body
 
-A braced `html` value uses [`view!`] syntax and captures the surrounding variable named `cx` as its context:
+The `html` value is any [`View`]. Write it with [`view!`], which captures the surrounding variable named `cx` as its context:
 
 ```rust
 # use topcoat::{Result, context::Cx};
-# use topcoat::mail::{Mail, mail};
+# use topcoat::{mail::{Mail, mail}, view::view};
 async fn welcome(cx: &Cx, name: &str) -> Result<Mail> {
     mail! {
         to: "ada@example.com",
         subject: format!("Welcome, {name}!"),
-        html: {
+        html: view! {
             <p>
                 "Hello, "
                 (name)
@@ -77,19 +77,17 @@ async fn welcome(cx: &Cx, name: &str) -> Result<Mail> {
 
 To add or override context values for the HTML body, shadow `cx` with `let cx = cx.with(value);` before `mail!`. See the [`view!` context guide](../view/macro.view.html#request-context) for shadowing and capture ownership.
 
-Pass an unbraced [`View`] expression to use an existing view.
-
 # The Plain-Text Body
 
 By default, Topcoat derives plain text from the HTML body. Set `text` to supply your own wording, or use [`TextBody::None`] to send only HTML:
 
 ```rust
 # use topcoat::{Result, context::Cx};
-# use topcoat::mail::{TextBody, mail};
+# use topcoat::{mail::{TextBody, mail}, view::view};
 # async fn example(cx: &Cx) -> Result<()> {
-let derived = mail! { html: { <p>"Hi"</p> } }?;
+let derived = mail! { html: view! { <p>"Hi"</p> } }?;
 let declared = mail! { text: "Hi there" }?;
-let html_alone = mail! { html: { <p>"Hi"</p> }, text: TextBody::None }?;
+let html_alone = mail! { html: view! { <p>"Hi"</p> }, text: TextBody::None }?;
 
 assert_eq!(derived.text(), &TextBody::FromHtml);
 assert_eq!(declared.text(), &TextBody::Text("Hi there".to_owned()));
@@ -104,11 +102,11 @@ assert_eq!(html_alone.text(), &TextBody::None);
 
 ```rust
 # use topcoat::{Result, context::Cx};
-# use topcoat::mail::{Attachment, mail};
+# use topcoat::{mail::{Attachment, mail}, view::view};
 # async fn example(cx: &Cx) -> Result<()> {
 let mail = mail! {
     subject: "Your invoice",
-    html: {
+    html: view! {
         <img src="cid:logo" alt="Example logo">
         <p>"The invoice is attached."</p>
     },

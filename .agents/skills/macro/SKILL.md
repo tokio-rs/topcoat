@@ -27,6 +27,7 @@ Every macro follows the same argument style, so users can guess the syntax of a 
 * To parse custom keywords that are not re-emitted into the generated code, create a private `mod kw` with `syn::custom_keyword!` invocations instead of parsing `syn::Ident`. Use `input.lookahead1()` if it makes sense.
 * Instead of manually peeking for optional AST nodes in the input stream at the call site, implement `ParseOption` and parse them with `input.call(Node::parse_option)?`.
 * Shared parsing and codegen helpers live in `topcoat_core_grammar::common`. Code that the macro only passes through, such as a Rust expression, is parsed with the matching type from `common::lenient` instead of `syn`, so input that is still being typed does not stop the macro from expanding.
+* Parse `key: value` options of a function-like macro as `Punctuated<lenient::FieldValue, Token![,]>`. Expand each option into a field of a struct literal or a builder method call named after the key, with the key's span, so the compiler reports unknown names and editors complete them.
 
 ## Entry points
 

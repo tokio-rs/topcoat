@@ -1,48 +1,53 @@
-use std::collections::HashSet;
-
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
-    Ident, LitStr, Token,
+    Token,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
 };
 use topcoat_core_grammar::common::{
-    QuoteOption,
+    lenient,
     paths::{topcoat_inventory, topcoat_router},
 };
 
+/// Arguments to `segment!`: comma-separated `name: value` options.
+///
+/// Parsing accepts options that are still being typed, such as a name without a
+/// value, so editors can complete them.
 pub struct Segment {
-    attrs: Punctuated<SegmentAttr, Token![,]>,
+    pub options: Punctuated<lenient::FieldValue, Token![,]>,
 }
 
 impl Segment {
-    fn find_kind(&self) -> Option<&Ident> {
-        self.attrs.iter().find_map(SegmentAttr::as_kind)
-    }
-
-    fn find_rename(&self) -> Option<&LitStr> {
-        self.attrs.iter().find_map(SegmentAttr::as_rename)
+    /// The option as a field of a `SegmentOptions` struct literal.
+    ///
+    /// The field name keeps its span, so the compiler reports unknown and repeated
+    /// names, and editors complete and document them. The variants of
+    /// `SegmentKind` are in scope for the value of `kind`.
+    fn option_field(option: &lenient::FieldValue) -> TokenStream {
+        let field = option.ident();
+        let value = &option.expr;
+        if option.name() == "kind" {
+            quote! {
+                #field: {
+                    #[allow(unused_imports)]
+                    use #topcoat_router::SegmentKind::*;
+                    ::core::option::Option::Some(#value)
+                }
+            }
+        } else {
+            quote! {
+                #field: ::core::option::Option::Some(::std::borrow::Cow::Borrowed(#value))
+            }
+        }
     }
 }
 
 impl Parse for Segment {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let attrs: Punctuated<SegmentAttr, Token![,]> =
-            input.parse_terminated(SegmentAttr::parse, Token![,])?;
-
-        // Check for duplicates.
-        let mut keys = HashSet::new();
-        for attr in &attrs {
-            if !keys.insert(attr.keyword()) {
-                return Err(syn::Error::new(
-                    attr.span(),
-                    format_args!("duplicate option `{}`", attr.keyword()),
-                ));
-            }
-        }
-
-        Ok(Self { attrs })
+        Ok(Self {
+            options: Punctuated::parse_terminated(input)?,
+        })
     }
 }
 
@@ -51,142 +56,32 @@ impl Parse for Segment {
 #[cfg(feature = "pretty")]
 impl topcoat_core_grammar::common::pretty::PrettyPrint for Segment {
     fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
-        self.attrs.pretty_print(printer);
+        self.options.pretty_print(printer);
     }
 }
 
+/// Checks the options and, with the `discover` feature, registers the segment.
 impl ToTokens for Segment {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        if cfg!(feature = "discover") {
-            let kind = self.find_kind();
-            let rename = self.find_rename();
-
-            let kind =
-                QuoteOption::new(kind.map(|kind| quote! { #topcoat_router::SegmentKind::#kind }));
-            let rename = QuoteOption::new(
-                rename.map(|rename| quote! { ::std::borrow::Cow::Borrowed(#rename) }),
-            );
+        let fields = self.options.iter().map(Self::option_field);
+        let submit = cfg!(feature = "discover").then(|| {
             quote! {
                 #topcoat_inventory::submit! {
-                    #topcoat_router::Segment::new(
-                        module_path!(),
-                        #kind,
-                        #rename,
-                    )
+                    #topcoat_router::Segment::new(module_path!(), OPTIONS)
                 }
             }
-            .to_tokens(tokens);
+        });
+        quote! {
+            const _: () = {
+                #[allow(clippy::needless_update)]
+                const OPTIONS: #topcoat_router::SegmentOptions = #topcoat_router::SegmentOptions {
+                    #(#fields,)*
+                    ..#topcoat_router::SegmentOptions::NONE
+                };
+                #submit
+            };
         }
-    }
-}
-
-mod kw {
-    use syn::custom_keyword;
-
-    custom_keyword!(kind);
-    custom_keyword!(rename);
-}
-
-#[allow(
-    dead_code,
-    reason = "parsed for syntax validation; not yet consumed by code generation"
-)]
-pub enum SegmentAttr {
-    Kind {
-        kind_kw: kw::kind,
-        colon_token: Token![:],
-        value: Ident,
-    },
-    Rename {
-        rename_kw: kw::rename,
-        colon_token: Token![:],
-        value: LitStr,
-    },
-}
-
-impl SegmentAttr {
-    fn keyword(&self) -> &'static str {
-        match self {
-            Self::Kind { .. } => "kind",
-            Self::Rename { .. } => "rename",
-        }
-    }
-
-    fn span(&self) -> Span {
-        match self {
-            Self::Kind { kind_kw, .. } => kind_kw.span,
-            Self::Rename { rename_kw, .. } => rename_kw.span,
-        }
-    }
-
-    fn as_kind(&self) -> Option<&Ident> {
-        match self {
-            Self::Kind { value, .. } => Some(value),
-            Self::Rename { .. } => None,
-        }
-    }
-
-    fn as_rename(&self) -> Option<&LitStr> {
-        match self {
-            Self::Rename { value, .. } => Some(value),
-            Self::Kind { .. } => None,
-        }
-    }
-}
-
-impl Parse for SegmentAttr {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let lookahead = input.lookahead1();
-        if lookahead.peek(kw::kind) {
-            Ok(Self::Kind {
-                kind_kw: input.parse()?,
-                colon_token: input.parse()?,
-                value: input.parse()?,
-            })
-        } else if lookahead.peek(kw::rename) {
-            Ok(Self::Rename {
-                rename_kw: input.parse()?,
-                colon_token: input.parse()?,
-                value: input.parse()?,
-            })
-        } else {
-            Err(lookahead.error())
-        }
-    }
-}
-
-#[cfg(feature = "pretty")]
-impl topcoat_core_grammar::common::pretty::PrettyPrint for SegmentAttr {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
-        use topcoat_core_grammar::common::pretty::Printer;
-
-        let option = |printer: &mut Printer<'_>, name: &'static str, span: Span| {
-            printer.move_cursor(span.start());
-            name.pretty_print(printer);
-            printer.move_cursor(span.end());
-        };
-        match self {
-            Self::Kind {
-                kind_kw,
-                colon_token,
-                value,
-            } => {
-                option(printer, "kind", kind_kw.span);
-                colon_token.pretty_print(printer);
-                " ".pretty_print(printer);
-                value.pretty_print(printer);
-            }
-            Self::Rename {
-                rename_kw,
-                colon_token,
-                value,
-            } => {
-                option(printer, "rename", rename_kw.span);
-                colon_token.pretty_print(printer);
-                " ".pretty_print(printer);
-                value.pretty_print(printer);
-            }
-        }
+        .to_tokens(tokens);
     }
 }
 
@@ -198,11 +93,25 @@ mod tests {
         syn::parse_str(input)
     }
 
+    fn expand(input: &str) -> String {
+        parse(input).unwrap().to_token_stream().to_string()
+    }
+
+    fn tokens(input: &str) -> String {
+        input.parse::<TokenStream>().unwrap().to_string()
+    }
+
     #[test]
-    fn parses_options() {
-        let segment = parse(r#"kind: CatchAll, rename: "path","#).unwrap();
-        assert_eq!(segment.find_kind().unwrap(), "CatchAll");
-        assert_eq!(segment.find_rename().unwrap().value(), "path");
+    fn parses_options_being_typed() {
+        for input in [
+            "",
+            "ki",
+            "kind:",
+            "kind:, rename: \"path\"",
+            r#"kind: Param,"#,
+        ] {
+            assert!(parse(input).is_ok(), "{input}");
+        }
     }
 
     #[test]
@@ -211,7 +120,19 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_duplicate_option() {
-        assert!(parse("kind: Group, kind: Static").is_err());
+    fn writes_each_option_as_a_field() {
+        let expanded = expand(r#"kind: CatchAll, rename: NAME"#);
+        assert!(expanded.contains(&tokens("Some (CatchAll)")), "{expanded}");
+        assert!(expanded.contains(&tokens("Borrowed (NAME)")), "{expanded}");
+        assert!(!expanded.contains("compile_error"), "{expanded}");
+    }
+
+    #[test]
+    fn a_missing_value_is_an_error() {
+        for input in ["kind", "kind:"] {
+            let expanded = expand(input);
+            assert!(expanded.contains("kind :"), "{expanded}");
+            assert!(expanded.contains("compile_error"), "{expanded}");
+        }
     }
 }

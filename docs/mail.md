@@ -34,7 +34,7 @@ Handlers use the registered transport. You can change delivery settings without 
 
 # Declaring and sending mail
 
-The [`mail!`] macro creates a [`Mail`] from `name: value` fields. Its `html` field accepts [`view!`](crate::view::view) markup:
+The [`mail!`] macro creates a [`Mail`] from `name: value` fields. Its `html` field accepts a view, such as [`view!`](crate::view::view) markup:
 
 ```rust
 // src/app/api/welcome.rs
@@ -43,6 +43,7 @@ use topcoat::{
     context::Cx,
     mail::{mail, send},
     router::route,
+    view::view,
 };
 
 #[route(POST)]
@@ -51,7 +52,7 @@ async fn welcome(cx: &Cx) -> Result<&'static str> {
         from: ("Topcoat", "welcome@example.com"),
         to: "ada@example.com",
         subject: "Welcome, Ada!",
-        html: {
+        html: view! {
             <h1>"Welcome!"</h1>
             <p>"Your account is ready."</p>
         },
@@ -75,11 +76,11 @@ Add files with the `attachments` field. Use [`Attachment::new`] for a downloadab
 
 ```rust
 # use topcoat::{Result, context::Cx};
-# use topcoat::mail::{Attachment, mail};
+# use topcoat::{mail::{Attachment, mail}, view::view};
 # async fn example(cx: &Cx) -> Result<()> {
 let mail = mail! {
     subject: "Your invoice",
-    html: {
+    html: view! {
         <img src="cid:logo" alt="Example logo">
         <p>"The invoice is attached."</p>
     },

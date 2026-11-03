@@ -1,8 +1,3 @@
-mod field_value;
-mod mail_field;
-
-pub use field_value::*;
-pub use mail_field::*;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
@@ -10,26 +5,55 @@ use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
 };
-use topcoat_core_grammar::common::paths::{topcoat_error, topcoat_mail};
+use topcoat_core_grammar::common::{
+    lenient,
+    paths::{topcoat_error, topcoat_mail, topcoat_view},
+};
 
 /// The parsed body of a `mail!` invocation: `name: value` fields in any
 /// order, at most once each. Lowers to an awaited `async` block that
 /// assembles a `topcoat_mail::Mail` through a `topcoat_mail::MailBuilder` and
 /// produces a `Result<Mail>`.
+///
+/// Parsing accepts fields that are still being typed, such as a name without
+/// a value, so editors can complete them.
 pub struct Mail {
-    pub fields: Punctuated<MailField, Token![,]>,
+    pub fields: Punctuated<lenient::FieldValue, Token![,]>,
+}
+
+impl Mail {
+    /// The field as a call of the `MailBuilder` method with the same name.
+    ///
+    /// The method name keeps its span, so the compiler reports unknown names,
+    /// and editors complete and document them.
+    fn builder_call(field: &lenient::FieldValue) -> TokenStream {
+        let method = field.ident();
+        let value = &field.expr;
+        let value = match field.name().as_str() {
+            "to" | "cc" | "bcc" | "reply_to" => {
+                quote! { #topcoat_mail::TryIntoMailboxes::try_into_mailboxes(#value)? }
+            }
+            "from" => quote! { #topcoat_mail::Mailbox::try_from(#value)? },
+            "html" => quote! { #topcoat_view::ViewExt::single(#value).await? },
+            "attachments" => quote! { #topcoat_mail::IntoAttachments::into_attachments(#value) },
+            "headers" => quote! { #topcoat_mail::IntoHeaders::into_headers(#value) },
+            _ => value.to_token_stream(),
+        };
+        quote! { let __builder = __builder.#method(#value); }
+    }
 }
 
 impl Parse for Mail {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let fields: Punctuated<MailField, Token![,]> = Punctuated::parse_terminated(input)?;
+        let fields: Punctuated<lenient::FieldValue, Token![,]> =
+            Punctuated::parse_terminated(input)?;
 
         let mut seen = Vec::new();
         for field in &fields {
             let name = field.name();
             if seen.contains(&name) {
                 return Err(syn::Error::new(
-                    field.name.span(),
+                    field.member.span(),
                     format!("duplicate `{name}` field"),
                 ));
             }
@@ -42,7 +66,7 @@ impl Parse for Mail {
 
 impl ToTokens for Mail {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let calls = self.fields.iter().map(MailField::builder_calls);
+        let calls = self.fields.iter().map(Self::builder_call);
         quote! {
             async {
                 let __builder = #topcoat_mail::Mail::builder();
@@ -107,7 +131,7 @@ mod tests {
             bcc: [d],
             reply_to: replies,
             subject: "Hello",
-            html: { <p>"Hi"</p> },
+            html: view! { <p>"Hi"</p> },
             text: "Hi",
             attachments: [invoice],
             headers: [("List-Unsubscribe", "<mailto:stop@example.com>")],
@@ -173,16 +197,10 @@ mod tests {
     }
 
     #[test]
-    fn html_field_expands_the_view_body() {
-        let tokens = expand(r#"html: { <p>"Hi"</p> }"#);
-        assert!(tokens.contains(". html ("), "{tokens}");
-        assert!(tokens.contains("<p>Hi</p>"), "{tokens}");
-    }
-
-    #[test]
-    fn html_field_accepts_a_view_expression() {
+    fn html_resolves_the_view() {
         let tokens = expand("html: prebuilt");
-        assert!(tokens.contains(". html (prebuilt)"), "{tokens}");
+        assert!(tokens.contains("ViewExt :: single (prebuilt)"), "{tokens}");
+        assert!(tokens.contains(". html ("), "{tokens}");
     }
 
     #[test]
@@ -195,16 +213,13 @@ mod tests {
     }
 
     #[test]
-    fn field_without_a_value_lowers_to_a_bare_access() {
-        let tokens = expand("subj");
-        assert!(tokens.contains("__builder . subj ;"), "{tokens}");
-    }
-
-    #[test]
-    fn field_with_a_dangling_colon_lowers_to_a_bare_access() {
-        let tokens = expand("subject: , to: a");
-        assert!(tokens.contains("__builder . subject ;"), "{tokens}");
-        assert!(tokens.contains(". to ("), "{tokens}");
+    fn field_without_a_value_is_an_error() {
+        for input in ["subj, to: a", "subj:, to: a"] {
+            let tokens = expand(input);
+            assert!(tokens.contains("__builder . subj ("), "{tokens}");
+            assert!(tokens.contains("compile_error"), "{tokens}");
+            assert!(tokens.contains(". to ("), "{tokens}");
+        }
     }
 
     #[test]
@@ -219,7 +234,7 @@ mod tests {
         // `ref` on the way to `references` is a keyword; the expansion
         // escapes it to stay valid Rust.
         let tokens = expand("ref");
-        assert!(tokens.contains("__builder . r#ref ;"), "{tokens}");
+        assert!(tokens.contains("__builder . r#ref ("), "{tokens}");
     }
 
     #[test]

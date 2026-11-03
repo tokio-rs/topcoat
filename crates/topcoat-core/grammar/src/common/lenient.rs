@@ -6,8 +6,10 @@
 
 mod block;
 mod expr;
+mod field_value;
 mod item;
 
 pub use block::*;
 pub use expr::*;
+pub use field_value::*;
 pub use item::*;
