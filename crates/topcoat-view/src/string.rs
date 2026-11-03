@@ -5,8 +5,7 @@ use std::ops::Deref;
 /// Use this when interpolating a string constant into a view:
 ///
 /// ```rust
-/// # use topcoat::context::Cx;
-/// # use topcoat::view::{PromotedStr, View, component, view};
+/// # use topcoat::{context::Cx, view::{PromotedStr, View, component, view}};
 /// # #[component]
 /// # async fn example(cx: &Cx) -> topcoat::Result<impl View> {
 /// Ok(view! {
@@ -35,8 +34,7 @@ impl Deref for PromotedStr {
 /// captures an ordinary `&str`:
 ///
 /// ```rust
-/// # use topcoat::context::Cx;
-/// # use topcoat::view::{StaticStr, View, component, view};
+/// # use topcoat::{context::Cx, view::{StaticStr, View, component, view}};
 /// # #[component]
 /// # async fn example(cx: &Cx) -> topcoat::Result<impl View> {
 /// # let name: &'static str = "hello";

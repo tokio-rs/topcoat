@@ -108,7 +108,7 @@ impl ToTokens for Component {
                 unreachable!("validated in Parse");
             };
             if pi.ident == "cx" {
-                args.push(quote! { cx });
+                args.push(quote! { __cx });
             } else {
                 let mut ty = (*pat_type.ty).clone();
                 field_lifetimes.visit_type_mut(&mut ty);
@@ -210,10 +210,9 @@ impl ToTokens for Component {
         .to_tokens(tokens);
 
         let render = quote! {
-            #[allow(unused_variables)]
             fn render<'__a, '__props>(
                 self,
-                cx: &'__a #topcoat_context::Cx,
+                __cx: &'__a #topcoat_context::Cx,
                 props: Self::Props<'__props>,
             ) -> impl Future<Output = #return_ty> + ::core::marker::Send + '__a
             where

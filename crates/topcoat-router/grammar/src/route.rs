@@ -131,13 +131,12 @@ impl ToTokens for Route {
         // user's function positionally, in declared parameter order.
         let body_param = args.request().map(|ty| quote! { , body: #ty });
         let forward_args = args.iter().map(|arg| match arg {
-            HandlerArg::Cx => quote! { cx },
+            HandlerArg::Cx => quote! { __cx },
             HandlerArg::Request(_) => quote! { body },
         });
         let handler = quote! {
             impl #ident {
-                #[allow(unused_variables)]
-                async fn handler(cx: &#topcoat_context::Cx #body_param) #output {
+                async fn handler(__cx: &#topcoat_context::Cx #body_param) #output {
                     #inner
 
                     #ident(#(#forward_args),*).await
