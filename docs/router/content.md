@@ -4,7 +4,7 @@ A handler's parameters describe the request body it accepts. Its return type des
 
 # Reading a request body
 
-A page or route can accept one body parameter that implements [`FromRequest`](crate::request::FromRequest). For example, [`Json`] deserializes a JSON body into your type. Add `cx: &Cx` when the handler also needs request context.
+A handler must take `cx: &Cx` as its first parameter, even when unused. An optional second parameter implements [`FromRequest`](crate::request::FromRequest). For example, [`Json`] deserializes a JSON body into your type.
 
 ```rust
 // src/app/api/users.rs
@@ -22,7 +22,7 @@ async fn create_user(cx: &Cx, Json(input): Json<CreateUser>) -> Result<String> {
 }
 ```
 
-The context and body parameters are optional and may appear in either order. There can be only one body parameter because the body can be consumed only once. Built-in extractors reject malformed input with `400 Bad Request`. Wrap an extractor in [`Option`] to accept an absent body. Pages read bodies the same way and return a view.
+There can be only one body parameter because the body can be consumed only once. Built-in extractors reject malformed input with `400 Bad Request`. Wrap an extractor in [`Option`] to accept an absent body. Pages read bodies the same way and return a view.
 
 # The body limit
 

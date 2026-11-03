@@ -230,7 +230,7 @@ See [`#[route]`](macro@route) for the handler signature and how return values co
 
 # Request and response bodies
 
-A page or route handler can take the request context as `cx: &`[`Cx`](crate::context::Cx) and, alongside it, a single request body parameter, such as a [`Json`](content::Json) body. An API route additionally returns a value that becomes the response.
+A handler must take [`cx: &Cx`](crate::context::Cx) as its first parameter, even when unused. An optional second parameter implements [`FromRequest`](request::FromRequest), such as a [`Json`](content::Json) body. An API route returns a value that becomes the response.
 
 ```rust
 // src/app/api/users.rs
@@ -249,7 +249,7 @@ async fn create_user(cx: &Cx, Json(input): Json<CreateUser>) -> Result<Json<User
 }
 ```
 
-Both parameters are optional and may appear in either order. A handler can take only one body parameter because the body can be consumed only once. Pages parse bodies the same way and return a view. See [`content`](mod@content) for request extractors and response types.
+A handler can take only one body parameter because the body can be consumed only once. Pages parse bodies the same way and return a view. See [`content`](mod@content) for request extractors and response types.
 
 # Path and query parameters
 
