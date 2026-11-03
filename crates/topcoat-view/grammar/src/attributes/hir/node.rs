@@ -19,7 +19,7 @@ pub(crate) enum Node {
     Statement { tokens: TokenStream },
     /// A `for` loop whose body is lowered into a nested scope.
     For {
-        pat: Pat,
+        pat: Box<Pat>,
         expr: lenient::Expr,
         body: Scope,
     },

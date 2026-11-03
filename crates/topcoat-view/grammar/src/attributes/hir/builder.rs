@@ -58,7 +58,7 @@ impl AttributeBuilder {
         let mut body = AttributeBuilder::new();
         f(&mut body);
         self.nodes.push(Node::For {
-            pat: pat.clone(),
+            pat: Box::new(pat.clone()),
             expr: expr.clone(),
             body: body.finish(),
         });

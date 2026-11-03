@@ -146,13 +146,13 @@ impl ViewBuilder {
         self.sites.set(ordinal + 1);
         let mut body = self.nested();
         f(&mut body);
-        self.nodes.push(Node::ForLoop(ForLoop {
+        self.nodes.push(Node::ForLoop(Box::new(ForLoop {
             pat: pat.clone(),
             expr: expr.clone(),
             key,
             ordinal,
             body: body.finish(),
-        }));
+        })));
     }
 
     pub fn if_else(
