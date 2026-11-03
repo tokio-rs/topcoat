@@ -4,7 +4,7 @@ use syn::{
     LitInt, Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::parse::ParseOption;
+use topcoat_core_grammar::common::ParseOption;
 use topcoat_font::fontsource as runtime;
 
 mod kw {
@@ -38,8 +38,8 @@ impl ParseOption for Weight {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for Weight {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for Weight {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.key.pretty_print(printer);
         self.colon_token.pretty_print(printer);
         " ".pretty_print(printer);
@@ -66,8 +66,8 @@ impl ParseOption for WeightKey {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for WeightKey {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for WeightKey {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
         printer.move_cursor(self.weight_kw.span().start());
         "weight".pretty_print(printer);
@@ -121,8 +121,8 @@ impl ToTokens for WeightValue {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for WeightValue {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for WeightValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.0.pretty_print(printer);
     }
 }

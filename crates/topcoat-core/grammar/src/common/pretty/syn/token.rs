@@ -1,7 +1,7 @@
 use quote::ToTokens;
 use syn::spanned::Spanned;
 
-use crate::pretty::{PrettyPrint, Printer, TextMode};
+use crate::common::pretty::{PrettyPrint, Printer, TextMode};
 
 impl PrettyPrint for syn::Ident {
     fn pretty_print(&self, printer: &mut Printer<'_>) {

@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
-use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_runtime};
+use topcoat_core_grammar::common::{ParseOption, paths::topcoat_runtime};
 
 use crate::template::{RuntimeExpr, TemplateExpr};
 
@@ -43,8 +43,8 @@ impl ToTokens for TemplateOrRuntimeExpr {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for TemplateOrRuntimeExpr {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for TemplateOrRuntimeExpr {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match self {
             Self::Template(inner) => inner.pretty_print(printer),
             Self::Runtime(inner) => inner.pretty_print(printer),
@@ -55,7 +55,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for TemplateOrRuntimeExpr {
 #[cfg(test)]
 mod tests {
     use quote::{ToTokens, quote};
-    use topcoat_core_grammar::paths::topcoat_runtime_macro;
+    use topcoat_core_grammar::common::paths::topcoat_runtime_macro;
 
     use super::*;
 

@@ -5,7 +5,7 @@ use syn::{
     ext::IdentExt,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::parse::UnparsedExpr;
+use topcoat_core_grammar::common::lenient;
 
 /// A single `name: value` option in an `asset!` call.
 ///
@@ -14,7 +14,7 @@ use topcoat_core_grammar::parse::UnparsedExpr;
 pub struct AssetOption {
     pub name: Ident,
     pub colon_token: Option<Token![:]>,
-    pub value: UnparsedExpr,
+    pub value: lenient::Expr,
 }
 
 impl AssetOption {
@@ -94,7 +94,7 @@ impl Parse for AssetOption {
         let colon_token: Option<Token![:]> = input.parse()?;
         let value = match colon_token {
             Some(_) => input.parse()?,
-            None => UnparsedExpr {
+            None => lenient::Expr {
                 tokens: TokenStream::new(),
                 span: input.span(),
             },
@@ -108,8 +108,8 @@ impl Parse for AssetOption {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for AssetOption {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for AssetOption {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.name.pretty_print(printer);
         self.colon_token.pretty_print(printer);
         if !self.value.is_empty() {

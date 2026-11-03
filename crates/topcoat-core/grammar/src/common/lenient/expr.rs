@@ -1,7 +1,7 @@
 use proc_macro2::{Delimiter, Spacing, Span, TokenStream, TokenTree};
 use quote::{ToTokens, quote_spanned};
 use syn::{
-    Expr, Token,
+    Token,
     parse::{Parse, ParseStream},
     token::Brace,
 };
@@ -14,14 +14,14 @@ use syn::{
 /// any group instead, so the macro keeps parsing. An empty expression expands
 /// to a compile error at the position where it was expected.
 #[derive(Clone)]
-pub struct UnparsedExpr {
+pub struct Expr {
     /// The expression tokens. Empty when no expression was written.
     pub tokens: TokenStream,
     /// The position where the expression starts.
     pub span: Span,
 }
 
-impl UnparsedExpr {
+impl Expr {
     /// Checks whether no tokens were written.
     #[must_use]
     pub fn is_empty(&self) -> bool {
@@ -31,7 +31,7 @@ impl UnparsedExpr {
     /// Parses an expression that is followed by a `{ ... }` block, like the
     /// condition of an `if` or the iterator of a `for` loop.
     ///
-    /// As with [`Expr::parse_without_eager_brace`], the block is not read as a
+    /// As with [`syn::Expr::parse_without_eager_brace`], the block is not read as a
     /// struct literal. An incomplete expression also ends before the next
     /// `{ ... }` outside of any group.
     ///
@@ -39,14 +39,14 @@ impl UnparsedExpr {
     ///
     /// Returns an error if the input contains an invalid token tree.
     pub fn parse_without_eager_brace(input: ParseStream) -> syn::Result<Self> {
-        Self::parse_with(input, Expr::parse_without_eager_brace, true)
+        Self::parse_with(input, syn::Expr::parse_without_eager_brace, true)
     }
 
     /// Takes the tokens `parse` accepts as an expression, or scans for the end
     /// of an incomplete expression when it accepts none.
     fn parse_with(
         input: ParseStream,
-        parse: fn(ParseStream) -> syn::Result<Expr>,
+        parse: fn(ParseStream) -> syn::Result<syn::Expr>,
         stop_at_block: bool,
     ) -> syn::Result<Self> {
         let span = input.span();
@@ -68,13 +68,13 @@ impl UnparsedExpr {
     }
 }
 
-impl Parse for UnparsedExpr {
+impl Parse for Expr {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        Self::parse_with(input, Expr::parse, false)
+        Self::parse_with(input, syn::Expr::parse, false)
     }
 }
 
-impl ToTokens for UnparsedExpr {
+impl ToTokens for Expr {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         if self.tokens.is_empty() {
             quote_spanned! {self.span=> ::core::compile_error!("expected an expression") }
@@ -88,16 +88,16 @@ impl ToTokens for UnparsedExpr {
 /// Formats the tokens as a Rust expression. Tokens that are not a complete
 /// expression are copied as written.
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for UnparsedExpr {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+impl crate::common::pretty::PrettyPrint for Expr {
+    fn pretty_print(&self, printer: &mut crate::common::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
 
-        use crate::pretty::TextMode;
+        use crate::common::pretty::TextMode;
 
         if self.tokens.is_empty() {
             return;
         }
-        if let Ok(expr) = syn::parse2::<Expr>(self.tokens.clone()) {
+        if let Ok(expr) = syn::parse2::<syn::Expr>(self.tokens.clone()) {
             expr.pretty_print(printer);
         } else {
             let span = self.tokens.span();
@@ -221,19 +221,16 @@ mod tests {
 
     /// Splits a comma-separated list into its expressions.
     fn split(input: &str) -> Vec<String> {
-        syn::parse::Parser::parse_str(
-            Punctuated::<UnparsedExpr, Token![,]>::parse_terminated,
-            input,
-        )
-        .unwrap()
-        .iter()
-        .map(|expr| expr.tokens.to_string())
-        .collect()
+        syn::parse::Parser::parse_str(Punctuated::<Expr, Token![,]>::parse_terminated, input)
+            .unwrap()
+            .iter()
+            .map(|expr| expr.tokens.to_string())
+            .collect()
     }
 
     /// Parses the expression at the start of `input` with `parse`, ignoring
     /// the rest.
-    fn first_with(parse: fn(ParseStream) -> syn::Result<UnparsedExpr>, input: &str) -> String {
+    fn first_with(parse: fn(ParseStream) -> syn::Result<Expr>, input: &str) -> String {
         syn::parse::Parser::parse_str(
             |input: ParseStream| {
                 let expr = parse(input)?;
@@ -248,11 +245,11 @@ mod tests {
     }
 
     fn first(input: &str) -> String {
-        first_with(UnparsedExpr::parse, input)
+        first_with(Expr::parse, input)
     }
 
     fn before_block(input: &str) -> String {
-        first_with(UnparsedExpr::parse_without_eager_brace, input)
+        first_with(Expr::parse_without_eager_brace, input)
     }
 
     fn tokens(input: &str) -> String {
@@ -314,7 +311,7 @@ mod tests {
 
     #[test]
     fn expands_a_missing_expression_to_a_compile_error() {
-        let expr: UnparsedExpr = syn::parse_str("").unwrap();
+        let expr: Expr = syn::parse_str("").unwrap();
         let expansion: syn::ExprMacro = syn::parse2(expr.to_token_stream()).unwrap();
         assert_eq!(
             expansion.mac.path.segments.last().unwrap().ident,
@@ -324,7 +321,7 @@ mod tests {
 
     #[test]
     fn expands_a_written_expression_unchanged() {
-        let expr: UnparsedExpr = syn::parse_str("user.").unwrap();
+        let expr: Expr = syn::parse_str("user.").unwrap();
         assert_eq!(expr.to_token_stream().to_string(), tokens("user."));
     }
 }

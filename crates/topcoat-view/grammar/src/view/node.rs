@@ -3,7 +3,7 @@ use syn::{
     parse::{Parse, ParseStream},
     spanned::Spanned,
 };
-use topcoat_core_grammar::parse::ParseOption;
+use topcoat_core_grammar::common::ParseOption;
 
 use crate::{
     template::{
@@ -117,8 +117,8 @@ impl Parse for Node {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for Node {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for Node {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match self {
             Self::Text(inner) => inner.pretty_print(printer),
             Self::DocumentType(inner) => inner.pretty_print(printer),

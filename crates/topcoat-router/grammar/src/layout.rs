@@ -6,8 +6,8 @@ use syn::{
     punctuated::Punctuated,
     spanned::Spanned,
 };
-use topcoat_core_grammar::{
-    parse::ParseOption,
+use topcoat_core_grammar::common::{
+    ParseOption,
     paths::{topcoat_context, topcoat_inventory, topcoat_router, topcoat_view, topcoat_view_macro},
 };
 
@@ -36,8 +36,8 @@ impl Parse for LayoutAttr {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for LayoutAttr {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for LayoutAttr {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.path.pretty_print(printer);
         RouteContext::pretty_print_entries(printer, self.comma.as_ref(), &self.context);
     }

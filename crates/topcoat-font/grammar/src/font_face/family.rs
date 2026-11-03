@@ -4,7 +4,7 @@ use syn::{
     Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::parse::{ParseOption, UnparsedExpr};
+use topcoat_core_grammar::common::{ParseOption, lenient};
 
 mod kw {
     use syn::custom_keyword;
@@ -42,8 +42,8 @@ impl ToTokens for FontFamily {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontFamily {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontFamily {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.key.pretty_print(printer);
         self.colon_token.pretty_print(printer);
         " ".pretty_print(printer);
@@ -74,8 +74,8 @@ impl ParseOption for FontFamilyKey {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontFamilyKey {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontFamilyKey {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
         printer.move_cursor(self.font_kw.span().start());
         "font-family".pretty_print(printer);
@@ -83,7 +83,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontFamilyKey {
     }
 }
 
-pub struct FontFamilyValue(pub UnparsedExpr);
+pub struct FontFamilyValue(pub lenient::Expr);
 
 impl Parse for FontFamilyValue {
     fn parse(input: ParseStream) -> syn::Result<Self> {
@@ -98,8 +98,8 @@ impl ToTokens for FontFamilyValue {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontFamilyValue {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontFamilyValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.0.pretty_print(printer);
     }
 }

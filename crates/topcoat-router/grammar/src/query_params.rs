@@ -4,7 +4,7 @@ use syn::{
     DeriveInput,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::paths::{
+use topcoat_core_grammar::common::paths::{
     topcoat_context, topcoat_context_macro, topcoat_router, topcoat_serde,
 };
 
@@ -27,8 +27,8 @@ impl Parse for QueryParamsAttr {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for QueryParamsAttr {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for QueryParamsAttr {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.error.pretty_print(printer);
     }
 }

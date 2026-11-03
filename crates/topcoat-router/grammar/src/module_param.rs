@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
-use topcoat_core_grammar::paths::topcoat_router_macro;
+use topcoat_core_grammar::common::paths::topcoat_router_macro;
 
 use super::path_param::PathParam;
 
@@ -32,8 +32,8 @@ impl Parse for ModuleParam {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for ModuleParam {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for ModuleParam {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.param.pretty_print(printer);
     }
 }

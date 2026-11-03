@@ -5,10 +5,7 @@ use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
 };
-use topcoat_core_grammar::{
-    parse::{ParseOption, UnparsedExpr},
-    paths::topcoat_view,
-};
+use topcoat_core_grammar::common::{ParseOption, lenient, paths::topcoat_view};
 
 /// The parsed body of a `class!` invocation. Lowers to a
 /// [`runtime::Class`](topcoat_view::Class).
@@ -62,8 +59,8 @@ impl ToTokens for Class {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for Class {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for Class {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         for (index, segment) in self.segments.iter().enumerate() {
             segment.pretty_print(printer);
             if index < self.segments.len() - 1 {
@@ -75,7 +72,10 @@ impl topcoat_core_grammar::pretty::PrettyPrint for Class {
             } else {
                 // A trailing comma is rendered only when the list breaks across
                 // multiple lines, and vanishes when it stays on one line.
-                printer.scan_text(",".into(), topcoat_core_grammar::pretty::TextMode::Break);
+                printer.scan_text(
+                    ",".into(),
+                    topcoat_core_grammar::common::pretty::TextMode::Break,
+                );
                 printer.advance_cursor(",");
             }
         }
@@ -106,7 +106,7 @@ fn entries_tuple(mut entries: Vec<TokenStream>) -> TokenStream {
 /// A single class list entry: an expression with an optional trailing
 /// `if cond` or `if cond else alt` condition.
 pub struct ClassSegment {
-    pub value: UnparsedExpr,
+    pub value: lenient::Expr,
     pub condition: Option<ClassCondition>,
 }
 
@@ -164,8 +164,8 @@ impl Parse for ClassSegment {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for ClassSegment {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for ClassSegment {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.value.pretty_print(printer);
         if let Some(condition) = &self.condition {
             " if ".pretty_print(printer);
@@ -180,7 +180,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for ClassSegment {
 
 /// Lowers a segment value to an entry expression, lowering string literals
 /// through [`entry_tokens`].
-fn value_tokens(expr: &UnparsedExpr) -> TokenStream {
+fn value_tokens(expr: &lenient::Expr) -> TokenStream {
     match as_lit_str(expr) {
         Some(lit) => entry_tokens(&lit.value(), lit.span()),
         None => expr.to_token_stream(),
@@ -212,7 +212,7 @@ fn escape_attribute_value(value: &str) -> String {
 }
 
 /// Returns the string literal behind `expr`, if it is one.
-fn as_lit_str(expr: &UnparsedExpr) -> Option<LitStr> {
+fn as_lit_str(expr: &lenient::Expr) -> Option<LitStr> {
     syn::parse2(expr.tokens.clone()).ok()
 }
 
@@ -220,7 +220,7 @@ fn as_lit_str(expr: &UnparsedExpr) -> Option<LitStr> {
 /// `else alt`.
 pub struct ClassCondition {
     pub if_token: Token![if],
-    pub condition: UnparsedExpr,
+    pub condition: lenient::Expr,
     pub else_branch: Option<ClassElse>,
 }
 
@@ -243,7 +243,7 @@ impl ParseOption for ClassCondition {
 /// The `else alt` branch of a [`ClassCondition`].
 pub struct ClassElse {
     pub else_token: Token![else],
-    pub value: UnparsedExpr,
+    pub value: lenient::Expr,
 }
 
 impl Parse for ClassElse {

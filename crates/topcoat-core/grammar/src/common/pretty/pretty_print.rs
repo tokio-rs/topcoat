@@ -1,4 +1,4 @@
-use crate::pretty::Printer;
+use crate::common::pretty::Printer;
 
 /// Writes a value as formatted text through a [`Printer`].
 ///

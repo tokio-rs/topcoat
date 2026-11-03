@@ -2,7 +2,7 @@ use syn::{
     Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::parse::ParseOption;
+use topcoat_core_grammar::common::ParseOption;
 
 use crate::view::hir::{LowerView, ViewBuilder};
 
@@ -47,8 +47,8 @@ impl ParseOption for DocumentType {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for DocumentType {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for DocumentType {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.lt_token.pretty_print(printer);
         self.exclamation_mark_token.pretty_print(printer);
         "DOCTYPE html".pretty_print(printer);

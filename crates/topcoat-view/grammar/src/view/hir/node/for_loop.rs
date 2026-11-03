@@ -1,8 +1,8 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::Pat;
-use topcoat_core_grammar::{
-    parse::UnparsedExpr,
+use topcoat_core_grammar::common::{
+    lenient,
     paths::{topcoat_context, topcoat_core, topcoat_view},
 };
 
@@ -14,8 +14,8 @@ use crate::view::hir::{
 /// A `for` loop whose body is lowered into a nested scope.
 pub(crate) struct ForLoop {
     pub pat: Pat,
-    pub expr: UnparsedExpr,
-    pub key: Option<UnparsedExpr>,
+    pub expr: lenient::Expr,
+    pub key: Option<lenient::Expr>,
     pub ordinal: u32,
     pub body: Scope,
 }

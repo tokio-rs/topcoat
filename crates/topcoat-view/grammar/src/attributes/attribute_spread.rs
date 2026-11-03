@@ -4,7 +4,7 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Paren,
 };
-use topcoat_core_grammar::parse::ParseOption;
+use topcoat_core_grammar::common::ParseOption;
 
 use crate::{
     attributes::hir::{AttributeBuilder, LowerAttribute},
@@ -63,8 +63,8 @@ impl ParseOption for AttributeSpread {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for AttributeSpread {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for AttributeSpread {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.expr.pretty_print(printer);
     }
 }

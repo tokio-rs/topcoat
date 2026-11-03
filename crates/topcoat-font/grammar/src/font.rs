@@ -5,7 +5,7 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Brace,
 };
-use topcoat_core_grammar::{parse::UnparsedExpr, paths::topcoat_font};
+use topcoat_core_grammar::common::{lenient, paths::topcoat_font};
 
 use crate::font_face::FontFace;
 
@@ -19,7 +19,7 @@ mod kw {
 /// A `font!` invocation: a family name followed by its faces, given either as
 /// CSS-like `@font-face` blocks or as a single expression.
 pub struct Font {
-    pub family: UnparsedExpr,
+    pub family: lenient::Expr,
     pub comma_token: Token![,],
     pub faces: FontFaces,
 }
@@ -68,7 +68,7 @@ impl ToTokens for Font {
 /// [`FontFaces`](topcoat_font::FontFaces).
 pub enum FontFaces {
     Css(Vec<FontFaceBlock>),
-    Expr(UnparsedExpr),
+    Expr(lenient::Expr),
 }
 
 impl Parse for FontFaces {
@@ -128,8 +128,8 @@ impl Parse for FontFaceBlock {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for Font {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for Font {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.family.pretty_print(printer);
         ",".pretty_print(printer);
         printer.scan_same_line_trivia();
@@ -153,10 +153,10 @@ impl topcoat_core_grammar::pretty::PrettyPrint for Font {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontFaceBlock {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontFaceBlock {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
-        use topcoat_core_grammar::pretty::{BreakMode, Delim};
+        use topcoat_core_grammar::common::pretty::{BreakMode, Delim};
 
         printer.move_cursor(self.at_token.span().start());
         "@font-face".pretty_print(printer);

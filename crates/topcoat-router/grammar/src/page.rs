@@ -7,8 +7,8 @@ use syn::{
     punctuated::Punctuated,
     spanned::Spanned,
 };
-use topcoat_core_grammar::{
-    parse::ParseOption,
+use topcoat_core_grammar::common::{
+    ParseOption,
     paths::{topcoat_context, topcoat_inventory, topcoat_router, topcoat_view, topcoat_view_macro},
 };
 
@@ -44,8 +44,8 @@ impl Parse for PageAttr {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for PageAttr {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for PageAttr {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.methods.pretty_print(printer);
         if self.methods.is_some() && self.path.is_some() {
             " ".pretty_print(printer);

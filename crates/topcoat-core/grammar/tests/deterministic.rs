@@ -1,5 +1,5 @@
 use quote::quote;
-use topcoat_core_grammar::{memoize::Memoize, testing::assert_deterministic};
+use topcoat_core_grammar::{common::testing::assert_deterministic, memoize::Memoize};
 
 #[test]
 fn memoize() {

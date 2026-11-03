@@ -17,7 +17,7 @@ const EXPANSIONS: usize = 4;
 /// between builds.
 ///
 /// ```
-/// use topcoat_core_grammar::testing::assert_deterministic;
+/// use topcoat_core_grammar::common::testing::assert_deterministic;
 ///
 /// assert_deterministic(|| syn::parse_str::<syn::Expr>("1 + 2"));
 /// ```

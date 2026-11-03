@@ -1,7 +1,7 @@
 use std::{fmt::Write as _, path::Path};
 
 use askama::Template;
-use topcoat_core_grammar::pretty::pretty_print_str;
+use topcoat_core_grammar::common::pretty::pretty_print_str;
 use topcoat_font::fontsource::{Family, Style};
 use topcoat_ui::{
     Registry,

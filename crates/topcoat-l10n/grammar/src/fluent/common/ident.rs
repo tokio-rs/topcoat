@@ -128,8 +128,8 @@ impl ToTokens for FluentIdent {
 
 /// Prints the identifier without spaces between its tokens, as in `password-field`.
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FluentIdent {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FluentIdent {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match self {
             Self::Tokens(tokens) => tokens.pretty_print(printer),
             Self::Str(lit) => lit.pretty_print(printer),
@@ -174,8 +174,8 @@ impl ToTokens for FluentIdentToken {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FluentIdentToken {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FluentIdentToken {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match self {
             Self::Ident(ident) => ident.pretty_print(printer),
             Self::Hyphen(hyphen) => hyphen.pretty_print(printer),

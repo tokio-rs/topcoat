@@ -1,7 +1,7 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::Pat;
-use topcoat_core_grammar::{parse::UnparsedExpr, paths::topcoat_view};
+use topcoat_core_grammar::common::{lenient, paths::topcoat_view};
 
 use crate::view::hir::{
     Bindings, Scope,
@@ -10,7 +10,7 @@ use crate::view::hir::{
 
 /// A `match` whose arm bodies are lowered into nested scopes.
 pub(crate) struct MatchExpr {
-    pub expr: UnparsedExpr,
+    pub expr: lenient::Expr,
     pub arms: Vec<MatchArm>,
 }
 
@@ -83,7 +83,7 @@ fn nest_either(view: TokenStream, index: usize, arm_count: usize) -> TokenStream
 /// A single `pat (if guard)? => body` arm of a [`MatchExpr`].
 pub(crate) struct MatchArm {
     pub pat: Pat,
-    pub guard: Option<UnparsedExpr>,
+    pub guard: Option<lenient::Expr>,
     pub body: Scope,
 }
 

@@ -7,7 +7,7 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Paren,
 };
-use topcoat_core_grammar::parse::{ParseOption, UnparsedExpr};
+use topcoat_core_grammar::common::{ParseOption, lenient};
 
 use crate::{
     template::RuntimeExpr,
@@ -41,7 +41,7 @@ pub struct NamedArg {
 /// the next `,`, or a `$(...)` runtime expression.
 #[derive(Clone)]
 pub enum NamedArgValue {
-    Expr(UnparsedExpr),
+    Expr(lenient::Expr),
     Runtime(RuntimeExpr),
 }
 
@@ -65,8 +65,8 @@ impl ToTokens for NamedArgValue {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for NamedArgValue {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for NamedArgValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match self {
             Self::Expr(inner) => inner.pretty_print(printer),
             Self::Runtime(inner) => inner.pretty_print(printer),
@@ -136,9 +136,9 @@ impl ParseOption for Component {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for Component {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
-        printer.scan_begin(topcoat_core_grammar::pretty::BreakMode::Consistent);
+impl topcoat_core_grammar::common::pretty::PrettyPrint for Component {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
+        printer.scan_begin(topcoat_core_grammar::common::pretty::BreakMode::Consistent);
         self.path.pretty_print(printer);
         "(".pretty_print(printer);
         let total = self.named_args.len() + self.children.len();

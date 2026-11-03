@@ -7,7 +7,7 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Paren,
 };
-use topcoat_core_grammar::parse::ParseOption;
+use topcoat_core_grammar::common::ParseOption;
 
 use crate::cookie::HeaderName;
 
@@ -47,8 +47,8 @@ impl Parse for CookieName {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for CookieName {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for CookieName {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match self {
             Self::Header(name) => name.pretty_print(printer),
             Self::Lit(lit) => lit.token().pretty_print(printer),
@@ -105,8 +105,8 @@ impl ParseOption for CookieValue {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for CookieValue {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for CookieValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match self {
             Self::Lit(lit) => lit.pretty_print(printer),
             Self::Expr(expr) => expr.pretty_print(printer),
@@ -135,9 +135,9 @@ impl Parse for ParenExpr {
 /// Formats the expression inside the parentheses. Tokens that are not a complete
 /// expression are copied as written.
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for ParenExpr {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
-        use topcoat_core_grammar::pretty::{BreakMode, Delim};
+impl topcoat_core_grammar::common::pretty::PrettyPrint for ParenExpr {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
+        use topcoat_core_grammar::common::pretty::{BreakMode, Delim};
 
         let expr = syn::parse2::<syn::Expr>(self.tokens.clone())
             .unwrap_or_else(|_| syn::Expr::Verbatim(self.tokens.clone()));

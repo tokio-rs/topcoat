@@ -2,7 +2,7 @@ use proc_macro2::Span;
 use quote::ToTokens;
 use syn::spanned::Spanned;
 
-use crate::pretty::{BreakMode, PrettyPrint, Printer, TextMode};
+use crate::common::pretty::{BreakMode, PrettyPrint, Printer, TextMode};
 
 /// Emits `text` for a token whose original source occupies `span`, keeping the
 /// printer's cursor in sync so trivia around the token stays anchored.
@@ -224,11 +224,11 @@ pub(super) fn space_separated<T, P>(
 pub(super) mod tests {
     use syn::parse::Parse;
 
-    use crate::pretty::{Lexer, MARGIN, PrettyPrint, Printer, Registry};
+    use crate::common::pretty::{Lexer, MARGIN, PrettyPrint, Printer, Registry};
 
     /// Formats `source` parsed as `T` at the left margin with an empty macro
     /// registry.
-    pub(in crate::pretty::syn) fn format<T>(source: &str) -> String
+    pub(in crate::common::pretty::syn) fn format<T>(source: &str) -> String
     where
         T: Parse + PrettyPrint,
     {
@@ -236,7 +236,7 @@ pub(super) mod tests {
     }
 
     /// Formats `source` parsed as `T` at the left margin.
-    pub(in crate::pretty::syn) fn format_with_registry<T>(
+    pub(in crate::common::pretty::syn) fn format_with_registry<T>(
         registry: &Registry,
         source: &str,
     ) -> String

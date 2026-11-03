@@ -4,7 +4,7 @@ use syn::{
     Ident, Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_font_fontsource};
+use topcoat_core_grammar::common::{ParseOption, paths::topcoat_font_fontsource};
 use topcoat_font::fontsource as runtime;
 
 mod kw {
@@ -38,8 +38,8 @@ impl ParseOption for Subset {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for Subset {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for Subset {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.key.pretty_print(printer);
         self.colon_token.pretty_print(printer);
         " ".pretty_print(printer);
@@ -66,8 +66,8 @@ impl ParseOption for SubsetKey {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for SubsetKey {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for SubsetKey {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
         printer.move_cursor(self.subset_kw.span().start());
         "subset".pretty_print(printer);
@@ -129,8 +129,8 @@ impl ToTokens for SubsetValue {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for SubsetValue {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for SubsetValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.0.pretty_print(printer);
     }
 }

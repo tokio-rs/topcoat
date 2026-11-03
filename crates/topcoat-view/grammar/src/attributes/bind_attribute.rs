@@ -3,7 +3,7 @@ use syn::{
     Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_runtime};
+use topcoat_core_grammar::common::{ParseOption, paths::topcoat_runtime};
 
 use crate::{
     attributes::{
@@ -79,8 +79,8 @@ impl ParseOption for BindAttribute {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for BindAttribute {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for BindAttribute {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.colon.pretty_print(printer);
         self.key.pretty_print(printer);
         self.eq.pretty_print(printer);

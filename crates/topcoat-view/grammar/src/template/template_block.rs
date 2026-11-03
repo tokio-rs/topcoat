@@ -3,7 +3,7 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Brace,
 };
-use topcoat_core_grammar::parse::ParseOption;
+use topcoat_core_grammar::common::ParseOption;
 
 use crate::{
     attributes::hir::{AttributeBuilder, LowerAttribute},
@@ -47,11 +47,11 @@ impl<T: Parse> ParseOption for TemplateBlock<T> {
 }
 
 #[cfg(feature = "pretty")]
-impl<T: topcoat_core_grammar::pretty::PrettyPrint> topcoat_core_grammar::pretty::PrettyPrint
-    for TemplateBlock<T>
+impl<T: topcoat_core_grammar::common::pretty::PrettyPrint>
+    topcoat_core_grammar::common::pretty::PrettyPrint for TemplateBlock<T>
 {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
-        use topcoat_core_grammar::pretty::Delim;
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
+        use topcoat_core_grammar::common::pretty::Delim;
 
         printer.move_cursor(self.brace.span().open().start());
         "{".pretty_print(printer);

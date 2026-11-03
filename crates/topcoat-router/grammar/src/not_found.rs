@@ -4,7 +4,7 @@ use syn::{
     LitStr,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::paths::{topcoat_error, topcoat_router, topcoat_router_macro};
+use topcoat_core_grammar::common::paths::{topcoat_error, topcoat_router, topcoat_router_macro};
 
 /// The `not_found!` macro input: an optional URL path prefix.
 pub struct NotFound {
@@ -35,8 +35,8 @@ impl Parse for NotFound {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for NotFound {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for NotFound {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.path.pretty_print(printer);
     }
 }

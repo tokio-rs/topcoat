@@ -7,7 +7,7 @@
 //! Interpolate a constant into `quote!` like any other path:
 //!
 //! ```ignore
-//! use topcoat_core_grammar::paths::{topcoat_context, topcoat_view};
+//! use topcoat_core_grammar::common::paths::{topcoat_context, topcoat_view};
 //!
 //! quote! {
 //!     impl #topcoat_view::Component for #ident {

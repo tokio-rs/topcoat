@@ -120,8 +120,8 @@ impl Parse for ElementName {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for ElementName {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for ElementName {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match self {
             Self::Ident(inner) => inner.pretty_print(printer),
             Self::LitStr(inner) => inner.pretty_print(printer),

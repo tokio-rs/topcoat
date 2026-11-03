@@ -47,8 +47,8 @@ impl Parse for HeaderName {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for HeaderName {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for HeaderName {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         for pair in self.parts.pairs() {
             pair.value().pretty_print(printer);
             if let Some(punct) = pair.punct() {
@@ -87,8 +87,8 @@ impl Parse for HeaderNamePart {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for HeaderNamePart {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for HeaderNamePart {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match self {
             Self::Ident(ident) => ident.pretty_print(printer),
             Self::Int(int) => int.pretty_print(printer),

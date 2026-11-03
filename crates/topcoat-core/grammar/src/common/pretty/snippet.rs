@@ -7,7 +7,7 @@ use syn::{
     visit::Visit,
 };
 
-use crate::pretty::{INDENT, MARGIN};
+use crate::common::pretty::{INDENT, MARGIN};
 
 /// The kind of invocation a [`MacroSnippet`] holds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

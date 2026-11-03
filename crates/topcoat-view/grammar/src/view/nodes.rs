@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use syn::parse::{Parse, ParseStream};
-use topcoat_core_grammar::parse::ParseOption;
+use topcoat_core_grammar::common::ParseOption;
 
 use crate::view::{
     ClosingTag, Node,
@@ -50,8 +50,8 @@ impl LowerView for Nodes {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for Nodes {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for Nodes {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         for (index, node) in self.iter().enumerate() {
             node.pretty_print(printer);
             if index < self.len() - 1 {

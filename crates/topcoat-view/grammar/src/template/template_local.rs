@@ -4,7 +4,7 @@ use syn::{
     Stmt, Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::parse::ParseOption;
+use topcoat_core_grammar::common::ParseOption;
 
 use crate::{
     attributes::hir::{AttributeBuilder, LowerAttribute},
@@ -97,8 +97,8 @@ impl ParseOption for TemplateLocal {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for TemplateLocal {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for TemplateLocal {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match syn::parse2::<Stmt>(self.to_token_stream()) {
             Ok(local) => local.pretty_print(printer),
             Err(_) => syn::Expr::Verbatim(self.to_token_stream()).pretty_print(printer),
@@ -227,7 +227,7 @@ mod tests {
     #[cfg(feature = "pretty")]
     #[test]
     fn incomplete_bindings_format_verbatim() {
-        use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
+        use topcoat_core_grammar::common::pretty::{Registry, pretty_print_str};
 
         let mut registry = Registry::new();
         registry.register_function_like::<crate::view::View>("view");

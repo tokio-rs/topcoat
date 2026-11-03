@@ -8,7 +8,7 @@ use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
 };
-use topcoat_core_grammar::{call_site::CallSite, parse::UnparsedExpr, paths::topcoat_asset};
+use topcoat_core_grammar::common::{CallSite, lenient, paths::topcoat_asset};
 
 /// Arguments to `asset!`: a path or URL, optionally followed by options.
 ///
@@ -20,7 +20,7 @@ use topcoat_core_grammar::{call_site::CallSite, parse::UnparsedExpr, paths::topc
 /// Parsing accepts options that are still being typed, such as a name without a
 /// value, so editors can complete them.
 pub struct Asset {
-    pub path: UnparsedExpr,
+    pub path: lenient::Expr,
     pub comma_token: Option<Token![,]>,
     pub options: Punctuated<AssetOption, Token![,]>,
 }
@@ -123,9 +123,9 @@ impl Parse for Asset {
 /// Prints the call on one line if it fits. Otherwise, puts the path and each option
 /// on their own lines, followed by a comma.
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for Asset {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
-        use topcoat_core_grammar::pretty::TextMode;
+impl topcoat_core_grammar::common::pretty::PrettyPrint for Asset {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
+        use topcoat_core_grammar::common::pretty::TextMode;
 
         self.path.pretty_print(printer);
 

@@ -1,6 +1,6 @@
 use std::fmt::Write;
 
-use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
+use topcoat_core_grammar::common::pretty::{Registry, pretty_print_str};
 use topcoat_font_grammar::fontsource::{font::FontsourceFont, font_face::FontsourceFontFace};
 
 fn diff(expected: &str, actual: &str) -> String {

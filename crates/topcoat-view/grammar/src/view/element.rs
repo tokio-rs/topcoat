@@ -3,7 +3,7 @@ use syn::{
     Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::parse::ParseOption;
+use topcoat_core_grammar::common::ParseOption;
 
 use crate::{
     attributes::Attributes,
@@ -160,9 +160,9 @@ impl ParseOption for Element {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for Element {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
-        printer.scan_begin(topcoat_core_grammar::pretty::BreakMode::Consistent);
+impl topcoat_core_grammar::common::pretty::PrettyPrint for Element {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
+        printer.scan_begin(topcoat_core_grammar::common::pretty::BreakMode::Consistent);
         match self {
             Self::Normal {
                 opening_tag,

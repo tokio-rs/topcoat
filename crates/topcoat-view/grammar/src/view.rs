@@ -21,7 +21,7 @@ pub use nodes::*;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
-use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_context};
+use topcoat_core_grammar::common::{ParseOption, paths::topcoat_context};
 
 use crate::{
     leading_cx::LeadingCx,
@@ -70,8 +70,8 @@ impl ToTokens for View {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for View {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for View {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         if let Some(cx) = &self.cx {
             cx.pretty_print(printer);
         }

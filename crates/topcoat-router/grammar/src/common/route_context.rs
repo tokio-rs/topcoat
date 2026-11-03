@@ -5,7 +5,7 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Paren,
 };
-use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_context};
+use topcoat_core_grammar::common::{ParseOption, paths::topcoat_context};
 
 mod kw {
     syn::custom_keyword!(with);
@@ -71,9 +71,9 @@ impl ParseOption for RouteContext {
 /// Prints the entry as `with(value)`, formatting the value as an expression.
 /// A long value breaks onto its own line inside the parentheses.
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for RouteContext {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
-        use topcoat_core_grammar::pretty::{BreakMode, Delim};
+impl topcoat_core_grammar::common::pretty::PrettyPrint for RouteContext {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
+        use topcoat_core_grammar::common::pretty::{BreakMode, Delim};
 
         printer.move_cursor(self.with.span.start());
         "with".pretty_print(printer);
@@ -95,11 +95,11 @@ impl RouteContext {
     /// breaks. A comma after the last entry is dropped, as `rustfmt` does for
     /// attribute arguments.
     pub(crate) fn pretty_print_entries(
-        printer: &mut topcoat_core_grammar::pretty::Printer<'_>,
+        printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>,
         comma: Option<&syn::Token![,]>,
         entries: &syn::punctuated::Punctuated<Self, syn::Token![,]>,
     ) {
-        use topcoat_core_grammar::pretty::{PrettyPrint, Printer};
+        use topcoat_core_grammar::common::pretty::{PrettyPrint, Printer};
 
         let separator = |printer: &mut Printer<'_>| {
             printer.scan_same_line_trivia();

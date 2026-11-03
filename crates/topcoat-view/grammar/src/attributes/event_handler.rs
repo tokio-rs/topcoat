@@ -4,7 +4,7 @@ use syn::{
     LitStr, Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_runtime};
+use topcoat_core_grammar::common::{ParseOption, paths::topcoat_runtime};
 
 use crate::{
     attributes::{
@@ -46,8 +46,8 @@ impl ToTokens for EventHandlerValue {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for EventHandlerValue {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for EventHandlerValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match self {
             Self::Expr(inner) => inner.pretty_print(printer),
             Self::LitStr(inner) => inner.pretty_print(printer),
@@ -143,8 +143,8 @@ impl ParseOption for EventHandler {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for EventHandler {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for EventHandler {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.at.pretty_print(printer);
         self.key.pretty_print(printer);
         self.eq.pretty_print(printer);

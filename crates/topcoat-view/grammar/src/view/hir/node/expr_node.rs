@@ -1,7 +1,7 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::Ident;
-use topcoat_core_grammar::paths::topcoat_view;
+use topcoat_core_grammar::common::paths::topcoat_view;
 
 use crate::view::hir::emit::{Emit, Emitter};
 

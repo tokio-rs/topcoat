@@ -7,9 +7,9 @@ use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
 };
-use topcoat_core_grammar::{
+use topcoat_core_grammar::common::{
+    QuoteOption,
     paths::{topcoat_inventory, topcoat_router},
-    quote_option::QuoteOption,
 };
 
 pub struct Segment {
@@ -49,8 +49,8 @@ impl Parse for Segment {
 /// Prints the options on one line if they fit. Otherwise, puts each option on
 /// its own line, followed by a comma.
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for Segment {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for Segment {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.attrs.pretty_print(printer);
     }
 }
@@ -156,9 +156,9 @@ impl Parse for SegmentAttr {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for SegmentAttr {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
-        use topcoat_core_grammar::pretty::Printer;
+impl topcoat_core_grammar::common::pretty::PrettyPrint for SegmentAttr {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
+        use topcoat_core_grammar::common::pretty::Printer;
 
         let option = |printer: &mut Printer<'_>, name: &'static str, span: Span| {
             printer.move_cursor(span.start());

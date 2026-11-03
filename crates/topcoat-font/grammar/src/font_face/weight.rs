@@ -4,10 +4,7 @@ use syn::{
     LitInt, Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::{
-    parse::{ParseOption, UnparsedExpr},
-    paths::topcoat_font,
-};
+use topcoat_core_grammar::common::{ParseOption, lenient, paths::topcoat_font};
 
 mod kw {
     use syn::custom_keyword;
@@ -47,8 +44,8 @@ impl ToTokens for FontWeight {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontWeight {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontWeight {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.key.pretty_print(printer);
         self.colon_token.pretty_print(printer);
         " ".pretty_print(printer);
@@ -79,8 +76,8 @@ impl ParseOption for FontWeightKey {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontWeightKey {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontWeightKey {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
         printer.move_cursor(self.font_kw.span().start());
         "font-weight".pretty_print(printer);
@@ -89,7 +86,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontWeightKey {
 }
 
 pub enum FontWeightValue {
-    Expr(UnparsedExpr),
+    Expr(lenient::Expr),
     Css(FontWeightRange),
 }
 
@@ -113,8 +110,8 @@ impl ToTokens for FontWeightValue {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontWeightValue {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontWeightValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match self {
             Self::Css(range) => range.pretty_print(printer),
             Self::Expr(inner) => inner.pretty_print(printer),
@@ -162,8 +159,8 @@ impl ToTokens for FontWeightRange {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontWeightRange {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontWeightRange {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.start.pretty_print(printer);
         if let Some(end) = &self.end {
             " ".pretty_print(printer);
@@ -220,8 +217,8 @@ impl ToTokens for FontWeightLevel {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontWeightLevel {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontWeightLevel {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         // Preserve the written form (`400`, `normal`, `bold`) rather than
         // normalizing keywords to their numeric weight.
         printer.move_cursor(self.span.start());

@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{Expr, Ident, Pat, Token};
-use topcoat_core_grammar::{parse::UnparsedExpr, paths::topcoat_view};
+use topcoat_core_grammar::common::{lenient, paths::topcoat_view};
 
 /// The bindings a control-flow pattern introduces into its body's scope.
 ///
@@ -27,7 +27,7 @@ impl Bindings {
     /// Collects the bindings of an `if` condition: the patterns of its
     /// `let`s, walking `&&` chains. A condition that is not a complete
     /// expression yet binds nothing.
-    pub(crate) fn of_condition(cond: &UnparsedExpr) -> Self {
+    pub(crate) fn of_condition(cond: &lenient::Expr) -> Self {
         let mut bindings = Self::empty();
         if let Ok(expr) = syn::parse2::<Expr>(cond.tokens.clone()) {
             bindings.collect_condition(&expr);
@@ -166,7 +166,7 @@ mod tests {
         bindings.idents().map(Ident::to_string).collect()
     }
 
-    fn condition_idents(cond: &UnparsedExpr) -> Vec<String> {
+    fn condition_idents(cond: &lenient::Expr) -> Vec<String> {
         let bindings = Bindings::of_condition(cond);
         bindings.idents().map(Ident::to_string).collect()
     }

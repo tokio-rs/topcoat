@@ -1,7 +1,7 @@
 use syn::{parse::Parser, punctuated::Punctuated, spanned::Spanned};
 
 use super::common;
-use crate::pretty::{BreakMode, Delim, MacroSnippet, PrettyPrint, Printer, TextMode};
+use crate::common::pretty::{BreakMode, Delim, MacroSnippet, PrettyPrint, Printer, TextMode};
 
 impl PrettyPrint for syn::Macro {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
@@ -66,7 +66,7 @@ mod tests {
     };
 
     use super::super::common::tests::{format, format_with_registry};
-    use crate::pretty::{PrettyPrint, Printer, Registry};
+    use crate::common::pretty::{PrettyPrint, Printer, Registry};
 
     fn expr(source: &str) -> String {
         format::<syn::Expr>(source)

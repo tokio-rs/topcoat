@@ -28,8 +28,8 @@ impl Parse for ErrorAttr {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for ErrorAttr {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for ErrorAttr {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         printer.move_cursor(self.error_token.span.start());
         "error".pretty_print(printer);
         printer.move_cursor(self.error_token.span.end());

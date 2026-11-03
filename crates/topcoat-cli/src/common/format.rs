@@ -1,6 +1,6 @@
 //! Formatting of Topcoat macro bodies.
 
-use topcoat_core_grammar::pretty::Registry;
+use topcoat_core_grammar::common::pretty::Registry;
 
 /// Every macro whose body Topcoat can format: function-like macros, then
 /// attribute macros.

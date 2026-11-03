@@ -2,7 +2,7 @@ use std::{cell::Cell, rc::Rc};
 
 use proc_macro2::{Span, TokenStream};
 use syn::{Ident, Pat, Path};
-use topcoat_core_grammar::parse::UnparsedExpr;
+use topcoat_core_grammar::common::lenient;
 
 use super::{
     Component, ExprKind, ExprNode, ForLoop, IfElse, Local, MatchArm, MatchExpr, Node, Scope,
@@ -137,8 +137,8 @@ impl ViewBuilder {
     pub fn for_loop(
         &mut self,
         pat: &Pat,
-        expr: &UnparsedExpr,
-        key: Option<UnparsedExpr>,
+        expr: &lenient::Expr,
+        key: Option<lenient::Expr>,
         f: impl FnOnce(&mut ViewBuilder),
     ) {
         self.flush();
@@ -157,7 +157,7 @@ impl ViewBuilder {
 
     pub fn if_else(
         &mut self,
-        expr: &UnparsedExpr,
+        expr: &lenient::Expr,
         f: impl FnOnce(&mut ViewBuilder, &mut ViewBuilder),
     ) {
         self.flush();
@@ -171,7 +171,7 @@ impl ViewBuilder {
         }));
     }
 
-    pub fn match_expr(&mut self, expr: &UnparsedExpr, f: impl FnOnce(&mut MatchArmsBuilder)) {
+    pub fn match_expr(&mut self, expr: &lenient::Expr, f: impl FnOnce(&mut MatchArmsBuilder)) {
         self.flush();
         let mut builder = MatchArmsBuilder {
             arms: Vec::new(),
@@ -204,7 +204,7 @@ impl MatchArmsBuilder {
     pub fn arm(
         &mut self,
         pat: &Pat,
-        guard: Option<&UnparsedExpr>,
+        guard: Option<&lenient::Expr>,
         f: impl FnOnce(&mut ViewBuilder),
     ) {
         let mut body = self.template.nested();

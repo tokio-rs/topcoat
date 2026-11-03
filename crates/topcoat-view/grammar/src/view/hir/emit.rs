@@ -1,7 +1,7 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{TokenStreamExt, format_ident, quote, quote_spanned};
 use syn::Ident;
-use topcoat_core_grammar::paths::topcoat_view;
+use topcoat_core_grammar::common::paths::topcoat_view;
 
 /// HIR nodes that emit themselves into the two phases of an [`Emitter`].
 pub(crate) trait Emit {

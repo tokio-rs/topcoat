@@ -3,7 +3,7 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Brace,
 };
-use topcoat_core_grammar::parse::UnparsedExpr;
+use topcoat_core_grammar::common::lenient;
 use topcoat_view_grammar::view::View;
 
 /// The value of a [`MailField`](super::MailField), shaped by the field's
@@ -12,7 +12,7 @@ pub enum FieldValue {
     /// A braced `view!` body: the value of the `html` field.
     Html(HtmlValue),
     /// An expression, ending at the next `,`: every other value.
-    Expr(UnparsedExpr),
+    Expr(lenient::Expr),
 }
 
 impl FieldValue {
@@ -49,8 +49,8 @@ impl Parse for HtmlValue {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FieldValue {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FieldValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match self {
             Self::Html(html) => html.pretty_print(printer),
             Self::Expr(expr) => expr.pretty_print(printer),
@@ -59,9 +59,9 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FieldValue {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for HtmlValue {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
-        use topcoat_core_grammar::pretty::{BreakMode, Delim};
+impl topcoat_core_grammar::common::pretty::PrettyPrint for HtmlValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
+        use topcoat_core_grammar::common::pretty::{BreakMode, Delim};
 
         self.brace_token
             .pretty_print(printer, Some(BreakMode::Consistent), |printer| {

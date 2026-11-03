@@ -59,8 +59,8 @@ impl LowerAttribute for AttributeNodes {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for AttributeNodes {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for AttributeNodes {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         for (index, node) in self.iter().enumerate() {
             node.pretty_print(printer);
             if index < self.len() - 1 {

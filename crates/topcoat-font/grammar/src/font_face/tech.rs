@@ -5,10 +5,7 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Paren,
 };
-use topcoat_core_grammar::{
-    parse::{ParseOption, UnparsedExpr},
-    paths::topcoat_font,
-};
+use topcoat_core_grammar::common::{ParseOption, lenient, paths::topcoat_font};
 
 mod kw {
     use syn::custom_keyword;
@@ -50,10 +47,10 @@ impl ToTokens for FontTechHint {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontTechHint {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontTechHint {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
-        use topcoat_core_grammar::pretty::Delim;
+        use topcoat_core_grammar::common::pretty::Delim;
 
         printer.move_cursor(self.tech_kw.span().start());
         "tech".pretty_print(printer);
@@ -68,7 +65,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontTechHint {
 /// A string literal is a CSS keyword, and an unknown keyword expands to a
 /// compile error. Other expressions must evaluate to
 /// [`topcoat_font::FontTech`].
-pub struct FontTech(pub UnparsedExpr);
+pub struct FontTech(pub lenient::Expr);
 
 impl Parse for FontTech {
     fn parse(input: ParseStream) -> syn::Result<Self> {
@@ -98,8 +95,8 @@ impl ToTokens for FontTech {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontTech {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontTech {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.0.pretty_print(printer);
     }
 }

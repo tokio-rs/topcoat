@@ -5,7 +5,7 @@ use syn::{
     LitStr,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::glob::Glob;
+use topcoat_core_grammar::common::Glob;
 
 /// A Fluent file pattern containing `{locale}`, such as `"./l10n/{locale}.ftl"` or
 /// `"./**/l10n/{locale}/**/*.ftl"`.

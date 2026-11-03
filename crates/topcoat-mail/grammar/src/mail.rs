@@ -10,7 +10,7 @@ use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
 };
-use topcoat_core_grammar::paths::{topcoat_error, topcoat_mail};
+use topcoat_core_grammar::common::paths::{topcoat_error, topcoat_mail};
 
 /// The parsed body of a `mail!` invocation: `name: value` fields in any
 /// order, at most once each. Lowers to an awaited `async` block that
@@ -58,8 +58,8 @@ impl ToTokens for Mail {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for Mail {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for Mail {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.fields.pretty_print(printer);
     }
 }

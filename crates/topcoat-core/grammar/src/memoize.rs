@@ -7,7 +7,7 @@ use syn::{
     spanned::Spanned,
 };
 
-use crate::paths::topcoat_context;
+use crate::common::paths::topcoat_context;
 
 mod kw {
     use syn::custom_keyword;
@@ -40,8 +40,8 @@ impl Parse for MemoizeAttr {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for MemoizeAttr {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+impl crate::common::pretty::PrettyPrint for MemoizeAttr {
+    fn pretty_print(&self, printer: &mut crate::common::pretty::Printer<'_>) {
         if let Some(as_ref) = &self.as_ref {
             printer.move_cursor(as_ref.span.start());
             "as_ref".pretty_print(printer);
@@ -251,7 +251,7 @@ mod tests {
     #[cfg(feature = "pretty")]
     #[test]
     fn formats_the_arguments() {
-        use crate::pretty::{Registry, pretty_print_str};
+        use crate::common::pretty::{Registry, pretty_print_str};
 
         // `rustfmt` lays out the attribute at file level, so it is formatted
         // inside a macro body that `rustfmt` does not reach.

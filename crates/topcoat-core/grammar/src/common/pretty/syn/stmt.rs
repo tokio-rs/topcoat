@@ -1,5 +1,5 @@
 use super::common;
-use crate::pretty::{PrettyPrint, Printer};
+use crate::common::pretty::{PrettyPrint, Printer};
 
 impl PrettyPrint for syn::Block {
     fn pretty_print(&self, printer: &mut Printer<'_>) {

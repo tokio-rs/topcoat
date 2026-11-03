@@ -1,4 +1,4 @@
-//! [`PrettyPrint`](crate::pretty::PrettyPrint) implementations for the `syn`
+//! [`PrettyPrint`](crate::common::pretty::PrettyPrint) implementations for the `syn`
 //! syntax tree, so Rust code embedded in a macro body is laid out natively by
 //! the pretty printer, comments included.
 //!

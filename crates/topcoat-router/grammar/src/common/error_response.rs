@@ -7,10 +7,7 @@ use syn::{
     spanned::Spanned,
     token::Paren,
 };
-use topcoat_core_grammar::{
-    parse::{ParseOption, UnparsedExpr},
-    paths::topcoat_router,
-};
+use topcoat_core_grammar::common::{ParseOption, lenient, paths::topcoat_router};
 
 mod kw {
     syn::custom_keyword!(bad_request);
@@ -130,7 +127,7 @@ impl Parse for ErrorKind {
 /// The parenthesized arguments passed to an error constructor.
 pub struct ErrorArgs {
     pub paren_token: Paren,
-    pub args: Punctuated<UnparsedExpr, Token![,]>,
+    pub args: Punctuated<lenient::Expr, Token![,]>,
 }
 
 impl Parse for ErrorArgs {
@@ -150,16 +147,16 @@ impl ParseOption for ErrorArgs {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for ErrorResponse {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for ErrorResponse {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.kind.pretty_print(printer);
         self.args.pretty_print(printer);
     }
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for ErrorKind {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for ErrorKind {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         let (name, span) = match self {
             Self::BadRequest(kw) => ("bad_request", kw.span),
             Self::Forbidden(kw) => ("forbidden", kw.span),
@@ -175,9 +172,9 @@ impl topcoat_core_grammar::pretty::PrettyPrint for ErrorKind {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for ErrorArgs {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
-        use topcoat_core_grammar::pretty::{BreakMode, Delim};
+impl topcoat_core_grammar::common::pretty::PrettyPrint for ErrorArgs {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
+        use topcoat_core_grammar::common::pretty::{BreakMode, Delim};
 
         self.paren_token
             .pretty_print(printer, Some(BreakMode::Consistent), |printer| {

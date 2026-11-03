@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Pat;
-use topcoat_core_grammar::parse::UnparsedExpr;
+use topcoat_core_grammar::common::lenient;
 
 use super::{MatchArm, Node, Scope};
 
@@ -52,7 +52,7 @@ impl AttributeBuilder {
     pub fn for_loop(
         &mut self,
         pat: &Pat,
-        expr: &UnparsedExpr,
+        expr: &lenient::Expr,
         f: impl FnOnce(&mut AttributeBuilder),
     ) {
         let mut body = AttributeBuilder::new();
@@ -66,7 +66,7 @@ impl AttributeBuilder {
 
     pub fn if_else(
         &mut self,
-        cond: &UnparsedExpr,
+        cond: &lenient::Expr,
         f: impl FnOnce(&mut AttributeBuilder, &mut AttributeBuilder),
     ) {
         let mut then_branch = AttributeBuilder::new();
@@ -79,7 +79,7 @@ impl AttributeBuilder {
         });
     }
 
-    pub fn match_expr(&mut self, expr: &UnparsedExpr, f: impl FnOnce(&mut MatchArmsBuilder)) {
+    pub fn match_expr(&mut self, expr: &lenient::Expr, f: impl FnOnce(&mut MatchArmsBuilder)) {
         let mut builder = MatchArmsBuilder { arms: Vec::new() };
         f(&mut builder);
         self.nodes.push(Node::Match {
@@ -104,7 +104,7 @@ impl MatchArmsBuilder {
     pub fn arm(
         &mut self,
         pat: &Pat,
-        guard: Option<&UnparsedExpr>,
+        guard: Option<&lenient::Expr>,
         f: impl FnOnce(&mut AttributeBuilder),
     ) {
         let mut body = AttributeBuilder::new();

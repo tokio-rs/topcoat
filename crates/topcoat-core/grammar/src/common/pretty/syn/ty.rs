@@ -1,7 +1,7 @@
 use syn::spanned::Spanned;
 
 use super::{common, path::qpath};
-use crate::pretty::{BreakMode, Delim, PrettyPrint, Printer, TextMode};
+use crate::common::pretty::{BreakMode, Delim, PrettyPrint, Printer, TextMode};
 
 impl PrettyPrint for syn::Type {
     fn pretty_print(&self, printer: &mut Printer<'_>) {

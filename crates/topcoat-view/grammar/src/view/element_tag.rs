@@ -2,7 +2,7 @@ use syn::{
     Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::parse::ParseOption;
+use topcoat_core_grammar::common::ParseOption;
 
 use crate::{attributes::Attributes, view::ElementName};
 
@@ -26,9 +26,9 @@ impl Parse for OpeningTag {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for OpeningTag {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
-        printer.scan_begin(topcoat_core_grammar::pretty::BreakMode::Consistent);
+impl topcoat_core_grammar::common::pretty::PrettyPrint for OpeningTag {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
+        printer.scan_begin(topcoat_core_grammar::common::pretty::BreakMode::Consistent);
         self.lt.pretty_print(printer);
         self.name.pretty_print(printer);
         if !self.attributes.is_empty() {
@@ -66,9 +66,9 @@ impl Parse for SelfClosingTag {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for SelfClosingTag {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
-        printer.scan_begin(topcoat_core_grammar::pretty::BreakMode::Consistent);
+impl topcoat_core_grammar::common::pretty::PrettyPrint for SelfClosingTag {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
+        printer.scan_begin(topcoat_core_grammar::common::pretty::BreakMode::Consistent);
         self.lt.pretty_print(printer);
         self.name.pretty_print(printer);
         if !self.attributes.is_empty() {
@@ -143,8 +143,8 @@ impl ParseOption for ClosingTag {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for ClosingTag {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for ClosingTag {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.lt.pretty_print(printer);
         self.slash.pretty_print(printer);
         self.name.pretty_print(printer);

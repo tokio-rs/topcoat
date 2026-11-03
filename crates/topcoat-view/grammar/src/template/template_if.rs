@@ -2,7 +2,7 @@ use syn::{
     Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::parse::{ParseOption, UnparsedExpr};
+use topcoat_core_grammar::common::{ParseOption, lenient};
 
 use crate::{
     attributes::hir::{AttributeBuilder, LowerAttribute},
@@ -13,7 +13,7 @@ use crate::{
 /// An `if cond { ... } else { ... }` chain in view-body position.
 pub struct TemplateIf<T> {
     pub if_token: Token![if],
-    pub cond: UnparsedExpr,
+    pub cond: lenient::Expr,
     pub then_branch: TemplateBlock<T>,
     pub else_branch: Option<TemplateElse<T>>,
 }
@@ -44,7 +44,7 @@ impl<T: Parse> Parse for TemplateIf<T> {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
             if_token: input.parse()?,
-            cond: input.call(UnparsedExpr::parse_without_eager_brace)?,
+            cond: input.call(lenient::Expr::parse_without_eager_brace)?,
             then_branch: input.parse()?,
             else_branch: input.call(TemplateElse::parse_option)?,
         })
@@ -59,10 +59,10 @@ impl<T: Parse> ParseOption for TemplateIf<T> {
 }
 
 #[cfg(feature = "pretty")]
-impl<T: topcoat_core_grammar::pretty::PrettyPrint> topcoat_core_grammar::pretty::PrettyPrint
-    for TemplateIf<T>
+impl<T: topcoat_core_grammar::common::pretty::PrettyPrint>
+    topcoat_core_grammar::common::pretty::PrettyPrint for TemplateIf<T>
 {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.if_token.pretty_print(printer);
         " ".pretty_print(printer);
         self.cond.pretty_print(printer);
@@ -126,10 +126,10 @@ impl<T: Parse> ParseOption for TemplateElse<T> {
 }
 
 #[cfg(feature = "pretty")]
-impl<T: topcoat_core_grammar::pretty::PrettyPrint> topcoat_core_grammar::pretty::PrettyPrint
-    for TemplateElse<T>
+impl<T: topcoat_core_grammar::common::pretty::PrettyPrint>
+    topcoat_core_grammar::common::pretty::PrettyPrint for TemplateElse<T>
 {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match self {
             Self::ElseIf {
                 else_token,

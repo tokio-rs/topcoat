@@ -1,5 +1,5 @@
 use super::common;
-use crate::pretty::{BreakMode, Delim, PrettyPrint, Printer};
+use crate::common::pretty::{BreakMode, Delim, PrettyPrint, Printer};
 
 impl PrettyPrint for syn::Path {
     fn pretty_print(&self, printer: &mut Printer<'_>) {

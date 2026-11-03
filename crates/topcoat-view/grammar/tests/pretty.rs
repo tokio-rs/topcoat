@@ -1,6 +1,6 @@
 use std::{fmt::Write, path::Path};
 
-use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
+use topcoat_core_grammar::common::pretty::{Registry, pretty_print_str};
 use topcoat_view_grammar::view::View;
 
 fn diff(expected: &str, actual: &str) -> String {

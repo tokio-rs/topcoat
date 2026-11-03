@@ -5,10 +5,7 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Paren,
 };
-use topcoat_core_grammar::{
-    parse::{ParseOption, UnparsedExpr},
-    paths::topcoat_font,
-};
+use topcoat_core_grammar::common::{ParseOption, lenient, paths::topcoat_font};
 
 mod kw {
     use syn::custom_keyword;
@@ -50,10 +47,10 @@ impl ToTokens for FontFormatHint {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontFormatHint {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontFormatHint {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
-        use topcoat_core_grammar::pretty::Delim;
+        use topcoat_core_grammar::common::pretty::Delim;
 
         printer.move_cursor(self.format_kw.span().start());
         "format".pretty_print(printer);
@@ -68,7 +65,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontFormatHint {
 /// A string literal is a CSS keyword, and an unknown keyword expands to a
 /// compile error. Other expressions must evaluate to
 /// [`topcoat_font::FontFormat`].
-pub struct FontFormat(pub UnparsedExpr);
+pub struct FontFormat(pub lenient::Expr);
 
 impl Parse for FontFormat {
     fn parse(input: ParseStream) -> syn::Result<Self> {
@@ -98,8 +95,8 @@ impl ToTokens for FontFormat {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontFormat {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontFormat {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.0.pretty_print(printer);
     }
 }

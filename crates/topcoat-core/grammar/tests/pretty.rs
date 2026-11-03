@@ -2,7 +2,9 @@ use std::{fmt::Write, path::Path};
 
 use proc_macro2::LineColumn;
 use syn::parse::Parser;
-use topcoat_core_grammar::pretty::{BreakMode, Lexer, MARGIN, PrettyPrint, Printer, Registry};
+use topcoat_core_grammar::common::pretty::{
+    BreakMode, Lexer, MARGIN, PrettyPrint, Printer, Registry,
+};
 
 fn diff(expected: &str, actual: &str) -> String {
     let mut output = String::new();

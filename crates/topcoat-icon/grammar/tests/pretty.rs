@@ -1,4 +1,4 @@
-use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
+use topcoat_core_grammar::common::pretty::{Registry, pretty_print_str};
 use topcoat_icon_grammar::iconify::{IconifyIcon, Include};
 
 fn registry() -> Registry {

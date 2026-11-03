@@ -6,7 +6,7 @@ use syn::{
     parse::{Parse, ParseStream},
     spanned::Spanned,
 };
-use topcoat_core_grammar::paths::topcoat_runtime;
+use topcoat_core_grammar::common::paths::topcoat_runtime;
 
 /// Names reserved for browser runtime members and JavaScript protocols.
 const RESERVED_FIELDS: &[&str] = &[
@@ -32,8 +32,8 @@ impl Parse for RecordAttr {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for RecordAttr {
-    fn pretty_print(&self, _printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {}
+impl topcoat_core_grammar::common::pretty::PrettyPrint for RecordAttr {
+    fn pretty_print(&self, _printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {}
 }
 
 /// A struct accepted by `#[record]`, with named fields and no generics.

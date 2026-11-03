@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use proc_macro2::LineColumn;
 
-use crate::pretty::{
+use crate::common::pretty::{
     BeginToken, BreakMode, BreakToken, TextMode, TextToken, Token, TokenBuffer, Trivia, TriviaKind,
     registry::Registry,
 };

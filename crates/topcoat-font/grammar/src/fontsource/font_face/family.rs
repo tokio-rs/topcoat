@@ -4,7 +4,7 @@ use syn::{
     Ident,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::paths::topcoat_font_fontsource;
+use topcoat_core_grammar::common::paths::topcoat_font_fontsource;
 use topcoat_font::fontsource::Family;
 
 /// A Fontsource font family, written as the name of its
@@ -41,8 +41,8 @@ impl ToTokens for FamilyName {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FamilyName {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FamilyName {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.0.pretty_print(printer);
     }
 }

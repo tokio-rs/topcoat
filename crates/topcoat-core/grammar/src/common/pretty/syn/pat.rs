@@ -1,7 +1,7 @@
 use syn::spanned::Spanned;
 
 use super::{common, path::qpath};
-use crate::pretty::{BreakMode, Delim, PrettyPrint, Printer, TextMode};
+use crate::common::pretty::{BreakMode, Delim, PrettyPrint, Printer, TextMode};
 
 impl PrettyPrint for syn::Pat {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
@@ -199,7 +199,7 @@ mod tests {
     use syn::parse::{Parse, ParseStream};
 
     use super::super::common::tests::format;
-    use crate::pretty::{PrettyPrint, Printer};
+    use crate::common::pretty::{PrettyPrint, Printer};
 
     /// Wraps [`syn::Pat`], which offers only inherent parse methods, so the
     /// test helper can parse one through [`Parse`].

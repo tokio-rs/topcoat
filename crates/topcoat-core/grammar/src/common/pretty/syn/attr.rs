@@ -1,7 +1,7 @@
 use syn::spanned::Spanned;
 
 use super::common;
-use crate::pretty::{MacroSnippet, PrettyPrint, Printer, TextMode};
+use crate::common::pretty::{MacroSnippet, PrettyPrint, Printer, TextMode};
 
 impl PrettyPrint for syn::Attribute {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
@@ -47,7 +47,7 @@ impl PrettyPrint for syn::Attribute {
 #[cfg(test)]
 mod tests {
     use super::super::common::tests::{format, format_with_registry};
-    use crate::pretty::Registry;
+    use crate::common::pretty::Registry;
 
     fn block(source: &str) -> String {
         format::<syn::Block>(source)

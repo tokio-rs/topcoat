@@ -1,4 +1,4 @@
-use topcoat_core_grammar::pretty::FormatError;
+use topcoat_core_grammar::common::pretty::FormatError;
 
 #[derive(Debug)]
 pub enum Error {

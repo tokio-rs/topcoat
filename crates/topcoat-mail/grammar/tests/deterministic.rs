@@ -1,4 +1,4 @@
-use topcoat_core_grammar::testing::assert_deterministic;
+use topcoat_core_grammar::common::testing::assert_deterministic;
 use topcoat_mail_grammar::mail::Mail;
 
 #[test]

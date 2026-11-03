@@ -4,10 +4,7 @@ use syn::{
     LitFloat, LitInt, Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::{
-    parse::{ParseOption, UnparsedExpr},
-    paths::topcoat_font,
-};
+use topcoat_core_grammar::common::{ParseOption, lenient, paths::topcoat_font};
 
 mod kw {
     use syn::custom_keyword;
@@ -48,8 +45,8 @@ impl ToTokens for FontStyle {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontStyle {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontStyle {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.key.pretty_print(printer);
         self.colon_token.pretty_print(printer);
         " ".pretty_print(printer);
@@ -80,8 +77,8 @@ impl ParseOption for FontStyleKey {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontStyleKey {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontStyleKey {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
         printer.move_cursor(self.font_kw.span().start());
         "font-style".pretty_print(printer);
@@ -90,7 +87,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontStyleKey {
 }
 
 pub enum FontStyleValue {
-    Expr(UnparsedExpr),
+    Expr(lenient::Expr),
     Css(FontStyleKind),
 }
 
@@ -114,8 +111,8 @@ impl ToTokens for FontStyleValue {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontStyleValue {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontStyleValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match self {
             Self::Css(kind) => kind.pretty_print(printer),
             Self::Expr(inner) => inner.pretty_print(printer),
@@ -167,8 +164,8 @@ impl ToTokens for FontStyleKind {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontStyleKind {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontStyleKind {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
         match self {
             Self::Normal(normal_kw) => {
@@ -306,8 +303,8 @@ impl ToTokens for ObliqueAngle {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for ObliqueAngle {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for ObliqueAngle {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         if let Some(minus_token) = &self.minus_token {
             minus_token.pretty_print(printer);
         }

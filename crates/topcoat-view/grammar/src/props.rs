@@ -5,7 +5,7 @@ use syn::{
     Attribute, Data, DeriveInput, Fields, GenericParam, Generics, Ident, Meta, Type, Visibility,
     ext::IdentExt, parse_quote,
 };
-use topcoat_core_grammar::{parse::UnparsedExpr, paths::topcoat_view};
+use topcoat_core_grammar::common::{lenient, paths::topcoat_view};
 
 /// A parsed `#[derive(Props)]` struct. Expands into a typestate builder where
 /// every field without `#[default]` must be set before `build()` becomes
@@ -39,7 +39,7 @@ struct PropsField {
     /// The expression a `#[default(expr)]` field falls back to when unset.
     /// `None` for a bare `#[default]` (which uses `Default::default()`) and for
     /// required fields.
-    default_expr: Option<UnparsedExpr>,
+    default_expr: Option<lenient::Expr>,
     /// The typestate parameter tracking whether this field has been set.
     /// `None` for `#[default]` fields, which never need to be set.
     state: Option<Ident>,

@@ -11,7 +11,7 @@ use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
 };
-use topcoat_core_grammar::paths::topcoat_cookie;
+use topcoat_core_grammar::common::paths::topcoat_cookie;
 pub use value::*;
 
 /// Arguments to `cookie!`, written like a `Set-Cookie` header: the cookie's
@@ -75,9 +75,9 @@ impl Parse for Cookie {
 /// Prints the cookie on one line if it fits. Otherwise, puts the name and value and
 /// each attribute on their own lines, followed by a `;`.
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for Cookie {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
-        use topcoat_core_grammar::pretty::TextMode;
+impl topcoat_core_grammar::common::pretty::PrettyPrint for Cookie {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
+        use topcoat_core_grammar::common::pretty::TextMode;
 
         self.name.pretty_print(printer);
         " ".pretty_print(printer);

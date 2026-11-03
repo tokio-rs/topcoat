@@ -53,8 +53,8 @@ impl ToTokens for AttributeValue {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for AttributeValue {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for AttributeValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match self {
             Self::Expr(inner) => inner.pretty_print(printer),
             Self::LitStr(inner) => inner.pretty_print(printer),

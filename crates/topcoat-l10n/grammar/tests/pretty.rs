@@ -1,5 +1,5 @@
 use syn::parse::Parse;
-use topcoat_core_grammar::pretty::{
+use topcoat_core_grammar::common::pretty::{
     Lexer, MARGIN, Macro, PrettyPrint, Printer, Registry, pretty_print_str,
 };
 use topcoat_l10n_grammar::fluent::{Messages, Translate};

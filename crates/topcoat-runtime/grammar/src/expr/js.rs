@@ -2,7 +2,7 @@ use std::{fmt, ops::AddAssign};
 
 use proc_macro2::{Ident, TokenStream};
 use quote::{ToTokens, quote};
-use topcoat_core_grammar::paths::topcoat_runtime;
+use topcoat_core_grammar::common::paths::topcoat_runtime;
 
 /// JavaScript source interleaved with expressions captured by the server.
 #[derive(Default)]

@@ -19,7 +19,6 @@ discover = [
 ]
 
 [dependencies]
-topcoat-core-grammar.workspace = true
 topcoat-runtime-grammar.workspace = true
 
 quote.workspace = true

@@ -1,7 +1,7 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
 use syn::Path;
-use topcoat_core_grammar::paths::{topcoat_context, topcoat_core, topcoat_view};
+use topcoat_core_grammar::common::paths::{topcoat_context, topcoat_core, topcoat_view};
 
 use crate::view::{
     NamedArg,

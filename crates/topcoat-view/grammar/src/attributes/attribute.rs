@@ -5,7 +5,7 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Paren,
 };
-use topcoat_core_grammar::{parse::ParseOption, paths::topcoat_view};
+use topcoat_core_grammar::common::{ParseOption, paths::topcoat_view};
 use topcoat_view::{Formatter, HtmlContext};
 
 use crate::{
@@ -94,8 +94,8 @@ impl ParseOption for Attribute {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for Attribute {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for Attribute {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.key.pretty_print(printer);
         self.eq.pretty_print(printer);
         self.value.pretty_print(printer);

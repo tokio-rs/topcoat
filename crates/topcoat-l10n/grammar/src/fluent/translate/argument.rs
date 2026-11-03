@@ -5,7 +5,7 @@ use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
 };
-use topcoat_core_grammar::parse::{ParseOption, UnparsedExpr};
+use topcoat_core_grammar::common::{ParseOption, lenient};
 
 use crate::fluent::{DocComments, FluentIdent, FluentIdentToken};
 
@@ -50,9 +50,9 @@ impl Parse for TranslateArguments {
 /// only when the list is split over several lines. A comma without arguments is
 /// dropped.
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for TranslateArguments {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
-        use topcoat_core_grammar::pretty::TextMode;
+impl topcoat_core_grammar::common::pretty::PrettyPrint for TranslateArguments {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
+        use topcoat_core_grammar::common::pretty::TextMode;
 
         let Some(comma_token) = &self.comma_token else {
             return;
@@ -144,8 +144,8 @@ impl Parse for TranslateArgument {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for TranslateArgument {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for TranslateArgument {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.docs.pretty_print(printer);
         self.name.pretty_print(printer);
         self.value.pretty_print(printer);
@@ -157,7 +157,7 @@ pub struct TranslateArgumentValue {
     /// The colon before the expression.
     pub colon_token: Token![:],
     /// The value. May be empty while the user types.
-    pub expr: UnparsedExpr,
+    pub expr: lenient::Expr,
 }
 
 impl Parse for TranslateArgumentValue {
@@ -177,8 +177,8 @@ impl ParseOption for TranslateArgumentValue {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for TranslateArgumentValue {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for TranslateArgumentValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.colon_token.pretty_print(printer);
         if !self.expr.is_empty() {
             " ".pretty_print(printer);

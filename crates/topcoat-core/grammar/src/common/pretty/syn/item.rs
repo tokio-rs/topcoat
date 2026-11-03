@@ -1,7 +1,7 @@
 use syn::spanned::Spanned;
 
 use super::{common, ty::bounds};
-use crate::pretty::{BreakMode, Delim, PrettyPrint, Printer, Unspaced};
+use crate::common::pretty::{BreakMode, Delim, PrettyPrint, Printer, Unspaced};
 
 impl PrettyPrint for syn::Item {
     fn pretty_print(&self, printer: &mut Printer<'_>) {

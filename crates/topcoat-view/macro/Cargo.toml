@@ -14,7 +14,6 @@ rust-version.workspace = true
 proc-macro = true
 
 [dependencies]
-topcoat-core-grammar.workspace = true
 topcoat-view-grammar.workspace = true
 
 quote.workspace = true

@@ -11,7 +11,7 @@ use std::{
 /// # Example
 ///
 /// ```
-/// # use topcoat_core_grammar::pretty::RingBuffer;
+/// # use topcoat_core_grammar::common::pretty::RingBuffer;
 /// let mut buffer = RingBuffer::new();
 /// buffer.push_back("first"); // index 0
 /// buffer.push_back("second"); // index 1
