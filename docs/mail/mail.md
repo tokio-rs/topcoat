@@ -55,7 +55,7 @@ let mail = mail! {
 
 # The HTML Body
 
-A braced `html` value uses [`view!`] syntax. Add a leading `cx =>` when the view needs the request context:
+A braced `html` value uses [`view!`] syntax and captures the surrounding variable named `cx` as its context:
 
 ```rust
 # use topcoat::{Result, context::Cx};
@@ -74,6 +74,8 @@ async fn welcome(cx: &Cx, name: &str) -> Result<Mail> {
     }
 }
 ```
+
+To add or override context values for the HTML body, shadow `cx` with `let cx = cx.with(value);` before `mail!`. See the [`view!` context guide](../view/macro.view.html#request-context) for shadowing and capture ownership.
 
 Pass an unbraced [`View`] expression to use an existing view.
 

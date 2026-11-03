@@ -19,6 +19,8 @@ Ok(view! {
 # }
 ```
 
+The macro borrows the surrounding variable named `cx`, which can be a `Cx` or `&Cx`, and builds the attributes immediately. To add or override context values used while building them, shadow `cx` with `let cx = cx.with(value);` before `attributes!`. See the [`view!` context guide](macro.view.html#request-context) for an example of context shadowing.
+
 # Syntax
 
 The body uses the same attribute syntax as an element in [`view!`], including expressions and control flow:

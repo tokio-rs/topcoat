@@ -191,7 +191,7 @@ Regions need a stable identity across renders. When a `view!` loop contains live
 
 # Request Context
 
-Inside a [`component`], the request context is available implicitly. In a plain function, pass it at the start of the live region:
+`live!` uses the surrounding variable named `cx` to identify the live region. Its body captures variables by move, like an `async move` block. This works the same way inside a [`component`] or an ordinary function:
 
 ```rust
 use topcoat::{context::Cx, view::{View, emit, live}};
@@ -201,7 +201,7 @@ fn greeting(cx: &Cx) -> impl View {
 }
 ```
 
-With `cx =>`, the returned view owns a clone of the supplied context. Without `cx =>`, it borrows the enclosing body's context. Emissions use that context implicitly. An individual emission can use another context with `emit! { ... }`. See the [`view!`] guide's section on rendering outside a component.
+`emit!` borrows the `cx` in scope at each emission. To add or override context values for the region, shadow `cx` with `let cx = cx.with(value);` before `live!`. To change the context for emitted content, shadow `cx` inside the live body before `emit!`. See the [`view!` context guide](macro.view.html#request-context) for shadowing and capture ownership.
 
 # Suspense And Error Boundaries
 
