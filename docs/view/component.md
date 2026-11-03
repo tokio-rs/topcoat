@@ -1,4 +1,4 @@
-The [`#[component]`][`component`] attribute defines an async function that returns a view. Components accept typed parameters and return [`Result<impl View>`][`Result`].
+The [`#[component]`][`component`] attribute defines a reusable view. The function must be `async` and take `cx: &Cx` as its first parameter, even when unused. Additional parameters define its props. The function must return [`Result<impl View>`][`Result`].
 
 ```rust
 use topcoat::{
@@ -19,7 +19,7 @@ async fn badge(cx: &Cx, label: &str, is_success: bool) -> Result<impl View> {
 
 # Calling Components
 
-Call components inside [`view!`] with named arguments:
+Call components inside [`view!`] with named arguments. Omit `cx` from the call; the view supplies it automatically:
 
 ```rust
 # use topcoat::{Result, context::Cx, view::*};
@@ -125,7 +125,7 @@ Prefer `#[into]` when the component only needs the converted value.
 
 # Request Context
 
-Components can ask for the current request context by declaring a `cx` parameter that borrows [`Cx`]:
+Every component receives the current request context through its `cx: &Cx` parameter. Use it to read context values or request data:
 
 ```rust
 use topcoat::{

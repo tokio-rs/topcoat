@@ -17,7 +17,7 @@ async fn search_results(cx: &Cx, query: String) -> Result<impl View> {
 
 # Calling Shards
 
-Inside a [`view!`] body, call a shard like a component. Each parameter accepts its declared type `T` or an `Expr<T>`, with conversion handled automatically:
+Inside a [`view!`] body, call a shard like a component. Omit `cx` from the call; Topcoat supplies the server request context automatically. Each remaining parameter accepts its declared type `T` or an `Expr<T>`, with conversion handled automatically:
 
 ```rust
 # use topcoat::{Result, context::Cx, view::*, runtime::{shard, signal, Event}};
@@ -101,9 +101,7 @@ The [`context`] module covers writing guards as functions on [`Cx`].
 
 # Arguments And Return Type
 
-Argument types must belong to the shared vocabulary of [`expr!`], since their values cross between Rust and JavaScript. The return type is a [`Result`] of a value implementing [`View`], like a component's.
-
-A parameter named `cx` of type `&Cx` receives the server request context. Callers omit this argument.
+The function must be `async` and take `cx: &Cx` as its first parameter, even when unused. Additional parameter types must belong to the shared vocabulary of [`expr!`], since their values cross between Rust and JavaScript. The function must return a [`Result`] containing a [`View`], like a component.
 
 A parameter typed [`Signal<T>`] accepts a signal handle. Passing the handle alone does not make the shard depend on its value. A tracked read in the shard body creates that dependency. Use an untracked read to use the value without triggering renders when it changes:
 
