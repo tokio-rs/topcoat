@@ -43,16 +43,12 @@ impl Scope {
     ///
     /// The body owns captured values and drives the view before dropping
     /// them, keeping the view's borrows valid.
-    ///
-    /// With `owns_cx`, the block takes ownership of `__cx` and borrows it
-    /// as `&Cx` inside. Otherwise it uses the enclosing body's `&Cx`.
-    pub fn emit_view(&self, owns_cx: bool) -> TokenStream {
-        let prologue = borrow_cx(owns_cx);
+    pub fn emit_view(&self) -> TokenStream {
         let inner = self.emit_driven();
         quote! {
             #topcoat_view::internal::ScopeView::new(
                 #topcoat_view::internal::MoveView::new(async move {
-                    #prologue
+                    let cx: &#topcoat_context::Cx = &cx;
                     #inner
                 })
             )
@@ -64,17 +60,10 @@ impl Scope {
     /// Construction and polling use the same buffer, so emitted content
     /// is self-contained. The caller awaits the view in place. Its
     /// expressions can therefore borrow from the enclosing block.
-    ///
-    /// With `owns_cx`, an owned `__cx` context is in scope and the view
-    /// borrows it.
-    pub fn emit_emit(&self, owns_cx: bool) -> TokenStream {
-        let prologue = borrow_cx(owns_cx);
+    pub fn emit_emit(&self) -> TokenStream {
         let inner = self.emit_inert();
         quote! {
-            #topcoat_view::internal::ScopeView::self_contained(|| {
-                #prologue
-                #inner
-            })
+            #topcoat_view::internal::ScopeView::self_contained(|| #inner)
         }
     }
 
@@ -113,16 +102,6 @@ impl Scope {
     }
 }
 
-/// Borrows a captured `__cx` as `&Cx`, whether the supplied value is owned
-/// or borrowed. Empty when the template uses the ambient context directly.
-fn borrow_cx(owns_cx: bool) -> TokenStream {
-    if owns_cx {
-        quote! { let __cx: &#topcoat_context::Cx = &__cx; }
-    } else {
-        TokenStream::new()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use proc_macro2::Span;
@@ -135,7 +114,7 @@ mod tests {
     };
 
     fn rendered(builder: ViewBuilder) -> String {
-        builder.finish().emit_view(false).to_string()
+        builder.finish().emit_view().to_string()
     }
 
     fn add_component(builder: &mut ViewBuilder, name: &str) {
@@ -161,7 +140,7 @@ mod tests {
 
     #[test]
     fn an_emitted_root_is_a_self_contained_scope_over_its_body() {
-        let out = ViewBuilder::new().finish().emit_emit(false).to_string();
+        let out = ViewBuilder::new().finish().emit_emit().to_string();
         assert!(
             out.starts_with(":: topcoat_view :: internal :: ScopeView :: self_contained (||"),
             "{out}"
@@ -189,7 +168,7 @@ mod tests {
     #[test]
     fn a_view_without_units_joins_over_unit() {
         let out = rendered(ViewBuilder::new());
-        assert!(out.contains("JoinView :: new (__cx , () , move | __b , () |"));
+        assert!(out.contains("JoinView :: new (cx , () , move | __b , () |"));
     }
 
     #[test]
@@ -318,7 +297,7 @@ mod tests {
         let out = rendered(builder);
         assert!(out.contains("for x in xs"), "{out}");
         assert!(out.contains("__views . push ("), "{out}");
-        assert!(out.contains("Builder :: block (__cx , | __b |"), "{out}");
+        assert!(out.contains("Builder :: block (cx , | __b |"), "{out}");
         assert!(out.contains("__b . attribute_unescaped (__expr0)"), "{out}");
         assert!(
             out.contains("for __view in __expr0 { __b . view (__view) ; }"),
@@ -444,7 +423,7 @@ mod tests {
         let mut builder = ViewBuilder::new();
         add_component(&mut builder, "solo");
         let out = rendered(builder);
-        assert!(out.contains("identity_raw (__cx) . child ("));
+        assert!(out.contains("identity_raw (cx) . child ("));
         assert!(out.contains("SiteKey :: new"));
         assert!(out.contains("file ! ()"));
     }
@@ -540,7 +519,7 @@ mod tests {
         let out = rendered(builder);
         // The loop introduces ambiguity; both components derive normally.
         assert_eq!(out.matches(". ambiguous_child (").count(), 1);
-        assert_eq!(out.matches("identity_raw (__cx) . child (").count(), 2);
+        assert_eq!(out.matches("identity_raw (cx) . child (").count(), 2);
     }
 
     #[test]

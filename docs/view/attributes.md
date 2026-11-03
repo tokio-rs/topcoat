@@ -4,7 +4,7 @@ Use it to build attributes separately from the element that renders them.
 
 ```rust
 # #[topcoat::view::component]
-# async fn example() -> topcoat::Result<impl topcoat::view::View> {
+# async fn example(cx: &topcoat::context::Cx) -> topcoat::Result<impl topcoat::view::View> {
 use topcoat::view::{View, attributes, view};
 
 let attrs = attributes! {
@@ -19,13 +19,15 @@ Ok(view! {
 # }
 ```
 
+The macro borrows the surrounding variable named `cx`, which can be a `Cx` or `&Cx`, and builds the attributes immediately. To add or override context values used while building them, shadow `cx` with `let cx = cx.with(value);` before `attributes!`. See the [`view!` context guide](macro.view.html#request-context) for an example of context shadowing.
+
 # Syntax
 
 The body uses the same attribute syntax as an element in [`view!`], including expressions and control flow:
 
 ```rust
 # #[topcoat::view::component]
-# async fn example() -> topcoat::Result<impl topcoat::view::View> {
+# async fn example(cx: &topcoat::context::Cx) -> topcoat::Result<impl topcoat::view::View> {
 use topcoat::view::{View, attributes, view};
 
 let id = "submit";
@@ -92,7 +94,7 @@ Insert an [`Attributes`] value into an element by using it as a parenthesized at
 
 ```rust
 # #[topcoat::view::component]
-# async fn example() -> topcoat::Result<impl topcoat::view::View> {
+# async fn example(cx: &topcoat::context::Cx) -> topcoat::Result<impl topcoat::view::View> {
 use topcoat::view::{View, attributes, view};
 
 let attrs = attributes! {
@@ -119,11 +121,12 @@ Components can accept [`Attributes`] as a normal argument. This is useful for fo
 ```rust
 use topcoat::{
     Result,
+    context::Cx,
     view::{Attributes, Child, View, attributes, component, view},
 };
 
 #[component]
-async fn panel(attrs: Attributes, #[default] child: Child<'_>) -> Result<impl View> {
+async fn panel(cx: &Cx, attrs: Attributes, #[default] child: Child<'_>) -> Result<impl View> {
     Ok(view! {
         <section (attrs)>
             (child)
@@ -132,7 +135,7 @@ async fn panel(attrs: Attributes, #[default] child: Child<'_>) -> Result<impl Vi
 }
 
 # #[topcoat::view::component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     panel(
         attrs: attributes! {

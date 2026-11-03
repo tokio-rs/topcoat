@@ -13,7 +13,10 @@ use syn::{
     spanned::Spanned,
     visit_mut::{self, VisitMut},
 };
-use topcoat_core_grammar::common::paths::{topcoat_context, topcoat_view, topcoat_view_macro};
+use topcoat_core_grammar::common::{
+    SignatureExt,
+    paths::{topcoat_context, topcoat_view, topcoat_view_macro},
+};
 
 /// A parsed `#[component] async fn ...`. Expands into:
 ///
@@ -51,6 +54,17 @@ impl Component {
 impl ToTokens for Component {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let mut item = self.item.item().clone();
+        // The `#[default]` and `#[into]` helper attributes are only meaningful to
+        // the `Props` derive, which sees them on the generated struct's fields.
+        // They are not valid on the re-emitted function's parameters, so strip
+        // them here to avoid a "cannot find attribute" error.
+        for arg in &mut item.sig.inputs {
+            if let FnArg::Typed(pat_type) = arg {
+                pat_type.attrs.clear();
+            }
+        }
+        item.sig.allow_unused_cx();
+
         let mut generics = item.sig.generics.clone();
         let vis = &item.vis;
         let ident = &item.sig.ident;
@@ -63,21 +77,6 @@ impl ToTokens for Component {
         let attrs = item.attrs;
         // Callers use named props, not this helper's positional arguments.
         item.attrs = vec![parse_quote!(#[allow(clippy::unused_async, clippy::too_many_arguments)])];
-        // The implicit `__cx` context parameter carries what `view!` bodies
-        // read: the request context.
-        item.sig.generics.params.insert(0, parse_quote! { '__a });
-        item.sig
-            .inputs
-            .insert(0, parse_quote! { __cx: &'__a #topcoat_context::Cx });
-        // The `#[default]` and `#[into]` helper attributes are only meaningful to
-        // the `Props` derive, which sees them on the generated struct's fields.
-        // They are not valid on the re-emitted function's parameters, so strip
-        // them here to avoid a "cannot find attribute" error.
-        for arg in &mut item.sig.inputs {
-            if let FnArg::Typed(pat_type) = arg {
-                pat_type.attrs.clear();
-            }
-        }
 
         // A component's borrows all live for the request: the context and
         // every reference parameter arrive together, and the returned view
@@ -89,6 +88,9 @@ impl ToTokens for Component {
         signature_lifetimes.visit_return_type_mut(&mut item.sig.output);
         for input in &mut item.sig.inputs {
             signature_lifetimes.visit_fn_arg_mut(input);
+        }
+        if signature_lifetimes.used {
+            item.sig.generics.params.insert(0, parse_quote! { '__a });
         }
         let ReturnType::Type(_, return_ty) = &item.sig.output else {
             unreachable!("validated in Parse");
@@ -103,27 +105,20 @@ impl ToTokens for Component {
             params: Vec::new(),
         };
 
-        for input in &self.item.item().sig.inputs {
-            let FnArg::Typed(pat_type) = input else {
-                unreachable!("validated in Parse");
-            };
+        for pat_type in self.item.item().sig.params() {
             let Pat::Ident(pi) = &*pat_type.pat else {
                 unreachable!("validated in Parse");
             };
-            if pi.ident == "cx" {
-                args.push(quote! { cx });
-            } else {
-                let mut ty = (*pat_type.ty).clone();
-                field_lifetimes.visit_type_mut(&mut ty);
-                impl_traits_visitor.prefix = pi.ident.unraw().to_string().to_pascal_case();
-                impl_traits_visitor.count = 0;
-                impl_traits_visitor.visit_type_mut(&mut ty);
+            let mut ty = (*pat_type.ty).clone();
+            field_lifetimes.visit_type_mut(&mut ty);
+            impl_traits_visitor.prefix = pi.ident.unraw().to_string().to_pascal_case();
+            impl_traits_visitor.count = 0;
+            impl_traits_visitor.visit_type_mut(&mut ty);
 
-                let attrs = &pat_type.attrs;
-                let field_ident = &pi.ident;
-                fields.push(quote! { #(#attrs)* #vis #field_ident: #ty });
-                args.push(quote! { props.#field_ident });
-            }
+            let attrs = &pat_type.attrs;
+            let field_ident = &pi.ident;
+            fields.push(quote! { #(#attrs)* #vis #field_ident: #ty });
+            args.push(quote! { props.#field_ident });
         }
 
         if field_lifetimes.used {
@@ -327,7 +322,7 @@ mod tests {
             TokenStream::new(),
             quote! {
                 /// Renders a badge.
-                async fn badge(label: &str) -> Result { todo!() }
+                async fn badge(cx: &Cx, label: &str) -> Result { todo!() }
             },
         )
         .unwrap();

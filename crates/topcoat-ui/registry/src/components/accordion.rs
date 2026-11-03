@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     icon::{icon, iconify::iconify_icon},
     view::{Attributes, Child, StaticClass, View, attributes, class, component, view},
 };
@@ -29,6 +30,7 @@ use topcoat::{
 /// ```
 #[component]
 pub async fn accordion(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -56,6 +58,7 @@ const ANIMATION: StaticClass = class!(
 /// open.
 #[component]
 pub async fn accordion_item(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -78,6 +81,7 @@ pub async fn accordion_item(
 /// Pass the heading as child content. A chevron shows whether the section is open.
 #[component]
 pub async fn accordion_trigger(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -108,6 +112,7 @@ pub async fn accordion_trigger(
 /// The content shown when an accordion section is open.
 #[component]
 pub async fn accordion_content(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {

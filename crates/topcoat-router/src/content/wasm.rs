@@ -23,12 +23,13 @@ use crate::{
 /// // src/app.rs
 /// use topcoat::{
 ///     Result,
+///     context::Cx,
 ///     router::{content::Wasm, route},
 /// };
 /// # const ENGINE: &[u8] = b"\0asm\x01\0\0\0";
 ///
 /// #[route(GET "./engine.wasm")]
-/// async fn engine() -> Result<Wasm<&'static [u8]>> {
+/// async fn engine(cx: &Cx) -> Result<Wasm<&'static [u8]>> {
 ///     Ok(Wasm(ENGINE))
 /// }
 /// ```

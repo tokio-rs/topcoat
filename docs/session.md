@@ -55,7 +55,7 @@ use topcoat::{
 # async fn persist_session(_cx: &Cx, _user: &User, _session: &session::Session) -> Result<()> { Ok(()) }
 # mod app {
 #     #[topcoat::router::page]
-#     pub async fn home() -> topcoat::Result<impl topcoat::view::View> { Ok(topcoat::view::view! { "Home" }) }
+#     pub async fn home(cx: &topcoat::context::Cx) -> topcoat::Result<impl topcoat::view::View> { Ok(topcoat::view::view! { "Home" }) }
 # }
 
 #[route(POST)]
@@ -107,7 +107,7 @@ use topcoat::{
 # mod app {
 #     pub mod login {
 #         #[topcoat::router::page]
-#         pub async fn page() -> topcoat::Result<impl topcoat::view::View> { Ok(topcoat::view::view! { "Sign in" }) }
+#         pub async fn page(cx: &topcoat::context::Cx) -> topcoat::Result<impl topcoat::view::View> { Ok(topcoat::view::view! { "Sign in" }) }
 #     }
 # }
 
@@ -138,7 +138,7 @@ use topcoat::{
 # async fn delete_session(_cx: &Cx, _hash: &session::TokenHash) -> Result<()> { Ok(()) }
 # mod app {
 #     #[topcoat::router::page]
-#     pub async fn home() -> topcoat::Result<impl topcoat::view::View> { Ok(topcoat::view::view! { "Home" }) }
+#     pub async fn home(cx: &topcoat::context::Cx) -> topcoat::Result<impl topcoat::view::View> { Ok(topcoat::view::view! { "Home" }) }
 # }
 
 #[route(POST)]

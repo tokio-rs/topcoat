@@ -358,7 +358,7 @@ mod tests {
         let cx = &Cx::new();
         let view = HoistView::new(ThenView::new(async move {
             let signal = signal(cx, || String::from(value));
-            Ok(view! { cx => <p>(signal.read_untracked())</p> })
+            Ok(view! { <p>(signal.read_untracked())</p> })
         }));
         block_on(view.single()).unwrap().render(cx)
     }
@@ -373,7 +373,7 @@ mod tests {
             let signal = signal(cx, || String::from("x"));
             read(&signal);
             out.set(signal.id()).unwrap();
-            Ok(view! { cx => <p></p> })
+            Ok(view! { <p></p> })
         }));
         let html = block_on(view.single()).unwrap().render(cx);
         let marker = format!("<!--::topcoat::dep(\"{}\")-->", id.get().unwrap());
@@ -386,7 +386,7 @@ mod tests {
         let cx = &with_identity(Cx::new(), Identity::ROOT.child(site));
         let view = HoistView::new(ThenView::new(async move {
             let signal = signal(cx, || 0.0_f64);
-            Ok(view! { cx => <p>(signal.id().to_string())</p> })
+            Ok(view! { <p>(signal.id().to_string())</p> })
         }));
         let html = block_on(view.single()).unwrap().render(cx);
         let start = html.find("<p>").unwrap() + 3;
@@ -415,7 +415,7 @@ mod tests {
             let first = signal(cx, || 0.0_f64);
             let second = signal(cx, || 0.0_f64);
             assert_ne!(first.id(), second.id());
-            Ok(view! { cx => <p></p> })
+            Ok(view! { <p></p> })
         }));
         block_on(view.single()).unwrap();
     }
@@ -453,7 +453,7 @@ mod tests {
                 init_ran.load(Ordering::Relaxed),
             ))
             .unwrap();
-            Ok(view! { cx => <p></p> })
+            Ok(view! { <p></p> })
         }));
         block_on(view.single()).unwrap();
         *seen.get().unwrap()

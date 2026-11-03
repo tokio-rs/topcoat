@@ -16,11 +16,11 @@ Add the parameter name in braces to the route path, such as `{post_id}`. With [m
 
 ```rust
 // src/app/posts.rs serves /posts/{post_id}.
-# use topcoat::{Result, router::{page, path_param}, view::{View, view}};
+# use topcoat::{Result, context::Cx, router::{page, path_param}, view::{View, view}};
 path_param!(post_id: u64);
 
 #[page("./{post_id}")]
-async fn post() -> Result<impl View> {
+async fn post(cx: &Cx) -> Result<impl View> {
     Ok(view! { "post" })
 }
 ```
@@ -155,7 +155,7 @@ An unparsed catch-all accepts any `IntoIterator` whose items implement `AsRef<st
 Pass the generated type to [`href!`](macro.href.html) to fill the matching parameter in a handler's URL:
 
 ```rust
-# use topcoat::{Result, router::{href, page, path_param}, view::{View, view}};
+# use topcoat::{Result, context::Cx, router::{href, page, path_param}, view::{View, view}};
 // src/app.rs
 mod posts {
     use super::*;
@@ -163,7 +163,7 @@ mod posts {
     path_param!(pub post_id: u64);
 
     #[page("./{post_id}")]
-    pub async fn post() -> Result<impl View> {
+    pub async fn post(cx: &Cx) -> Result<impl View> {
         Ok(view! { "post" })
     }
 }
@@ -174,13 +174,13 @@ mod docs {
     path_param!(pub *doc_path);
 
     #[page("./{*doc_path}")]
-    pub async fn document() -> Result<impl View> {
+    pub async fn document(cx: &Cx) -> Result<impl View> {
         Ok(view! { "doc" })
     }
 }
 
 #[page]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         // /posts/1
         <a href=(href!(posts::post, posts::PostId(1)))>"The first post"</a>

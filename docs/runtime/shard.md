@@ -17,12 +17,12 @@ async fn search_results(cx: &Cx, query: String) -> Result<impl View> {
 
 # Calling Shards
 
-Inside a [`view!`] body, call a shard like a component. Each parameter accepts its declared type `T` or an `Expr<T>`, with conversion handled automatically:
+Inside a [`view!`] body, call a shard like a component. Omit `cx` from the call; Topcoat supplies the server request context automatically. Each remaining parameter accepts its declared type `T` or an `Expr<T>`, with conversion handled automatically:
 
 ```rust
 # use topcoat::{Result, context::Cx, view::*, runtime::{shard, signal, Event}};
 # #[shard]
-# async fn search_results(query: String) -> Result<impl View> { Ok(view! { (query) }) }
+# async fn search_results(cx: &Cx, query: String) -> Result<impl View> { Ok(view! { (query) }) }
 # #[component]
 # async fn example(cx: &Cx) -> Result<impl View> {
 let query = signal(cx, String::new);
@@ -101,9 +101,7 @@ The [`context`] module covers writing guards as functions on [`Cx`].
 
 # Arguments And Return Type
 
-Argument types must belong to the shared vocabulary of [`expr!`], since their values cross between Rust and JavaScript. The return type is a [`Result`] of a value implementing [`View`], like a component's.
-
-A parameter named `cx` of type `&Cx` receives the server request context. Callers omit this argument.
+The function must be `async` and take `cx: &Cx` as its first parameter, even when unused. Additional parameter types must belong to the shared vocabulary of [`expr!`], since their values cross between Rust and JavaScript. The function must return a [`Result`] containing a [`View`], like a component.
 
 A parameter typed [`Signal<T>`] accepts a signal handle. Passing the handle alone does not make the shard depend on its value. A tracked read in the shard body creates that dependency. Use an untracked read to use the value without triggering renders when it changes:
 
@@ -137,10 +135,10 @@ search_results(query: $(query.get()), limit: limit)
 Register a shard on the [`Router`] so the browser can request new content. It implements [`Route`], so pass its name to `.route()`:
 
 ```rust,standalone_crate
-use topcoat::router::module_router;
+use topcoat::{context::Cx, router::module_router};
 # use topcoat::{Result, router::Router, runtime::shard, view::{View, view}};
 # #[shard]
-# async fn search_results(query: String) -> Result<impl View> { Ok(view! { (query) }) }
+# async fn search_results(cx: &Cx, query: String) -> Result<impl View> { Ok(view! { (query) }) }
 let router = module_router!().route(search_results).build();
 ```
 
@@ -151,10 +149,10 @@ With the `discover` feature enabled, `.discover()` registers all shards linked i
 Topcoat generates an internal path for each shard from its name and source location. This path changes when the shard is renamed or moved. To choose a stable endpoint, pass an absolute path to `#[shard]`:
 
 ```rust
-use topcoat::{Result, runtime::shard, view::{View, view}};
+use topcoat::{Result, context::Cx, runtime::shard, view::{View, view}};
 
 #[shard("/search/results")]
-async fn search_results(query: String) -> Result<impl View> {
+async fn search_results(cx: &Cx, query: String) -> Result<impl View> {
     Ok(view! { <p>"Results for " (query)</p> })
 }
 ```

@@ -19,28 +19,28 @@ async fn send(router: &Router, method: &str, path: &str) -> (u16, String) {
 }
 
 #[route(GET "/one")]
-async fn one() -> Result<&'static str> {
+async fn one(cx: &Cx) -> Result<&'static str> {
     Ok("one")
 }
 
 #[route([GET, POST] "/multi")]
-async fn multi() -> Result<&'static str> {
+async fn multi(cx: &Cx) -> Result<&'static str> {
     Ok("multi")
 }
 
 #[route(* "/any")]
-async fn any() -> Result<&'static str> {
+async fn any(cx: &Cx) -> Result<&'static str> {
     Ok("any")
 }
 
 // A specific method and `*` at the same path: the specific method wins.
 #[route(GET "/mixed")]
-async fn mixed_get() -> Result<&'static str> {
+async fn mixed_get(cx: &Cx) -> Result<&'static str> {
     Ok("get")
 }
 
 #[route(* "/mixed")]
-async fn mixed_rest() -> Result<&'static str> {
+async fn mixed_rest(cx: &Cx) -> Result<&'static str> {
     Ok("rest")
 }
 
@@ -57,13 +57,13 @@ struct Title(&'static str);
 
 // A route with route context: each `with(...)` adds one value.
 #[route(GET "/report.csv", with(Title("first")), with(Title("second")))]
-async fn report() -> Result<&'static str> {
+async fn report(cx: &Cx) -> Result<&'static str> {
     Ok("report")
 }
 
 // A route with route context but no path, derived by the module router.
 #[route(POST, with(Title("module")))]
-async fn module_report() -> Result<&'static str> {
+async fn module_report(cx: &Cx) -> Result<&'static str> {
     Ok("module")
 }
 

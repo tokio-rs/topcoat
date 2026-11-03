@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     runtime::Expr,
     view::{Attributes, Child, StaticClass, View, class, component, view},
 };
@@ -44,6 +45,7 @@ const FADE: StaticClass = class!(
 /// ```
 #[component]
 pub async fn sheet(
+    cx: &Cx,
     /// Whether the sheet shows.
     #[into]
     open: Expr<bool>,
@@ -129,6 +131,7 @@ const CONTENT: StaticClass = class!(
 /// dimensions.
 #[component]
 pub async fn sheet_content(
+    cx: &Cx,
     /// The edge the panel lies against.
     #[default]
     side: SheetSide,

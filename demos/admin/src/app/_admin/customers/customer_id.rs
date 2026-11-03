@@ -87,7 +87,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
 }
 
 #[component]
-async fn detail(data: IconData, child: Child<'_>) -> Result<impl View> {
+async fn detail(cx: &Cx, data: IconData, child: Child<'_>) -> Result<impl View> {
     Ok(view! {
         <span class="flex items-center gap-1.5">
             icon(data: data, attrs: attributes! { class="size-4" })
@@ -165,7 +165,7 @@ async fn customer_orders(cx: &Cx, id: u64) -> Result<impl View> {
 }
 
 #[component]
-async fn customer_orders_skeleton() -> Result<impl View> {
+async fn customer_orders_skeleton(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <div aria-busy="true" class="grid grid-cols-1 gap-4 sm:grid-cols-3">
             for label in [t!(orders), t!(total_spent), t!(average_order)] {
@@ -213,7 +213,7 @@ async fn customer_orders_skeleton() -> Result<impl View> {
 }
 
 #[component]
-async fn stat(label: Translation<'_>, child: Child<'_>) -> Result<impl View> {
+async fn stat(cx: &Cx, label: Translation<'_>, child: Child<'_>) -> Result<impl View> {
     Ok(view! {
         card(
             attrs: attributes! { class="gap-1" },
@@ -226,7 +226,7 @@ async fn stat(label: Translation<'_>, child: Child<'_>) -> Result<impl View> {
 }
 
 #[component]
-async fn order_columns() -> Result<impl View> {
+async fn order_columns(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         table_header(
             table_row(

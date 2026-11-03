@@ -180,12 +180,6 @@ mod tests {
     }
 
     #[test]
-    fn html_field_accepts_a_leading_cx_argument() {
-        let tokens = expand("html: { cx => <p>(greeting)</p> }");
-        assert!(tokens.contains("let __cx"), "{tokens}");
-    }
-
-    #[test]
     fn html_field_accepts_a_view_expression() {
         let tokens = expand("html: prebuilt");
         assert!(tokens.contains(". html (prebuilt)"), "{tokens}");

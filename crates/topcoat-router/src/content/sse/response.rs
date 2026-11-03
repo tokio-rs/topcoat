@@ -39,6 +39,7 @@ use crate::{
 /// use futures_core::Stream;
 /// use topcoat::{
 ///     Result,
+///     context::Cx,
 ///     router::{
 ///         content::sse::{Event, KeepAlive, Sse},
 ///         route,
@@ -46,7 +47,7 @@ use crate::{
 /// };
 ///
 /// #[route(GET)]
-/// async fn events() -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
+/// async fn events(cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
 ///     let events = futures_util::stream::iter(
 ///         ["one", "two", "three"].map(|name| Ok(Event::new().data(name))),
 ///     );

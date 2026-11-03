@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
@@ -30,6 +31,7 @@ use super::floating::{
 /// ```
 #[component]
 pub async fn tooltip(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -63,6 +65,7 @@ const BUBBLE: StaticClass = class!(
 /// tries other positions if there is not enough room in the window.
 #[component]
 pub async fn tooltip_content(
+    cx: &Cx,
     /// Where the hint appears relative to the trigger.
     #[default(FloatingSide::Top)]
     side: FloatingSide,

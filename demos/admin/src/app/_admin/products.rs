@@ -58,7 +58,7 @@ impl ProductsQuery {
 
 /// Marks the product pages as part of the products section.
 #[layout(with(Section::Products))]
-async fn section(slot: Slot<'_>) -> Result<impl View> {
+async fn section(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! { (slot) })
 }
 
@@ -285,7 +285,7 @@ async fn product_rows(
 }
 
 #[component]
-async fn product_rows_skeleton(rows: usize) -> Result<impl View> {
+async fn product_rows_skeleton(cx: &Cx, rows: usize) -> Result<impl View> {
     Ok(view! {
         table(
             attrs: attributes! { aria-busy="true" },
@@ -320,7 +320,7 @@ async fn product_rows_skeleton(rows: usize) -> Result<impl View> {
 }
 
 #[component]
-async fn product_columns() -> Result<impl View> {
+async fn product_columns(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         table_header(
             table_row(
@@ -340,7 +340,7 @@ async fn product_columns() -> Result<impl View> {
 }
 
 #[component]
-async fn stock_badge(level: StockLevel) -> Result<impl View> {
+async fn stock_badge(cx: &Cx, level: StockLevel) -> Result<impl View> {
     let dot: StaticClass = match level {
         StockLevel::InStock => class!("bg-emerald-500"),
         StockLevel::Low => class!("bg-amber-500"),

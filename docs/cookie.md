@@ -81,7 +81,7 @@ use topcoat::{
 };
 # use topcoat::view::component;
 # #[component]
-# async fn figures() -> Result<impl View> { Ok(view! { <p>"42"</p> }) }
+# async fn figures(cx: &Cx) -> Result<impl View> { Ok(view! { <p>"42"</p> }) }
 
 #[page]
 async fn report(cx: &Cx) -> Result<impl View> {

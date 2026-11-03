@@ -12,9 +12,9 @@ use crate::{
 /// [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html):
 ///
 /// ```rust
-/// # use topcoat::view::{View, component, view};
+/// # use topcoat::{context::Cx, view::{View, component, view}};
 /// # #[component]
-/// # async fn example() -> topcoat::Result<impl View> {
+/// # async fn example(cx: &Cx) -> topcoat::Result<impl View> {
 /// # let my_value = "primary";
 /// Ok(view! {
 ///     <div class=(my_value)></div>

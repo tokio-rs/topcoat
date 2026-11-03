@@ -6,6 +6,7 @@ pub mod paths;
 #[cfg(feature = "pretty")]
 pub mod pretty;
 mod quote_option;
+mod signature_ext;
 #[cfg(feature = "testing")]
 pub mod testing;
 
@@ -13,3 +14,4 @@ pub use call_site::*;
 pub use glob::*;
 pub use parse_option::*;
 pub use quote_option::*;
+pub use signature_ext::*;

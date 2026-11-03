@@ -1,6 +1,8 @@
 [`Cx`] holds the values your code needs while handling a request. These include HTTP request data, shared application values such as a database connection, and values added for part of the request.
 
-Add a `cx: &Cx` parameter when a function needs these values. Topcoat supplies it to pages, layouts, routes, layers, and components. When you call a plain function, pass `cx` yourself.
+Topcoat's handler and component macros require `cx: &Cx` as the first parameter, even when unused. Topcoat supplies the context when it calls these functions.
+
+Ordinary helper functions can take a `cx: &Cx` parameter when they need context values. Pass `cx` explicitly when calling them. Functions annotated with [`#[memoize]`](macro@memoize) require `cx: &Cx` first too, and callers pass it explicitly.
 
 # Reading values
 
@@ -63,6 +65,8 @@ assert_eq!(url_form(&cx), UrlForm::Relative);
 assert_eq!(url_form(&email_context(&cx)), UrlForm::Absolute);
 ```
 
+To use a child context in a view, shadow the surrounding binding with `let cx = cx.with(value);` before `view!`. The view captures that binding, and components called inside it receive the child context. See the [`view!` context guide](../view/macro.view.html#request-context) for an example.
+
 A [layer](crate::router#layers) can add values for the rest of the request by passing a child context to [`next.run`](crate::router::Next::run). For data that code can load when it needs it, such as the current user, prefer [helper functions](#functions-not-middlewares).
 
 To add several values at once, pass a tuple to [`Cx::with_many`]. The result is the same as calling `with` for each value, but it creates one child context instead of one per value, so it is more efficient.
@@ -122,7 +126,7 @@ async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
 }
 
 #[page("/products", with(Title("Products")))]
-async fn products() -> Result<impl View> {
+async fn products(cx: &Cx) -> Result<impl View> {
     Ok(view! { <h1>"Products"</h1> })
 }
 

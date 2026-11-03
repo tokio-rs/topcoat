@@ -5,13 +5,14 @@ Use `link` inside a view, with [`href!`] pointing to a page in your app:
 ```rust
 use topcoat::{
     Result,
+    context::Cx,
     router::{href, page},
     runtime::link,
     view::{View, view},
 };
 
 #[page]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         link(href: href!(about::page), "About")
     })
@@ -21,7 +22,7 @@ mod about {
     use super::*;
 
     #[page]
-    pub async fn page() -> Result<impl View> {
+    pub async fn page(cx: &Cx) -> Result<impl View> {
         Ok(view! { <h1>"About"</h1> })
     }
 }
@@ -40,16 +41,17 @@ Set `prefetch` on a link to choose when its destination loads:
 
 ```rust
 use topcoat::{
+    context::Cx,
     router::href,
     runtime::{PrefetchMode, link},
     view::view,
 };
 # #[topcoat::router::page("/products")]
-# async fn products() -> topcoat::Result<impl topcoat::view::View> { Ok(view! { "Products" }) }
+# async fn products(cx: &Cx) -> topcoat::Result<impl topcoat::view::View> { Ok(view! { "Products" }) }
 # #[topcoat::router::page("/reports")]
-# async fn reports() -> topcoat::Result<impl topcoat::view::View> { Ok(view! { "Reports" }) }
+# async fn reports(cx: &Cx) -> topcoat::Result<impl topcoat::view::View> { Ok(view! { "Reports" }) }
 # #[topcoat::view::component]
-# async fn example() -> topcoat::Result<impl topcoat::view::View> {
+# async fn example(cx: &Cx) -> topcoat::Result<impl topcoat::view::View> {
 Ok(view! {
     link(href: href!(products), prefetch: PrefetchMode::Viewport, "Products")
     link(href: href!(reports), prefetch: PrefetchMode::Never, "Reports")
@@ -85,11 +87,11 @@ use topcoat::{
     view::{View, view},
 };
 # #[topcoat::router::page("/reports")]
-# async fn reports() -> topcoat::Result<impl View> { Ok(view! { "Reports" }) }
+# async fn reports(cx: &Cx) -> topcoat::Result<impl View> { Ok(view! { "Reports" }) }
 
 fn reports_nav(cx: &Cx) -> impl View {
     let cx = cx.with(PrefetchMode::Never);
-    view! { cx =>
+    view! {
         link(href: href!(reports), "Reports")
     }
 }
@@ -102,11 +104,11 @@ A link uses its `prefetch` argument when one is given. Otherwise, it uses the `P
 Pass `attrs` to add classes and other HTML attributes:
 
 ```rust
-# use topcoat::{router::href, runtime::link, view::{attributes, view}};
+# use topcoat::{context::Cx, router::href, runtime::link, view::{attributes, view}};
 # #[topcoat::router::page("/products")]
-# async fn products() -> topcoat::Result<impl topcoat::view::View> { Ok(view! { "Products" }) }
+# async fn products(cx: &Cx) -> topcoat::Result<impl topcoat::view::View> { Ok(view! { "Products" }) }
 # #[topcoat::view::component]
-# async fn example() -> topcoat::Result<impl topcoat::view::View> {
+# async fn example(cx: &Cx) -> topcoat::Result<impl topcoat::view::View> {
 Ok(view! {
     link(
         href: href!(products),
@@ -129,11 +131,11 @@ use topcoat::{
     view::{View, view},
 };
 # #[topcoat::router::page("/products")]
-# async fn products() -> topcoat::Result<impl View> { Ok(view! { "Products" }) }
+# async fn products(cx: &Cx) -> topcoat::Result<impl View> { Ok(view! { "Products" }) }
 
 fn products_link(cx: &Cx) -> impl View {
     let attrs = link_attrs(cx, href!(products), prefetch_mode(cx));
-    view! { cx =>
+    view! {
         <a class="product-card" (attrs)>
             <strong>"Browse products"</strong>
             <span>"See what's new"</span>

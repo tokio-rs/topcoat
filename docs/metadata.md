@@ -9,6 +9,7 @@ Add `Metadata` to a layout or page with `with(...)`. The router makes these valu
 ```rust
 use topcoat::{
     Result,
+    context::Cx,
     metadata::Metadata,
     router::{Router, Slot, layout, page},
     view::{View, view},
@@ -19,7 +20,7 @@ use topcoat::{
         .title("Acme")
         .description("Everything you need for tea.")
 ))]
-async fn shell(slot: Slot<'_>) -> Result<impl View> {
+async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>
@@ -30,7 +31,7 @@ async fn shell(slot: Slot<'_>) -> Result<impl View> {
 }
 
 #[page("/products", with(Metadata::new().title("Products")))]
-async fn products() -> Result<impl View> {
+async fn products(cx: &Cx) -> Result<impl View> {
     Ok(view! { <h1>"Products"</h1> })
 }
 
@@ -76,12 +77,13 @@ Use [`topcoat::metadata::tags()`](tags) to render the page's combined metadata. 
 ```rust
 use topcoat::{
     Result,
+    context::Cx,
     router::{Slot, layout},
     view::{View, view},
 };
 
 #[layout("/")]
-async fn shell(slot: Slot<'_>) -> Result<impl View> {
+async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>

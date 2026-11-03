@@ -1,6 +1,7 @@
 use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
+    context::Cx,
     router::{Slot, layout, module_router, page},
     tailwind,
     view::{View, view},
@@ -16,7 +17,7 @@ async fn main() {
 }
 
 #[layout]
-async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>
@@ -37,7 +38,7 @@ async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
 }
 
 #[page]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <main
             class="mx-4 w-full max-w-md rounded-2xl bg-white p-8 shadow-lg ring-1 ring-slate-200"

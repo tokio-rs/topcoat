@@ -7,6 +7,7 @@ Topcoat renders icons as inline `<svg>` elements. Icons scale with the surroundi
 ```rust,no_run
 use topcoat::{
     Result,
+    context::Cx,
     icon::{IconData, icon},
     router::{module_router, page},
     view::{View, svg::ViewBox, view},
@@ -26,7 +27,7 @@ async fn main() {
 }
 
 #[page]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>
@@ -43,10 +44,10 @@ Icons are `1em` square by default. Their SVG bodies can use `currentColor` to in
 An icon without a `label` is hidden from assistive technology. Provide a label when the icon conveys information that the surrounding text does not:
 
 ```rust
-# use topcoat::{Result, icon::{IconData, icon}, view::*};
+# use topcoat::{Result, context::Cx, icon::{IconData, icon}, view::*};
 # const TRASH: IconData = IconData::unescaped_unchecked(svg::ViewBox::new(0.0, 0.0, 24.0, 24.0), "<g/>");
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     icon(data: TRASH, size: 48, label: "Delete")
 })

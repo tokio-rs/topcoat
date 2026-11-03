@@ -35,6 +35,7 @@ use crate::{
 /// // src/app.rs
 /// use topcoat::{
 ///     Result,
+///     context::Cx,
 ///     router::{
 ///         content::sitemap::{ChangeFrequency, Sitemap, SitemapUrl},
 ///         route,
@@ -42,7 +43,7 @@ use crate::{
 /// };
 ///
 /// #[route(GET "./sitemap.xml")]
-/// async fn sitemap() -> Result<Sitemap> {
+/// async fn sitemap(cx: &Cx) -> Result<Sitemap> {
 ///     Ok(Sitemap::new()
 ///         .url("/")
 ///         .url(SitemapUrl::new("/about").change_frequency(ChangeFrequency::Monthly)))

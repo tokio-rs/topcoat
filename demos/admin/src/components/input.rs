@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     view::{Attributes, StaticClass, View, class, component, view},
 };
 
@@ -26,6 +27,6 @@ const INPUT: StaticClass = class!(
 /// }
 /// ```
 #[component]
-pub async fn input(#[default] mut attrs: Attributes) -> Result<impl View> {
+pub async fn input(cx: &Cx, #[default] mut attrs: Attributes) -> Result<impl View> {
     Ok(view! { <input class=(class!(INPUT, attrs.remove("class"))) (attrs)> })
 }

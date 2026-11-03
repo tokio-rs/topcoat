@@ -18,12 +18,13 @@ Load the htmx script before using `hx-*` attributes. This example bundles the sc
 use topcoat::{
     Result,
     asset::asset,
+    context::Cx,
     router::{Slot, layout},
     view::{View, view},
 };
 
 #[layout]
-async fn root(slot: Slot<'_>) -> Result<impl View> {
+async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>
@@ -88,7 +89,7 @@ use topcoat::{
 
 #[route(POST)]
 async fn save(cx: &Cx) -> Result<(HxRetarget, HxReswap, ViewHandle)> {
-    let body = view! { cx => <div>"Saved!"</div> }.single().await?;
+    let body = view! { <div>"Saved!"</div> }.single().await?;
     Ok((
         HxRetarget::from("#status"),
         HxReswap(SwapOption::InnerHtml),

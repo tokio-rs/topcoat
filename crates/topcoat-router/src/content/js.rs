@@ -19,11 +19,12 @@ use crate::{
 /// // src/app.rs
 /// use topcoat::{
 ///     Result,
+///     context::Cx,
 ///     router::{content::Js, route},
 /// };
 ///
 /// #[route(GET "./app.js")]
-/// async fn app_js() -> Result<Js<&'static str>> {
+/// async fn app_js(cx: &Cx) -> Result<Js<&'static str>> {
 ///     Ok(Js("export const ready = true;"))
 /// }
 /// ```

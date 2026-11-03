@@ -4,28 +4,20 @@ use syn::{
     parse::{Parse, ParseStream},
     spanned::Spanned,
 };
-use topcoat_core_grammar::common::{
-    ParseOption,
-    paths::{topcoat_context, topcoat_core, topcoat_view},
-};
+use topcoat_core_grammar::common::paths::{topcoat_context, topcoat_core, topcoat_view};
 
-use crate::{
-    leading_cx::LeadingCx,
-    view::{
-        View,
-        hir::{LowerView, ViewBuilder},
-    },
+use crate::view::{
+    View,
+    hir::{LowerView, ViewBuilder},
 };
 
 pub struct Live {
-    pub cx: Option<LeadingCx>,
     pub body: TokenStream,
 }
 
 impl Parse for Live {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
-            cx: input.call(LeadingCx::parse_option)?,
             body: input.parse()?,
         })
     }
@@ -44,21 +36,12 @@ impl ToTokens for Live {
             }
         };
         let body = &self.body;
-        let bind_cx = self.cx.as_ref().map(|cx| {
-            let cx = &cx.cx;
-            quote! { let __cx: #topcoat_context::Cx = (#cx).clone(); }
-        });
-
         quote! {{
-            #bind_cx
-            let __region = #topcoat_view::RegionId::new(#topcoat_context::identity(&__cx), #site);
-            #topcoat_view::internal::LiveView::new(
-                __region,
-                async move {
-                    let __cx: &#topcoat_context::Cx = &__cx;
-                    #body
-                },
-            )
+            let __region = #topcoat_view::RegionId::new(
+                #topcoat_context::identity(&cx),
+                #site,
+            );
+            #topcoat_view::internal::LiveView::new(__region, async move { #body })
         }}
         .to_tokens(tokens);
     }
@@ -70,7 +53,6 @@ impl topcoat_core_grammar::common::pretty::PrettyPrint for Live {
     fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         use syn::parse::Parser;
 
-        self.cx.pretty_print(printer);
         let Ok(body) = syn::Block::parse_within.parse2(self.body.clone()) else {
             syn::Expr::Verbatim(self.body.clone()).pretty_print(printer);
             return;
@@ -103,25 +85,14 @@ impl ToTokens for Emit {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let mut builder = ViewBuilder::new();
         self.view.nodes.lower(&mut builder);
-        let owns_cx = self.view.cx.is_some();
-        let view = builder.finish().emit_emit(owns_cx);
+        let view = builder.finish().emit_emit();
 
-        let drive = quote! {
+        // The view borrows the context, so the binding has to outlive the
+        // drive it is emitted for.
+        quote! {{
+            let cx: &#topcoat_context::Cx = &cx;
             #topcoat_view::internal::LiveView::drive(__region, #view).await
-        };
-
-        // The view borrows the context rather than moving it, so the binding
-        // has to outlive the drive it is emitted for.
-        match &self.view.cx {
-            Some(cx) => {
-                let cx = &cx.cx;
-                quote! {{
-                    let __cx: #topcoat_context::Cx = (#cx).clone();
-                    #drive
-                }}
-            }
-            None => drive,
-        }
+        }}
         .to_tokens(tokens);
     }
 }
@@ -149,8 +120,11 @@ mod tests {
     #[test]
     fn an_emitted_view_is_driven_into_the_live_view() {
         let tokens = emit("<div></div>");
-        assert!(tokens.starts_with(":: topcoat_view :: internal :: LiveView :: drive (__region ,"));
-        assert!(tokens.ends_with(". await"), "{tokens}");
+        assert!(
+            tokens.contains(":: topcoat_view :: internal :: LiveView :: drive (__region ,"),
+            "{tokens}"
+        );
+        assert!(tokens.ends_with(". await }"), "{tokens}");
     }
 
     #[test]
@@ -160,16 +134,24 @@ mod tests {
     }
 
     #[test]
-    fn an_emitted_view_keeps_the_ambient_cx() {
+    fn an_emitted_view_borrows_the_call_site_cx_without_cloning_it() {
         let tokens = emit("<div></div>");
-        assert!(!tokens.contains("let __cx"), "{tokens}");
+        let binding = tokens.find("Cx = & cx ;").expect(&tokens);
+        let drive = tokens.find("LiveView :: drive (").expect(&tokens);
+        assert!(binding < drive, "{tokens}");
+        assert!(!tokens.contains("clone ()"), "{tokens}");
     }
 
     #[test]
-    fn an_explicit_cx_binds_the_context_identifier() {
-        let tokens = emit("cx => <div></div>");
-        assert!(tokens.contains("Cx = (cx) . clone () ;"), "{tokens}");
-        assert!(tokens.contains("Cx = & __cx ;"), "{tokens}");
+    fn a_live_region_is_identified_by_the_call_site_cx() {
+        let tokens = syn::parse_str::<Live>("emit! { <div></div> }")
+            .unwrap()
+            .to_token_stream()
+            .to_string();
+        let identity = tokens.find("identity (& cx)").expect(&tokens);
+        let body = tokens.find("async move {").expect(&tokens);
+        assert!(identity < body, "{tokens}");
+        assert!(!tokens.contains("clone ()"), "{tokens}");
     }
 
     #[test]
@@ -192,20 +174,18 @@ mod tests {
             "let f = |value| value.;",
             "match value { Some(x) => x., None => () }",
         ] {
-            for prefix in ["", "cx => "] {
-                let live = syn::parse_str::<Live>(&format!("{prefix}{source}")).unwrap();
-                let original: TokenStream = source.parse().unwrap();
-                assert_eq!(live.body.to_string(), original.to_string());
-                let expanded = live.to_token_stream().to_string();
-                assert!(expanded.contains(&original.to_string()), "{expanded}");
-                assert!(expanded.contains("async move {"), "{expanded}");
-            }
+            let live = syn::parse_str::<Live>(source).unwrap();
+            let original: TokenStream = source.parse().unwrap();
+            assert_eq!(live.body.to_string(), original.to_string());
+            let expanded = live.to_token_stream().to_string();
+            assert!(expanded.contains(&original.to_string()), "{expanded}");
+            assert!(expanded.contains("async move {"), "{expanded}");
         }
     }
 
     #[test]
     fn live_body_preserves_its_source_location() {
-        let live = syn::parse_str::<Live>("cx =>\n    let x = value.;").unwrap();
+        let live = syn::parse_str::<Live>("\n    let x = value.;").unwrap();
         assert_eq!(
             live.body.span().start(),
             proc_macro2::LineColumn { line: 2, column: 4 },

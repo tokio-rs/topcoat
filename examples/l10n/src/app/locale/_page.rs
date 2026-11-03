@@ -1,6 +1,7 @@
 use jiff::Zoned;
 use topcoat::{
     Result,
+    context::Cx,
     router::page,
     view::{View, view},
 };
@@ -8,7 +9,7 @@ use topcoat::{
 use crate::app::t;
 
 #[page]
-pub async fn page() -> Result<impl View> {
+pub async fn page(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         // Translates the message `title` into the locale of the page.
         <h1>(t!(title))</h1>

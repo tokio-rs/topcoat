@@ -1,13 +1,13 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote, quote_spanned};
 use syn::{
-    FnArg, Pat, ReturnType,
+    Pat, ReturnType,
     parse::{Parse, ParseStream},
     parse_quote,
     spanned::Spanned,
 };
 
-use crate::common::{lenient, paths::topcoat_context};
+use crate::common::{SignatureExt, lenient, paths::topcoat_context};
 
 mod kw {
     use syn::custom_keyword;
@@ -57,30 +57,7 @@ pub struct MemoizeItem {
 impl Parse for MemoizeItem {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let item: lenient::ItemFn = input.parse()?;
-        let mut has_cx = false;
-        for arg in &item.sig.inputs {
-            match arg {
-                FnArg::Receiver(r) => {
-                    return Err(syn::Error::new_spanned(
-                        r,
-                        "memoize functions cannot take a `self` receiver",
-                    ));
-                }
-                FnArg::Typed(pat_type) => {
-                    if let Pat::Ident(pi) = &*pat_type.pat
-                        && pi.ident == "cx"
-                    {
-                        has_cx = true;
-                    }
-                }
-            }
-        }
-        if !has_cx {
-            return Err(syn::Error::new_spanned(
-                &item.sig,
-                "memoize functions must take a `cx: &Cx` parameter",
-            ));
-        }
+        item.sig.cx_param()?;
         Ok(Self { item })
     }
 }
@@ -125,24 +102,17 @@ impl ToTokens for Memoize {
         let mut closure_pats: Vec<TokenStream> = Vec::new();
         let mut destructures: Vec<TokenStream> = Vec::new();
 
-        for arg in &sig.inputs {
-            let FnArg::Typed(pat_type) = arg else {
-                continue;
-            };
-            if let Pat::Ident(pi) = &*pat_type.pat
-                && pi.ident == "cx"
-            {
-                let span = pi.span();
-                // Keep the written type so its import counts as used.
-                let cx_type = match &*pat_type.ty {
-                    syn::Type::Reference(reference) if reference.lifetime.is_none() => {
-                        reference.elem.to_token_stream()
-                    }
-                    _ => quote! { #topcoat_context::Cx },
-                };
-                new_inputs.push(quote_spanned! {span=> cx: &'__cx #cx_type });
-                continue;
+        let cx_param = sig.cx_param().expect("validated by MemoizeItem");
+        // Keep the written type so its import counts as used.
+        let cx_type = match &*cx_param.ty {
+            syn::Type::Reference(reference) if reference.lifetime.is_none() => {
+                reference.elem.to_token_stream()
             }
+            _ => quote! { #topcoat_context::Cx },
+        };
+        new_inputs.push(quote_spanned! {cx_param.pat.span()=> cx: &'__cx #cx_type });
+
+        for pat_type in sig.params() {
             let ty = &pat_type.ty;
             let pat = &pat_type.pat;
             let is_ref = matches!(&**ty, syn::Type::Reference(_));

@@ -165,6 +165,6 @@ mod tests {
     #[test]
     fn expression_key_and_value_are_inserted_as_is() {
         let out = lowered(&parse("(name)=(value)"));
-        assert!(out.contains("insert (__cx , name , value)"));
+        assert!(out.contains("insert (cx , name , value)"));
     }
 }

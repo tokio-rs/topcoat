@@ -5,9 +5,12 @@ pub use attr::*;
 pub use item::*;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
-use topcoat_core_grammar::common::paths::{
-    topcoat_context, topcoat_error, topcoat_inventory, topcoat_router, topcoat_runtime,
-    topcoat_view, topcoat_view_macro,
+use topcoat_core_grammar::common::{
+    SignatureExt,
+    paths::{
+        topcoat_context, topcoat_error, topcoat_inventory, topcoat_router, topcoat_runtime,
+        topcoat_view, topcoat_view_macro,
+    },
 };
 
 use crate::common::EndpointPath;
@@ -43,25 +46,16 @@ impl ToTokens for Shard {
         let item = self.item.item();
         let vis = &item.vis;
         let ident = &item.sig.ident;
-        let inputs = &item.sig.inputs;
+        let mut handler_sig = item.sig.clone();
+        handler_sig.allow_unused_cx();
+        let inputs = &handler_sig.inputs;
         let output = &item.sig.output;
         let block = &item.block;
 
-        // Split the inputs into the optional `cx` parameter and the value
-        // parameters that become shard arguments.
-        let mut has_cx = false;
+        // The value parameters after `cx` become shard arguments.
         let mut value_idents = Vec::new();
         let mut value_tys = Vec::new();
-        for input in inputs {
-            let syn::FnArg::Typed(pat_type) = input else {
-                unreachable!("validated by ShardItem")
-            };
-            if let syn::Pat::Ident(pat_ident) = &*pat_type.pat
-                && pat_ident.ident == "cx"
-            {
-                has_cx = true;
-                continue;
-            }
+        for pat_type in item.sig.params() {
             let syn::Pat::Ident(pat_ident) = &*pat_type.pat else {
                 unreachable!("validated by ShardItem")
             };
@@ -76,22 +70,13 @@ impl ToTokens for Shard {
             .map(|id| format_ident!("__topcoat_js_{}", id))
             .collect();
 
-        // Arguments forwarded to the hidden implementation after the implicit
-        // `__cx` context: `cx` (when present) followed by the value parameters.
-        let call_args = has_cx
-            .then(|| quote!(cx))
-            .into_iter()
-            .chain(value_idents.iter().map(|id| quote!(#id)));
-        let call_args: Vec<_> = call_args.collect();
-
         // The component face accepts a value or expression for each parameter.
-        let cx_param = has_cx.then(|| quote!(cx: &#topcoat_context::Cx,));
         // Bound to a local because it is interpolated inside the `#(...)*`
         // repetition below, where a bare `#topcoat_runtime` would expand to a
         // `let` binding that cannot shadow the imported constant.
         let expr_ty = quote!(#topcoat_runtime::Expr);
         let component_params = quote! {
-            #cx_param
+            cx: &#topcoat_context::Cx,
             #(#[into] #value_idents: #expr_ty<#value_tys>,)*
         };
 
@@ -125,17 +110,17 @@ impl ToTokens for Shard {
             #(#docs)*
             #[#topcoat_view_macro::component]
             #vis async fn #ident(#component_params) -> #topcoat_error::Result<impl #topcoat_view::View> {
-                let __identity = #topcoat_context::identity(__cx);
+                let __identity = #topcoat_context::identity(cx);
                 #(
                     let (#value_idents, #js_idents) = #value_idents.into_evaluated_and_js();
                 )*
                 #topcoat_error::Result::Ok(#topcoat_runtime::ShardScope::new(
-                    __cx,
+                    cx,
                     __identity,
                     #url,
                     ::std::vec![#(#js_idents),*],
                     #topcoat_view::HoistView::new(#topcoat_view::internal::ThenView::new(
-                        #ident::handler(__cx, #(#call_args),*),
+                        #ident::handler(cx, #(#value_idents),*),
                     )),
                 ))
             }
@@ -144,16 +129,11 @@ impl ToTokens for Shard {
         // The user's function body, re-emitted as the marker's `handler`
         // associated function. Associated items are reached through the type
         // rather than lexical scope, so `#ident::handler` is callable from
-        // the component face and the route implementation below. The leading
-        // `__cx` parameter carries the ambient context that `view!` bodies
-        // read.
+        // the component face and the route implementation below.
         let handler = quote! {
             impl #ident {
                 #[allow(clippy::unused_async, clippy::unused_async_trait_impl)]
-                async fn handler(
-                    __cx: &#topcoat_context::Cx,
-                    #inputs
-                ) #output #block
+                async fn handler(#inputs) #output #block
             }
         };
 
@@ -208,7 +188,7 @@ impl ToTokens for Shard {
                             let __view = #topcoat_view::internal::ScopeView::new(
                                 #topcoat_view::HoistView::new(
                                     #topcoat_view::internal::ThenView::new(
-                                        #ident::handler(cx, #(#call_args),*),
+                                        #ident::handler(cx, #(#value_idents),*),
                                     ),
                                 ),
                             );
@@ -258,7 +238,7 @@ mod tests {
             TokenStream::new(),
             quote! {
                 /// Counts clicks.
-                async fn counter(count: i64) -> Result<impl View> { todo!() }
+                async fn counter(cx: &Cx, count: i64) -> Result<impl View> { todo!() }
             },
         )
         .unwrap();
@@ -273,7 +253,7 @@ mod tests {
         let shard = Shard::parse(
             quote! { "/search" },
             quote! {
-                async fn counter(count: i64) -> Result<impl View> { todo!() }
+                async fn counter(cx: &Cx, count: i64) -> Result<impl View> { todo!() }
             },
         )
         .unwrap();
@@ -287,7 +267,7 @@ mod tests {
         let shard = Shard::parse(
             TokenStream::new(),
             quote! {
-                async fn counter(count: i64) -> Result<impl View> { todo!() }
+                async fn counter(cx: &Cx, count: i64) -> Result<impl View> { todo!() }
             },
         )
         .unwrap();
@@ -300,7 +280,7 @@ mod tests {
         let shard = Shard::parse(
             quote! { "/(api)/search" },
             quote! {
-                async fn counter(count: i64) -> Result<impl View> { todo!() }
+                async fn counter(cx: &Cx, count: i64) -> Result<impl View> { todo!() }
             },
         )
         .unwrap();

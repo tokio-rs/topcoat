@@ -145,7 +145,6 @@ async fn renders_as_content_and_attribute_values() {
     let cx = &scope(locale!("de"));
     let name = "<Ada>";
     let view = view! {
-        cx =>
         <p>(t!(greeting, name))</p>
         <input placeholder=(t!(login-input.placeholder))>
     };

@@ -80,7 +80,6 @@ Add files with the `attachments` field. Use [`Attachment::new`] for a downloadab
 let mail = mail! {
     subject: "Your invoice",
     html: {
-        cx =>
         <img src="cid:logo" alt="Example logo">
         <p>"The invoice is attached."</p>
     },

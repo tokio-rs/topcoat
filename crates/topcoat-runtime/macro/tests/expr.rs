@@ -37,7 +37,7 @@ async fn nested_expressions(cx: &Cx) -> Result<impl View> {
 #[tokio::test]
 async fn nested_expressions_preserve_static_and_dynamic_bindings() {
     let cx = &Cx::new();
-    let html = view! { cx => nested_expressions() }
+    let html = view! { nested_expressions() }
         .single()
         .await
         .unwrap()
@@ -70,7 +70,6 @@ async fn trailing_comma_in_an_inline_expression_keeps_both_attributes() {
     let cx = &Cx::new();
     let dark = false;
     let html = view! {
-        cx =>
         let label = expr!(
             if dark { "Switch to light theme" } else { "Switch to dark theme" },
         );
@@ -99,11 +98,7 @@ async fn toggle_button(cx: &Cx) -> Result<impl View> {
 #[tokio::test]
 async fn toggle_reaches_the_generated_javascript() {
     let cx = &Cx::new();
-    let html = view! { cx => toggle_button() }
-        .single()
-        .await
-        .unwrap()
-        .render(cx);
+    let html = view! { toggle_button() }.single().await.unwrap().render(cx);
 
     assert!(html.contains(".toggle()"), "{html}");
 }
@@ -128,7 +123,7 @@ async fn counter_buttons(cx: &Cx) -> Result<impl View> {
 #[tokio::test]
 async fn increment_and_decrement_reach_the_generated_javascript() {
     let cx = &Cx::new();
-    let html = view! { cx => counter_buttons() }
+    let html = view! { counter_buttons() }
         .single()
         .await
         .unwrap()
@@ -147,7 +142,7 @@ async fn push_str_button(cx: &Cx) -> Result<impl View> {
 #[tokio::test]
 async fn push_str_reaches_the_generated_javascript_with_its_argument() {
     let cx = &Cx::new();
-    let html = view! { cx => push_str_button() }
+    let html = view! { push_str_button() }
         .single()
         .await
         .unwrap()
@@ -170,7 +165,7 @@ async fn counter_display(cx: &Cx) -> Result<impl View> {
 #[tokio::test]
 async fn a_signal_is_declared_once_ahead_of_every_capture() {
     let cx = &Cx::new();
-    let html = view! { cx => counter_display() }
+    let html = view! { counter_display() }
         .single()
         .await
         .unwrap()
@@ -184,7 +179,7 @@ async fn a_signal_is_declared_once_ahead_of_every_capture() {
 }
 
 #[procedure]
-async fn test_procedure(v: String) -> Result<String, std::convert::Infallible> {
+async fn test_procedure(cx: &Cx, v: String) -> Result<String, std::convert::Infallible> {
     Ok(v)
 }
 
@@ -192,7 +187,6 @@ async fn test_procedure(v: String) -> Result<String, std::convert::Infallible> {
 async fn procedure_call_inside_if_is_an_async_func() {
     let cx = &Cx::new();
     let html = view! {
-        cx =>
         <button
             @click=$(async |_e| {
                 if true {
@@ -218,7 +212,6 @@ async fn procedure_call_inside_if_is_an_async_func() {
 async fn procedure_call_inside_block_is_an_async_func() {
     let cx = &Cx::new();
     let html = view! {
-        cx =>
         <button
             @click=$(async |_e| {
                 {
@@ -257,7 +250,7 @@ async fn push_str_input(cx: &Cx) -> Result<impl View> {
 #[tokio::test]
 async fn push_str_accepts_the_owned_string_from_an_event() {
     let cx = &Cx::new();
-    let html = view! { cx => push_str_input() }
+    let html = view! { push_str_input() }
         .single()
         .await
         .unwrap()
@@ -274,7 +267,7 @@ async fn push_str_accepts_the_owned_string_from_an_event() {
 async fn a_captured_value_cannot_break_out_of_its_marker_comment() {
     let cx = &Cx::new();
     let spicy = String::from(r#"-->"<&"#);
-    let html = view! { cx => captured_text(text: spicy) }
+    let html = view! { captured_text(text: spicy) }
         .single()
         .await
         .unwrap()
@@ -308,7 +301,7 @@ async fn captured_text(cx: &Cx, text: String) -> Result<impl View> {
 #[tokio::test]
 async fn a_string_literal_with_quotes_stays_inside_the_handler_attribute() {
     let cx = &Cx::new();
-    let html = view! { cx => quoted_push_str_button() }
+    let html = view! { quoted_push_str_button() }
         .single()
         .await
         .unwrap()
@@ -319,7 +312,7 @@ async fn a_string_literal_with_quotes_stays_inside_the_handler_attribute() {
 }
 
 #[component]
-async fn panel(#[into] open: Expr<bool>) -> Result<impl View> {
+async fn panel(cx: &Cx, #[into] open: Expr<bool>) -> Result<impl View> {
     Ok(view! { <dialog :open=(open)></dialog> })
 }
 
@@ -327,7 +320,6 @@ async fn panel(#[into] open: Expr<bool>) -> Result<impl View> {
 async fn value_conversion_renders_props_as_ordinary_attributes() {
     let cx = &Cx::new();
     let html = view! {
-        cx =>
         panel(open: true)
         panel(open: false)
     }
@@ -348,7 +340,7 @@ async fn interactive_panel(cx: &Cx) -> Result<impl View> {
 #[tokio::test]
 async fn expression_conversion_preserves_runtime_prop_bindings() {
     let cx = &Cx::new();
-    let html = view! { cx => interactive_panel() }
+    let html = view! { interactive_panel() }
         .single()
         .await
         .unwrap()
@@ -362,11 +354,7 @@ async fn expression_conversion_preserves_runtime_prop_bindings() {
 async fn value_conversion_renders_nodes_without_markers_and_escapes_html() {
     let cx = &Cx::new();
     let text = Expr::from("<b>&");
-    let html = view! { cx => <p>(text)</p> }
-        .single()
-        .await
-        .unwrap()
-        .render(cx);
+    let html = view! { <p>(text)</p> }.single().await.unwrap().render(cx);
 
     assert_eq!(html, "<p>&lt;b&gt;&amp;</p>");
 }
@@ -377,14 +365,11 @@ async fn constants_and_captured_values_render_without_bindings() {
     assert!(expr!(true).is_static());
     let captured = String::from("<&");
     assert!(expr!(captured.to_owned()).is_static());
-    let html = view! {
-        cx =>
-        <p :title=$(captured.to_owned())>$(captured.to_owned())</p>
-    }
-    .single()
-    .await
-    .unwrap()
-    .render(cx);
+    let html = view! { <p :title=$(captured.to_owned())>$(captured.to_owned())</p> }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
 
     assert_eq!(html, "<p title=\"<&amp;\">&lt;&amp;</p>");
 }
@@ -395,7 +380,7 @@ async fn dynamic_constants_render_bindings() {
     let open = Expr::from(true).dynamic();
     let state = expr!(if open { "open" } else { "closed" });
     assert!(!state.is_static());
-    let html = view! { cx => <dialog :open=(open) :data-state=(state)></dialog> }
+    let html = view! { <dialog :open=(open) :data-state=(state)></dialog> }
         .single()
         .await
         .unwrap()
@@ -409,7 +394,7 @@ async fn dynamic_constants_render_bindings() {
 #[tokio::test]
 async fn forwarded_value_conversions_replace_dynamic_bindings() {
     let cx = &Cx::new();
-    let html = view! { cx => replaced_dynamic_bindings() }
+    let html = view! { replaced_dynamic_bindings() }
         .single()
         .await
         .unwrap()
@@ -438,7 +423,7 @@ async fn replaced_dynamic_bindings(cx: &Cx) -> Result<impl View> {
 #[tokio::test]
 async fn forwarded_dynamic_bindings_replace_value_conversions() {
     let cx = &Cx::new();
-    let html = view! { cx => replaced_static_binding() }
+    let html = view! { replaced_static_binding() }
         .single()
         .await
         .unwrap()
@@ -497,7 +482,7 @@ async fn observed_expressions(cx: &Cx) -> Result<impl View> {
 #[tokio::test]
 async fn signal_reads_and_raw_fallbacks_keep_bindings_but_not_server_dependencies() {
     let cx = &Cx::new();
-    let html = view! { cx => observed_expressions() }
+    let html = view! { observed_expressions() }
         .single()
         .await
         .unwrap()

@@ -34,6 +34,7 @@ use crate::{
 /// use serde::{Deserialize, Serialize};
 /// use topcoat::{
 ///     Result,
+///     context::Cx,
 ///     router::{
 ///         content::{Form, Json},
 ///         route,
@@ -47,7 +48,7 @@ use crate::{
 /// }
 ///
 /// #[route(GET)]
-/// async fn search(Form(input): Form<Search>) -> Result<Json<Search>> {
+/// async fn search(cx: &Cx, Form(input): Form<Search>) -> Result<Json<Search>> {
 ///     Ok(Json(input))
 /// }
 /// ```

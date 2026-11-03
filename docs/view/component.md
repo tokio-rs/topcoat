@@ -1,13 +1,14 @@
-The [`#[component]`][`component`] attribute defines an async function that returns a view. Components accept typed parameters and return [`Result<impl View>`][`Result`].
+The [`#[component]`][`component`] attribute defines a reusable view. The function must be `async` and take `cx: &Cx` as its first parameter, even when unused. Additional parameters define its props. The function must return [`Result<impl View>`][`Result`].
 
 ```rust
 use topcoat::{
     Result,
+    context::Cx,
     view::{View, class, component, view},
 };
 
 #[component]
-async fn badge(label: &str, is_success: bool) -> Result<impl View> {
+async fn badge(cx: &Cx, label: &str, is_success: bool) -> Result<impl View> {
     Ok(view! {
         <span class=(class!("badge", "badge-success" if is_success))>
             (label)
@@ -18,14 +19,14 @@ async fn badge(label: &str, is_success: bool) -> Result<impl View> {
 
 # Calling Components
 
-Call components inside [`view!`] with named arguments:
+Call components inside [`view!`] with named arguments. Omit `cx` from the call; the view supplies it automatically:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn badge(label: &str, is_success: bool) -> Result<impl View> { Ok(view! { <span class=(topcoat::view::class!("badge", "badge-success" if is_success))>(label)</span> }) }
+# async fn badge(cx: &Cx, label: &str, is_success: bool) -> Result<impl View> { Ok(view! { <span class=(topcoat::view::class!("badge", "badge-success" if is_success))>(label)</span> }) }
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     <header>
         badge(
@@ -44,11 +45,12 @@ If a component accepts a parameter named `child` with type [`Child`], any extra 
 ```rust
 use topcoat::{
     Result,
+    context::Cx,
     view::{Child, View, component, view},
 };
 
 #[component]
-async fn panel(title: &str, #[default] child: Child<'_>) -> Result<impl View> {
+async fn panel(cx: &Cx, title: &str, #[default] child: Child<'_>) -> Result<impl View> {
     Ok(view! {
         <section class="panel">
             <h2>(title)</h2>
@@ -60,9 +62,9 @@ async fn panel(title: &str, #[default] child: Child<'_>) -> Result<impl View> {
 }
 
 # #[component]
-# async fn badge(label: &str, is_success: bool) -> Result<impl View> { Ok(view! { <span class=(topcoat::view::class!("badge", "badge-success" if is_success))>(label)</span> }) }
+# async fn badge(cx: &Cx, label: &str, is_success: bool) -> Result<impl View> { Ok(view! { <span class=(topcoat::view::class!("badge", "badge-success" if is_success))>(label)</span> }) }
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     panel(
         title: "Profile",
@@ -87,11 +89,11 @@ A parameter can have these attributes:
 - `#[into]` accepts any value that converts to the parameter's type through `Into`. The component receives the converted value.
 
 ```rust
-# use topcoat::{Result, view::{View, component, view}};
+# use topcoat::{Result, context::Cx, view::{View, component, view}};
 # #[derive(Default)]
 # struct Tone;
 #[component]
-async fn badge(#[into] label: String, #[default] tone: Tone, #[default(80)] max_length: usize) -> Result<impl View> {
+async fn badge(cx: &Cx, #[into] label: String, #[default] tone: Tone, #[default(80)] max_length: usize) -> Result<impl View> {
     // ...
 #     Ok(view! { <span>(label)</span> })
 }
@@ -102,9 +104,9 @@ async fn badge(#[into] label: String, #[default] tone: Tone, #[default(80)] max_
 Components can be generic. Depending on usage, you may need to declare the type as `Send` or `Sync`:
 
 ```rust
-# use topcoat::{Result, view::{View, component, view}};
+# use topcoat::{Result, context::Cx, view::{View, component, view}};
 #[component]
-async fn count<T: Send + Sync>(items: Vec<T>) -> Result<impl View> {
+async fn count<T: Send + Sync>(cx: &Cx, items: Vec<T>) -> Result<impl View> {
     Ok(view! { <span>(items.len())</span> })
 }
 ```
@@ -112,9 +114,9 @@ async fn count<T: Send + Sync>(items: Vec<T>) -> Result<impl View> {
 `impl Trait` parameters work too:
 
 ```rust
-# use topcoat::{Result, view::{View, component, view}};
+# use topcoat::{Result, context::Cx, view::{View, component, view}};
 #[component]
-async fn shout(label: impl Into<String> + Send) -> Result<impl View> {
+async fn shout(cx: &Cx, label: impl Into<String> + Send) -> Result<impl View> {
     Ok(view! { <b>(label.into().to_uppercase())</b> })
 }
 ```
@@ -123,7 +125,7 @@ Prefer `#[into]` when the component only needs the converted value.
 
 # Request Context
 
-Components can ask for the current request context by declaring a `cx` parameter that borrows [`Cx`]:
+Every component receives the current request context through its `cx: &Cx` parameter. Use it to read context values or request data:
 
 ```rust
 use topcoat::{
@@ -149,11 +151,12 @@ A recursive component needs to box its view with [`boxed`](trait.ViewExt.html#me
 ```rust
 use topcoat::{
     Result,
+    context::Cx,
     view::{View, ViewExt, component, view},
 };
 
 #[component]
-async fn countdown(n: u32) -> Result<impl View> {
+async fn countdown(cx: &Cx, n: u32) -> Result<impl View> {
     Ok(view! {
         <li>(n)</li>
         if n > 0 {

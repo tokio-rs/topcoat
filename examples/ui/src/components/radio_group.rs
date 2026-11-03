@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
@@ -27,6 +28,7 @@ use topcoat::{
 /// ```
 #[component]
 pub async fn radio_group(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -60,7 +62,7 @@ const DOT: StaticClass = class!(
 /// Pair it with a label. Classes in `attrs` apply to the wrapper, while other
 /// attributes go on the `<input>`.
 #[component]
-pub async fn radio_group_item(#[default] mut attrs: Attributes) -> Result<impl View> {
+pub async fn radio_group_item(cx: &Cx, #[default] mut attrs: Attributes) -> Result<impl View> {
     // The dot cannot be drawn by the `<input>` itself, which renders no
     // children or pseudo-elements: it is a sibling overlaid on the control,
     // revealed by the input's `peer` state while picked.

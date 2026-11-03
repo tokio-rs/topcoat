@@ -167,7 +167,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
 }
 
 #[topcoat::view::component]
-async fn demo_accounts() -> Result<impl View> {
+async fn demo_accounts(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         card(
             attrs: attributes! { class="w-full max-w-sm" },

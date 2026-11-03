@@ -13,9 +13,9 @@ use crate::{Captured, HtmlContext, PartsWriter, PromotedStr, StaticStr, Unescape
 /// [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html):
 ///
 /// ```rust
-/// # use topcoat::view::{View, component, view};
+/// # use topcoat::{context::Cx, view::{View, component, view}};
 /// # #[component]
-/// # async fn example() -> topcoat::Result<impl View> {
+/// # async fn example(cx: &Cx) -> topcoat::Result<impl View> {
 /// # let my_key = "data-state";
 /// Ok(view! {
 ///     <div (my_key)="value"></div>

@@ -60,7 +60,7 @@ impl OrdersQuery {
 
 /// Marks the order pages as part of the orders section.
 #[layout(with(Section::Orders))]
-async fn section(slot: Slot<'_>) -> Result<impl View> {
+async fn section(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! { (slot) })
 }
 
@@ -306,7 +306,7 @@ async fn order_rows(
 }
 
 #[component]
-async fn order_rows_skeleton(rows: usize) -> Result<impl View> {
+async fn order_rows_skeleton(cx: &Cx, rows: usize) -> Result<impl View> {
     Ok(view! {
         table(
             attrs: attributes! { aria-busy="true" },
@@ -349,7 +349,7 @@ async fn order_rows_skeleton(rows: usize) -> Result<impl View> {
 }
 
 #[component]
-async fn order_columns() -> Result<impl View> {
+async fn order_columns(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         table_header(
             table_row(
@@ -368,7 +368,7 @@ async fn order_columns() -> Result<impl View> {
 }
 
 #[component]
-pub(super) async fn status_badge(status: OrderStatus) -> Result<impl View> {
+pub(super) async fn status_badge(cx: &Cx, status: OrderStatus) -> Result<impl View> {
     let dot: StaticClass = match status {
         OrderStatus::Pending => class!("bg-amber-500"),
         OrderStatus::Paid => class!("bg-sky-500"),
@@ -390,7 +390,7 @@ pub(super) async fn status_badge(status: OrderStatus) -> Result<impl View> {
 /// Shows recent timestamps as elapsed time, such as `3 hours ago`.
 /// After a week, shows a date such as `Oct 12, 2026`.
 #[component]
-pub(super) async fn time_ago(timestamp: Timestamp) -> Result<impl View> {
+pub(super) async fn time_ago(cx: &Cx, timestamp: Timestamp) -> Result<impl View> {
     let minutes = Timestamp::now().duration_since(timestamp).as_mins();
 
     Ok(view! {

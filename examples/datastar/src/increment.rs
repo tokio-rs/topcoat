@@ -21,7 +21,6 @@ pub(crate) async fn increment(
     let count = counter.count + 1;
 
     let entry = view! {
-        cx =>
         <li>
             "Counted to "
             (count)

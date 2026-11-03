@@ -18,12 +18,13 @@ Load the Datastar script before using its attributes. This example bundles the s
 use topcoat::{
     Result,
     asset::asset,
+    context::Cx,
     router::{Slot, layout},
     view::{View, view},
 };
 
 #[layout]
-async fn root(slot: Slot<'_>) -> Result<impl View> {
+async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>
@@ -50,6 +51,7 @@ The [`Signals`] extractor deserializes request signals into your type. It reads 
 use serde::{Deserialize, Serialize};
 use topcoat::{
     Result,
+    context::Cx,
     datastar::{PatchSignals, Signals},
     router::route,
 };
@@ -60,7 +62,7 @@ struct Counter {
 }
 
 #[route(POST)]
-async fn increment(Signals(counter): Signals<Counter>) -> Result<PatchSignals> {
+async fn increment(cx: &Cx, Signals(counter): Signals<Counter>) -> Result<PatchSignals> {
     PatchSignals::json(&Counter {
         count: counter.count + 1,
     })
@@ -85,7 +87,7 @@ use topcoat::{
 
 #[route(POST)]
 async fn create(cx: &Cx) -> Result<PatchElements> {
-    let entry = view! { cx => <li>"A new entry"</li> }.single().await?;
+    let entry = view! { <li>"A new entry"</li> }.single().await?;
     Ok(PatchElements::new(entry.render(cx))
         .selector("#feed")
         .mode(ElementPatchMode::Prepend))
@@ -109,11 +111,9 @@ use futures_util::stream;
 use serde::Serialize;
 use topcoat::{
     Result,
+    context::Cx,
     datastar::PatchSignals,
-    router::{
-        content::sse::{Event, KeepAlive, Sse},
-        route,
-    },
+    router::{ content::sse::{Event, KeepAlive, Sse}, route, },
 };
 
 #[derive(Serialize)]
@@ -122,7 +122,7 @@ struct Progress {
 }
 
 #[route(GET)]
-async fn progress() -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
+async fn progress(cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
     let events = stream::iter((0..=100u8).step_by(20).map(|percent| {
         PatchSignals::json(&Progress { percent }).map(Into::into)
     }));
@@ -159,7 +159,7 @@ use topcoat::{
 
 #[route(POST)]
 async fn save(cx: &Cx) -> Result<(DatastarSelector, DatastarMode, ViewHandle)> {
-    let status = view! { cx => <p>"Saved!"</p> }.single().await?;
+    let status = view! { <p>"Saved!"</p> }.single().await?;
     Ok((
         DatastarSelector::from("#status"),
         DatastarMode(ElementPatchMode::Inner),

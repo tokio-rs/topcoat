@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use topcoat::{
     Result,
+    context::Cx,
     router::page,
     view::{View, emit, live, view},
 };
@@ -9,7 +10,7 @@ use topcoat::{
 // The browser receives the shell with the placeholder right away, and the
 // content replaces it in place once the lookup finishes.
 #[page]
-pub async fn page() -> Result<impl View> {
+pub async fn page(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>"Suspense"</h1>
         (live! {

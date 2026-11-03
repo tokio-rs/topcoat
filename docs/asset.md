@@ -8,6 +8,7 @@ Use [`asset!`](asset) anywhere in your app:
 use topcoat::{
     Result,
     asset::{Asset, asset},
+    context::Cx,
     router::page,
     view::{View, view},
 };
@@ -15,7 +16,7 @@ use topcoat::{
 const FERRIS: Asset = asset!("./ferris.png");
 
 #[page]
-async fn about_page() -> Result<impl View> {
+async fn about_page(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <img src=(FERRIS)>
     })
@@ -25,9 +26,9 @@ async fn about_page() -> Result<impl View> {
 You can also call the macro inline:
 
 ```rust
-# use topcoat::{asset::asset, view::{View, view}};
+# use topcoat::{asset::asset, context::Cx, view::{View, view}};
 # #[topcoat::view::component]
-# async fn example() -> topcoat::Result<impl topcoat::view::View> {
+# async fn example(cx: &Cx) -> topcoat::Result<impl topcoat::view::View> {
 Ok(view! {
     <script
         type="module"

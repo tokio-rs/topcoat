@@ -6,7 +6,7 @@ Pass the result directly as the value of a `class` attribute:
 
 ```rust
 # #[topcoat::view::component]
-# async fn example() -> topcoat::Result<impl topcoat::view::View> {
+# async fn example(cx: &topcoat::context::Cx) -> topcoat::Result<impl topcoat::view::View> {
 use topcoat::view::{View, class, view};
 
 let is_active = true;
@@ -27,7 +27,7 @@ The body is a comma-separated list of entries. Each entry is a Rust expression, 
 
 ```rust
 # #[topcoat::view::component]
-# async fn example() -> topcoat::Result<impl topcoat::view::View> {
+# async fn example(cx: &topcoat::context::Cx) -> topcoat::Result<impl topcoat::view::View> {
 use topcoat::view::{View, class, view};
 
 let variant: Option<&str> = Some("primary");
@@ -53,7 +53,7 @@ Absent entries contribute no text or separator. This includes `None`, empty stri
 
 ```rust
 # #[topcoat::view::component]
-# async fn example() -> topcoat::Result<impl topcoat::view::View> {
+# async fn example(cx: &topcoat::context::Cx) -> topcoat::Result<impl topcoat::view::View> {
 use topcoat::view::{View, class, view};
 
 let variant: Option<&str> = None;
@@ -72,11 +72,12 @@ When a component accepts an attribute collection, remove its `class` entry and c
 ```rust
 use topcoat::{
     Result,
+    context::Cx,
     view::{Attributes, Child, View, class, component, view},
 };
 
 #[component]
-async fn panel(#[default] mut attrs: Attributes, #[default] child: Child<'_>) -> Result<impl View> {
+async fn panel(cx: &Cx, #[default] mut attrs: Attributes, #[default] child: Child<'_>) -> Result<impl View> {
     Ok(view! {
         <section class=(class!("panel", attrs.remove("class"))) (attrs)>
             (child)

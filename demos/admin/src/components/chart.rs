@@ -69,7 +69,11 @@ pub async fn line_chart(
 /// highlighted. The chart fills its parent and uses its text color.
 /// Extra `attrs` go on the SVG.
 #[component]
-pub async fn bar_chart(values: &[i64], #[default] mut attrs: Attributes) -> Result<impl View> {
+pub async fn bar_chart(
+    cx: &Cx,
+    values: &[i64],
+    #[default] mut attrs: Attributes,
+) -> Result<impl View> {
     let max = values.iter().copied().max().unwrap_or(0).max(1);
     let width = values.len() * STEP;
 

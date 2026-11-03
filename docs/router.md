@@ -22,17 +22,18 @@ To choose paths directly, put an absolute path in each handler's attribute and r
 ```rust
 use topcoat::{
     Result,
+    context::Cx,
     router::{Router, page, route},
     view::{View, view},
 };
 
 #[page("/")]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! { <h1>"Home"</h1> })
 }
 
 #[route(GET "/api/health")]
-async fn health() -> Result<&'static str> {
+async fn health(cx: &Cx) -> Result<&'static str> {
     Ok("ok")
 }
 
@@ -52,16 +53,16 @@ You can also combine the approaches. `module_router!()` collects module-derived 
 Use [`href!`](macro@href) for URLs targeting Topcoat handlers, including navigation links, form actions, and redirects. Pass the handler's Rust name so the URL follows its registered path when you rename a module or change an explicit path. Pass each path parameter as a `path_param!` value:
 
 ```rust
-use topcoat::{router::href, view::view};
+use topcoat::{context::Cx, router::href, view::view};
 # use topcoat::{Result, router::{page, route}, view::View};
-# #[page("/posts")] async fn posts() -> Result<impl View> { Ok(topcoat::view::view! { "Posts" }) }
-# #[route(POST "/posts")] async fn publish() -> Result<()> { Ok(()) }
+# #[page("/posts")] async fn posts(cx: &Cx) -> Result<impl View> { Ok(topcoat::view::view! { "Posts" }) }
+# #[route(POST "/posts")] async fn publish(cx: &Cx) -> Result<()> { Ok(()) }
 # mod post_id {
 #     use super::*;
 #     topcoat::router::path_param!(pub post_id: u64);
-#     #[page("/posts/{post_id}")] pub async fn post() -> Result<impl View> { Ok(topcoat::view::view! { "Post" }) }
+#     #[page("/posts/{post_id}")] pub async fn post(cx: &Cx) -> Result<impl View> { Ok(topcoat::view::view! { "Post" }) }
 # }
-# #[page] async fn example() -> Result<impl View> {
+# #[page] async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     <a href=(href!(posts))>"All posts"</a>
     <a href=(href!(post_id::post, post_id::PostId(1)))>"First post"</a>
@@ -82,7 +83,7 @@ use topcoat::{
     router::{error::{SeeOther, see_other}, href, route},
 };
 # #[topcoat::router::page("/posts")]
-# async fn posts() -> Result<impl topcoat::view::View> { Ok(topcoat::view::view! { "Posts" }) }
+# async fn posts(cx: &Cx) -> Result<impl topcoat::view::View> { Ok(topcoat::view::view! { "Posts" }) }
 
 #[route(POST)]
 async fn publish(cx: &Cx) -> Result<SeeOther> {
@@ -112,21 +113,21 @@ A page is an async function annotated with [`#[page]`](page), returning a render
 
 ```rust
 // src/app.rs
-use topcoat::{Result, router::page, view::{View, view}};
+use topcoat::{Result, context::Cx, router::page, view::{View, view}};
 
 #[page]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! { <h1>"Home"</h1> })
 }
 
 mod users {
     mod id {
-        use topcoat::{Result, router::{module_param, page}, view::{View, view}};
+        use topcoat::{Result, context::Cx, router::{module_param, page}, view::{View, view}};
 
         module_param!(id);
 
         #[page]
-        async fn user_profile() -> Result<impl View> {
+        async fn user_profile(cx: &Cx) -> Result<impl View> {
             Ok(view! { <h1>"User profile"</h1> })
         }
     }
@@ -149,10 +150,10 @@ use topcoat::{
     router::{Slot, href, layout},
     view::{View, class, view},
 };
-# #[topcoat::router::page] async fn home() -> Result<impl View> { Ok(topcoat::view::view! { "Home" }) }
+# #[topcoat::router::page] async fn home(cx: &Cx) -> Result<impl View> { Ok(topcoat::view::view! { "Home" }) }
 # mod about {
 #     use super::*;
-#     #[topcoat::router::page] pub async fn page() -> Result<impl View> { Ok(topcoat::view::view! { "About" }) }
+#     #[topcoat::router::page] pub async fn page(cx: &Cx) -> Result<impl View> { Ok(topcoat::view::view! { "About" }) }
 # }
 
 #[layout]
@@ -215,10 +216,10 @@ An API route is an async function annotated with [`#[route]`](macro@route) and a
 
 ```rust
 // src/app/api/health.rs
-use topcoat::{Result, router::route};
+use topcoat::{Result, context::Cx, router::route};
 
 #[route(GET)]
-async fn health() -> Result<&'static str> {
+async fn health(cx: &Cx) -> Result<&'static str> {
     Ok("ok")
 }
 ```
@@ -229,7 +230,7 @@ See [`#[route]`](macro@route) for the handler signature and how return values co
 
 # Request and response bodies
 
-A page or route handler can take the request context as `cx: &`[`Cx`](crate::context::Cx) and, alongside it, a single request body parameter, such as a [`Json`](content::Json) body. An API route additionally returns a value that becomes the response.
+A handler must take [`cx: &Cx`](crate::context::Cx) as its first parameter, even when unused. An optional second parameter implements [`FromRequest`](request::FromRequest), such as a [`Json`](content::Json) body. An API route returns a value that becomes the response.
 
 ```rust
 // src/app/api/users.rs
@@ -248,7 +249,7 @@ async fn create_user(cx: &Cx, Json(input): Json<CreateUser>) -> Result<Json<User
 }
 ```
 
-Both parameters are optional and may appear in either order. A handler can take only one body parameter because the body can be consumed only once. Pages parse bodies the same way and return a view. See [`content`](mod@content) for request extractors and response types.
+A handler can take only one body parameter because the body can be consumed only once. Pages parse bodies the same way and return a view. See [`content`](mod@content) for request extractors and response types.
 
 # Path and query parameters
 
@@ -372,7 +373,7 @@ mod posts {
 }
 
 #[layout]
-async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <html>
             <body>
@@ -409,13 +410,13 @@ For routes with explicit paths, register each handler with `.page()`, `.layout()
 
 ```rust
 # use topcoat::{Result, context::Cx, router::{Body, Next, Slot, layer, layout, page, response::Response, route}, view::{View, view}};
-# #[layout("/")] async fn root_layout(slot: Slot<'_>) -> Result<impl View> { Ok(view! { (slot) }) }
-# #[layout("/settings")] async fn settings_layout(slot: Slot<'_>) -> Result<impl View> { Ok(view! { (slot) }) }
+# #[layout("/")] async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> { Ok(view! { (slot) }) }
+# #[layout("/settings")] async fn settings_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> { Ok(view! { (slot) }) }
 # #[layer("/")] async fn timing(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> { next.run(cx, body).await }
-# #[page("/")] async fn home() -> Result<impl View> { Ok(view! { <h1>"Home"</h1> }) }
-# #[page("/about")] async fn about() -> Result<impl View> { Ok(view! { <h1>"About"</h1> }) }
-# #[page("/settings/profile")] async fn profile() -> Result<impl View> { Ok(view! { <h1>"Profile"</h1> }) }
-# #[route(GET "/api/health")] async fn health() -> Result<&'static str> { Ok("ok") }
+# #[page("/")] async fn home(cx: &Cx) -> Result<impl View> { Ok(view! { <h1>"Home"</h1> }) }
+# #[page("/about")] async fn about(cx: &Cx) -> Result<impl View> { Ok(view! { <h1>"About"</h1> }) }
+# #[page("/settings/profile")] async fn profile(cx: &Cx) -> Result<impl View> { Ok(view! { <h1>"Profile"</h1> }) }
+# #[route(GET "/api/health")] async fn health(cx: &Cx) -> Result<&'static str> { Ok("ok") }
 use topcoat::router::Router;
 
 pub fn router() -> Router {
@@ -537,7 +538,7 @@ struct NewUser {
 }
 
 #[layout("/")]
-async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>
@@ -560,28 +561,28 @@ async fn api_log(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
 }
 
 #[page("/")]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! { <h1>"Welcome"</h1> })
 }
 
 #[page("/users")]
-async fn users_list() -> Result<impl View> {
+async fn users_list(cx: &Cx) -> Result<impl View> {
     Ok(view! { <h1>"All users"</h1> })
 }
 
 #[page("/users/{id}")]
-async fn user_profile() -> Result<impl View> {
+async fn user_profile(cx: &Cx) -> Result<impl View> {
     Ok(view! { <h1>"User profile"</h1> })
 }
 
 #[route(GET "/api/health")]
-async fn health() -> Result<&'static str> {
+async fn health(cx: &Cx) -> Result<&'static str> {
     Ok("ok")
 }
 
 // Reads a JSON request body and echoes it back as a JSON response.
 #[route(POST "/api/users")]
-async fn create_user(Json(user): Json<NewUser>) -> Result<Json<NewUser>> {
+async fn create_user(cx: &Cx, Json(user): Json<NewUser>) -> Result<Json<NewUser>> {
     Ok(Json(user))
 }
 

@@ -11,7 +11,6 @@ let mail = mail! {
     to: "ada@example.com",
     subject: "Welcome, Ada!",
     html: {
-        cx =>
         <h1>"Welcome!"</h1>
         <p>"Your account is ready."</p>
     },
@@ -56,7 +55,7 @@ let mail = mail! {
 
 # The HTML Body
 
-A braced `html` value uses [`view!`] syntax. Add a leading `cx =>` when the view needs the request context:
+A braced `html` value uses [`view!`] syntax and captures the surrounding variable named `cx` as its context:
 
 ```rust
 # use topcoat::{Result, context::Cx};
@@ -66,7 +65,6 @@ async fn welcome(cx: &Cx, name: &str) -> Result<Mail> {
         to: "ada@example.com",
         subject: format!("Welcome, {name}!"),
         html: {
-            cx =>
             <p>
                 "Hello, "
                 (name)
@@ -76,6 +74,8 @@ async fn welcome(cx: &Cx, name: &str) -> Result<Mail> {
     }
 }
 ```
+
+To add or override context values for the HTML body, shadow `cx` with `let cx = cx.with(value);` before `mail!`. See the [`view!` context guide](../view/macro.view.html#request-context) for shadowing and capture ownership.
 
 Pass an unbraced [`View`] expression to use an existing view.
 
@@ -87,9 +87,9 @@ By default, Topcoat derives plain text from the HTML body. Set `text` to supply 
 # use topcoat::{Result, context::Cx};
 # use topcoat::mail::{TextBody, mail};
 # async fn example(cx: &Cx) -> Result<()> {
-let derived = mail! { html: { cx => <p>"Hi"</p> } }?;
+let derived = mail! { html: { <p>"Hi"</p> } }?;
 let declared = mail! { text: "Hi there" }?;
-let html_alone = mail! { html: { cx => <p>"Hi"</p> }, text: TextBody::None }?;
+let html_alone = mail! { html: { <p>"Hi"</p> }, text: TextBody::None }?;
 
 assert_eq!(derived.text(), &TextBody::FromHtml);
 assert_eq!(declared.text(), &TextBody::Text("Hi there".to_owned()));
@@ -109,7 +109,6 @@ assert_eq!(html_alone.text(), &TextBody::None);
 let mail = mail! {
     subject: "Your invoice",
     html: {
-        cx =>
         <img src="cid:logo" alt="Example logo">
         <p>"The invoice is attached."</p>
     },

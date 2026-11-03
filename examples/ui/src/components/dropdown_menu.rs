@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     icon::{icon, iconify::iconify_icon},
     view::{Attributes, Child, StaticClass, View, attributes, class, component, view},
 };
@@ -40,6 +41,7 @@ use super::floating::{FloatingAlign, FloatingAnchor, FloatingSide, floating_vari
 /// ```
 #[component]
 pub async fn dropdown_menu(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -80,6 +82,7 @@ pub async fn dropdown_menu(
 /// ```
 #[component]
 pub async fn dropdown_menu_trigger(
+    cx: &Cx,
     /// The menu ID this button controls.
     target: &str,
     /// Attributes to add to the button.
@@ -114,6 +117,7 @@ const PANEL: StaticClass = class!(
 /// positions if there is not enough room in the window.
 #[component]
 pub async fn dropdown_menu_content(
+    cx: &Cx,
     /// The menu ID to pass to the trigger's `target`.
     id: &str,
     /// Where the menu opens relative to the button.
@@ -160,6 +164,7 @@ const ITEM: StaticClass = class!(
 /// `type="submit"` through `attrs`, the button submits its form and ignores `close`.
 #[component]
 pub async fn dropdown_menu_item(
+    cx: &Cx,
     /// The menu ID to close when this button is clicked.
     #[default]
     close: Option<&str>,
@@ -212,6 +217,7 @@ pub async fn dropdown_menu_item(
 /// ```
 #[component]
 pub async fn dropdown_menu_sub(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -232,6 +238,7 @@ pub async fn dropdown_menu_sub(
 /// open. `attrs` adds attributes and classes to the row's `<button>`.
 #[component]
 pub async fn dropdown_menu_sub_trigger(
+    cx: &Cx,
     /// The submenu ID this button controls.
     target: &str,
     /// Attributes to add to the button.
@@ -266,6 +273,7 @@ pub async fn dropdown_menu_sub_trigger(
 /// The browser tries other positions if the submenu does not fit in the window.
 #[component]
 pub async fn dropdown_menu_sub_content(
+    cx: &Cx,
     /// The submenu ID to pass to the trigger's `target`.
     id: &str,
     /// Attributes to add to the submenu's `<div>`.
@@ -298,6 +306,7 @@ pub async fn dropdown_menu_sub_content(
 /// A non-interactive heading grouping the items after it.
 #[component]
 pub async fn dropdown_menu_label(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -316,7 +325,10 @@ pub async fn dropdown_menu_label(
 
 /// A hairline rule separating groups of items.
 #[component]
-pub async fn dropdown_menu_separator(#[default] mut attrs: Attributes) -> Result<impl View> {
+pub async fn dropdown_menu_separator(
+    cx: &Cx,
+    #[default] mut attrs: Attributes,
+) -> Result<impl View> {
     Ok(view! {
         <hr class=(class!("-mx-1 my-1 border-border", attrs.remove("class"))) (attrs)>
     })

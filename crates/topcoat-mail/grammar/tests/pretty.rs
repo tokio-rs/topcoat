@@ -119,22 +119,6 @@ fn keeps_a_short_html_body_inline() {
 }
 
 #[test]
-fn preserves_a_leading_cx_argument() {
-    let expected = r#"mail! {
-    subject: "Hello",
-    html: {
-        cx =>
-        <p>
-            "Hello, "
-            (name)
-            "!"
-        </p>
-    },
-}"#;
-    assert_format_idempotent(expected, expected);
-}
-
-#[test]
 fn keeps_a_line_comment_between_fields() {
     let expected = r#"mail! {
     subject: "Hello",

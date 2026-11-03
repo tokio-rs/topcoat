@@ -16,7 +16,7 @@ use crate::components::input::input;
 use crate::features::todo::Todo;
 
 #[page{{ paths.page("/todos") }}]
-pub async fn page() -> Result<impl View> {
+pub async fn page(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <main{{ classes.main }} data-signals:title="''">
             <h1{{ classes.heading }}>"Todos"</h1>
@@ -101,7 +101,7 @@ pub async fn todo_list(cx: &Cx) -> Result<impl View> {
 
 /// Renders the todo list as a Datastar patch for the element with its id.
 pub async fn patch_todo_list(cx: &Cx) -> Result<PatchElements> {
-    let list = view! { cx => todo_list() }.single().await?;
+    let list = view! { todo_list() }.single().await?;
     Ok(PatchElements::new(list.render(cx)))
 }
 

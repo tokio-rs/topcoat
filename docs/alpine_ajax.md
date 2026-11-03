@@ -17,12 +17,13 @@ Load the Alpine AJAX plugin before Alpine.js. Give both scripts `defer` so they 
 ```rust
 use topcoat::{
     Result,
+    context::Cx,
     router::{Slot, layout},
     view::{View, view},
 };
 
 #[layout]
-async fn root(slot: Slot<'_>) -> Result<impl View> {
+async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>
@@ -118,7 +119,6 @@ async fn create_comment(cx: &Cx /* , Form(input): Form<NewComment> */) -> Result
         return (
             StatusCode::UNPROCESSABLE_ENTITY,
             view! {
-                cx =>
                 <form id="comment_form" x-target="comment_form comments" x-target.422="comment_form">
                     <textarea name="body"></textarea>
                     <p class="error">(message)</p>

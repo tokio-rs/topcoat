@@ -105,17 +105,15 @@ impl Crumb {
 }
 
 #[layout(
-    with(
-        Metadata::from_fn(
-            async |cx| {
-                let title = match try_context::<Crumb>(cx) {
-                    Some(crumb) => Text::from(crumb.0.call(cx).await?),
-                    None => Text::from(context::<Section>(cx).label()),
-                };
-                Ok(Metadata::new().title(title))
-            },
-        )
-    )
+    with(Metadata::from_fn(
+        async |cx| {
+            let title = match try_context::<Crumb>(cx) {
+                Some(crumb) => Text::from(crumb.0.call(cx).await?),
+                None => Text::from(context::<Section>(cx).label()),
+            };
+            Ok(Metadata::new().title(title))
+        },
+    ))
 )]
 async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     let user = require_user(cx).await?;

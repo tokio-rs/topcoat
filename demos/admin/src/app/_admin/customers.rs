@@ -56,7 +56,7 @@ impl CustomersQuery {
 
 /// Marks the customer pages as part of the customers section.
 #[layout(with(Section::Customers))]
-async fn section(slot: Slot<'_>) -> Result<impl View> {
+async fn section(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! { (slot) })
 }
 
@@ -265,7 +265,7 @@ async fn customer_rows(
 }
 
 #[component]
-async fn customer_rows_skeleton(rows: usize) -> Result<impl View> {
+async fn customer_rows_skeleton(cx: &Cx, rows: usize) -> Result<impl View> {
     Ok(view! {
         table(
             attrs: attributes! { aria-busy="true" },
@@ -309,7 +309,7 @@ async fn customer_rows_skeleton(rows: usize) -> Result<impl View> {
 }
 
 #[component]
-async fn customer_columns() -> Result<impl View> {
+async fn customer_columns(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         table_header(
             table_row(

@@ -13,9 +13,7 @@ use crate::Counter;
 #[route(POST)]
 pub(crate) async fn increment(cx: &Cx) -> Result<(HxResponseTrigger, ViewHandle)> {
     let count = context::<Counter>(cx).0.fetch_add(1, Ordering::Relaxed) + 1;
-    let fragment = view! { cx => <span id="count">(count)</span> }
-        .single()
-        .await?;
+    let fragment = view! { <span id="count">(count)</span> }.single().await?;
 
     // The trigger becomes an `HX-Trigger: counted` response header, which
     // fires a `counted` event in the browser.

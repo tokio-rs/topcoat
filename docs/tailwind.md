@@ -28,13 +28,14 @@ Then link the generated stylesheet from your layout:
 ```rust,ignore
 use topcoat::{
     Result,
+    context::Cx,
     router::{Slot, layout},
     tailwind,
     view::{View, view},
 };
 
 #[layout]
-async fn layout(slot: Slot<'_>) -> Result<impl View> {
+async fn layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>

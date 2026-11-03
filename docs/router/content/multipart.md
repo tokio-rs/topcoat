@@ -10,11 +10,12 @@ Accept a [`Multipart`] parameter and call [`next_field`](Multipart::next_field) 
 // src/app/api/upload.rs
 use topcoat::{
     Result,
+    context::Cx,
     router::{content::multipart::Multipart, route},
 };
 
 #[route(POST)]
-async fn upload(mut multipart: Multipart) -> Result<&'static str> {
+async fn upload(cx: &Cx, mut multipart: Multipart) -> Result<&'static str> {
     while let Some(field) = multipart.next_field().await? {
         let name = field.name().map(str::to_owned);
         let data = field.bytes().await?;

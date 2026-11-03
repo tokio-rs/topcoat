@@ -10,14 +10,12 @@ This example serves a sitemap at `/sitemap.xml`. The relative path `./sitemap.xm
 // src/app.rs
 use topcoat::{
     Result,
-    router::{
-        content::sitemap::{ChangeFrequency, Sitemap, SitemapUrl},
-        route,
-    },
+    context::Cx,
+    router::{ content::sitemap::{ChangeFrequency, Sitemap, SitemapUrl}, route, },
 };
 
 #[route(GET "./sitemap.xml")]
-async fn sitemap() -> Result<Sitemap> {
+async fn sitemap(cx: &Cx) -> Result<Sitemap> {
     let posts = ["first-post", "second-post"];
     Ok(Sitemap::new()
         .url("/")

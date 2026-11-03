@@ -219,7 +219,7 @@ async fn stat_card(
 }
 
 #[component]
-async fn figure_details(figure: &Figure, accent: StaticClass) -> Result<impl View> {
+async fn figure_details(cx: &Cx, figure: &Figure, accent: StaticClass) -> Result<impl View> {
     Ok(view! {
         <p class="mt-1 px-6 text-3xl font-semibold tracking-tight tabular-nums">
             match figure.value {
@@ -312,7 +312,7 @@ async fn open_orders(cx: &Cx) -> Result<impl View> {
 }
 
 #[component]
-async fn open_orders_skeleton() -> Result<impl View> {
+async fn open_orders_skeleton(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         table(
             attrs: attributes! { aria-busy="true" },
@@ -345,7 +345,7 @@ async fn open_orders_skeleton() -> Result<impl View> {
 }
 
 #[component]
-async fn open_order_columns() -> Result<impl View> {
+async fn open_order_columns(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         table_header(
             table_row(

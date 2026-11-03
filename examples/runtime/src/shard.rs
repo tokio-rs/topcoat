@@ -9,7 +9,7 @@ use topcoat::{
 };
 
 #[page]
-pub async fn page() -> Result<impl View> {
+pub async fn page(cx: &Cx) -> Result<impl View> {
     Ok(view! { search() })
 }
 

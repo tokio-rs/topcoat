@@ -6,7 +6,7 @@ use syn::{
     parse_quote,
 };
 use topcoat_core_grammar::common::{
-    ParseOption, lenient,
+    ParseOption, SignatureExt, lenient,
     paths::{topcoat_context, topcoat_inventory, topcoat_router},
 };
 
@@ -37,9 +37,9 @@ pub struct LayerItem {
 
 impl Parse for LayerItem {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        Ok(Self {
-            item: input.parse()?,
-        })
+        let item: lenient::ItemFn = input.parse()?;
+        item.sig.cx_param()?;
+        Ok(Self { item })
     }
 }
 
@@ -84,6 +84,7 @@ impl ToTokens for Layer {
         // implementation below.
         let mut inner = item.clone();
         inner.sig.ident = format_ident!("handler", span = ident.span());
+        inner.sig.allow_unused_cx();
         inner.vis = Visibility::Inherited;
         inner
             .attrs

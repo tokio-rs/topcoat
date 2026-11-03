@@ -1,4 +1,4 @@
-use topcoat_core::error::Result;
+use topcoat_core::{context::Cx, error::Result};
 use topcoat_view::View;
 use topcoat_view_macro::{component, view};
 
@@ -11,10 +11,10 @@ use crate::{Font, FontFormat, FontSource};
 /// face so the browser can start fetching the files before the CSS is parsed.
 ///
 /// ```rust
-/// # use topcoat::{font::{Font, fontsource::fontsource_font}, view::{View, view}};
+/// # use topcoat::{context::Cx, font::{Font, fontsource::fontsource_font}, view::{View, view}};
 /// # const LAVISHLY_YOURS: Font = fontsource_font!(LAVISHLY_YOURS, host: Asset);
 /// # #[topcoat::view::component]
-/// # async fn example() -> topcoat::Result<impl View> {
+/// # async fn example(cx: &Cx) -> topcoat::Result<impl View> {
 /// Ok(view! {
 ///     topcoat::font::link(font: LAVISHLY_YOURS)
 /// })
@@ -22,6 +22,7 @@ use crate::{Font, FontFormat, FontSource};
 /// ```
 #[component]
 pub async fn link(
+    cx: &Cx,
     /// The font to load.
     font: Font,
     /// Whether to emit `rel="preload"` links for the font's sources ahead of
@@ -48,6 +49,7 @@ pub async fn link(
 /// otherwise.
 #[component]
 pub async fn preload_link(
+    cx: &Cx,
     /// The font source to preload.
     source: &FontSource,
 ) -> Result<impl View> {

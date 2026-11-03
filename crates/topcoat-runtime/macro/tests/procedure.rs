@@ -1,31 +1,32 @@
 use topcoat::{
     Result,
+    context::Cx,
     router::{Body, Route, Router, response::Response, to_bytes},
     runtime::{Surrogated, procedure},
 };
 
 #[procedure]
-async fn without_arguments() -> Result<bool> {
+async fn without_arguments(cx: &Cx) -> Result<bool> {
     Ok(true)
 }
 
 #[procedure("/api/double")]
-async fn at_path(value: f64) -> Result<f64> {
+async fn at_path(cx: &Cx, value: f64) -> Result<f64> {
     Ok(value * 2.0)
 }
 
 #[procedure("/(api)/grouped")]
-async fn grouped(value: f64) -> Result<f64> {
+async fn grouped(cx: &Cx, value: f64) -> Result<f64> {
     Ok(value)
 }
 
 #[procedure]
-async fn with_unit(_value: ()) -> Result<bool> {
+async fn with_unit(cx: &Cx, _value: ()) -> Result<bool> {
     Ok(true)
 }
 
 #[procedure]
-async fn with_arguments(enabled: bool, label: String) -> Result<String> {
+async fn with_arguments(cx: &Cx, enabled: bool, label: String) -> Result<String> {
     Ok(if enabled { label } else { String::new() })
 }
 

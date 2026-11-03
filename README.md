@@ -39,6 +39,7 @@ Topcoat is a modular, batteries-included Rust framework for building full-stack 
 ```rust,ignore
 use topcoat::{
     Result,
+    context::Cx,
     router::{module_router, page},
     view::{View, component, view},
 };
@@ -49,7 +50,7 @@ async fn main() {
 }
 
 #[page]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>
@@ -61,7 +62,7 @@ async fn home() -> Result<impl View> {
 }
 
 #[component]
-async fn hello(name: &str) -> Result<impl View> {
+async fn hello(cx: &Cx, name: &str) -> Result<impl View> {
     Ok(view! { <h1>"Hello, " (name) "!"</h1> })
 }
 ```
@@ -162,7 +163,7 @@ Topcoat UI is a component library based on [Tailwind](https://tailwindcss.com/) 
 
 ```rust,ignore
 #[component]
-async fn delete_card() -> Result<impl View> {
+async fn delete_card(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         card(
             card_header(

@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
@@ -49,6 +50,7 @@ const AVATAR: StaticClass = class!("relative flex shrink-0 overflow-hidden round
 /// ```
 #[component]
 pub async fn avatar(
+    cx: &Cx,
     /// The dimensions of the circle.
     #[default]
     size: AvatarSize,
@@ -72,6 +74,7 @@ pub async fn avatar(
 /// ratio.
 #[component]
 pub async fn avatar_image(
+    cx: &Cx,
     /// Alternative text for the image.
     ///
     /// Defaults to empty text, suitable when an adjacent name already identifies the
@@ -102,6 +105,7 @@ pub async fn avatar_image(
 /// Pass initials or another small view as children.
 #[component]
 pub async fn avatar_fallback(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {

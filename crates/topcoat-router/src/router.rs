@@ -537,8 +537,8 @@ mod tests {
     }
 
     // Page and layout render functions for the rendering tests.
-    fn render_page(cx: &Cx, _body: Body) -> BoxView<'static> {
-        view! { cx => "page" }.boxed()
+    fn render_page(cx: &Cx, _body: Body) -> BoxView<'_> {
+        view! { "page" }.boxed()
     }
 
     /// A view part that panics when it renders, so the router's panic
@@ -558,14 +558,13 @@ mod tests {
         }
     }
 
-    fn render_panicking_page(cx: &Cx, _body: Body) -> BoxView<'static> {
-        view! { cx => (Panicking) }.boxed()
+    fn render_panicking_page(cx: &Cx, _body: Body) -> BoxView<'_> {
+        view! { (Panicking) }.boxed()
     }
 
     /// Wraps the child content in `R[ ... ]` so layout nesting is observable.
-    fn layout_root<'a>(cx: &Cx, slot: Slot<'a>) -> BoxView<'a> {
+    fn layout_root<'a>(cx: &'a Cx, slot: Slot<'a>) -> BoxView<'a> {
         view! {
-            cx =>
             "R["
             (slot)
             "]"
@@ -574,9 +573,8 @@ mod tests {
     }
 
     /// Wraps the child content in `A[ ... ]`.
-    fn layout_admin<'a>(cx: &Cx, slot: Slot<'a>) -> BoxView<'a> {
+    fn layout_admin<'a>(cx: &'a Cx, slot: Slot<'a>) -> BoxView<'a> {
         view! {
-            cx =>
             "A["
             (slot)
             "]"
@@ -2146,9 +2144,9 @@ mod tests {
         Box::pin(async move { tags(cx).into_response(cx) })
     }
 
-    fn render_tags(cx: &Cx, _body: Body) -> BoxView<'static> {
+    fn render_tags(cx: &Cx, _body: Body) -> BoxView<'_> {
         let tags = tags(cx);
-        view! { cx => (tags) }.boxed()
+        view! { (tags) }.boxed()
     }
 
     /// Answers every request with the tags it sees, without running the

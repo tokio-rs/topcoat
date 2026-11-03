@@ -3,9 +3,9 @@ The [`live!`] and [`emit!`] macros stream updates to part of a page. Use them to
 [`live!`] marks a region of the page whose content can still change while the response streams. Its body is ordinary async Rust. Inside the body, [`emit!`] renders markup into the region, and every emission replaces the previous one in the browser.
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     <h1>"Quote of the day"</h1>
     (live! {
@@ -29,9 +29,9 @@ Use [`suspense`] to show a fallback while content loads, or [`error_boundary`] t
 [`emit!`] accepts the same syntax as [`view!`]. The surrounding body is ordinary async Rust. Emit repeatedly to show the progress of a task:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     <h1>"Progress"</h1>
     (live! {
@@ -55,9 +55,9 @@ A live region must emit at least once. Its body returns [`Result<EmitToken>`][`R
 If the body cannot end with an emission, return the token explicitly:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     (live! {
         while let Some(price) = next_price().await {
@@ -133,11 +133,11 @@ When a connection closes, its render and subscriptions are dropped. The browser 
 If markup fails to render, [`emit!`] returns `Err`. Propagate the error with `?`, or handle it and emit a fallback:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn forecast() -> Result<impl View> { Ok(view! { <p>"Sunny"</p> }) }
+# async fn forecast(cx: &Cx) -> Result<impl View> { Ok(view! { <p>"Sunny"</p> }) }
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     <h1>"Weather"</h1>
     (live! {
@@ -162,11 +162,12 @@ A live region implements `View`. A component can return it directly:
 ```rust
 use topcoat::{
     Result,
+    context::Cx,
     view::{View, component, emit, live, view},
 };
 
 #[component]
-async fn daily_quote() -> Result<impl View> {
+async fn daily_quote(cx: &Cx) -> Result<impl View> {
     Ok(live! {
         emit! { <p>"Loading..."</p> }?;
         let quote = fetch_quote().await;
@@ -176,7 +177,7 @@ async fn daily_quote() -> Result<impl View> {
 # async fn fetch_quote() -> &'static str { "..." }
 
 #[component]
-async fn page() -> Result<impl View> {
+async fn page(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>"Quote of the day"</h1>
         daily_quote()
@@ -190,28 +191,28 @@ Regions need a stable identity across renders. When a `view!` loop contains live
 
 # Request Context
 
-Inside a [`component`], the request context is available implicitly. In a plain function, pass it at the start of the live region:
+`live!` uses the surrounding variable named `cx` to identify the live region. Its body captures variables by move, like an `async move` block. This works the same way inside a [`component`] or an ordinary function:
 
 ```rust
 use topcoat::{context::Cx, view::{View, emit, live}};
 
 fn greeting(cx: &Cx) -> impl View {
-    live! { cx => emit! { <p>"Hello"</p> } }
+    live! { emit! { <p>"Hello"</p> } }
 }
 ```
 
-With `cx =>`, the returned view owns a clone of the supplied context. Without `cx =>`, it borrows the enclosing body's context. Emissions use that context implicitly. An individual emission can use another context with `emit! { cx => ... }`. See the [`view!`] guide's section on rendering outside a component.
+`emit!` borrows the `cx` in scope at each emission. To add or override context values for the region, shadow `cx` with `let cx = cx.with(value);` before `live!`. To change the context for emitted content, shadow `cx` inside the live body before `emit!`. See the [`view!` context guide](macro.view.html#request-context) for shadowing and capture ownership.
 
 # Suspense And Error Boundaries
 
 The [`suspense`] component shows a fallback while its child content loads. If the child is ready immediately, the fallback never appears:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn quote() -> Result<impl View> { Ok(view! { <blockquote>"..."</blockquote> }) }
+# async fn quote(cx: &Cx) -> Result<impl View> { Ok(view! { <blockquote>"..."</blockquote> }) }
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     suspense(
         fallback: view! { <p>"Loading..."</p> },
@@ -224,11 +225,11 @@ Ok(view! {
 The [`error_boundary`] component renders its child content and swaps in a fallback built from the error when any part of it fails:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn stats() -> Result<impl View> { Ok(view! { <p>"3 visits today"</p> }) }
+# async fn stats(cx: &Cx) -> Result<impl View> { Ok(view! { <p>"3 visits today"</p> }) }
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     error_boundary(
         fallback: |error| Ok(view! {

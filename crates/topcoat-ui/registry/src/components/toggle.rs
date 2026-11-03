@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     view::{Attributes, Child, PromotedStr, StaticClass, View, class, component, view},
 };
 
@@ -82,6 +83,7 @@ const BASE: StaticClass = class!(
 /// ```
 #[component]
 pub async fn toggle(
+    cx: &Cx,
     /// Whether the toggle presses on its own or as one of a group.
     #[default]
     kind: ToggleKind,
@@ -128,6 +130,7 @@ pub async fn toggle(
 /// ```
 #[component]
 pub async fn toggle_group(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {

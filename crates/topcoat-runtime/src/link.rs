@@ -137,7 +137,7 @@ mod tests {
     fn link_attrs_mark_the_anchor_with_its_destination_and_mode() {
         let cx = &Cx::new();
         let attrs = link_attrs(cx, "/products", PrefetchMode::Viewport);
-        let html = render(view! { cx => <a (attrs)>"Products"</a> });
+        let html = render(view! { <a (attrs)>"Products"</a> });
 
         assert!(html.contains(r#"href="/products""#), "{html}");
         assert!(html.contains(r#"data-topcoat-link="viewport""#), "{html}");
@@ -153,7 +153,7 @@ mod tests {
             PrefetchMode::Viewport,
         ] {
             let attrs = link_attrs(cx, "/", prefetch);
-            let html = render(view! { cx => <a (attrs)></a> });
+            let html = render(view! { <a (attrs)></a> });
             assert!(!seen.contains(&html), "{html}");
             seen.push(html);
         }
@@ -162,8 +162,8 @@ mod tests {
     #[test]
     fn link_renders_an_anchor_with_forwarded_attributes() {
         let cx = &Cx::new();
-        let attrs = attributes! { cx => class="nav" aria-current="page" };
-        let html = render(view! { cx => link(href: "/account", attrs: attrs, "Account") });
+        let attrs = attributes! { class="nav" aria-current="page" };
+        let html = render(view! { link(href: "/account", attrs: attrs, "Account") });
 
         assert!(html.starts_with("<a "), "{html}");
         assert!(html.contains(r#"href="/account""#), "{html}");
@@ -177,9 +177,8 @@ mod tests {
     #[test]
     fn explicit_props_take_precedence_over_forwarded_attributes() {
         let cx = &Cx::new();
-        let attrs = attributes! { cx => href="/elsewhere" data-topcoat-link="viewport" };
+        let attrs = attributes! { href="/elsewhere" data-topcoat-link="viewport" };
         let html = render(view! {
-            cx =>
             link(href: "/account", prefetch: PrefetchMode::Never, attrs: attrs)
         });
 
@@ -200,13 +199,10 @@ mod tests {
     #[test]
     fn link_uses_the_context_mode_unless_given_one() {
         let cx = &Cx::new().with(PrefetchMode::Viewport);
-        let html = render(view! { cx => link(href: "/", "Home") });
+        let html = render(view! { link(href: "/", "Home") });
         assert!(html.contains(r#"data-topcoat-link="viewport""#), "{html}");
 
-        let explicit = render(view! {
-            cx =>
-            link(href: "/", prefetch: PrefetchMode::Never, "Home")
-        });
+        let explicit = render(view! { link(href: "/", prefetch: PrefetchMode::Never, "Home") });
         assert!(
             explicit.contains(r#"data-topcoat-link="never""#),
             "{explicit}"

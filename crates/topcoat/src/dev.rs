@@ -8,6 +8,7 @@ use tokio_tungstenite::tungstenite::Message;
 
 use crate::{
     Result,
+    context::Cx,
     view::{View, component, view},
 };
 
@@ -62,7 +63,7 @@ fn http_to_ws(url: &str) -> String {
 ///
 /// Renders nothing when the app is not running under `topcoat dev`.
 #[component]
-pub async fn script(#[default(true)] status_indicator: bool) -> Result<impl View> {
+pub async fn script(cx: &Cx, #[default(true)] status_indicator: bool) -> Result<impl View> {
     let src = std::env::var("TOPCOAT_DEV_URL")
         .ok()
         .map(|base| format!("{base}/dev.js"));

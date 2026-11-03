@@ -1,22 +1,22 @@
 A procedure is an async server function called from a runtime [expression](macro.expr.html). Use it when browser code needs server resources, such as a database. Each procedure has an HTTP endpoint. **Validate its arguments and authorize access inside the procedure**, since callers can send their own requests.
 
 ```rust
-use topcoat::{Result, runtime::procedure};
+use topcoat::{Result, context::Cx, runtime::procedure};
 
 #[procedure]
-async fn double(value: usize) -> Result<usize> {
+async fn double(cx: &Cx, value: usize) -> Result<usize> {
     Ok(value * 2)
 }
 ```
 
 # Calling Procedures
 
-Inside a runtime expression, call a procedure like an ordinary async function and `.await` its result:
+Inside a runtime expression, call a procedure like an ordinary async function and `.await` its result. Omit `cx` from the call; Topcoat supplies the server request context automatically:
 
 ```rust
 # use topcoat::{Result, context::Cx, view::*, runtime::{procedure, signal}};
 # #[procedure]
-# async fn double(value: usize) -> Result<usize> { Ok(value * 2) }
+# async fn double(cx: &Cx, value: usize) -> Result<usize> { Ok(value * 2) }
 # #[component]
 # async fn example(cx: &Cx) -> Result<impl View> {
 let count = signal(cx, || 1usize);
@@ -42,9 +42,9 @@ A procedure call in a runtime expression must run only in the browser. The serve
 
 # Arguments And Return Type
 
-Arguments and the `Ok` value of the returned [`Result`] must use types supported by [`expr!`]. These values travel between the Rust server and JavaScript in the browser.
+The function must be `async` and take `cx: &Cx` as its first parameter, even when unused. Additional parameters must use types supported by [`expr!`]. The function must return a [`Result`] whose `Ok` value also uses a supported type. These arguments and the `Ok` value travel between the Rust server and JavaScript in the browser.
 
-Add `cx: &Cx` to read the server's context for this request. Topcoat supplies it, so browser code leaves it out of the call:
+Use `cx` to read context values or request data:
 
 ```rust
 use topcoat::{Result, context::Cx, runtime::procedure};
@@ -66,10 +66,10 @@ Awaiting a call yields the procedure's `Ok` value. If the procedure returns `Err
 Register a procedure on the [`Router`] before calling it from the browser. It implements [`Route`], so pass its name to `.route()`:
 
 ```rust,standalone_crate
-use topcoat::router::module_router;
+use topcoat::{context::Cx, router::module_router};
 # use topcoat::{Result, router::Router, runtime::procedure};
 # #[procedure]
-# async fn double(value: usize) -> Result<usize> { Ok(value * 2) }
+# async fn double(cx: &Cx, value: usize) -> Result<usize> { Ok(value * 2) }
 let router = module_router!().route(double).build();
 ```
 
@@ -80,10 +80,10 @@ With the `discover` feature enabled, `.discover()` registers all procedures link
 Topcoat generates an internal path for each procedure from its name and source location. This path changes when the procedure is renamed or moved. To choose a stable endpoint, pass an absolute path to `#[procedure]`:
 
 ```rust
-use topcoat::{Result, runtime::procedure};
+use topcoat::{Result, context::Cx, runtime::procedure};
 
 #[procedure("/api/double")]
-async fn double(value: usize) -> Result<usize> {
+async fn double(cx: &Cx, value: usize) -> Result<usize> {
     Ok(value * 2)
 }
 ```

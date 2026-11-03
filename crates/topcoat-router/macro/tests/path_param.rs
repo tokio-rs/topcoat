@@ -124,7 +124,7 @@ path_param!(pub *public_parts);
 // A page linking to pages that take a parameter: the marker resolves to the
 // path the router serves it at, and the values fill that path's parameters.
 #[page("/links")]
-async fn links() -> Result<impl View> {
+async fn links(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <a href=(href!(post, PostId(42)))>"post"</a>
         <a href=(href!(document, DocPath(["guides", "getting started"])))>"guides"</a>

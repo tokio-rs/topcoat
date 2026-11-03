@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     view::{Attributes, Child, Class, StaticClass, View, class, component, view},
 };
 
@@ -68,6 +69,7 @@ pub fn badge_variants(variant: BadgeVariant) -> Class<(StaticClass, StaticClass)
 /// ```
 #[component]
 pub async fn badge(
+    cx: &Cx,
     #[default] variant: BadgeVariant,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,

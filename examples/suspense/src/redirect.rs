@@ -13,7 +13,7 @@ use topcoat::{
 // redirect can no longer become a redirect response. It streams to the
 // browser as a client-side navigation to the login page instead.
 #[page]
-pub async fn page() -> Result<impl View> {
+pub async fn page(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>"Redirect"</h1>
         suspense(fallback: view! { <p>"Checking your session..."</p> }, content())

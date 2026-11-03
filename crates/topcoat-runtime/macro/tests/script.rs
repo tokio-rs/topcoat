@@ -27,7 +27,7 @@ fn asset_config() -> AssetConfig {
 #[tokio::test]
 async fn the_script_renders_on_a_router_set_up_for_the_runtime() {
     let cx = &Cx::new().with_many((asset_config(), RuntimeSetup));
-    let html = view! { cx => topcoat::runtime::script() }
+    let html = view! { topcoat::runtime::script() }
         .single()
         .await
         .unwrap()
@@ -39,12 +39,12 @@ async fn the_script_renders_on_a_router_set_up_for_the_runtime() {
 #[should_panic(expected = "call `.runtime()` on the router builder")]
 async fn the_script_panics_on_a_router_without_the_runtime() {
     let cx = &Cx::new().with(asset_config());
-    let _ = view! { cx => topcoat::runtime::script() }.single().await;
+    let _ = view! { topcoat::runtime::script() }.single().await;
 }
 
 #[tokio::test]
 #[should_panic(expected = "call `.runtime()` on the router builder")]
 async fn the_check_runs_before_the_asset_is_resolved() {
     let cx = &Cx::new();
-    let _ = view! { cx => topcoat::runtime::script() }.single().await;
+    let _ = view! { topcoat::runtime::script() }.single().await;
 }

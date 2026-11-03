@@ -29,7 +29,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
 
 // Validate arguments here in a real application, since the browser supplies them.
 #[procedure]
-pub async fn print_on_server(input: String) -> Result<String> {
+pub async fn print_on_server(cx: &Cx, input: String) -> Result<String> {
     println!("{input}");
     Ok(format!("message received: {input}"))
 }

@@ -80,9 +80,8 @@ mod tests {
     /// Renders the result of `check` using the supplied context.
     fn render(cx: Cx, check: impl Fn(&Cx) -> bool + Send + 'static) -> String {
         let view = HoistView::new(ThenView::new(async move {
-            let cx = &cx;
-            let result = check(cx);
-            Ok(view! { cx => <p>(result)</p> })
+            let result = check(&cx);
+            Ok(view! { <p>(result)</p> })
         }));
         block_on(view.single()).unwrap().render(&Cx::new())
     }

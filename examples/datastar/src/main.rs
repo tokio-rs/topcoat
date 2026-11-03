@@ -3,6 +3,7 @@ mod increment;
 use serde::{Deserialize, Serialize};
 use topcoat::{
     Result,
+    context::Cx,
     router::{href, module_router, page},
     view::{View, view},
 };
@@ -13,7 +14,7 @@ async fn main() {
 }
 
 #[page]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     // Datastar keeps the counter in the browser and sends it along with every
     // action request.
     Ok(view! {

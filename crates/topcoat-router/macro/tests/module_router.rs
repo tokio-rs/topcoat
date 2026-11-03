@@ -4,6 +4,7 @@
 
 use topcoat::{
     Result,
+    context::Cx,
     router::{Router, Slot, layout, page},
     view::{View, view},
 };
@@ -18,24 +19,25 @@ fn router() -> Router {
 // -- module-derived paths --
 
 #[layout]
-async fn shell(slot: Slot<'_>) -> Result<impl View> {
+async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! { <main>(slot)</main> })
 }
 
 #[page]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! { "home" })
 }
 
 mod blog_posts {
     use topcoat::{
         Result,
+        context::Cx,
         router::page,
         view::{View, view},
     };
 
     #[page]
-    async fn index() -> Result<impl View> {
+    async fn index(cx: &Cx) -> Result<impl View> {
         Ok(view! { "blog posts" })
     }
 }
@@ -44,12 +46,13 @@ mod _marketing {
     mod pricing {
         use topcoat::{
             Result,
+            context::Cx,
             router::page,
             view::{View, view},
         };
 
         #[page]
-        async fn pricing() -> Result<impl View> {
+        async fn pricing(cx: &Cx) -> Result<impl View> {
             Ok(view! { "pricing" })
         }
     }
@@ -80,6 +83,7 @@ mod posts {
 mod docs {
     use topcoat::{
         Result,
+        context::Cx,
         router::{page, segment},
         view::{View, view},
     };
@@ -87,7 +91,7 @@ mod docs {
     segment!(rename: "documentation");
 
     #[page]
-    async fn docs() -> Result<impl View> {
+    async fn docs(cx: &Cx) -> Result<impl View> {
         Ok(view! { "docs" })
     }
 }
@@ -142,48 +146,50 @@ async fn segment_rename_replaces_the_module_name() {
 // -- relative paths --
 
 #[page("./about")]
-async fn about() -> Result<impl View> {
+async fn about(cx: &Cx) -> Result<impl View> {
     Ok(view! { "about" })
 }
 
 mod settings {
     use topcoat::{
         Result,
+        context::Cx,
         router::{Slot, layout, page},
         view::{View, view},
     };
 
     #[page]
-    async fn settings() -> Result<impl View> {
+    async fn settings(cx: &Cx) -> Result<impl View> {
         Ok(view! { "settings" })
     }
 
     #[page("./export")]
-    async fn export() -> Result<impl View> {
+    async fn export(cx: &Cx) -> Result<impl View> {
         Ok(view! { "export" })
     }
 
     // A layout below the module path wraps only the pages under it, so it
     // coexists with a module-derived layout in the same module.
     #[layout]
-    async fn settings_layout(slot: Slot<'_>) -> Result<impl View> {
+    async fn settings_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
         Ok(view! { <div>(slot)</div> })
     }
 
     #[layout("./admin")]
-    async fn admin_layout(slot: Slot<'_>) -> Result<impl View> {
+    async fn admin_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
         Ok(view! { <section>(slot)</section> })
     }
 
     mod admin {
         use topcoat::{
             Result,
+            context::Cx,
             router::page,
             view::{View, view},
         };
 
         #[page]
-        async fn admin() -> Result<impl View> {
+        async fn admin(cx: &Cx) -> Result<impl View> {
             Ok(view! { "admin" })
         }
     }
@@ -215,15 +221,15 @@ mod api {
     }
 
     #[route(GET "./status")]
-    async fn status() -> Result<&'static str> {
+    async fn status(cx: &Cx) -> Result<&'static str> {
         Ok("status")
     }
 
     mod v1 {
-        use topcoat::{Result, router::route};
+        use topcoat::{Result, context::Cx, router::route};
 
         #[route(GET "./health")]
-        async fn health() -> Result<&'static str> {
+        async fn health(cx: &Cx) -> Result<&'static str> {
             Ok("health")
         }
     }
@@ -243,7 +249,7 @@ mod threads {
     path_param!(reply_id: u32 else not_found);
 
     #[page]
-    async fn threads() -> Result<impl View> {
+    async fn threads(cx: &Cx) -> Result<impl View> {
         Ok(view! { "threads" })
     }
 

@@ -11,6 +11,7 @@ mod lint_regressions {
 
     #[component]
     pub async fn unused_component(
+        cx: &Cx,
         first: u8,
         second: u8,
         third: u8,
@@ -35,7 +36,7 @@ mod lint_regressions {
     }
 }
 
-// `view!` lowers component calls to expressions that reference `__cx`. In
+// `view!` lowers component calls to expressions that reference `cx`. In
 // real code that name is supplied by `#[page]`, `#[layout]`, and
 // `#[component]`. These tests stand in for those wrappers by binding it by
 // hand.
@@ -44,7 +45,7 @@ fn empty_cx() -> Cx {
 }
 
 #[component]
-async fn greeting(name: &str) -> Result<impl View> {
+async fn greeting(cx: &Cx, name: &str) -> Result<impl View> {
     Ok(view! {
         <h1>
             "Hello, "
@@ -57,34 +58,34 @@ async fn greeting(name: &str) -> Result<impl View> {
 #[tokio::test]
 async fn component_with_named_arg_renders_inline() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let result = view! { <main>greeting(name: "Ada")</main> };
 
     assert_eq!(
-        result.single().await.unwrap().render(__cx),
+        result.single().await.unwrap().render(cx),
         "<main><h1>Hello, Ada!</h1></main>"
     );
 }
 
 #[component]
-async fn badge(label: &str, tone: &str) -> Result<impl View> {
+async fn badge(cx: &Cx, label: &str, tone: &str) -> Result<impl View> {
     Ok(view! { <span class=(format!("badge badge-{tone}"))>(label)</span> })
 }
 
 #[tokio::test]
 async fn component_with_multiple_named_args_renders_attributes() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let result = view! { badge(label: "New", tone: "success") };
 
     assert_eq!(
-        result.single().await.unwrap().render(__cx),
+        result.single().await.unwrap().render(cx),
         r#"<span class="badge badge-success">New</span>"#,
     );
 }
 
 #[component]
-async fn panel(title: &str, child: Child<'_>) -> Result<impl View> {
+async fn panel(cx: &Cx, title: &str, child: Child<'_>) -> Result<impl View> {
     Ok(view! {
         <section class="panel">
             <h2>(title)</h2>
@@ -96,7 +97,7 @@ async fn panel(title: &str, child: Child<'_>) -> Result<impl View> {
 #[tokio::test]
 async fn component_with_trailing_child_nodes_collects_them_as_child_view() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let result = view! {
         panel(
             title: "Profile",
@@ -106,39 +107,39 @@ async fn component_with_trailing_child_nodes_collects_them_as_child_view() {
     };
 
     assert_eq!(
-        result.single().await.unwrap().render(__cx),
+        result.single().await.unwrap().render(cx),
         "<section class=\"panel\"><h2>Profile</h2><div class=\"body\"><p>hello</p><p>world</p></div></section>",
     );
 }
 
 #[component]
-async fn nested_caller(child: Child<'_>) -> Result<impl View> {
+async fn nested_caller(cx: &Cx, child: Child<'_>) -> Result<impl View> {
     Ok(view! { panel(title: "Outer", (child)) })
 }
 
 #[tokio::test]
 async fn component_can_call_other_components_and_forward_child_views() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let result = view! { nested_caller(<em>"inner"</em>) };
-    let html = result.single().await.unwrap().render(__cx);
+    let html = result.single().await.unwrap().render(cx);
 
     assert!(html.contains("<h2>Outer</h2>"));
     assert!(html.contains("<em>inner</em>"));
 }
 
 #[component]
-async fn no_args_component() -> Result<impl View> {
+async fn no_args_component(cx: &Cx) -> Result<impl View> {
     Ok(view! { <p>"static"</p> })
 }
 
 #[tokio::test]
 async fn component_without_args_renders() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let result = view! { no_args_component() };
 
-    assert_eq!(result.single().await.unwrap().render(__cx), "<p>static</p>");
+    assert_eq!(result.single().await.unwrap().render(cx), "<p>static</p>");
 }
 
 #[component]
@@ -150,17 +151,17 @@ async fn uses_cx(cx: &Cx) -> Result<impl View> {
 #[tokio::test]
 async fn component_can_take_cx_param() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let result = view! { uses_cx() };
 
     assert_eq!(
-        result.single().await.unwrap().render(__cx),
+        result.single().await.unwrap().render(cx),
         "<p>cx component</p>"
     );
 }
 
 #[component]
-async fn shout(label: impl Into<String> + Send) -> Result<impl View> {
+async fn shout(cx: &Cx, label: impl Into<String> + Send) -> Result<impl View> {
     let label: String = label.into();
     Ok(view! { <b>(label.to_uppercase())</b> })
 }
@@ -168,18 +169,18 @@ async fn shout(label: impl Into<String> + Send) -> Result<impl View> {
 #[tokio::test]
 async fn component_with_impl_trait_param_accepts_any_impl() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let result = view! { shout(label: "hi") };
 
-    assert_eq!(result.single().await.unwrap().render(__cx), "<b>HI</b>");
+    assert_eq!(result.single().await.unwrap().render(cx), "<b>HI</b>");
 
     let result = view! { shout(label: String::from("owned")) };
 
-    assert_eq!(result.single().await.unwrap().render(__cx), "<b>OWNED</b>");
+    assert_eq!(result.single().await.unwrap().render(cx), "<b>OWNED</b>");
 }
 
 #[component]
-async fn item_list(items: impl IntoIterator<Item = u8> + Send) -> Result<impl View> {
+async fn item_list(cx: &Cx, items: impl IntoIterator<Item = u8> + Send) -> Result<impl View> {
     Ok(view! {
         <ul>
             for item in items {
@@ -192,30 +193,27 @@ async fn item_list(items: impl IntoIterator<Item = u8> + Send) -> Result<impl Vi
 #[tokio::test]
 async fn component_with_bounded_impl_trait_param_renders() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let result = view! { item_list(items: vec![1, 2, 3]) };
 
     assert_eq!(
-        result.single().await.unwrap().render(__cx),
+        result.single().await.unwrap().render(cx),
         "<ul><li>1</li><li>2</li><li>3</li></ul>",
     );
 }
 
 #[component]
-async fn count<T: Send + Sync>(items: Vec<T>) -> Result<impl View> {
+async fn count<T: Send + Sync>(cx: &Cx, items: Vec<T>) -> Result<impl View> {
     Ok(view! { <span>(items.len())</span> })
 }
 
 #[tokio::test]
 async fn generic_component_renders() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let result = view! { count(items: vec!["a", "b", "c"]) };
 
-    assert_eq!(
-        result.single().await.unwrap().render(__cx),
-        "<span>3</span>"
-    );
+    assert_eq!(result.single().await.unwrap().render(cx), "<span>3</span>");
 }
 
 struct TreeNode {
@@ -226,7 +224,7 @@ struct TreeNode {
 // A loop body is boxed for the `LoopView` that drives its iterations, so a
 // component recursing through one needs no boxing of its own.
 #[component]
-async fn tree(node: &TreeNode) -> Result<impl View> {
+async fn tree(cx: &Cx, node: &TreeNode) -> Result<impl View> {
     Ok(view! {
         <li>
             (node.label)
@@ -244,7 +242,7 @@ async fn tree(node: &TreeNode) -> Result<impl View> {
 #[tokio::test]
 async fn a_component_recursing_through_a_loop_renders_itself() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let root = TreeNode {
         label: "root",
         children: vec![
@@ -264,7 +262,7 @@ async fn a_component_recursing_through_a_loop_renders_itself() {
     let result = view! { <ul>tree(node: &root)</ul> };
 
     assert_eq!(
-        result.single().await.unwrap().render(__cx),
+        result.single().await.unwrap().render(cx),
         "<ul><li>root<ul><li>a<ul><li>a1</li></ul></li><li>b</li></ul></li></ul>",
     );
 }
@@ -273,7 +271,7 @@ async fn a_component_recursing_through_a_loop_renders_itself() {
 // would contain itself. Boxing the view erases it; a view that borrows takes
 // the lifetime of what it borrows from.
 #[component]
-async fn boxed_tree(node: &TreeNode) -> Result<BoxView<'_>> {
+async fn boxed_tree(cx: &Cx, node: &TreeNode) -> Result<BoxView<'_>> {
     Ok(view! {
         <li>
             (node.label)
@@ -292,7 +290,7 @@ async fn boxed_tree(node: &TreeNode) -> Result<BoxView<'_>> {
 #[tokio::test]
 async fn a_boxed_view_lets_a_component_render_itself_recursively() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let root = TreeNode {
         label: "root",
         children: vec![TreeNode {
@@ -306,7 +304,7 @@ async fn a_boxed_view_lets_a_component_render_itself_recursively() {
     let result = view! { <ul>boxed_tree(node: &root)</ul> };
 
     assert_eq!(
-        result.single().await.unwrap().render(__cx),
+        result.single().await.unwrap().render(cx),
         "<ul><li>root<ul><li>a<ul><li>a1</li></ul></li></ul></li></ul>",
     );
 }
@@ -316,7 +314,7 @@ async fn a_boxed_view_lets_a_component_render_itself_recursively() {
 // view's lifetime resolves to that one lifetime without the return type
 // spelling out `BoxView`.
 #[component]
-async fn erased_tree(node: &TreeNode) -> Result<impl View> {
+async fn erased_tree(cx: &Cx, node: &TreeNode) -> Result<impl View> {
     Ok(view! {
         <li>
             (node.label)
@@ -335,7 +333,7 @@ async fn erased_tree(node: &TreeNode) -> Result<impl View> {
 #[tokio::test]
 async fn boxing_behind_impl_view_lets_a_borrowing_component_recurse() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let root = TreeNode {
         label: "root",
         children: vec![TreeNode {
@@ -349,7 +347,7 @@ async fn boxing_behind_impl_view_lets_a_borrowing_component_recurse() {
     let result = view! { <ul>erased_tree(node: &root)</ul> };
 
     assert_eq!(
-        result.single().await.unwrap().render(__cx),
+        result.single().await.unwrap().render(cx),
         "<ul><li>root<ul><li>a<ul><li>a1</li></ul></li></ul></li></ul>",
     );
 }
@@ -358,7 +356,7 @@ async fn boxing_behind_impl_view_lets_a_borrowing_component_recurse() {
 // because `even_steps` boxes its own view, which breaks the cycle for both.
 // Borrowing nothing, `even_steps` keeps `impl View` and boxes behind it.
 #[component]
-async fn even_steps(n: u32) -> Result<impl View> {
+async fn even_steps(cx: &Cx, n: u32) -> Result<impl View> {
     Ok(view! {
         <i>(n)</i>
         if n > 0 {
@@ -369,7 +367,7 @@ async fn even_steps(n: u32) -> Result<impl View> {
 }
 
 #[component]
-async fn odd_steps(n: u32) -> Result<impl View> {
+async fn odd_steps(cx: &Cx, n: u32) -> Result<impl View> {
     Ok(view! {
         <b>(n)</b>
         if n > 0 {
@@ -381,11 +379,11 @@ async fn odd_steps(n: u32) -> Result<impl View> {
 #[tokio::test]
 async fn mutually_recursive_components_need_only_one_boxed_view() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let result = view! { even_steps(n: 3) };
 
     assert_eq!(
-        result.single().await.unwrap().render(__cx),
+        result.single().await.unwrap().render(cx),
         "<i>3</i><b>2</b><i>1</i><b>0</b>",
     );
 }

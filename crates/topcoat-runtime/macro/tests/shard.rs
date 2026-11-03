@@ -36,7 +36,7 @@ async fn host(cx: &Cx) -> Result<impl View> {
 }
 
 #[shard]
-async fn by_signal(query: Signal<String>) -> Result<impl View> {
+async fn by_signal(cx: &Cx, query: Signal<String>) -> Result<impl View> {
     Ok(view! { <p>(query.get())</p> })
 }
 
@@ -47,7 +47,7 @@ async fn signal_host(cx: &Cx) -> Result<impl View> {
 }
 
 #[shard]
-async fn search_results(query: String, limit: usize) -> Result<impl View> {
+async fn search_results(cx: &Cx, query: String, limit: usize) -> Result<impl View> {
     Ok(view! {
         <p>
             (query)
@@ -70,18 +70,18 @@ async fn without_arguments(cx: &Cx) -> Result<impl View> {
 }
 
 #[shard("/search/results")]
-async fn at_path(query: String) -> Result<impl View> {
+async fn at_path(cx: &Cx, query: String) -> Result<impl View> {
     Ok(view! { <p>(query)</p> })
 }
 
 #[shard("/(api)/grouped")]
-async fn grouped(query: String) -> Result<impl View> {
+async fn grouped(cx: &Cx, query: String) -> Result<impl View> {
     Ok(view! { <p>(query)</p> })
 }
 
 /// A shard whose content updates a live region after its first render.
 #[shard]
-async fn region_probe() -> Result<impl View> {
+async fn region_probe(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         (live! {
             emit! { <p>"first"</p> }?;
@@ -185,7 +185,7 @@ async fn rerender(identity: &str, signals: &str) -> String {
 #[tokio::test]
 async fn a_live_shard_streams_its_updates_through_the_enclosing_content() {
     let cx = &Cx::new();
-    let (html, swaps) = drive(cx, view! { cx => region_probe() }).await;
+    let (html, swaps) = drive(cx, view! { region_probe() }).await;
 
     // The first content shows the first emission only, with its region
     // inside the shard's markers so the browser attributes the region's
@@ -213,7 +213,7 @@ async fn a_live_shard_streams_its_updates_through_the_enclosing_content() {
 #[tokio::test]
 async fn a_live_shard_streams_its_updates_through_its_endpoint() {
     let cx = &Cx::new();
-    let (inline, _) = drive(cx, view! { cx => region_probe() }).await;
+    let (inline, _) = drive(cx, view! { region_probe() }).await;
     let (_, identity) = scope_marker(&inline);
     let region = region_id(&inline);
 
@@ -236,7 +236,7 @@ async fn a_live_shard_streams_its_updates_through_its_endpoint() {
 #[tokio::test]
 async fn a_live_shard_endpoint_sends_frames_to_a_request_accepting_them() {
     let cx = &Cx::new();
-    let (inline, _) = drive(cx, view! { cx => region_probe() }).await;
+    let (inline, _) = drive(cx, view! { region_probe() }).await;
     let (_, identity) = scope_marker(&inline);
     let region = region_id(&inline);
 
@@ -273,7 +273,7 @@ async fn a_live_shard_endpoint_sends_frames_to_a_request_accepting_them() {
 #[tokio::test]
 async fn a_shard_without_arguments_accepts_the_browser_request() {
     let cx = &Cx::new();
-    let inline = view! { cx => without_arguments() }
+    let inline = view! { without_arguments() }
         .single()
         .await
         .unwrap()
@@ -291,11 +291,7 @@ async fn a_shard_without_arguments_accepts_the_browser_request() {
 #[tokio::test]
 async fn a_signal_argument_is_read_inline_and_rebuilt_from_its_value() {
     let cx = &Cx::new();
-    let inline = view! { cx => signal_host() }
-        .single()
-        .await
-        .unwrap()
-        .render(cx);
+    let inline = view! { signal_host() }.single().await.unwrap().render(cx);
     let (shard, identity) = scope_marker(&inline);
     assert_eq!(shard, by_signal.path().as_str(), "{inline}");
     assert!(inline.contains("<p>shoes</p>"), "{inline}");
@@ -319,7 +315,7 @@ async fn a_signal_argument_is_read_inline_and_rebuilt_from_its_value() {
 #[tokio::test]
 async fn a_static_argument_keeps_its_javascript_for_rerenders() {
     let cx = &Cx::new();
-    let inline = view! { cx => stateful(label: String::from("constant")) }
+    let inline = view! { stateful(label: String::from("constant")) }
         .single()
         .await
         .unwrap()
@@ -339,11 +335,7 @@ async fn a_static_argument_keeps_its_javascript_for_rerenders() {
 #[tokio::test]
 async fn fixed_and_reactive_arguments_render_together() {
     let cx = &Cx::new();
-    let inline = view! { cx => search_host() }
-        .single()
-        .await
-        .unwrap()
-        .render(cx);
+    let inline = view! { search_host() }.single().await.unwrap().render(cx);
     let (_, identity) = scope_marker(&inline);
 
     assert!(inline.contains("<p>shoes 20</p>"), "{inline}");
@@ -371,7 +363,7 @@ async fn a_signal_argument_without_a_value_is_rejected() {
 #[tokio::test]
 async fn a_rerender_derives_the_same_signal_id_as_the_inline_render() {
     let cx = &Cx::new().keyed("host");
-    let inline = view! { cx => host() }.single().await.unwrap().render(cx);
+    let inline = view! { host() }.single().await.unwrap().render(cx);
     let (shard, identity) = scope_marker(&inline);
     assert_eq!(shard, stateful.path().as_str(), "{inline}");
 
@@ -387,7 +379,7 @@ async fn a_rerender_derives_the_same_signal_id_as_the_inline_render() {
 #[tokio::test]
 async fn a_rerender_resumes_signals_from_the_values_it_carries() {
     let cx = &Cx::new().keyed("host");
-    let inline = view! { cx => host() }.single().await.unwrap().render(cx);
+    let inline = view! { host() }.single().await.unwrap().render(cx);
     let (_, identity) = scope_marker(&inline);
     let id = last_signal_id(&inline);
     assert!(inline.contains("&quot;v&quot;:0.0"), "{inline}");
@@ -401,7 +393,7 @@ async fn a_rerender_resumes_signals_from_the_values_it_carries() {
 #[tokio::test]
 async fn a_rerender_at_another_identity_derives_another_signal_id() {
     let cx = &Cx::new();
-    let inline = view! { cx => host() }.single().await.unwrap().render(cx);
+    let inline = view! { host() }.single().await.unwrap().render(cx);
 
     let rerendered = rerender(&"A".repeat(22), "{}").await;
 
@@ -426,7 +418,7 @@ async fn a_shard_with_a_path_is_served_there_and_names_it_in_its_marker() {
     assert_eq!(at_path.path().as_str(), "/search/results");
 
     let cx = &Cx::new();
-    let inline = view! { cx => at_path(query: String::from("shoes")) }
+    let inline = view! { at_path(query: String::from("shoes")) }
         .single()
         .await
         .unwrap()
@@ -441,7 +433,7 @@ async fn a_shard_with_a_path_is_served_there_and_names_it_in_its_marker() {
 #[tokio::test]
 async fn a_grouped_path_names_the_served_url_in_its_marker() {
     let cx = &Cx::new();
-    let inline = view! { cx => grouped(query: String::from("shoes")) }
+    let inline = view! { grouped(query: String::from("shoes")) }
         .single()
         .await
         .unwrap()

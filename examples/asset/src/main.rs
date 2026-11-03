@@ -1,6 +1,7 @@
 use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt, asset},
+    context::Cx,
     router::{module_router, page},
     view::{View, view},
 };
@@ -15,7 +16,7 @@ async fn main() {
 }
 
 #[page]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>

@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     view::{PromotedStr, StaticClass, View, class, component, view},
 };
 
@@ -59,7 +60,7 @@ const FOOTER_COLUMNS: [(&str, [(&str, &str); 4]); 4] = [
 ];
 
 #[component]
-pub async fn site_nav() -> Result<impl View> {
+pub async fn site_nav(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <header class="border-b border-slate-200 bg-white">
             <nav
@@ -83,7 +84,7 @@ pub async fn site_nav() -> Result<impl View> {
 }
 
 #[component]
-pub async fn site_footer() -> Result<impl View> {
+pub async fn site_footer(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <footer class="border-t border-slate-200 bg-white">
             <div
@@ -112,7 +113,7 @@ pub async fn site_footer() -> Result<impl View> {
 }
 
 #[component]
-pub async fn rating_stars(tenths: u32, size: &str) -> Result<impl View> {
+pub async fn rating_stars(cx: &Cx, tenths: u32, size: &str) -> Result<impl View> {
     let filled = filled_stars(tenths);
 
     Ok(view! {
@@ -135,7 +136,7 @@ pub async fn rating_stars(tenths: u32, size: &str) -> Result<impl View> {
 }
 
 #[component]
-pub async fn product_card(product: &Product) -> Result<impl View> {
+pub async fn product_card(cx: &Cx, product: &Product) -> Result<impl View> {
     Ok(view! {
         <a
             href=(("/products/", product.id))
@@ -170,6 +171,7 @@ pub async fn product_card(product: &Product) -> Result<impl View> {
 
 #[component]
 pub async fn pagination(
+    cx: &Cx,
     current: usize,
     page_count: usize,
     sort: Option<&str>,
@@ -208,7 +210,12 @@ pub async fn pagination(
 }
 
 #[component]
-pub async fn breadcrumbs(category: &str, category_slug: &str, name: &str) -> Result<impl View> {
+pub async fn breadcrumbs(
+    cx: &Cx,
+    category: &str,
+    category_slug: &str,
+    name: &str,
+) -> Result<impl View> {
     Ok(view! {
         <nav aria-label="Breadcrumb" class="text-sm text-slate-500">
             <ol class="flex flex-wrap items-center gap-2">
@@ -232,7 +239,7 @@ pub async fn breadcrumbs(category: &str, category_slug: &str, name: &str) -> Res
 }
 
 #[component]
-pub async fn spec_table(specs: &[Spec]) -> Result<impl View> {
+pub async fn spec_table(cx: &Cx, specs: &[Spec]) -> Result<impl View> {
     Ok(view! {
         <div class="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white">
             <table class="w-full text-sm">
@@ -255,7 +262,7 @@ pub async fn spec_table(specs: &[Spec]) -> Result<impl View> {
 }
 
 #[component]
-pub async fn review_list(reviews: &[Review]) -> Result<impl View> {
+pub async fn review_list(cx: &Cx, reviews: &[Review]) -> Result<impl View> {
     Ok(view! {
         <div class="mt-6 space-y-6">
             for review in reviews {
