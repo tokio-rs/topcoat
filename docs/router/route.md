@@ -12,7 +12,7 @@ Use `#[route(GET)]` without a path string with [module routing](macro.module_rou
 
 # Handler signature
 
-The function must be `async` and return `Result<T>`, where `T` implements [`AsyncIntoResponse`](response/trait.AsyncIntoResponse.html). Every [`IntoResponse`](response/trait.IntoResponse.html) type meets this bound. The handler may take [`cx: &Cx`](../context/struct.Cx.html) and one body parameter implementing [`FromRequest`](request/trait.FromRequest.html). Both are optional and may appear in either order. The body parameter may use a pattern such as `Json(input): Json<T>`.
+The function must be `async` and take [`cx: &Cx`](../context/struct.Cx.html) as its first parameter, even when unused. An optional second parameter implements [`FromRequest`](request/trait.FromRequest.html) and may use a pattern such as `Json(input): Json<T>`. The function must return `Result<T>`, where `T` implements [`AsyncIntoResponse`](response/trait.AsyncIntoResponse.html). Every [`IntoResponse`](response/trait.IntoResponse.html) type meets this bound.
 
 # Route context
 

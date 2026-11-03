@@ -6,7 +6,7 @@ Use `#[layout]` without a path string with [module routing](macro.module_router.
 
 # Handler signature
 
-The function must be `async` and return a [`Result`](../type.Result.html) containing a [`View`](../view/trait.View.html). It receives the inner content as `slot: Slot<'_>` and may also take [`cx: &Cx`](../context/struct.Cx.html). The macro recognizes these parameters by name. They may appear in either order, and no other parameters are accepted.
+The function must be `async` and take [`cx: &Cx`](../context/struct.Cx.html) as its first parameter, even when unused. Its second parameter must be `slot: Slot<'_>`, which receives the inner content. No other parameters are accepted. The function must return a [`Result`](../type.Result.html) containing a [`View`](../view/trait.View.html).
 
 Render `slot` where the inner content should appear. Wrap it in an [`error_boundary`](../view/struct.error_boundary.html) to show a custom view if it fails. See the [error guide](../router/error/index.html).
 

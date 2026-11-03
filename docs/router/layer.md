@@ -10,7 +10,9 @@ When several layers wrap a handler, they nest from least specific (outermost) to
 
 # Handler signature
 
-The function must be `async` and take [`cx: &Cx`](../context/struct.Cx.html), [`body: Body`](struct.Body.html), and [`next: Next<'_>`](struct.Next.html). It returns `Result<T>`, where `T` implements [`AsyncIntoResponse`](response/trait.AsyncIntoResponse.html). Every [`IntoResponse`](response/trait.IntoResponse.html) type meets this bound. Call [`next.run(cx, body)`](struct.Next.html#method.run) to run the remaining layers and handler. Return directly to answer the request without running them.
+The function must be `async` and take [`cx: &Cx`](../context/struct.Cx.html) as its first parameter, even when unused. Its second and third parameters are [`body: Body`](struct.Body.html) and [`next: Next<'_>`](struct.Next.html). The function must return `Result<T>`, where `T` implements [`AsyncIntoResponse`](response/trait.AsyncIntoResponse.html). Every [`IntoResponse`](response/trait.IntoResponse.html) type meets this bound.
+
+Call [`next.run(cx, body)`](struct.Next.html#method.run) to run the remaining layers and handler. Return directly to answer the request without running them.
 
 # Examples
 

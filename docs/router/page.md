@@ -10,7 +10,7 @@ Path strings follow the [`Path`](struct.Path.html) syntax.
 
 # Handler signature
 
-The function must be `async` and return a [`Result`](../type.Result.html) containing a [`View`](../view/trait.View.html). It may take [`cx: &Cx`](../context/struct.Cx.html) and one body parameter implementing [`FromRequest`](request/trait.FromRequest.html). Both are optional and may appear in either order. The body parameter may use a pattern such as `Json(input): Json<T>`.
+The function must be `async` and take [`cx: &Cx`](../context/struct.Cx.html) as its first parameter, even when unused. An optional second parameter implements [`FromRequest`](request/trait.FromRequest.html) and may use a pattern such as `Json(input): Json<T>`. The function must return a [`Result`](../type.Result.html) containing a [`View`](../view/trait.View.html).
 
 # Route context
 
