@@ -26,7 +26,8 @@ use topcoat_core_grammar::common::{
 ///   types are lifted into generic type parameters of the props struct.
 /// - a zero-sized marker struct named after the function, carrying the function's doc comments,
 ///   that implements [`topcoat::view::Component`] with a `render` method calling the original
-///   function body.
+///   function body. The marker is a type but not a value, so parameters and local variables can
+///   share its name.
 ///
 /// [`Props`]: derive.Props.html
 /// [`topcoat::view::Component`]: trait.Component.html
@@ -176,22 +177,16 @@ impl ToTokens for Component {
             })
             .collect::<Vec<_>>();
 
-        // A type parameter must appear in the body, so generic markers carry
-        // a `PhantomData` field. Markers with no such parameters are emitted
-        // as unit structs, which makes the marker's bare name a value
-        // (`combobox_content`) rather than a tuple-struct constructor, letting
-        // callers pass it directly, e.g. `router.route(combobox_content)`.
-        let (marker_body, default_value) = if phantom_args.is_empty() {
-            (quote! { #where_clause; }, quote! { Self })
-        } else {
-            (
-                quote! {
-                    (
-                        #vis ::core::marker::PhantomData<(#(#phantom_args,)*)>,
-                    ) #where_clause;
-                },
-                quote! { Self(::core::marker::PhantomData) },
-            )
+        // The marker is a braced struct, which lives in the type namespace
+        // only. A unit or tuple struct would also claim the value namespace,
+        // so a parameter or local variable named after the component would
+        // be read as a pattern matching the marker instead of a new binding.
+        // The `PhantomData` field uses every type parameter, which the struct
+        // body must do.
+        let marker_body = quote! {
+            #where_clause {
+                __marker: ::core::marker::PhantomData<(#(#phantom_args,)*)>,
+            }
         };
 
         // The marker is what a `view!` invocation names, so it carries the
@@ -227,7 +222,7 @@ impl ToTokens for Component {
             impl #marker_impl_generics ::core::default::Default for #ident #marker_ty_generics #where_clause {
                 #[inline]
                 fn default() -> Self {
-                    #default_value
+                    Self { __marker: ::core::marker::PhantomData }
                 }
             }
 

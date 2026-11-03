@@ -125,9 +125,18 @@ impl ToTokens for Page {
             let stmts = std::mem::take(&mut face.block.stmts);
             face.block.stmts = quote! { let #pat = body; #stmts };
         }
+        // The component's marker is only a type, so a constant holding it
+        // makes the page's name a value for `router.page(...)`.
+        let vis = &item.vis;
+        let docs = item.attrs.iter().filter(|attr| attr.path().is_ident("doc"));
         let component = quote! {
             #[#topcoat_view_macro::component]
             #face
+
+            #(#docs)*
+            #[doc(hidden)]
+            #[allow(non_upper_case_globals)]
+            #vis const #ident: #ident = #ident { __marker: ::core::marker::PhantomData };
         };
 
         // A request that fails to parse becomes the error the view's stream

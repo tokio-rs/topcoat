@@ -85,6 +85,27 @@ async fn component_with_multiple_named_args_renders_attributes() {
 }
 
 #[component]
+async fn named_after_components(cx: &Cx, badge: &str) -> Result<impl View> {
+    let greeting = badge;
+    Ok(view! {
+        badge(label: badge, tone: "info")
+        greeting(name: greeting)
+    })
+}
+
+#[tokio::test]
+async fn props_and_locals_can_share_a_component_name() {
+    let cx = empty_cx();
+    let cx = &cx;
+    let result = view! { named_after_components(badge: "Ada") };
+
+    assert_eq!(
+        result.single().await.unwrap().render(cx),
+        r#"<span class="badge badge-info">Ada</span><h1>Hello, Ada!</h1>"#,
+    );
+}
+
+#[component]
 async fn panel(cx: &Cx, title: &str, child: Child<'_>) -> Result<impl View> {
     Ok(view! {
         <section class="panel">
