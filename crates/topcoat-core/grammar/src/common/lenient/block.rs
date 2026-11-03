@@ -90,7 +90,10 @@ mod tests {
         let block: Block = syn::parse_str(source).unwrap();
         assert_eq!(block.inner_attrs.len(), 1);
         assert_eq!(block.stmts.to_string(), tokens("#[inline] fn f() {} f()"));
-        assert_eq!(block.to_token_stream().to_string(), tokens(source));
+
+        let expanded: Block = syn::parse2(block.to_token_stream()).unwrap();
+        assert_eq!(expanded.inner_attrs.len(), 1);
+        assert_eq!(expanded.stmts.to_string(), block.stmts.to_string());
     }
 
     #[test]

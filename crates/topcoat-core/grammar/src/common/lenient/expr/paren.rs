@@ -65,17 +65,19 @@ impl fmt::Debug for ExprParen {
     }
 }
 
-/// Formats the expression inside the parentheses. Tokens that are not a
-/// complete expression are copied as written.
+/// Formats the expression inside the parentheses, which hug it, so a block
+/// stays `({ ... })`. Tokens that are not a complete expression are copied as
+/// written.
 #[cfg(feature = "pretty")]
 impl crate::common::pretty::PrettyPrint for ExprParen {
     fn pretty_print(&self, printer: &mut crate::common::pretty::Printer<'_>) {
-        use crate::common::pretty::{BreakMode, Delim};
-
-        self.paren_token
-            .pretty_print(printer, Some(BreakMode::Consistent), |printer| {
-                self.expr.pretty_print(printer);
-            });
+        printer.move_cursor(self.paren_token.span.open().start());
+        "(".pretty_print(printer);
+        printer.move_cursor(self.paren_token.span.open().end());
+        self.expr.pretty_print(printer);
+        printer.move_cursor(self.paren_token.span.close().start());
+        ")".pretty_print(printer);
+        printer.move_cursor(self.paren_token.span.close().end());
     }
 }
 
