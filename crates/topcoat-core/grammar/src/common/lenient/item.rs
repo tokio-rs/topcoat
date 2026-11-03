@@ -51,7 +51,8 @@ mod tests {
 
     #[test]
     fn parses_a_function_with_an_incomplete_body() {
-        let source = "/// Docs.\n#[inline] pub async fn card<T>(title: &str) -> u8 where T: Copy { user. }";
+        let source =
+            "/// Docs.\n#[inline] pub async fn card<T>(title: &str) -> u8 where T: Copy { user. }";
         let item: ItemFn = syn::parse_str(source).unwrap();
         assert_eq!(item.attrs.len(), 2);
         assert_eq!(item.sig.ident, "card");

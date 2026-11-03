@@ -4,7 +4,6 @@ mod scanner;
 use std::fmt;
 
 pub use paren::*;
-
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote_spanned};
 use syn::parse::{Parse, ParseStream};
