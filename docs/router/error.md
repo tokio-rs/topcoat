@@ -52,12 +52,13 @@ Wrap content in an [`error_boundary`](https://docs.rs/topcoat/latest/topcoat/vie
 // src/app.rs
 use topcoat::{
     Result,
+    context::Cx,
     router::{Slot, StatusCode, error::ForbiddenError, layout},
     view::{View, error_boundary, view},
 };
 
 #[layout]
-async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <html>
             <body>

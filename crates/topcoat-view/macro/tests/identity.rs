@@ -33,7 +33,7 @@ async fn ambiguity(cx: &Cx) -> Result<impl View> {
 }
 
 #[component]
-async fn wrapper(child: Child<'_>) -> Result<impl View> {
+async fn wrapper(cx: &Cx, child: Child<'_>) -> Result<impl View> {
     Ok(view! { (child) })
 }
 
@@ -51,13 +51,13 @@ fn ids(rendered: &str) -> HashMap<String, String> {
 #[tokio::test]
 async fn identities_are_stable_across_renders() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let render = || async {
         view! { probe(label: "a") }
             .single()
             .await
             .unwrap()
-            .render(__cx)
+            .render(cx)
     };
     assert_eq!(render().await, render().await);
 }
@@ -65,7 +65,7 @@ async fn identities_are_stable_across_renders() {
 #[tokio::test]
 async fn sibling_invocations_have_distinct_identities() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let rendered = view! {
         probe(label: "a")
         probe(label: "b")
@@ -73,7 +73,7 @@ async fn sibling_invocations_have_distinct_identities() {
     .single()
     .await
     .unwrap()
-    .render(__cx);
+    .render(cx);
 
     let ids = ids(&rendered);
     assert_ne!(ids["a"], ids["b"]);
@@ -82,7 +82,7 @@ async fn sibling_invocations_have_distinct_identities() {
 #[tokio::test]
 async fn keys_give_each_iteration_its_own_stable_identity() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let render = |labels: Vec<&'static str>| async move {
         let rendered = view! {
             #[key(label)]
@@ -93,7 +93,7 @@ async fn keys_give_each_iteration_its_own_stable_identity() {
         .single()
         .await
         .unwrap()
-        .render(__cx);
+        .render(cx);
         ids(&rendered)
     };
 
@@ -108,7 +108,7 @@ async fn keys_give_each_iteration_its_own_stable_identity() {
 #[tokio::test]
 async fn the_same_key_at_two_sites_stays_distinct() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let rendered = view! {
         #[key(item)]
         for item in [1] {
@@ -122,7 +122,7 @@ async fn the_same_key_at_two_sites_stays_distinct() {
     .single()
     .await
     .unwrap()
-    .render(__cx);
+    .render(cx);
 
     let ids = ids(&rendered);
     assert_ne!(ids["a"], ids["b"]);
@@ -131,15 +131,15 @@ async fn the_same_key_at_two_sites_stays_distinct() {
 #[tokio::test]
 async fn an_unkeyed_component_outside_a_loop_is_unambiguous() {
     let cx = empty_cx();
-    let __cx = &cx;
-    let rendered = view! { ambiguity() }.single().await.unwrap().render(__cx);
+    let cx = &cx;
+    let rendered = view! { ambiguity() }.single().await.unwrap().render(cx);
     assert_eq!(rendered, "ok");
 }
 
 #[tokio::test]
 async fn an_unkeyed_component_in_a_loop_reports_the_missing_key() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let rendered = view! {
         for _ in 0..1 {
             ambiguity()
@@ -148,7 +148,7 @@ async fn an_unkeyed_component_in_a_loop_reports_the_missing_key() {
     .single()
     .await
     .unwrap()
-    .render(__cx);
+    .render(cx);
 
     assert!(rendered.contains("`for` loop"), "names the loop");
     assert!(rendered.contains("identity.rs"), "points into this file");
@@ -158,7 +158,7 @@ async fn an_unkeyed_component_in_a_loop_reports_the_missing_key() {
 #[tokio::test]
 async fn an_ambiguous_invocation_poisons_its_children() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let rendered = view! {
         for _ in 0..1 {
             wrapper(ambiguity())
@@ -167,7 +167,7 @@ async fn an_ambiguous_invocation_poisons_its_children() {
     .single()
     .await
     .unwrap()
-    .render(__cx);
+    .render(cx);
 
     assert!(rendered.contains("`for` loop"));
 }
@@ -175,7 +175,7 @@ async fn an_ambiguous_invocation_poisons_its_children() {
 #[tokio::test]
 async fn a_key_resolves_the_children_of_a_repeated_invocation() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let items = vec!["a", "b"];
     let rendered = view! {
         #[key(item)]
@@ -186,7 +186,7 @@ async fn a_key_resolves_the_children_of_a_repeated_invocation() {
     .single()
     .await
     .unwrap()
-    .render(__cx);
+    .render(cx);
 
     let ids = ids(&rendered);
     assert_ne!(ids["a"], ids["b"]);
@@ -194,14 +194,14 @@ async fn a_key_resolves_the_children_of_a_repeated_invocation() {
 
 /// Invokes `probe` from its own template rather than as child content.
 #[component]
-async fn parent(label: &str) -> Result<impl View> {
+async fn parent(cx: &Cx, label: &str) -> Result<impl View> {
     Ok(view! { probe(label: label) })
 }
 
 #[tokio::test]
 async fn a_key_resolves_the_template_of_a_repeated_invocation() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let items = vec!["a", "b"];
     let rendered = view! {
         #[key(item)]
@@ -212,7 +212,7 @@ async fn a_key_resolves_the_template_of_a_repeated_invocation() {
     .single()
     .await
     .unwrap()
-    .render(__cx);
+    .render(cx);
 
     let ids = ids(&rendered);
     assert_ne!(ids["a"], ids["b"]);
@@ -221,8 +221,8 @@ async fn a_key_resolves_the_template_of_a_repeated_invocation() {
 #[tokio::test]
 async fn an_explicit_context_inside_a_loop_keeps_its_own_identity() {
     let cx = empty_cx();
-    let __cx = &cx;
-    let outer = __cx;
+    let cx = &cx;
+    let outer = cx;
     let rendered = view! {
         for _ in [0] {
             (identity(outer).to_string())
@@ -231,14 +231,14 @@ async fn an_explicit_context_inside_a_loop_keeps_its_own_identity() {
     .single()
     .await
     .unwrap()
-    .render(__cx);
-    assert_eq!(rendered, identity(__cx).to_string());
+    .render(cx);
+    assert_eq!(rendered, identity(cx).to_string());
 }
 
 #[tokio::test]
 async fn an_inner_key_preserves_outer_ambiguity() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let rendered = view! {
         for _ in [0] {
             #[key(item)]
@@ -250,14 +250,14 @@ async fn an_inner_key_preserves_outer_ambiguity() {
     .single()
     .await
     .unwrap()
-    .render(__cx);
+    .render(cx);
     assert!(rendered.contains("`for` loop"));
 }
 
 #[tokio::test]
 async fn a_key_borrows_the_item_and_is_evaluated_once_per_iteration() {
     let cx = empty_cx();
-    let __cx = &cx;
+    let cx = &cx;
     let calls = std::sync::atomic::AtomicUsize::new(0);
     let calls = &calls;
     let rendered = view! {
@@ -269,7 +269,7 @@ async fn a_key_borrows_the_item_and_is_evaluated_once_per_iteration() {
     .single()
     .await
     .unwrap()
-    .render(__cx);
+    .render(cx);
     let ids = ids(&rendered);
     assert_ne!(ids["a"], ids["b"]);
     assert_eq!(calls.load(std::sync::atomic::Ordering::Relaxed), 2);
@@ -293,7 +293,6 @@ async fn sibling_region_ids_do_not_depend_on_completion_order() {
     let mut previous = None;
     for slow_first in [false, true] {
         let mut view = pin!(view! {
-            cx =>
             (live! {
                 if slow_first {
                     tokio::task::yield_now().await;
@@ -330,7 +329,7 @@ async fn sibling_region_ids_do_not_depend_on_completion_order() {
 }
 
 #[component]
-async fn updating(label: &str) -> Result<impl View> {
+async fn updating(cx: &Cx, label: &str) -> Result<impl View> {
     Ok(live! {
         emit! { (label) }?;
         emit! { "updated" }
@@ -342,7 +341,6 @@ async fn region_ids_follow_component_keys_when_reordered() {
     let cx = &Cx::new();
     let render = |labels: [&'static str; 2]| async move {
         view! {
-            cx =>
             #[key(label)]
             for label in labels {
                 updating(label: label)

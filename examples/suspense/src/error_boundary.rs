@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use topcoat::{
     Result,
+    context::Cx,
     router::page,
     view::{View, component, error_boundary, suspense, view},
 };
@@ -10,7 +11,7 @@ use topcoat::{
 // but the boundary around it turns the error into a message in place, and
 // the section next to it is unaffected.
 #[page]
-pub async fn page() -> Result<impl View> {
+pub async fn page(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>"Error boundary"</h1>
         error_boundary(
@@ -35,7 +36,7 @@ pub async fn page() -> Result<impl View> {
 }
 
 #[component]
-async fn failing() -> Result<impl View> {
+async fn failing(cx: &Cx) -> Result<impl View> {
     let content = load_content().await?;
     Ok(view! { <p>(content)</p> })
 }
@@ -47,7 +48,7 @@ async fn load_content() -> Result<&'static str> {
 }
 
 #[component]
-async fn succeeding() -> Result<impl View> {
+async fn succeeding(cx: &Cx) -> Result<impl View> {
     tokio::time::sleep(Duration::from_secs(2)).await;
     Ok(view! { <p>"The second section loaded on its own."</p> })
 }

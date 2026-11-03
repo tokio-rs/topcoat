@@ -122,7 +122,7 @@ async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
 }
 
 #[page("/products", with(Title("Products")))]
-async fn products() -> Result<impl View> {
+async fn products(cx: &Cx) -> Result<impl View> {
     Ok(view! { <h1>"Products"</h1> })
 }
 

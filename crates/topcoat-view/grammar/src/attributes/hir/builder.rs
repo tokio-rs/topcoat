@@ -30,7 +30,7 @@ impl AttributeBuilder {
     #[allow(clippy::needless_pass_by_value)]
     pub fn insert(&mut self, key: TokenStream, value: TokenStream) {
         self.nodes.push(Node::Insert {
-            tokens: quote! { __attrs.insert(__cx, #key, #value); },
+            tokens: quote! { __attrs.insert(cx, #key, #value); },
             capacity: 1,
         });
     }

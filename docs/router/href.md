@@ -7,10 +7,10 @@ Pass a handler as the first argument to use its registered path, including when 
 Import the macro from `topcoat::router`. Pass the returned [`Href`] directly to `href`, `action`, or another URL attribute:
 
 ```rust
-use topcoat::{Result, router::{href, page}, view::{View, view}};
+use topcoat::{Result, context::Cx, router::{href, page}, view::{View, view}};
 
 #[page]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! { <a href=(href!(about::page))>"About"</a> })
 }
 
@@ -18,7 +18,7 @@ mod about {
     use super::*;
 
     #[page]
-    pub async fn page() -> Result<impl View> {
+    pub async fn page(cx: &Cx) -> Result<impl View> {
         Ok(view! { <h1>"About"</h1> })
     }
 }
@@ -104,7 +104,7 @@ use topcoat::{
     view::{View, class, component, view},
 };
 # #[topcoat::router::page("/posts")]
-# async fn posts() -> Result<impl View> { Ok(topcoat::view::view! { "Posts" }) }
+# async fn posts(cx: &Cx) -> Result<impl View> { Ok(topcoat::view::view! { "Posts" }) }
 
 #[component]
 async fn posts_link(cx: &Cx) -> Result<impl View> {
@@ -137,9 +137,9 @@ use topcoat::{
     view::{View, component, view},
 };
 # #[topcoat::router::page("/")]
-# async fn home() -> Result<impl View> { Ok(topcoat::view::view! { "Home" }) }
+# async fn home(cx: &Cx) -> Result<impl View> { Ok(topcoat::view::view! { "Home" }) }
 # #[topcoat::router::page("/posts")]
-# async fn posts() -> Result<impl View> { Ok(topcoat::view::view! { "Posts" }) }
+# async fn posts(cx: &Cx) -> Result<impl View> { Ok(topcoat::view::view! { "Posts" }) }
 
 const NAV: &[(&str, &(dyn HrefTarget + Sync))] = &[("Home", &home), ("Posts", &posts)];
 

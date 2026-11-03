@@ -19,9 +19,9 @@ Attach metadata with `with(...)`, such as `#[layout(with(Title("My shop")))]` or
 Module-derived path (in `src/app/settings.rs` under `module_router!()`, this wraps every page under `/settings`):
 
 ```rust
-# use topcoat::{Result, router::{Slot, layout}, view::{View, view}};
+# use topcoat::{Result, context::Cx, router::{Slot, layout}, view::{View, view}};
 #[layout]
-async fn settings_layout(slot: Slot<'_>) -> Result<impl View> {
+async fn settings_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <section>
             <nav>"Settings nav"</nav>
@@ -34,12 +34,12 @@ async fn settings_layout(slot: Slot<'_>) -> Result<impl View> {
 Explicit path:
 
 ```rust
-use topcoat::{Result, router::{Slot, href, layout}, view::{View, view}};
+use topcoat::{Result, context::Cx, router::{Slot, href, layout}, view::{View, view}};
 # #[topcoat::router::page("/")]
-# async fn home() -> Result<impl View> { Ok(topcoat::view::view! { "Home" }) }
+# async fn home(cx: &Cx) -> Result<impl View> { Ok(topcoat::view::view! { "Home" }) }
 
 #[layout("/")]
-async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>
@@ -55,9 +55,9 @@ async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
 Path below the module (in `src/app/settings.rs` under `module_router!()`, this wraps every page under `/settings/admin`):
 
 ```rust
-# use topcoat::{Result, router::{Slot, layout}, view::{View, view}};
+# use topcoat::{Result, context::Cx, router::{Slot, layout}, view::{View, view}};
 #[layout("./admin")]
-async fn admin_layout(slot: Slot<'_>) -> Result<impl View> {
+async fn admin_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <section>
             <nav>"Admin nav"</nav>
@@ -72,9 +72,9 @@ async fn admin_layout(slot: Slot<'_>) -> Result<impl View> {
 When several layouts match a page, they nest from least specific (outermost) to most specific (innermost):
 
 ```rust
-# use topcoat::{Result, router::{Slot, layout, page}, view::{View, view}};
+# use topcoat::{Result, context::Cx, router::{Slot, layout, page}, view::{View, view}};
 #[layout]
-async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! { <html><body>(slot)</body></html> })
 }
 
@@ -82,7 +82,7 @@ mod settings {
     use super::*;
 
     #[layout]
-    async fn settings_layout(slot: Slot<'_>) -> Result<impl View> {
+    async fn settings_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
         Ok(view! {
             <div class="settings-shell">
                 <nav>"Settings nav"</nav>
@@ -95,7 +95,7 @@ mod settings {
         use super::*;
     
         #[page]
-        async fn profile() -> Result<impl View> {
+        async fn profile(cx: &Cx) -> Result<impl View> {
             Ok(view! { <h1>"Profile"</h1> })
         }
     }
@@ -110,13 +110,13 @@ A request to `/settings/profile` renders `root_layout` > `settings_layout` > `pr
 A layout doubles as a [component](../view/attr.component.html), taking a [`Slot`](type.Slot.html) as its `slot` property:
 
 ```rust
-# use topcoat::{Result, router::{Slot, layout, page}, view::{View, view}};
+# use topcoat::{Result, context::Cx, router::{Slot, layout, page}, view::{View, view}};
 # #[layout]
-# async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+# async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
 #     Ok(view! { <body>(slot)</body> })
 # }
 #[page]
-async fn standalone() -> Result<impl View> {
+async fn standalone(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         root_layout(slot: Slot::new(view! { <p>"content"</p> }))
     })

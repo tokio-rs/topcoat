@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     view::{Attributes, StaticClass, View, class, component, view},
 };
 
@@ -29,6 +30,7 @@ const PROGRESS: StaticClass = class!(
 /// ```
 #[component]
 pub async fn progress(
+    cx: &Cx,
     /// The completed amount, out of `max`.
     #[into]
     #[default]

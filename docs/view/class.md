@@ -5,8 +5,9 @@ Use it to combine base classes, variants, optional classes, conditional classes,
 Pass the result directly as the value of a `class` attribute:
 
 ```rust
+# use topcoat::context::Cx;
 # #[topcoat::view::component]
-# async fn example() -> topcoat::Result<impl topcoat::view::View> {
+# async fn example(cx: &Cx) -> topcoat::Result<impl topcoat::view::View> {
 use topcoat::view::{View, class, view};
 
 let is_active = true;
@@ -26,8 +27,9 @@ The body is a comma-separated list of entries. Each entry is a Rust expression, 
 - `expr if cond else alt` includes `expr` when `cond` is true and `alt` otherwise.
 
 ```rust
+# use topcoat::context::Cx;
 # #[topcoat::view::component]
-# async fn example() -> topcoat::Result<impl topcoat::view::View> {
+# async fn example(cx: &Cx) -> topcoat::Result<impl topcoat::view::View> {
 use topcoat::view::{View, class, view};
 
 let variant: Option<&str> = Some("primary");
@@ -52,8 +54,9 @@ Entries must implement [`ClassViewParts`]. This includes strings, optional value
 Absent entries contribute no text or separator. This includes `None`, empty strings, and entries with a false condition. When every entry is absent, the element omits the `class` attribute:
 
 ```rust
+# use topcoat::context::Cx;
 # #[topcoat::view::component]
-# async fn example() -> topcoat::Result<impl topcoat::view::View> {
+# async fn example(cx: &Cx) -> topcoat::Result<impl topcoat::view::View> {
 use topcoat::view::{View, class, view};
 
 let variant: Option<&str> = None;
@@ -72,11 +75,12 @@ When a component accepts an attribute collection, remove its `class` entry and c
 ```rust
 use topcoat::{
     Result,
+    context::Cx,
     view::{Attributes, Child, View, class, component, view},
 };
 
 #[component]
-async fn panel(#[default] mut attrs: Attributes, #[default] child: Child<'_>) -> Result<impl View> {
+async fn panel(cx: &Cx, #[default] mut attrs: Attributes, #[default] child: Child<'_>) -> Result<impl View> {
     Ok(view! {
         <section class=(class!("panel", attrs.remove("class"))) (attrs)>
             (child)

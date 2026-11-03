@@ -15,13 +15,14 @@ use crate::{metadata, tag};
 /// ```
 /// use topcoat::{
 ///     Result,
+///     context::Cx,
 ///     metadata::Metadata,
 ///     router::{Slot, layout},
 ///     view::{View, view},
 /// };
 ///
 /// #[layout("/", with(Metadata::new().title("Acme")))]
-/// async fn shell(slot: Slot<'_>) -> Result<impl View> {
+/// async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
 ///     Ok(view! {
 ///         <!DOCTYPE html>
 ///         <html>

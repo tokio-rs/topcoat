@@ -1,4 +1,4 @@
-use topcoat::asset::RouterBuilderAssetExt;
+use topcoat::{asset::RouterBuilderAssetExt, context::Cx};
 
 mod echo;
 
@@ -19,7 +19,7 @@ async fn main() {
 }
 
 #[page]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>

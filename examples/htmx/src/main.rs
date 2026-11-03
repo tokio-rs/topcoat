@@ -42,7 +42,7 @@ async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
 }
 
 #[page]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>
             "Count: "

@@ -15,7 +15,7 @@ use crate::components::input::input;
 use crate::features::todo::Todo;
 
 #[page{{ paths.page("/todos") }}]
-pub async fn page() -> Result<impl View> {
+pub async fn page(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <main{{ classes.main }}>
             <h1{{ classes.heading }}>"Todos"</h1>
@@ -121,5 +121,5 @@ pub async fn create(cx: &Cx, Form(new_todo): Form<NewTodo>) -> Result<ViewHandle
     if !title.is_empty() {
         Todo::add(cx, title).await?;
     }
-    Ok(view! { cx => todo_list() }.single().await?)
+    Ok(view! { todo_list() }.single().await?)
 }

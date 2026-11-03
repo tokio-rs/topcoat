@@ -75,17 +75,17 @@ impl Emit for Component {
             let #ident = {
                 use #topcoat_view::Component;
                 let __props = #path::props_builder()#(#setters)*;
-                let __cx = #topcoat_context::with_identity(
-                    __cx.clone(), #topcoat_context::identity_raw(__cx).child(#site),
+                let cx = #topcoat_context::with_identity(
+                    cx.clone(), #topcoat_context::identity_raw(cx).child(#site),
                 );
-                let __captured = #topcoat_view::internal::Capture((__cx, __props));
+                let __captured = #topcoat_view::internal::Capture((cx, __props));
                 #topcoat_view::HoistView::new(
                     #topcoat_view::internal::MoveView::new(async {
-                        let (__cx, __props) = __captured.take();
-                        let __cx = &__cx;
+                        let (cx, __props) = __captured.take();
+                        let cx = &cx;
                         let __props = __props #child.build();
                         #[allow(clippy::default_constructed_unit_structs)]
-                        let __view = Component::render(#path::default(), __cx, __props).await?;
+                        let __view = Component::render(#path::default(), cx, __props).await?;
                         #topcoat_view::internal::MoveView::drive(__view).await
                     }),
                 )

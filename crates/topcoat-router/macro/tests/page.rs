@@ -23,7 +23,7 @@ async fn send_as(router: &Router, method: &str, path: &str) -> (u16, String) {
 }
 
 #[page("/")]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! { <h1>"home"</h1> })
 }
 
@@ -34,7 +34,7 @@ struct Search {
 
 // A page that reads a request body through a destructuring pattern.
 #[page("/search")]
-async fn search(Form(input): Form<Search>) -> Result<impl View> {
+async fn search(cx: &Cx, Form(input): Form<Search>) -> Result<impl View> {
     Ok(view! {
         <p>
             "searching for "
@@ -51,7 +51,7 @@ async fn whoami(cx: &Cx) -> Result<impl View> {
 // A page whose body binds its own name: the binding must shadow the
 // generated marker.
 #[page("/shadowed")]
-async fn shadowed() -> Result<impl View> {
+async fn shadowed(cx: &Cx) -> Result<impl View> {
     let shadowed = "shadowed";
     Ok(view! { <p>(shadowed)</p> })
 }
@@ -59,7 +59,7 @@ async fn shadowed() -> Result<impl View> {
 // A page linking to itself: the marker stays reachable from the page's own
 // body, next to a binding of the same name shadowing it.
 #[page("/self-linked")]
-async fn self_linked() -> Result<impl View> {
+async fn self_linked(cx: &Cx) -> Result<impl View> {
     let self_linked = "self-linked";
     Ok(view! { <a href=(href!(self_linked))>(self_linked)</a> })
 }
@@ -67,7 +67,7 @@ async fn self_linked() -> Result<impl View> {
 // Pages used as components: called like any component inside `view!`, with a
 // request body passed as the already-parsed `body` prop.
 #[page("/composed")]
-async fn composed() -> Result<impl View> {
+async fn composed(cx: &Cx) -> Result<impl View> {
     let query = Search {
         q: String::from("topcoat"),
     };
@@ -80,19 +80,19 @@ async fn composed() -> Result<impl View> {
 
 // A page serving a method other than the default `GET`.
 #[page(POST "/submit")]
-async fn submit() -> Result<impl View> {
+async fn submit(cx: &Cx) -> Result<impl View> {
     Ok(view! { <p>"submitted"</p> })
 }
 
 // A page serving several methods at one path.
 #[page([GET, POST] "/either")]
-async fn either() -> Result<impl View> {
+async fn either(cx: &Cx) -> Result<impl View> {
     Ok(view! { <p>"either"</p> })
 }
 
 // A page serving every method.
 #[page(* "/anything")]
-async fn anything() -> Result<impl View> {
+async fn anything(cx: &Cx) -> Result<impl View> {
     Ok(view! { <p>"anything"</p> })
 }
 
@@ -110,13 +110,13 @@ mod presets {
 
 // A page with route context: each `with(...)` adds one value.
 #[page(POST "/described", with(Title("described")), with(presets::tag()))]
-async fn described() -> Result<impl View> {
+async fn described(cx: &Cx) -> Result<impl View> {
     Ok(view! { <p>"described"</p> })
 }
 
 // A page repeating a type: the later value shadows the earlier one.
 #[page("/retitled", with(Title("first")), with(Title("second")))]
-async fn retitled() -> Result<impl View> {
+async fn retitled(cx: &Cx) -> Result<impl View> {
     Ok(view! { <p>"retitled"</p> })
 }
 
@@ -129,7 +129,7 @@ async fn titled(cx: &Cx) -> Result<impl View> {
 
 // A page with route context but no path, derived by the module router.
 #[page(with(Title("module")))]
-async fn module_described() -> Result<impl View> {
+async fn module_described(cx: &Cx) -> Result<impl View> {
     Ok(view! { <p>"module"</p> })
 }
 

@@ -2,13 +2,14 @@ pub mod install;
 
 use topcoat::{
     Result,
+    context::Cx,
     router::{Slot, layout, page},
     view::{View, view},
 };
 
 // A layout in app::docs wraps /docs and child routes such as /docs/install.
 #[layout]
-async fn docs_layout(slot: Slot<'_>) -> Result<impl View> {
+async fn docs_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <section>
             <p>"docs layout"</p>
@@ -19,7 +20,7 @@ async fn docs_layout(slot: Slot<'_>) -> Result<impl View> {
 
 // A page in app::docs renders at /docs.
 #[page]
-pub async fn page() -> Result<impl View> {
+pub async fn page(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>"docs"</h1>
         <p>"src/app/docs.rs -> /docs"</p>

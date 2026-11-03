@@ -22,12 +22,13 @@ To choose paths directly, put an absolute path in each handler's attribute and r
 ```rust
 use topcoat::{
     Result,
+    context::Cx,
     router::{Router, page, route},
     view::{View, view},
 };
 
 #[page("/")]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! { <h1>"Home"</h1> })
 }
 
@@ -52,16 +53,16 @@ You can also combine the approaches. `module_router!()` collects module-derived 
 Use [`href!`](macro@href) for URLs targeting Topcoat handlers, including navigation links, form actions, and redirects. Pass the handler's Rust name so the URL follows its registered path when you rename a module or change an explicit path. Pass each path parameter as a `path_param!` value:
 
 ```rust
-use topcoat::{router::href, view::view};
+use topcoat::{context::Cx, router::href, view::view};
 # use topcoat::{Result, router::{page, route}, view::View};
-# #[page("/posts")] async fn posts() -> Result<impl View> { Ok(topcoat::view::view! { "Posts" }) }
+# #[page("/posts")] async fn posts(cx: &Cx) -> Result<impl View> { Ok(topcoat::view::view! { "Posts" }) }
 # #[route(POST "/posts")] async fn publish() -> Result<()> { Ok(()) }
 # mod post_id {
 #     use super::*;
 #     topcoat::router::path_param!(pub post_id: u64);
-#     #[page("/posts/{post_id}")] pub async fn post() -> Result<impl View> { Ok(topcoat::view::view! { "Post" }) }
+#     #[page("/posts/{post_id}")] pub async fn post(cx: &Cx) -> Result<impl View> { Ok(topcoat::view::view! { "Post" }) }
 # }
-# #[page] async fn example() -> Result<impl View> {
+# #[page] async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     <a href=(href!(posts))>"All posts"</a>
     <a href=(href!(post_id::post, post_id::PostId(1)))>"First post"</a>
@@ -82,7 +83,7 @@ use topcoat::{
     router::{error::{SeeOther, see_other}, href, route},
 };
 # #[topcoat::router::page("/posts")]
-# async fn posts() -> Result<impl topcoat::view::View> { Ok(topcoat::view::view! { "Posts" }) }
+# async fn posts(cx: &Cx) -> Result<impl topcoat::view::View> { Ok(topcoat::view::view! { "Posts" }) }
 
 #[route(POST)]
 async fn publish(cx: &Cx) -> Result<SeeOther> {
@@ -112,21 +113,21 @@ A page is an async function annotated with [`#[page]`](page), returning a render
 
 ```rust
 // src/app.rs
-use topcoat::{Result, router::page, view::{View, view}};
+use topcoat::{Result, context::Cx, router::page, view::{View, view}};
 
 #[page]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! { <h1>"Home"</h1> })
 }
 
 mod users {
     mod id {
-        use topcoat::{Result, router::{module_param, page}, view::{View, view}};
+        use topcoat::{Result, context::Cx, router::{module_param, page}, view::{View, view}};
 
         module_param!(id);
 
         #[page]
-        async fn user_profile() -> Result<impl View> {
+        async fn user_profile(cx: &Cx) -> Result<impl View> {
             Ok(view! { <h1>"User profile"</h1> })
         }
     }
@@ -149,10 +150,10 @@ use topcoat::{
     router::{Slot, href, layout},
     view::{View, class, view},
 };
-# #[topcoat::router::page] async fn home() -> Result<impl View> { Ok(topcoat::view::view! { "Home" }) }
+# #[topcoat::router::page] async fn home(cx: &Cx) -> Result<impl View> { Ok(topcoat::view::view! { "Home" }) }
 # mod about {
 #     use super::*;
-#     #[topcoat::router::page] pub async fn page() -> Result<impl View> { Ok(topcoat::view::view! { "About" }) }
+#     #[topcoat::router::page] pub async fn page(cx: &Cx) -> Result<impl View> { Ok(topcoat::view::view! { "About" }) }
 # }
 
 #[layout]
@@ -372,7 +373,7 @@ mod posts {
 }
 
 #[layout]
-async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <html>
             <body>
@@ -409,12 +410,12 @@ For routes with explicit paths, register each handler with `.page()`, `.layout()
 
 ```rust
 # use topcoat::{Result, context::Cx, router::{Body, Next, Slot, layer, layout, page, response::Response, route}, view::{View, view}};
-# #[layout("/")] async fn root_layout(slot: Slot<'_>) -> Result<impl View> { Ok(view! { (slot) }) }
-# #[layout("/settings")] async fn settings_layout(slot: Slot<'_>) -> Result<impl View> { Ok(view! { (slot) }) }
+# #[layout("/")] async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> { Ok(view! { (slot) }) }
+# #[layout("/settings")] async fn settings_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> { Ok(view! { (slot) }) }
 # #[layer("/")] async fn timing(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> { next.run(cx, body).await }
-# #[page("/")] async fn home() -> Result<impl View> { Ok(view! { <h1>"Home"</h1> }) }
-# #[page("/about")] async fn about() -> Result<impl View> { Ok(view! { <h1>"About"</h1> }) }
-# #[page("/settings/profile")] async fn profile() -> Result<impl View> { Ok(view! { <h1>"Profile"</h1> }) }
+# #[page("/")] async fn home(cx: &Cx) -> Result<impl View> { Ok(view! { <h1>"Home"</h1> }) }
+# #[page("/about")] async fn about(cx: &Cx) -> Result<impl View> { Ok(view! { <h1>"About"</h1> }) }
+# #[page("/settings/profile")] async fn profile(cx: &Cx) -> Result<impl View> { Ok(view! { <h1>"Profile"</h1> }) }
 # #[route(GET "/api/health")] async fn health() -> Result<&'static str> { Ok("ok") }
 use topcoat::router::Router;
 
@@ -537,7 +538,7 @@ struct NewUser {
 }
 
 #[layout("/")]
-async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>
@@ -560,17 +561,17 @@ async fn api_log(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
 }
 
 #[page("/")]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! { <h1>"Welcome"</h1> })
 }
 
 #[page("/users")]
-async fn users_list() -> Result<impl View> {
+async fn users_list(cx: &Cx) -> Result<impl View> {
     Ok(view! { <h1>"All users"</h1> })
 }
 
 #[page("/users/{id}")]
-async fn user_profile() -> Result<impl View> {
+async fn user_profile(cx: &Cx) -> Result<impl View> {
     Ok(view! { <h1>"User profile"</h1> })
 }
 

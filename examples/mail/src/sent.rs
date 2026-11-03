@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     router::{href, page},
     view::{View, view},
 };
@@ -7,7 +8,7 @@ use topcoat::{
 use crate::{OUTBOX, home, outbox};
 
 #[page]
-pub(crate) async fn sent() -> Result<impl View> {
+pub(crate) async fn sent(cx: &Cx) -> Result<impl View> {
     let files = outbox()?;
 
     Ok(view! {

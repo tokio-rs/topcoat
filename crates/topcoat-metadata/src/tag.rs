@@ -16,13 +16,14 @@ use crate::PageMetadata;
 /// Put this tag first in `<head>`. Browsers look for the charset declaration
 /// within the document's first 1024 bytes.
 #[component]
-pub async fn charset() -> Result<impl View> {
+pub async fn charset(cx: &Cx) -> Result<impl View> {
     Ok(view! { <meta charset="utf-8"> })
 }
 
 /// Writes the page's [viewport tag](crate::Metadata::viewport), if present.
 #[component]
 pub async fn viewport(
+    cx: &Cx,
     /// The combined metadata to render.
     metadata: &PageMetadata,
 ) -> Result<impl View> {
@@ -36,6 +37,7 @@ pub async fn viewport(
 /// Writes a `<title>` tag for the page's [title](crate::Metadata::title), if set.
 #[component]
 pub async fn title(
+    cx: &Cx,
     /// The combined metadata to render.
     metadata: &PageMetadata,
 ) -> Result<impl View> {
@@ -49,6 +51,7 @@ pub async fn title(
 /// Writes a meta tag for the page's [description](crate::Metadata::description), if set.
 #[component]
 pub async fn description(
+    cx: &Cx,
     /// The combined metadata to render.
     metadata: &PageMetadata,
 ) -> Result<impl View> {
@@ -67,10 +70,10 @@ pub async fn canonical(
     /// The combined metadata to render.
     metadata: &PageMetadata,
 ) -> Result<impl View> {
-    let absolute = cx.with(UrlForm::Absolute);
+    let cx = cx.with(UrlForm::Absolute);
     Ok(view! {
         if let Some(canonical) = metadata.canonical() {
-            (view! { absolute => <link rel="canonical" href=(canonical)> })
+            <link rel="canonical" href=(canonical)>
         }
     })
 }
@@ -81,6 +84,7 @@ pub async fn canonical(
 /// those are the defaults without a tag.
 #[component]
 pub async fn robots(
+    cx: &Cx,
     /// The combined metadata to render.
     metadata: &PageMetadata,
 ) -> Result<impl View> {
@@ -101,6 +105,7 @@ pub async fn robots(
 /// Writes a meta tag for the page's [theme color](crate::Metadata::theme_color), if set.
 #[component]
 pub async fn theme_color(
+    cx: &Cx,
     /// The combined metadata to render.
     metadata: &PageMetadata,
 ) -> Result<impl View> {
@@ -132,8 +137,9 @@ pub async fn open_graph(
         if let Some(site_name) = og.site_name() {
             <meta property="og:site_name" content=(site_name)>
         }
-        (view! {
-            absolute =>
+        ({
+            let cx = &absolute;
+            view! {
             if let Some(url) = og.url() {
                 <meta property="og:url" content=(url)>
             }
@@ -149,6 +155,7 @@ pub async fn open_graph(
                     <meta property="og:image:alt" content=(alt)>
                 }
             }
+            }
         })
     })
 }
@@ -157,6 +164,7 @@ pub async fn open_graph(
 /// [Open Graph tags](open_graph) for the preview's content.
 #[component]
 pub async fn twitter(
+    cx: &Cx,
     /// The combined metadata to render.
     metadata: &PageMetadata,
 ) -> Result<impl View> {
@@ -187,7 +195,7 @@ mod tests {
             .with(Metadata::new().canonical("/about"));
         let page = metadata(cx).await.unwrap();
 
-        let html = view! { cx => canonical(metadata: page) }
+        let html = view! { canonical(metadata: page) }
             .single()
             .await
             .unwrap()
@@ -210,7 +218,7 @@ mod tests {
             );
         let page = metadata(cx).await.unwrap();
 
-        let html = view! { cx => open_graph(metadata: page) }
+        let html = view! { open_graph(metadata: page) }
             .single()
             .await
             .unwrap()
@@ -232,22 +240,22 @@ mod tests {
 
     #[tokio::test]
     async fn renders_robots_only_when_a_directive_is_denied() {
-        let allowed = &Cx::new();
-        let page = metadata(allowed).await.unwrap();
-        let html = view! { allowed => robots(metadata: page) }
+        let cx = &Cx::new();
+        let page = metadata(cx).await.unwrap();
+        let html = view! { robots(metadata: page) }
             .single()
             .await
             .unwrap()
-            .render(allowed);
+            .render(cx);
         assert!(!html.contains("robots"), "{html}");
 
-        let denied = &Cx::new().with(Metadata::new().robots(|r| r.index(false)));
-        let page = metadata(denied).await.unwrap();
-        let html = view! { denied => robots(metadata: page) }
+        let cx = &Cx::new().with(Metadata::new().robots(|r| r.index(false)));
+        let page = metadata(cx).await.unwrap();
+        let html = view! { robots(metadata: page) }
             .single()
             .await
             .unwrap()
-            .render(denied);
+            .render(cx);
         assert!(html.contains("noindex"), "{html}");
     }
 }

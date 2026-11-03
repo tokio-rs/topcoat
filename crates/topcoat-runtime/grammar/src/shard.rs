@@ -76,8 +76,8 @@ impl ToTokens for Shard {
             .map(|id| format_ident!("__topcoat_js_{}", id))
             .collect();
 
-        // Arguments forwarded to the hidden implementation after the implicit
-        // `__cx` context: `cx` (when present) followed by the value parameters.
+        // Arguments forwarded to the hidden implementation: `cx` (when
+        // present) followed by the value parameters.
         let call_args = has_cx
             .then(|| quote!(cx))
             .into_iter()
@@ -85,13 +85,12 @@ impl ToTokens for Shard {
         let call_args: Vec<_> = call_args.collect();
 
         // The component face accepts a value or expression for each parameter.
-        let cx_param = has_cx.then(|| quote!(cx: &#topcoat_context::Cx,));
         // Bound to a local because it is interpolated inside the `#(...)*`
         // repetition below, where a bare `#topcoat_runtime` would expand to a
         // `let` binding that cannot shadow the imported constant.
         let expr_ty = quote!(#topcoat_runtime::Expr);
         let component_params = quote! {
-            #cx_param
+            cx: &#topcoat_context::Cx,
             #(#[into] #value_idents: #expr_ty<#value_tys>,)*
         };
 
@@ -125,17 +124,17 @@ impl ToTokens for Shard {
             #(#docs)*
             #[#topcoat_view_macro::component]
             #vis async fn #ident(#component_params) -> #topcoat_error::Result<impl #topcoat_view::View> {
-                let __identity = #topcoat_context::identity(__cx);
+                let __identity = #topcoat_context::identity(cx);
                 #(
                     let (#value_idents, #js_idents) = #value_idents.into_evaluated_and_js();
                 )*
                 #topcoat_error::Result::Ok(#topcoat_runtime::ShardScope::new(
-                    __cx,
+                    cx,
                     __identity,
                     #url,
                     ::std::vec![#(#js_idents),*],
                     #topcoat_view::HoistView::new(#topcoat_view::internal::ThenView::new(
-                        #ident::handler(__cx, #(#call_args),*),
+                        #ident::handler(#(#call_args),*),
                     )),
                 ))
             }
@@ -144,16 +143,11 @@ impl ToTokens for Shard {
         // The user's function body, re-emitted as the marker's `handler`
         // associated function. Associated items are reached through the type
         // rather than lexical scope, so `#ident::handler` is callable from
-        // the component face and the route implementation below. The leading
-        // `__cx` parameter carries the ambient context that `view!` bodies
-        // read.
+        // the component face and the route implementation below.
         let handler = quote! {
             impl #ident {
                 #[allow(clippy::unused_async, clippy::unused_async_trait_impl)]
-                async fn handler(
-                    __cx: &#topcoat_context::Cx,
-                    #inputs
-                ) #output #block
+                async fn handler(#inputs) #output #block
             }
         };
 
@@ -204,11 +198,12 @@ impl ToTokens for Shard {
                         // the build, whose content is self-contained.
                         let __owned = cx.clone();
                         let __view = #topcoat_view::internal::MoveView::new(async move {
+                            #[allow(unused_variables)]
                             let cx = &__owned;
                             let __view = #topcoat_view::internal::ScopeView::new(
                                 #topcoat_view::HoistView::new(
                                     #topcoat_view::internal::ThenView::new(
-                                        #ident::handler(cx, #(#call_args),*),
+                                        #ident::handler(#(#call_args),*),
                                     ),
                                 ),
                             );

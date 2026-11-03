@@ -100,7 +100,7 @@ impl LowerAttribute for EventHandler {
                     quote! {
                         {
                             let __key = ::core::convert::Into::<::std::string::String>::into(#key);
-                            __attrs.insert(__cx, ::std::format!("data-topcoat-on:{}", __key), #value);
+                            __attrs.insert(cx, ::std::format!("data-topcoat-on:{}", __key), #value);
                         }
                     },
                 );
@@ -113,7 +113,7 @@ impl LowerAttribute for EventHandler {
                             let __key = ::core::convert::Into::<::std::string::String>::into(#key);
                             let (_, __js) = #value.into_evaluated_and_js();
                             __attrs.insert(
-                                __cx,
+                                cx,
                                 ::std::format!("data-topcoat-on:{}", __key),
                                 __js,
                             );

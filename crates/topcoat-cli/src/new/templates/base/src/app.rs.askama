@@ -9,6 +9,7 @@ use topcoat::{
 {%- else %}
     asset::{AssetBundle, RouterBuilderAssetExt, asset},
 {%- endif %}
+    context::Cx,
 {%- if font.is_some() %}
 {%- if discover %}
     font::{Font, fontsource::fontsource_font},
@@ -115,7 +116,7 @@ pub fn router() -> Router {
 }
 
 #[layout{{ paths.page("/") }}]
-async fn root(slot: Slot<'_>) -> Result<impl View> {
+async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html lang="en">
@@ -174,7 +175,7 @@ async fn root(slot: Slot<'_>) -> Result<impl View> {
 {%- endif %}
 
 #[page{{ paths.page("/") }}]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <main{{ classes.main }}>
 {%- if ui %}

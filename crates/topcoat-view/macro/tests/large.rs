@@ -7,7 +7,7 @@ use topcoat::{
 };
 
 #[component]
-async fn item(n: usize) -> Result<impl View> {
+async fn item(cx: &Cx, n: usize) -> Result<impl View> {
     Ok(view! { <i>(n)</i> })
 }
 
@@ -21,7 +21,6 @@ async fn hundreds_of_dynamic_positions_in_one_template_compile_and_render_in_ord
     // past the depth the compiler allows for a type that nests once per
     // dynamic position.
     let html = view! {
-        cx =>
         <p>(next())</p>
         item(n: next())
         <p>(next())</p>

@@ -12,7 +12,6 @@ async fn attributes_macro_builds_runtime_attributes() {
     ];
 
     let attrs = topcoat::view::attributes! {
-        cx =>
         class="button"
         id=(id)
         :data-bound=$(id.to_owned())
@@ -56,8 +55,8 @@ async fn spread_inserts_attribute_fragment_into_element() {
     use topcoat::{context::Cx, view::view};
 
     let cx = &Cx::new();
-    let attrs = topcoat::view::attributes! { cx => type="submit" };
-    let result = view! { cx => <button (attrs)>"Save"</button> };
+    let attrs = topcoat::view::attributes! { type="submit" };
+    let result = view! { <button (attrs)>"Save"</button> };
     let html = result.single().await.unwrap().render(cx);
 
     assert_eq!(html, r#"<button type="submit">Save</button>"#);
@@ -68,8 +67,8 @@ async fn spread_follows_other_attributes() {
     use topcoat::{context::Cx, view::view};
 
     let cx = &Cx::new();
-    let attrs = topcoat::view::attributes! { cx => type="submit" };
-    let result = view! { cx => <button class="btn" (attrs)>"Save"</button> };
+    let attrs = topcoat::view::attributes! { type="submit" };
+    let result = view! { <button class="btn" (attrs)>"Save"</button> };
     let html = result.single().await.unwrap().render(cx);
 
     assert!(html.contains(r#"class="btn""#));
@@ -82,7 +81,7 @@ async fn dynamic_key_still_parses_after_spread_support() {
     // spread.
     let cx = &topcoat::context::Cx::new();
     let name = "data-state";
-    let attrs = topcoat::view::attributes! { cx => (name)="ready" };
+    let attrs = topcoat::view::attributes! { (name)="ready" };
     assert!(attrs.contains_key("data-state"));
 }
 
@@ -91,13 +90,13 @@ async fn spread_merges_within_attributes_macro() {
     use topcoat::{context::Cx, view::view};
 
     let cx = &Cx::new();
-    let base = topcoat::view::attributes! { cx => class="btn" type="button" };
-    let merged = topcoat::view::attributes! { cx => class="card" (base) };
+    let base = topcoat::view::attributes! { class="btn" type="button" };
+    let merged = topcoat::view::attributes! { class="card" (base) };
 
     assert!(merged.contains_key("type"));
 
     // The spread's keys replace earlier ones, so `class` renders as `btn`.
-    let result = view! { cx => <div (merged)></div> };
+    let result = view! { <div (merged)></div> };
     let html = result.single().await.unwrap().render(cx);
     assert!(html.contains(r#"class="btn""#));
     assert!(!html.contains(r#"class="card""#));

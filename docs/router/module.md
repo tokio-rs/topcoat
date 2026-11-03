@@ -82,26 +82,26 @@ Use [`href!`](macro.href.html) to link to a handler by its Rust name, such as `h
 A `#[page]` serves `GET` unless the attribute declares other methods, such as `#[page(POST)]`. A `#[layout]` wraps pages in its module and descendant modules.
 
 ```rust
-# use topcoat::{Result, router::{Slot, layout, page}, view::{View, view}};
+# use topcoat::{Result, context::Cx, router::{Slot, layout, page}, view::{View, view}};
 // src/app.rs: both handlers use "/"
 #[layout]
-async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <html><body>(slot)</body></html>
     })
 }
 
 #[page]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! { <h1>"Home"</h1> })
 }
 ```
 
 ```rust
-# use topcoat::{Result, router::page, view::{View, view}};
+# use topcoat::{Result, context::Cx, router::page, view::{View, view}};
 // src/app/about.rs: GET /about
 #[page]
-async fn about() -> Result<impl View> {
+async fn about(cx: &Cx) -> Result<impl View> {
     Ok(view! { <h1>"About"</h1> })
 }
 ```
@@ -140,16 +140,16 @@ async fn api_log(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
 A relative path string starting with `./` is joined onto the module path. This places a handler below its module without adding a module for it.
 
 ```rust
-# use topcoat::{Result, router::page, view::{View, view}};
+# use topcoat::{Result, context::Cx, router::page, view::{View, view}};
 // src/app/settings.rs: GET /settings
 #[page]
-async fn settings() -> Result<impl View> {
+async fn settings(cx: &Cx) -> Result<impl View> {
     Ok(view! { <h1>"Settings"</h1> })
 }
 
 // src/app/settings.rs: POST /settings/export
 #[page(POST "./export")]
-async fn export() -> Result<impl View> {
+async fn export(cx: &Cx) -> Result<impl View> {
     Ok(view! { <p>"Export started"</p> })
 }
 ```
@@ -157,16 +157,16 @@ async fn export() -> Result<impl View> {
 This can also be used to add a trailing slash to the end of your module path. A bare `./` serves the module path itself with a trailing slash, and a relative path ending in a slash keeps it.
 
 ```rust
-# use topcoat::{Result, router::page, view::{View, view}};
+# use topcoat::{Result, context::Cx, router::page, view::{View, view}};
 // src/app/settings.rs: GET /settings/
 #[page("./")]
-async fn settings() -> Result<impl View> {
+async fn settings(cx: &Cx) -> Result<impl View> {
     Ok(view! { <h1>"Settings"</h1> })
 }
 
 // src/app/settings.rs: GET /settings/export/
 #[page("./export/")]
-async fn export() -> Result<impl View> {
+async fn export(cx: &Cx) -> Result<impl View> {
     Ok(view! { <h1>"Export"</h1> })
 }
 ```
@@ -333,10 +333,10 @@ Adding an absolute path string to `#[page]`, `#[layout]`, `#[layer]`, or `#[rout
 `module_router!()` discovers module-derived handlers. Register an absolute-path handler by name:
 
 ```rust,standalone_crate
-use topcoat::router::module_router;
+use topcoat::{context::Cx, router::module_router};
 # use topcoat::{Result, router::page, view::{View, view}};
 #[page("/legacy")]
-async fn legacy() -> Result<impl View> {
+async fn legacy(cx: &Cx) -> Result<impl View> {
     Ok(view! { <h1>"Legacy"</h1> })
 }
 

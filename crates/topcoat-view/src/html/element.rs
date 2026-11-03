@@ -8,9 +8,10 @@ use crate::{PartsWriter, PromotedStr, StaticStr, Unescaped};
 /// [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html):
 ///
 /// ```rust
+/// # use topcoat::context::Cx;
 /// # use topcoat::view::{View, component, view};
 /// # #[component]
-/// # async fn example() -> topcoat::Result<impl View> {
+/// # async fn example(cx: &Cx) -> topcoat::Result<impl View> {
 /// # let tag_name = "div";
 /// Ok(view! {
 ///     <(tag_name)></(tag_name)>

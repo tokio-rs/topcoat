@@ -2,6 +2,7 @@ mod products;
 
 use topcoat::{
     Result,
+    context::Cx,
     metadata::{Metadata, Url},
     router::{Slot, href, layout, module_router, page},
     view::{View, view},
@@ -31,7 +32,7 @@ async fn main() {
             .twitter(|x| x.site("@acme"))
     )
 )]
-async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>
@@ -55,7 +56,7 @@ async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
 
 // Inherits every metadata field from the layout.
 #[page]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>"Acme"</h1>
         <p>"View the page source to see the metadata of each page."</p>

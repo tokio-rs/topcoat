@@ -146,7 +146,7 @@ async fn order_items(cx: &Cx, id: u64, total: Money) -> Result<impl View> {
 }
 
 #[component]
-async fn order_items_skeleton() -> Result<impl View> {
+async fn order_items_skeleton(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         card_header(
             card_title((t!(items)))
@@ -197,7 +197,7 @@ async fn order_items_skeleton() -> Result<impl View> {
 }
 
 #[component]
-async fn order_item_columns() -> Result<impl View> {
+async fn order_item_columns(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         table_header(
             table_row(
@@ -262,7 +262,7 @@ async fn customer_details(cx: &Cx, id: u64) -> Result<impl View> {
 }
 
 #[component]
-async fn customer_details_skeleton() -> Result<impl View> {
+async fn customer_details_skeleton(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         card_content(
             attrs: attributes! { aria-busy="true" },

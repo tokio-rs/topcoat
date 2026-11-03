@@ -9,9 +9,9 @@ Use [`link`](struct.link.html) for navigation without a full document reload, wi
 Interactive pages need the runtime's browser script. `script()` renders the script tag; include it in your document head:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn document() -> Result<impl View> {
+# async fn document(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     <html>
         <head>
@@ -50,9 +50,9 @@ The runtime reruns a page by sending its current signal values to the page's URL
 A `$(...)` block is a **runtime expression**. Use it in a view to render its value:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     <p>"The answer: " $(1 + 2)</p>
 })

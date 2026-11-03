@@ -38,7 +38,6 @@ async fn main() -> Result<()> {
 async fn render(cx: &Cx) -> Result<String> {
     // Outside a component, pass the context explicitly to `view!`.
     let view = view! {
-        cx =>
         document(
             greeting()
             <p>"Rendered to a string with only the view feature enabled."</p>

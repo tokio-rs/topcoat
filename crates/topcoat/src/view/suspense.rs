@@ -23,18 +23,19 @@ use crate::{
 /// ```rust
 /// use topcoat::{
 ///     Result,
+///     context::Cx,
 ///     view::{View, component, suspense, view},
 /// };
 ///
 /// #[component]
-/// async fn quote() -> Result<impl View> {
+/// async fn quote(cx: &Cx) -> Result<impl View> {
 ///     let quote = fetch_quote().await;
 ///     Ok(view! { <blockquote>(quote)</blockquote> })
 /// }
 /// # async fn fetch_quote() -> &'static str { "..." }
 ///
 /// #[component]
-/// async fn page() -> Result<impl View> {
+/// async fn page(cx: &Cx) -> Result<impl View> {
 ///     Ok(view! {
 ///         suspense(
 ///             fallback: view! { <p>"Loading..."</p> },
@@ -83,18 +84,19 @@ pub async fn suspense(
 /// ```rust
 /// use topcoat::{
 ///     Result,
+///     context::Cx,
 ///     view::{SuspenseMode, View, component, suspense, view},
 /// };
 ///
 /// #[component]
-/// async fn product() -> Result<impl View> {
+/// async fn product(cx: &Cx) -> Result<impl View> {
 ///     let description = fetch_description().await;
 ///     Ok(view! { <p>(description)</p> })
 /// }
 /// # async fn fetch_description() -> &'static str { "..." }
 ///
 /// #[component]
-/// async fn page() -> Result<impl View> {
+/// async fn page(cx: &Cx) -> Result<impl View> {
 ///     Ok(view! {
 ///         suspense(
 ///             fallback: view! { <p>"Loading..."</p> },
@@ -164,13 +166,13 @@ mod tests {
 
     /// Yields once before rendering its content.
     #[component]
-    async fn deferred() -> Result<impl View> {
+    async fn deferred(cx: &Cx) -> Result<impl View> {
         tokio::task::yield_now().await;
         Ok(view! { <p>"content"</p> })
     }
 
     #[page("/")]
-    async fn home() -> Result<impl View> {
+    async fn home(cx: &Cx) -> Result<impl View> {
         Ok(view! { suspense(fallback: view! { <p>"loading"</p> }, deferred()) })
     }
 

@@ -20,27 +20,19 @@ pub use attribute_value::*;
 pub use bind_attribute::*;
 pub use event_handler::*;
 use proc_macro2::{Span, TokenStream};
-use quote::{ToTokens, quote};
+use quote::ToTokens;
 use syn::parse::{Parse, ParseStream};
 use topcoat_core_grammar::common::ParseOption;
 pub use visitor::*;
 
 use crate::{
     attributes::hir::{AttributeBuilder, LowerAttribute},
-    leading_cx::LeadingCx,
     template::{TemplateElse, TemplateForLoop, TemplateIf, TemplateMatch},
     view::hir::{ExprKind, LowerView, ViewBuilder},
 };
 
 /// The full list of attributes attached to a single tag.
 pub struct Attributes {
-    /// The request context binding supplied by a leading `cx =>` argument to
-    /// the `attributes!` macro.
-    ///
-    /// `None` uses the surrounding macro's context. An explicit
-    /// `attributes! { cx => ... }` uses the supplied context.
-    /// Attributes parsed inside an element tag never carry this argument.
-    pub cx: Option<LeadingCx>,
     pub items: Vec<AttributeNode>,
 }
 
@@ -80,7 +72,6 @@ impl LowerAttribute for Attributes {
 
 impl Parse for Attributes {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let cx = input.call(LeadingCx::parse_option)?;
         let mut items = Vec::new();
         while let Some(item) = input.call(AttributeNode::parse_option)? {
             items.push(item);
@@ -95,7 +86,7 @@ impl Parse for Attributes {
             return Err(error);
         }
 
-        Ok(Self { cx, items })
+        Ok(Self { items })
     }
 }
 
@@ -103,29 +94,13 @@ impl ToTokens for Attributes {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let mut builder = AttributeBuilder::new();
         LowerAttribute::lower(self, &mut builder);
-        let attrs = builder.finish().emit();
-
-        // When an explicit context is named, bind it to the `__cx` identifier
-        // the generated `__attrs.insert(__cx, ...)` calls read from. Inside a
-        // component/page/layout this binding is already in scope, so we emit the
-        // attributes untouched.
-        match &self.cx {
-            Some(cx) => quote! {{
-                #cx
-                #attrs
-            }}
-            .to_tokens(tokens),
-            None => attrs.to_tokens(tokens),
-        }
+        builder.finish().emit().to_tokens(tokens);
     }
 }
 
 #[cfg(feature = "pretty")]
 impl topcoat_core_grammar::common::pretty::PrettyPrint for Attributes {
     fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
-        if let Some(cx) = &self.cx {
-            cx.pretty_print(printer);
-        }
         if self.is_empty() {
             return;
         }
@@ -298,7 +273,7 @@ mod tests {
     fn write_view(source: &str) -> String {
         let mut builder = ViewBuilder::new();
         LowerView::lower(&parse(source), &mut builder);
-        builder.finish().emit_view(false).to_string()
+        builder.finish().emit_view().to_string()
     }
 
     /// Returns `true` if the attribute list falls back to a runtime `Attributes`

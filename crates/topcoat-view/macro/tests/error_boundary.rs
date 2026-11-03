@@ -12,7 +12,7 @@ use topcoat::{
 };
 
 #[component]
-async fn load(fail: bool) -> Result<impl View> {
+async fn load(cx: &Cx, fail: bool) -> Result<impl View> {
     if fail {
         return Err(io::Error::other("boom").into());
     }
@@ -33,7 +33,6 @@ async fn next_swap<V: View>(view: &mut Pin<&mut V>) -> Result<Option<ViewSwap>> 
 async fn error_boundary_renders_child_content_as_plain_content() {
     let cx = &Cx::new();
     let html = view! {
-        cx =>
         error_boundary(fallback: |_| Ok(view! { <p>"failed"</p> }), <p>"content"</p>)
     }
     .single()
@@ -48,7 +47,6 @@ async fn error_boundary_renders_child_content_as_plain_content() {
 async fn error_boundary_shows_the_fallback_for_a_failed_child() {
     let cx = &Cx::new();
     let html = view! {
-        cx =>
         error_boundary(
             fallback: |error| Ok(view! { <p class="error">(error.to_string())</p> }),
             load(fail: true)
@@ -66,7 +64,6 @@ async fn error_boundary_shows_the_fallback_for_a_failed_child() {
 async fn error_boundary_rethrows_an_error_the_fallback_returns() {
     let cx = &Cx::new();
     let error = view! {
-        cx =>
         error_boundary(
             fallback: |error| {
                 if error.to_string() == "boom" {
@@ -89,7 +86,6 @@ async fn error_boundary_replaces_streamed_content_on_a_late_error() {
     let cx = &Cx::new();
     let (tx, rx) = oneshot::channel::<()>();
     let mut view = pin!(view! {
-        cx =>
         error_boundary(
             fallback: |error| Ok(view! { <p class="error">(error.to_string())</p> }),
             (live! {
@@ -117,7 +113,6 @@ async fn error_boundary_finishes_after_a_single_emission_fallback() {
     let cx = &Cx::new();
     let (tx, rx) = oneshot::channel::<()>();
     let mut view = pin!(view! {
-        cx =>
         error_boundary(
             fallback: |error| Ok(live! {
                 emit! { <p class="error">(error.to_string())</p> }
@@ -145,7 +140,6 @@ async fn error_boundary_streams_a_multi_emission_fallback_after_a_late_error() {
     let cx = &Cx::new();
     let (tx, rx) = oneshot::channel::<()>();
     let mut view = pin!(view! {
-        cx =>
         error_boundary(
             fallback: |error| Ok(live! {
                 emit! { <p class="error">(error.to_string())</p> }?;

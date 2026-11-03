@@ -22,7 +22,7 @@ Inside a [`view!`] body, call a shard like a component. Each parameter accepts i
 ```rust
 # use topcoat::{Result, context::Cx, view::*, runtime::{shard, signal, Event}};
 # #[shard]
-# async fn search_results(query: String) -> Result<impl View> { Ok(view! { (query) }) }
+# async fn search_results(cx: &Cx, query: String) -> Result<impl View> { Ok(view! { (query) }) }
 # #[component]
 # async fn example(cx: &Cx) -> Result<impl View> {
 let query = signal(cx, String::new);
@@ -137,10 +137,10 @@ search_results(query: $(query.get()), limit: limit)
 Register a shard on the [`Router`] so the browser can request new content. It implements [`Route`], so pass its name to `.route()`:
 
 ```rust,standalone_crate
-use topcoat::router::module_router;
+use topcoat::{context::Cx, router::module_router};
 # use topcoat::{Result, router::Router, runtime::shard, view::{View, view}};
 # #[shard]
-# async fn search_results(query: String) -> Result<impl View> { Ok(view! { (query) }) }
+# async fn search_results(cx: &Cx, query: String) -> Result<impl View> { Ok(view! { (query) }) }
 let router = module_router!().route(search_results).build();
 ```
 
@@ -151,10 +151,10 @@ With the `discover` feature enabled, `.discover()` registers all shards linked i
 Topcoat generates an internal path for each shard from its name and source location. This path changes when the shard is renamed or moved. To choose a stable endpoint, pass an absolute path to `#[shard]`:
 
 ```rust
-use topcoat::{Result, runtime::shard, view::{View, view}};
+use topcoat::{Result, context::Cx, runtime::shard, view::{View, view}};
 
 #[shard("/search/results")]
-async fn search_results(query: String) -> Result<impl View> {
+async fn search_results(cx: &Cx, query: String) -> Result<impl View> {
     Ok(view! { <p>"Results for " (query)</p> })
 }
 ```

@@ -18,12 +18,13 @@ Load the Datastar script before using its attributes. This example bundles the s
 use topcoat::{
     Result,
     asset::asset,
+    context::Cx,
     router::{Slot, layout},
     view::{View, view},
 };
 
 #[layout]
-async fn root(slot: Slot<'_>) -> Result<impl View> {
+async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>
@@ -85,7 +86,7 @@ use topcoat::{
 
 #[route(POST)]
 async fn create(cx: &Cx) -> Result<PatchElements> {
-    let entry = view! { cx => <li>"A new entry"</li> }.single().await?;
+    let entry = view! { <li>"A new entry"</li> }.single().await?;
     Ok(PatchElements::new(entry.render(cx))
         .selector("#feed")
         .mode(ElementPatchMode::Prepend))
@@ -159,7 +160,7 @@ use topcoat::{
 
 #[route(POST)]
 async fn save(cx: &Cx) -> Result<(DatastarSelector, DatastarMode, ViewHandle)> {
-    let status = view! { cx => <p>"Saved!"</p> }.single().await?;
+    let status = view! { <p>"Saved!"</p> }.single().await?;
     Ok((
         DatastarSelector::from("#status"),
         DatastarMode(ElementPatchMode::Inner),

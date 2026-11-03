@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     view::{Attributes, PromotedStr, StaticClass, View, class, component, view},
 };
 
@@ -60,6 +61,7 @@ const SEPARATOR: StaticClass = class!("shrink-0 border-0 bg-border");
 /// ```
 #[component]
 pub async fn separator(
+    cx: &Cx,
     /// The direction the rule runs in.
     #[default]
     orientation: SeparatorOrientation,

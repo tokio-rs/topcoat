@@ -44,7 +44,7 @@ struct Todo {
 }
 
 #[layout]
-async fn root(slot: Slot<'_>) -> Result<impl View> {
+async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>
@@ -101,7 +101,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
 // --- Components -------------------------------------------------------------
 
 #[component]
-async fn toggle_checkbox(todo: &Todo) -> Result<impl View> {
+async fn toggle_checkbox(cx: &Cx, todo: &Todo) -> Result<impl View> {
     Ok(view! {
         <form
             method="post"
@@ -116,7 +116,7 @@ async fn toggle_checkbox(todo: &Todo) -> Result<impl View> {
 }
 
 #[component]
-async fn delete_button(todo: &Todo) -> Result<impl View> {
+async fn delete_button(cx: &Cx, todo: &Todo) -> Result<impl View> {
     Ok(view! {
         <form
             method="post"

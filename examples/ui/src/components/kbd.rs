@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
@@ -22,6 +23,7 @@ const KBD: StaticClass = class!(
 /// ```
 #[component]
 pub async fn kbd(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -31,6 +33,7 @@ pub async fn kbd(
 /// A row of key labels for one keyboard shortcut. The keys stay on one line.
 #[component]
 pub async fn kbd_group(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {

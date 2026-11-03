@@ -52,7 +52,7 @@ fn router() -> &'static Router {
 // --- Layouts ----------------------------------------------------------------
 
 #[layout("/")]
-async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>
@@ -65,7 +65,7 @@ async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
 // --- Pages ------------------------------------------------------------------
 
 #[page("/")]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>"Hello from a Worker"</h1>
         <form method="post" action=(href!(submit))>
@@ -81,7 +81,7 @@ struct Greeting {
 }
 
 #[page("/greet")]
-async fn greet(Form(input): Form<Greeting>) -> Result<impl View> {
+async fn greet(cx: &Cx, Form(input): Form<Greeting>) -> Result<impl View> {
     Ok(view! {
         <h1>
             "Hello, "

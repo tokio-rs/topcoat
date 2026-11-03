@@ -23,19 +23,20 @@ use crate::{Field, Text, Url};
 /// ```
 /// use topcoat::{
 ///     Result,
+///     context::Cx,
 ///     metadata::Metadata,
 ///     router::{Slot, layout, page},
 ///     view::{View, view},
 /// };
 ///
 /// #[layout("/", with(Metadata::new().description("Acme sells everything.")))]
-/// async fn shell(slot: Slot<'_>) -> Result<impl View> {
+/// async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
 ///     Ok(view! { (slot) })
 /// }
 ///
 /// // Uses this title and inherits the description from the layout.
 /// #[page("/products", with(Metadata::new().title("Products")))]
-/// async fn products() -> Result<impl View> {
+/// async fn products(cx: &Cx) -> Result<impl View> {
 ///     Ok(view! { <h1>"Products"</h1> })
 /// }
 /// ```

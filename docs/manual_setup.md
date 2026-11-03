@@ -25,6 +25,7 @@ Replace `src/main.rs` with:
 ```rust,standalone_crate
 use topcoat::{
     Result,
+    context::Cx,
     router::{module_router, page},
     view::{View, component, view},
 };
@@ -35,7 +36,7 @@ async fn main() {
 }
 
 #[page]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>
@@ -51,7 +52,7 @@ async fn home() -> Result<impl View> {
 }
 
 #[component]
-async fn hello(name: &str) -> Result<impl View> {
+async fn hello(cx: &Cx, name: &str) -> Result<impl View> {
     Ok(view! {
         <h1>"Hello, " (name) "!"</h1>
     })

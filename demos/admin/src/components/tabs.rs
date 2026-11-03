@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     runtime::Expr,
     view::{Attributes, Child, StaticClass, View, class, component, view},
 };
@@ -31,6 +32,7 @@ use topcoat::{
 /// ```
 #[component]
 pub async fn tabs(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -44,6 +46,7 @@ pub async fn tabs(
 /// A row of controls for selecting a panel.
 #[component]
 pub async fn tabs_list(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -79,6 +82,7 @@ const TRIGGER: StaticClass = class!(
 /// signal.
 #[component]
 pub async fn tabs_trigger(
+    cx: &Cx,
     /// Whether this trigger selects the visible panel.
     #[into]
     #[default(false.into())]
@@ -107,6 +111,7 @@ pub async fn tabs_trigger(
 /// bindings to switch between them in the browser.
 #[component]
 pub async fn tabs_content(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {

@@ -5,6 +5,7 @@ mod rewritten;
 
 use topcoat::{
     Result,
+    context::Cx,
     router::{
         Slot, StatusCode,
         error::{ForbiddenError, NotFoundError},
@@ -19,7 +20,7 @@ async fn main() {
 }
 
 #[page]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>"Error handling"</h1>
         <ul>
@@ -54,7 +55,7 @@ async fn home() -> Result<impl View> {
 // An error keeps its type on the way out, so an error boundary around the slot
 // can downcast it and replace the page with a branded error page.
 #[layout]
-async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <html>
             <body>

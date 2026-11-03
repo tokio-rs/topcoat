@@ -63,12 +63,6 @@ impl ToTokens for Component {
         let attrs = item.attrs;
         // Callers use named props, not this helper's positional arguments.
         item.attrs = vec![parse_quote!(#[allow(clippy::unused_async, clippy::too_many_arguments)])];
-        // The implicit `__cx` context parameter carries what `view!` bodies
-        // read: the request context.
-        item.sig.generics.params.insert(0, parse_quote! { '__a });
-        item.sig
-            .inputs
-            .insert(0, parse_quote! { __cx: &'__a #topcoat_context::Cx });
         // The `#[default]` and `#[into]` helper attributes are only meaningful to
         // the `Props` derive, which sees them on the generated struct's fields.
         // They are not valid on the re-emitted function's parameters, so strip
@@ -89,6 +83,9 @@ impl ToTokens for Component {
         signature_lifetimes.visit_return_type_mut(&mut item.sig.output);
         for input in &mut item.sig.inputs {
             signature_lifetimes.visit_fn_arg_mut(input);
+        }
+        if signature_lifetimes.used {
+            item.sig.generics.params.insert(0, parse_quote! { '__a });
         }
         let ReturnType::Type(_, return_ty) = &item.sig.output else {
             unreachable!("validated in Parse");
@@ -213,6 +210,7 @@ impl ToTokens for Component {
         .to_tokens(tokens);
 
         let render = quote! {
+            #[allow(unused_variables)]
             fn render<'__a, '__props>(
                 self,
                 cx: &'__a #topcoat_context::Cx,
@@ -224,7 +222,7 @@ impl ToTokens for Component {
                 Self::Props<'__props>: '__a,
             {
                 #item
-                #ident(cx, #(#args),*)
+                #ident(#(#args),*)
             }
         };
 

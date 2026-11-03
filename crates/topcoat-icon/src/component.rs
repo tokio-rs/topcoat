@@ -1,4 +1,4 @@
-use topcoat_core::error::Result;
+use topcoat_core::{context::Cx, error::Result};
 use topcoat_view::{Attributes, Length, View};
 use topcoat_view_macro::{component, view};
 
@@ -10,6 +10,7 @@ use crate::IconData;
 /// text, and carries `aria-hidden` unless a `label` is passed.
 #[component]
 pub async fn icon(
+    cx: &Cx,
     /// The icon to render.
     data: IconData,
     /// The rendered width and height.

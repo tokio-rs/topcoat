@@ -85,7 +85,7 @@ impl Drop for NotifyOnDrop {
 
 /// Renders until its run is stopped, reporting when that happens.
 #[page("/endless")]
-async fn endless() -> Result<impl View> {
+async fn endless(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <main>
             (live! {
@@ -100,7 +100,7 @@ async fn endless() -> Result<impl View> {
 
 /// Updates a live region after its first render.
 #[shard]
-async fn ticker() -> Result<impl View> {
+async fn ticker(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         (live! {
             emit! { <p>"tick"</p> }?;
@@ -111,7 +111,7 @@ async fn ticker() -> Result<impl View> {
 
 /// Hosts a live shard, whose updates travel with the page's run.
 #[page("/shards")]
-async fn shards() -> Result<impl View> {
+async fn shards(cx: &Cx) -> Result<impl View> {
     Ok(view! { <main>ticker()</main> })
 }
 
@@ -143,7 +143,7 @@ async fn feed(cx: &Cx, label: String) -> Result<impl View> {
 
 /// Redirects before rendering any content.
 #[page("/away")]
-async fn away() -> Result<impl View> {
+async fn away(cx: &Cx) -> Result<impl View> {
     let redirected: Result<()> = Err(redirect("/target").into());
     redirected?;
     Ok(view! { <p>"never"</p> })
@@ -151,7 +151,7 @@ async fn away() -> Result<impl View> {
 
 /// Returns an error before rendering any content.
 #[page("/broken")]
-async fn broken() -> Result<impl View> {
+async fn broken(cx: &Cx) -> Result<impl View> {
     let failed: Result<()> = Err(bad_request("broken").into());
     failed?;
     Ok(view! { <p>"never"</p> })

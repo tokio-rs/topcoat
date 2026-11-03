@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use topcoat::{
     Result,
+    context::Cx,
     router::page,
     view::{View, component, emit, live, view},
 };
@@ -9,7 +10,7 @@ use topcoat::{
 // A failed emission comes back as an Err instead of ending the stream, so
 // matching on it lets the region emit a fallback in its place.
 #[page]
-pub async fn page() -> Result<impl View> {
+pub async fn page(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>"Error handling"</h1>
         (live! {
@@ -28,7 +29,7 @@ pub async fn page() -> Result<impl View> {
 }
 
 #[component]
-async fn content() -> Result<impl View> {
+async fn content(cx: &Cx) -> Result<impl View> {
     let content = load_content().await?;
     Ok(view! { <p>(content)</p> })
 }

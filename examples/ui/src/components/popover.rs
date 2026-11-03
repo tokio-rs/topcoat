@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
@@ -34,6 +35,7 @@ use super::floating::{FloatingAlign, FloatingAnchor, FloatingSide, floating_vari
 /// ```
 #[component]
 pub async fn popover(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -52,6 +54,7 @@ pub async fn popover(
 /// All attributes in `attrs` go on the `<button>`.
 #[component]
 pub async fn popover_trigger(
+    cx: &Cx,
     /// The panel ID this button controls.
     target: &str,
     /// Attributes to add to the button.
@@ -89,6 +92,7 @@ const PANEL: StaticClass = class!(
 /// to change the panel's size.
 #[component]
 pub async fn popover_content(
+    cx: &Cx,
     /// The panel ID to pass to the trigger's `target`.
     id: &str,
     /// Where the panel opens relative to the button.

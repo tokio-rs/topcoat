@@ -9,9 +9,9 @@ The [`view!`] macro builds HTML from markup and Rust expressions. It follows HTM
 Write text nodes in quotes.
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     <!DOCTYPE html>
     <html>
@@ -32,9 +32,9 @@ Ok(view! {
 Element names can contain dashes for custom elements:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     <my-widget data-widget-id="profile"></my-widget>
 })
@@ -48,10 +48,10 @@ Use parentheses to interpolate a Rust expression into markup.
 In child position, the expression becomes a node:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # struct User { name: &'static str }
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 # let user = User { name: "Ada" };
 # let sidebar = view! { <aside></aside> };
 Ok(view! {
@@ -64,9 +64,9 @@ Ok(view! {
 In attribute value position, the expression becomes the value:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 # let url = "/posts";
 # let is_current = true;
 Ok(view! {
@@ -78,9 +78,9 @@ Ok(view! {
 Use parentheses for dynamic attribute and element names too:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 let tag = "section";
 let attr = "data-state";
 
@@ -93,9 +93,9 @@ Ok(view! {
 Use a quoted string for literal text or an expression for computed text:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 # let computed_text = "Computed";
 Ok(view! {
     <p>"This is text"</p>
@@ -113,9 +113,9 @@ Use Rust control flow with markup in its branches and loop bodies.
 Use `if`, `else if`, and `else` to choose which markup is emitted.
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 # let user: Option<()> = None;
 Ok(view! {
     if user.is_some() {
@@ -130,9 +130,9 @@ Ok(view! {
 In attributes, each branch emits attributes instead of child nodes:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 # let current = true;
 Ok(view! {
     <a
@@ -153,10 +153,10 @@ Ok(view! {
 Use `for pat in expr { ... }` to render the body once for each item.
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # struct Post { url: &'static str, title: &'static str }
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 # let posts = vec![Post { url: "/a", title: "A" }];
 Ok(view! {
     <ul>
@@ -173,9 +173,9 @@ Ok(view! {
 In attributes, a loop can emit zero or more attributes. This is useful when you already have attributes represented as data:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 # let attrs = vec![("data-id", "1")];
 Ok(view! {
     <div
@@ -192,10 +192,10 @@ Ok(view! {
 Use `match` to choose markup from patterns. Match arms can also use guards.
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # enum Status { Draft, Published { title: &'static str }, Archived }
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 # let status = Status::Draft;
 # let show_archived = true;
 Ok(view! {
@@ -212,10 +212,10 @@ Ok(view! {
 A match arm body is one view node. If a branch needs multiple sibling nodes, wrap them in a block:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # struct User { name: &'static str }
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 # let user: Option<User> = None;
 Ok(view! {
     match user {
@@ -232,10 +232,10 @@ Ok(view! {
 In attributes, each arm can emit attribute nodes:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # enum State { Open, Closed }
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 # let state = State::Open;
 Ok(view! {
     <article
@@ -253,10 +253,10 @@ Ok(view! {
 Use `let pat = expr;` to bind values for later nodes in the same body.
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # struct Post { title: &'static str, url: &'static str }
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 # let post = Post { title: " Hello ", url: "/hello" };
 Ok(view! {
     <article>
@@ -272,11 +272,11 @@ Ok(view! {
 The same works in an attribute list. The binding is in scope for attributes that follow it:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # struct Post { slug: &'static str, title: &'static str }
 # impl Post { fn url(&self) -> &str { "/hello" } }
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 # let post = Post { slug: "hello", title: "Hello" };
 Ok(view! {
     <a
@@ -295,13 +295,13 @@ Ok(view! {
 Call components with comma-separated `name: value` arguments. If a component accepts a `child` property, place child nodes after the named arguments. Child nodes do not need commas:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn panel(title: &str, #[default] child: Child<'_>) -> Result<impl View> { Ok(view! { <section>(title)(child)</section> }) }
+# async fn panel(cx: &Cx, title: &str, #[default] child: Child<'_>) -> Result<impl View> { Ok(view! { <section>(title)(child)</section> }) }
 # #[component]
-# async fn badge(label: &str, tone: &str) -> Result<impl View> { Ok(view! { <span>(label)(tone)</span> }) }
+# async fn badge(cx: &Cx, label: &str, tone: &str) -> Result<impl View> { Ok(view! { <span>(label)(tone)</span> }) }
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     panel(
         // Named title parameter:
@@ -320,13 +320,13 @@ Ok(view! {
 You can also pass the child view explicitly:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn panel(title: &str, #[default] child: Child<'_>) -> Result<impl View> { Ok(view! { <section>(title)(child)</section> }) }
+# async fn panel(cx: &Cx, title: &str, #[default] child: Child<'_>) -> Result<impl View> { Ok(view! { <section>(title)(child)</section> }) }
 # #[component]
-# async fn badge(label: &str, tone: &str) -> Result<impl View> { Ok(view! { <span>(label)(tone)</span> }) }
+# async fn badge(cx: &Cx, label: &str, tone: &str) -> Result<impl View> { Ok(view! { <span>(label)(tone)</span> }) }
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     panel(
         title: "Profile",
@@ -350,12 +350,12 @@ See how to define components in the [`component`] macro guide.
 Each component call has a stable identity that associates its state with the same call across renders. In a `for` loop, use `#[key(expr)]` to distinguish iterations and the components they render:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # struct Post { id: u64, title: &'static str }
 # #[component]
-# async fn post_card(title: &str) -> Result<impl View> { Ok(view! { <article>(title)</article> }) }
+# async fn post_card(cx: &Cx, title: &str) -> Result<impl View> { Ok(view! { <article>(title)</article> }) }
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 # let posts = vec![Post { id: 1, title: "A" }];
 Ok(view! {
     #[key(post.id)]
@@ -397,9 +397,9 @@ A [`view!`] expression creates a value implementing [`View`]. Expressions inside
 A view captures variables by moving them, like an `async move` block:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 let title = String::from("Hello");
 let header = view! { <h1>(title)</h1> };
 
@@ -428,9 +428,9 @@ Treat component bodies and template expressions as computations without side eff
 [Boolean HTML attributes](https://developer.mozilla.org/en-US/docs/Glossary/Boolean/HTML) such as `disabled` are true when present and false when absent. Use an empty string to include one unconditionally:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     <input type="email" required="" disabled="">
 })
@@ -440,9 +440,9 @@ Ok(view! {
 Use a [`bool`] expression for a conditional boolean attribute. [`true`] renders an empty attribute and [`false`] omits it. For attributes with values, use [`Some`] to include the value or [`None`] to omit the attribute:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 let is_disabled = false;
 let is_current = true;
 let maybe_title: Option<&str> = None;
@@ -464,9 +464,9 @@ The rendered opening tag includes `aria-current="page"`, but leaves out `disable
 This omission logic applies to expression attributes. Literal attributes are always present:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     <button disabled="false">"Still disabled in HTML"</button>
 })
@@ -476,9 +476,9 @@ Ok(view! {
 Attributes that take the literal strings `"true"` and `"false"` as values, such as `aria-expanded` or `contenteditable`, are enumerated attributes, not boolean attributes. For them, `"false"` means something different than omitting the attribute, so pass strings instead of booleans:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 # let expanded = false;
 Ok(view! {
     <button aria-expanded=(if expanded { "true" } else { "false" })>"Menu"</button>
@@ -493,10 +493,10 @@ Use [`attributes!`] to build an attribute collection separately from its element
 Use [`class!`] when a class list combines base classes with conditional, optional, or supplied classes. The macro joins the entries with spaces and skips absent entries:
 
 ```rust
-use topcoat::{Result, view::{View, class, component, view}};
+use topcoat::{Result, context::Cx, view::{View, class, component, view}};
 
 #[component]
-async fn save_button(is_pending: bool, #[default] extra_class: Option<&str>) -> Result<impl View> {
+async fn save_button(cx: &Cx, is_pending: bool, #[default] extra_class: Option<&str>) -> Result<impl View> {
     Ok(view! {
         <button
             disabled=(is_pending)
@@ -515,10 +515,10 @@ Keep a fixed class list as `class="btn btn-primary"`. For composed lists, prefer
 A view can declare the status code and headers of the HTTP response it renders into. A [`StatusCode`] in node position sets the response status, and a [`HeaderMap`] or a single `(HeaderName, HeaderValue)` pair adds response headers. None of them render any content.
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # use topcoat::router::{StatusCode, HeaderValue, header};
 # #[component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     (StatusCode::NOT_FOUND)
     ((header::CACHE_CONTROL, HeaderValue::from_static("no-store")))
@@ -531,10 +531,10 @@ The first status code in markup order wins. For each header name, the first decl
 
 ```rust
 // src/app/docs.rs
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # use topcoat::router::{HeaderValue, Slot, header, layout};
 #[layout]
-async fn docs_layout(slot: Slot<'_>) -> Result<impl View> {
+async fn docs_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <main>(slot)</main>
         ((header::CACHE_CONTROL, HeaderValue::from_static("max-age=60")))
@@ -555,9 +555,9 @@ Inside a [`component`], the request context is available implicitly. In a plain 
 ```rust
 # use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn greeting(name: &str) -> Result<impl View> { Ok(view! { <h1>(name)</h1> }) }
+# async fn greeting(cx: &Cx, name: &str) -> Result<impl View> { Ok(view! { <h1>(name)</h1> }) }
 async fn render(cx: &Cx) -> Result<impl View> {
-    Ok(view! { cx => greeting(name: "World") })
+    Ok(view! { greeting(name: "World") })
 }
 ```
 
@@ -578,10 +578,10 @@ Each trait method receives a [`PartsWriter`] for the position being filled. Ever
 For example, a type can opt into child-node rendering by implementing [`NodeViewParts`]:
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
-use topcoat::{context::Cx, view::{NodeViewParts, PartsWriter}};
+# async fn example(cx: &Cx) -> Result<impl View> {
+use topcoat::view::{NodeViewParts, PartsWriter};
 
 struct Badge(String);
 
@@ -600,10 +600,10 @@ Ok(view! {
 For attribute values, implement [`AttributeValueViewParts`]. Its [`attribute_present`][AttributeValueViewParts::attribute_present] method controls whether the containing attribute is rendered at all.
 
 ```rust
-# use topcoat::{Result, view::*};
+# use topcoat::{Result, context::Cx, view::*};
 # #[component]
-# async fn example() -> Result<impl View> {
-use topcoat::{context::Cx, view::{AttributeValueViewParts, PartsWriter}};
+# async fn example(cx: &Cx) -> Result<impl View> {
+use topcoat::view::{AttributeValueViewParts, PartsWriter};
 
 struct DataId(Option<String>);
 

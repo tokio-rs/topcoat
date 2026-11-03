@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use topcoat_core_grammar::common::paths::topcoat_view;
+use topcoat_core_grammar::common::paths::{topcoat_context, topcoat_view};
 
 use super::Node;
 
@@ -27,6 +27,7 @@ impl Scope {
         let capacity = self.capacity();
         let statements = Self::emit_nodes(&self.nodes);
         quote! {{
+            let cx: &#topcoat_context::Cx = &cx;
             let mut __attrs = #topcoat_view::Attributes::with_capacity(#capacity);
             #statements
             __attrs
@@ -115,8 +116,8 @@ mod tests {
         builder.insert(quote! { "id" }, quote! { "x" });
         let out = rendered(builder);
         assert!(out.contains("with_capacity (2usize)"));
-        assert!(out.contains("__attrs . insert (__cx , \"class\" , \"btn\")"));
-        assert!(out.contains("__attrs . insert (__cx , \"id\" , \"x\")"));
+        assert!(out.contains("__attrs . insert (cx , \"class\" , \"btn\")"));
+        assert!(out.contains("__attrs . insert (cx , \"id\" , \"x\")"));
     }
 
     #[test]

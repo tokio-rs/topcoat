@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     icon::{icon, iconify::iconify_icon},
     view::{Attributes, Length, View, attributes, class, component, view},
 };
@@ -21,6 +22,7 @@ use topcoat::{
 /// ```
 #[component]
 pub async fn spinner(
+    cx: &Cx,
     /// The rendered width and height.
     #[into]
     #[default(Length::em(1.0))]

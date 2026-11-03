@@ -48,6 +48,7 @@ Load the generated stylesheet in your root layout. If the theme names a web font
 ```rust,ignore
 use topcoat::{
     Result,
+    context::Cx,
     font::fontsource::fontsource_font,
     router::{Slot, layout},
     tailwind,
@@ -55,7 +56,7 @@ use topcoat::{
 };
 
 #[layout]
-async fn layout(slot: Slot<'_>) -> Result<impl View> {
+async fn layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>

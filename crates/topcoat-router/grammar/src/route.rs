@@ -118,15 +118,9 @@ impl ToTokens for Route {
         // The user's function, re-emitted under its original name inside the
         // bridge below to keep the module namespace clean. Its own name shadows
         // the marker within its body, so bindings named after the route keep
-        // working. The injected `__cx` parameter carries the ambient context
-        // that `view!` bodies read.
+        // working.
         let mut inner = item.clone();
         inner.vis = Visibility::Inherited;
-        inner.sig.generics.params.insert(0, parse_quote! { '__cx });
-        inner
-            .sig
-            .inputs
-            .insert(0, parse_quote! { __cx: &'__cx #topcoat_context::Cx });
         inner
             .attrs
             .push(parse_quote! { #[allow(clippy::unused_async)] });
@@ -142,10 +136,11 @@ impl ToTokens for Route {
         });
         let handler = quote! {
             impl #ident {
+                #[allow(unused_variables)]
                 async fn handler(cx: &#topcoat_context::Cx #body_param) #output {
                     #inner
 
-                    #ident(cx #(, #forward_args)*).await
+                    #ident(#(#forward_args),*).await
                 }
             }
         };

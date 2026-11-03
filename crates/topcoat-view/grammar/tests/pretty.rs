@@ -122,11 +122,6 @@ fixture_test!(component_empty);
 fixture_test!(component_with_child);
 fixture_test!(component_with_children);
 
-// -- Explicit context --------------------------------------------------------
-
-fixture_test!(explicit_cx);
-fixture_test!(explicit_cx_multiline);
-
 // -- Class lists --------------------------------------------------------------
 
 fixture_test!(class_macro_short);
@@ -143,7 +138,6 @@ fixture_test!(local_binding_typed);
 
 fixture_test!(live_single_emit);
 fixture_test!(live_statements);
-fixture_test!(live_explicit_cx);
 
 // -- DOCTYPE -----------------------------------------------------------------
 

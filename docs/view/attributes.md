@@ -3,8 +3,9 @@ The [`attributes!`] macro builds a [`topcoat::view::Attributes`] value from Topc
 Use it to build attributes separately from the element that renders them.
 
 ```rust
+# use topcoat::context::Cx;
 # #[topcoat::view::component]
-# async fn example() -> topcoat::Result<impl topcoat::view::View> {
+# async fn example(cx: &Cx) -> topcoat::Result<impl topcoat::view::View> {
 use topcoat::view::{View, attributes, view};
 
 let attrs = attributes! {
@@ -24,8 +25,9 @@ Ok(view! {
 The body uses the same attribute syntax as an element in [`view!`], including expressions and control flow:
 
 ```rust
+# use topcoat::context::Cx;
 # #[topcoat::view::component]
-# async fn example() -> topcoat::Result<impl topcoat::view::View> {
+# async fn example(cx: &Cx) -> topcoat::Result<impl topcoat::view::View> {
 use topcoat::view::{View, attributes, view};
 
 let id = "submit";
@@ -91,8 +93,9 @@ Each key appears at most once. Inserting the same key again replaces its value. 
 Insert an [`Attributes`] value into an element by using it as a parenthesized attribute fragment:
 
 ```rust
+# use topcoat::context::Cx;
 # #[topcoat::view::component]
-# async fn example() -> topcoat::Result<impl topcoat::view::View> {
+# async fn example(cx: &Cx) -> topcoat::Result<impl topcoat::view::View> {
 use topcoat::view::{View, attributes, view};
 
 let attrs = attributes! {
@@ -119,11 +122,12 @@ Components can accept [`Attributes`] as a normal argument. This is useful for fo
 ```rust
 use topcoat::{
     Result,
+    context::Cx,
     view::{Attributes, Child, View, attributes, component, view},
 };
 
 #[component]
-async fn panel(attrs: Attributes, #[default] child: Child<'_>) -> Result<impl View> {
+async fn panel(cx: &Cx, attrs: Attributes, #[default] child: Child<'_>) -> Result<impl View> {
     Ok(view! {
         <section (attrs)>
             (child)
@@ -132,7 +136,7 @@ async fn panel(attrs: Attributes, #[default] child: Child<'_>) -> Result<impl Vi
 }
 
 # #[topcoat::view::component]
-# async fn example() -> Result<impl View> {
+# async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     panel(
         attrs: attributes! {

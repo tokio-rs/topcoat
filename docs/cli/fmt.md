@@ -61,10 +61,10 @@ Without `--rustfmt`, the formatter changes only supported macro bodies. For exam
 
 ```rust
 // src/app.rs
-use topcoat::{router::page, view::{View, view}};
+use topcoat::{context::Cx, router::page, view::{View, view}};
 
 #[page]
-async fn page() -> topcoat::Result<impl View> {
+async fn page(cx: &Cx) -> topcoat::Result<impl View> {
     Ok(view! {
         <main>
             <h1>"Hello"</h1>

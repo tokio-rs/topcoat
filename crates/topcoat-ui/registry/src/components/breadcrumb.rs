@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     icon::{icon, iconify::iconify_icon},
     view::{Attributes, Child, View, attributes, class, component, view},
 };
@@ -24,6 +25,7 @@ use topcoat::{
 /// ```
 #[component]
 pub async fn breadcrumb(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -38,6 +40,7 @@ pub async fn breadcrumb(
 /// outgrows its container.
 #[component]
 pub async fn breadcrumb_list(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -58,6 +61,7 @@ pub async fn breadcrumb_list(
 /// [`breadcrumb_page`].
 #[component]
 pub async fn breadcrumb_item(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -74,6 +78,7 @@ pub async fn breadcrumb_item(
 /// A link to an ancestor page. Pass its destination as `href` in `attrs`.
 #[component]
 pub async fn breadcrumb_link(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -95,6 +100,7 @@ pub async fn breadcrumb_link(
 /// Renders with `aria-current="page"` and does not navigate.
 #[component]
 pub async fn breadcrumb_page(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -111,7 +117,7 @@ pub async fn breadcrumb_page(
 
 /// A decorative chevron between breadcrumb items, hidden from assistive technology.
 #[component]
-pub async fn breadcrumb_separator(#[default] mut attrs: Attributes) -> Result<impl View> {
+pub async fn breadcrumb_separator(cx: &Cx, #[default] mut attrs: Attributes) -> Result<impl View> {
     Ok(view! {
         <li aria-hidden="true" class=(attrs.remove("class")) (attrs)>
             icon(
@@ -124,7 +130,7 @@ pub async fn breadcrumb_separator(#[default] mut attrs: Attributes) -> Result<im
 
 /// An ellipsis representing omitted breadcrumb items, with an accessible text label.
 #[component]
-pub async fn breadcrumb_ellipsis(#[default] mut attrs: Attributes) -> Result<impl View> {
+pub async fn breadcrumb_ellipsis(cx: &Cx, #[default] mut attrs: Attributes) -> Result<impl View> {
     Ok(view! {
         <span class=(class!("flex items-center", attrs.remove("class"))) (attrs)>
             icon(

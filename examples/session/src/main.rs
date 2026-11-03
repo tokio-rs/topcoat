@@ -34,7 +34,7 @@ async fn main() {
 }
 
 #[layout]
-async fn root(slot: Slot<'_>) -> Result<impl View> {
+async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>

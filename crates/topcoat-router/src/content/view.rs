@@ -478,13 +478,12 @@ mod tests {
 
     /// A region that settles after a single emission.
     fn render_settled_region_page(cx: &Cx, _body: Body) -> BoxView<'_> {
-        view! { cx => <main>(live! { emit! { <p>"only"</p> } })</main> }.boxed()
+        view! { <main>(live! { emit! { <p>"only"</p> } })</main> }.boxed()
     }
 
     /// A region that emits twice, so the response streams one swap.
     fn render_live_page(cx: &Cx, _body: Body) -> BoxView<'_> {
         view! {
-            cx =>
             <main>
                 (live! {
                     emit! { <p>"first"</p> }?;
@@ -498,7 +497,6 @@ mod tests {
     /// A region that emits three times, so the response streams two swaps.
     fn render_thrice_emitting_page(cx: &Cx, _body: Body) -> BoxView<'_> {
         view! {
-            cx =>
             <main>
                 (live! {
                     emit! { <p>"one"</p> }?;
@@ -513,7 +511,6 @@ mod tests {
     /// Two sibling regions that each emit twice.
     fn render_two_region_page(cx: &Cx, _body: Body) -> BoxView<'_> {
         view! {
-            cx =>
             <main>
                 <section>
                     (live! {
@@ -536,7 +533,6 @@ mod tests {
     /// content.
     fn render_live_metadata_page(cx: &Cx, _body: Body) -> BoxView<'_> {
         view! {
-            cx =>
             (StatusCode::ACCEPTED)
             ((
                 http::HeaderName::from_static("x-test"),
@@ -555,7 +551,6 @@ mod tests {
     /// A settled page that declares a status code and a header.
     fn render_settled_metadata_page(cx: &Cx, _body: Body) -> BoxView<'_> {
         view! {
-            cx =>
             (StatusCode::CREATED)
             ((
                 http::HeaderName::from_static("x-test"),
@@ -568,7 +563,7 @@ mod tests {
 
     /// A region that fails before it produces any content.
     fn render_failing_page(cx: &Cx, _body: Body) -> BoxView<'_> {
-        view! { cx => <main>(live! { Err(io::Error::other("boom").into()) })</main> }.boxed()
+        view! { <main>(live! { Err(io::Error::other("boom").into()) })</main> }.boxed()
     }
 
     /// A region that fails after its first emission, mid-stream.
@@ -578,7 +573,6 @@ mod tests {
     /// fails the view before any content is sent.
     fn render_late_failing_page(cx: &Cx, _body: Body) -> BoxView<'_> {
         view! {
-            cx =>
             <main>
                 (live! {
                     emit! { <p>"first"</p> }?;
@@ -593,7 +587,6 @@ mod tests {
     /// A region that panics after its first emission, mid-stream.
     fn render_late_panicking_page(cx: &Cx, _body: Body) -> BoxView<'_> {
         view! {
-            cx =>
             <main>
                 (live! {
                     emit! { <p>"first"</p> }?;
@@ -606,9 +599,8 @@ mod tests {
     }
 
     /// Wraps the child content in `R[ ... ]` so layout nesting is observable.
-    fn wrap_layout<'a>(cx: &Cx, slot: Slot<'a>) -> BoxView<'a> {
+    fn wrap_layout<'a>(cx: &'a Cx, slot: Slot<'a>) -> BoxView<'a> {
         view! {
-            cx =>
             "R["
             (slot)
             "]"
@@ -775,7 +767,6 @@ mod tests {
     async fn a_view_handle_response_carries_its_status_and_headers() {
         let cx = &Cx::new();
         let handle = view! {
-            cx =>
             (StatusCode::CREATED)
             ((
                 http::HeaderName::from_static("x-test"),
@@ -812,7 +803,6 @@ mod tests {
     /// A region that fails in the same poll as its first emission.
     fn render_immediately_failing_page(cx: &Cx, _body: Body) -> BoxView<'_> {
         view! {
-            cx =>
             <main>
                 (live! {
                     emit! { <p>"first"</p> }?;
@@ -878,13 +868,12 @@ mod tests {
 
     /// A region that redirects before it produces any content.
     fn render_redirecting_page(cx: &Cx, _body: Body) -> BoxView<'_> {
-        view! { cx => <main>(live! { Err(redirect("/target").into()) })</main> }.boxed()
+        view! { <main>(live! { Err(redirect("/target").into()) })</main> }.boxed()
     }
 
     /// A region that redirects after its first emission, mid-stream.
     fn render_late_redirecting_page(cx: &Cx, _body: Body) -> BoxView<'_> {
         view! {
-            cx =>
             <main>
                 (live! {
                     emit! { <p>"first"</p> }?;
@@ -898,13 +887,12 @@ mod tests {
 
     /// A page that answers with a "see other" before it produces any content.
     fn render_see_other_page(cx: &Cx, _body: Body) -> BoxView<'_> {
-        view! { cx => <main>(live! { Err(see_other("/target").into()) })</main> }.boxed()
+        view! { <main>(live! { Err(see_other("/target").into()) })</main> }.boxed()
     }
 
     /// A page that answers with a "see other" after its first emission.
     fn render_late_see_other_page(cx: &Cx, _body: Body) -> BoxView<'_> {
         view! {
-            cx =>
             <main>
                 (live! {
                     emit! { <p>"first"</p> }?;
@@ -1160,7 +1148,6 @@ mod tests {
     async fn a_framed_view_handle_response_is_a_snapshot_frame_with_its_status() {
         let cx = &Cx::new().with(ViewResponseDelivery::Frames);
         let handle = view! {
-            cx =>
             (StatusCode::CREATED)
             <p>"made"</p>
         }

@@ -29,7 +29,7 @@ async fn collects_every_field() -> Result<()> {
         bcc: [Mailbox::new("dan@example.com")?],
         reply_to: Mailbox::new("replies@example.com")?,
         subject: "Analytical engines",
-        html: { cx => <p>"The engine weaves algebraic patterns."</p> },
+        html: { <p>"The engine weaves algebraic patterns."</p> },
         text: "The engine weaves algebraic patterns.",
         attachments: [Attachment::new("invoice.pdf", "application/pdf", b"%PDF-")],
         headers: [("List-Unsubscribe", "<mailto:stop@example.com>")],
@@ -96,7 +96,6 @@ async fn html_renders_dynamic_parts_against_the_named_context() -> Result<()> {
 
     let mail = mail! {
         html: {
-            cx =>
             <p>
                 "Hello, "
                 (name)

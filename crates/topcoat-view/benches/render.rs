@@ -71,7 +71,6 @@ fn measure(
 /// output buffer, which is the fast path the renderer takes most often.
 fn static_page(cx: &Cx) -> impl View {
     view! {
-        cx =>
         <!DOCTYPE html>
         <html lang="en">
             <head>
@@ -189,7 +188,6 @@ fn static_page(cx: &Cx) -> impl View {
 /// safe runs.
 fn comment_feed(cx: &Cx, comments: &[String]) -> impl View {
     view! {
-        cx =>
         <ul class="space-y-4">
             for comment in comments {
                 <li
@@ -223,7 +221,6 @@ fn make_comments(count: usize) -> Vec<String> {
 /// `Display`-based render path, isolating numeric formatting from markup.
 fn numeric_table(cx: &Cx, rows: &[Vec<i64>]) -> impl View {
     view! {
-        cx =>
         <table class="w-full text-right font-mono text-sm">
             <tbody>
                 for row in rows {
@@ -262,7 +259,6 @@ fn make_number_rows(rows: usize, cols: usize) -> Vec<Vec<i64>> {
 /// quoting.
 fn tag_cloud(cx: &Cx, tags: &[Tag]) -> impl View {
     view! {
-        cx =>
         <div class="flex flex-wrap gap-2">
             for tag in tags {
                 <a
@@ -357,7 +353,7 @@ fn make_products(count: usize) -> Vec<Product> {
 /// A row of five stars, filled up to the product's rating. Nested inside every
 /// card, so it multiplies the per-card render work.
 #[component]
-async fn rating_stars(tenths: u32) -> Result<impl View> {
+async fn rating_stars(cx: &Cx, tenths: u32) -> Result<impl View> {
     let filled = (tenths + 5) / 10;
 
     Ok(view! {
@@ -383,7 +379,7 @@ async fn rating_stars(tenths: u32) -> Result<impl View> {
 /// A single product card: static markup mixed with escaped text, a nested
 /// component, numeric interpolation, and computed attributes.
 #[component]
-async fn product_card(product: &Product) -> Result<impl View> {
+async fn product_card(cx: &Cx, product: &Product) -> Result<impl View> {
     Ok(view! {
         <a
             href=(format!("/products/{}", product.id))
@@ -422,7 +418,6 @@ async fn product_card(product: &Product) -> Result<impl View> {
 /// with the `cx,` form; on top of that it invokes a component (`product_card`).
 fn product_grid(cx: &Cx, products: &[Product]) -> impl View {
     view! {
-        cx =>
         <main class="mx-auto w-full max-w-6xl px-4 py-10">
             <h1 class="text-2xl font-bold tracking-tight">"All products"</h1>
             <div class="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">

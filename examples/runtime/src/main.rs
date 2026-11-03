@@ -33,7 +33,7 @@ async fn page(cx: &Cx) -> Result<()> {
 }
 
 #[layout]
-async fn layout(slot: Slot<'_>) -> Result<impl View> {
+async fn layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>

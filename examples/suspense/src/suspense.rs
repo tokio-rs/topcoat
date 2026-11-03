@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use topcoat::{
     Result,
+    context::Cx,
     router::page,
     view::{View, component, suspense, view},
 };
@@ -9,7 +10,7 @@ use topcoat::{
 // The shell and the fallback reach the browser right away; the content
 // replaces the fallback in place once it has rendered.
 #[page]
-pub async fn page() -> Result<impl View> {
+pub async fn page(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>"Suspense"</h1>
         suspense(fallback: view! { <p>"Loading..."</p> }, content())
@@ -17,7 +18,7 @@ pub async fn page() -> Result<impl View> {
 }
 
 #[component]
-async fn content() -> Result<impl View> {
+async fn content(cx: &Cx) -> Result<impl View> {
     Ok(view! { <p>(load_content().await)</p> })
 }
 

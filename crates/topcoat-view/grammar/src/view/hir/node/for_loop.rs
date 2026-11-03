@@ -36,11 +36,11 @@ impl ForLoop {
         };
         if let Some(key) = &self.key {
             quote! {
-                #topcoat_context::identity_raw(__cx).keyed_child(#site, &(#key))
+                #topcoat_context::identity_raw(cx).keyed_child(#site, &(#key))
             }
         } else {
             quote! {
-                #topcoat_context::identity_raw(__cx).ambiguous_child(
+                #topcoat_context::identity_raw(cx).ambiguous_child(
                     #site,
                     ::core::concat!(
                         "`for` loop at ",
@@ -60,7 +60,7 @@ impl Emit for ForLoop {
         } = self;
         let identity = self.identity();
         let context = quote! {
-            #topcoat_context::with_identity(__cx.clone(), #identity)
+            #topcoat_context::with_identity(cx.clone(), #identity)
         };
 
         if body.is_async() {
@@ -68,7 +68,7 @@ impl Emit for ForLoop {
             // finishes. LoopView drives them concurrently in source order.
             let inner = body.emit_driven();
             let body = Bindings::of_pattern(pat).emit_capture(&quote! {
-                let __cx = &#context;
+                let cx = &#context;
                 #inner
             });
             emitter.hoist(quote! {
@@ -104,7 +104,7 @@ impl Emit for ForLoop {
                     let mut __views = ::std::vec::Vec::new();
                     for #pat in #expr {
                         __views.push({
-                            let __cx = #iteration_context;
+                            let cx = #iteration_context;
                             #body
                         });
                     }

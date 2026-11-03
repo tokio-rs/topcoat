@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use topcoat::{
     Result,
+    context::Cx,
     router::page,
     view::{View, emit, live, view},
 };
@@ -9,7 +10,7 @@ use topcoat::{
 // Every emit replaces the previous one, so the page can narrate a long-running
 // task as it happens.
 #[page]
-pub async fn page() -> Result<impl View> {
+pub async fn page(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>"Progress"</h1>
         (live! {

@@ -15,7 +15,7 @@ use topcoat::{
 
 /// Renders the label the channel delivers, or fails with its error.
 #[component]
-async fn slow(rx: oneshot::Receiver<Result<&'static str>>) -> Result<impl View> {
+async fn slow(cx: &Cx, rx: oneshot::Receiver<Result<&'static str>>) -> Result<impl View> {
     let label = rx.await.unwrap()?;
     Ok(view! { <i>(label)</i> })
 }
@@ -35,7 +35,6 @@ async fn poll_first_once<V: View>(view: &mut Pin<&mut V>) -> Poll<Result<ViewFir
 async fn streams_fallback(cx: &Cx, mode: Option<SuspenseMode>) -> bool {
     let (_tx, rx) = oneshot::channel();
     let mut view = pin!(view! {
-        cx =>
         suspense(
             fallback: view! { <p>"loading"</p> },
             mode: mode,
@@ -62,7 +61,6 @@ async fn suspense_shows_the_fallback_until_the_child_is_ready() {
     let cx = &Cx::new();
     let (tx, rx) = oneshot::channel();
     let mut view = pin!(view! {
-        cx =>
         suspense(
             fallback: view! { <p>"loading"</p> },
             (view! { <b>"prefix"</b> })
@@ -86,7 +84,6 @@ async fn suspense_shows_the_fallback_until_the_child_is_ready() {
 async fn suspense_renders_a_ready_child_in_place() {
     let cx = &Cx::new();
     let mut view = pin!(view! {
-        cx =>
         suspense(
             fallback: view! { <p>"loading"</p> },
             <p>"content"</p>
@@ -105,7 +102,6 @@ async fn suspense_renders_a_ready_child_in_place() {
 async fn suspense_forwards_a_ready_childs_swaps() {
     let cx = &Cx::new();
     let mut view = pin!(view! {
-        cx =>
         suspense(
             fallback: view! { <p>"loading"</p> },
             (live! {
@@ -135,7 +131,6 @@ async fn suspense_forwards_child_swaps_after_replacing_the_fallback() {
     let cx = &Cx::new();
     let (tx, rx) = oneshot::channel::<()>();
     let mut view = pin!(view! {
-        cx =>
         suspense(
             fallback: view! { <p>"loading"</p> },
             (live! {
@@ -178,7 +173,6 @@ async fn suspense_propagates_a_child_error() {
     let cx = &Cx::new();
     let (tx, rx) = oneshot::channel();
     let mut view = pin!(view! {
-        cx =>
         suspense(
             fallback: view! { <p>"loading"</p> },
             slow(rx: rx)
@@ -202,7 +196,6 @@ async fn waiting_suspense_holds_its_first_content_until_the_child_is_ready() {
     let cx = &Cx::new();
     let (tx, rx) = oneshot::channel();
     let mut view = pin!(view! {
-        cx =>
         suspense(
             fallback: view! { <p>"loading"</p> },
             mode: SuspenseMode::Wait,
@@ -225,7 +218,6 @@ async fn waiting_suspense_forwards_a_live_childs_swaps() {
     let cx = &Cx::new();
     let (tx, rx) = oneshot::channel::<()>();
     let mut view = pin!(view! {
-        cx =>
         suspense(
             fallback: view! { <p>"loading"</p> },
             mode: SuspenseMode::Wait,
@@ -260,7 +252,6 @@ async fn waiting_suspense_propagates_a_child_error() {
     let cx = &Cx::new();
     let (tx, rx) = oneshot::channel();
     let mut view = pin!(view! {
-        cx =>
         suspense(
             fallback: view! { <p>"loading"</p> },
             mode: SuspenseMode::Wait,

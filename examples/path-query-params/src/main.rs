@@ -3,6 +3,7 @@ mod posts;
 
 use topcoat::{
     Result,
+    context::Cx,
     router::{Slot, href, layout, module_router, page, query_params},
     view::{View, view},
 };
@@ -15,7 +16,7 @@ async fn main() {
 // --- Layout -----------------------------------------------------------------
 
 #[layout]
-async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <!DOCTYPE html>
         <html>
@@ -28,7 +29,7 @@ async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
 // --- Home -------------------------------------------------------------------
 
 #[page]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>"Path and query params"</h1>
         <ul>

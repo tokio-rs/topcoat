@@ -75,7 +75,7 @@ impl Emitter {
     }
 
     /// Returns a block that runs the hoist phase, builds the template's
-    /// `JoinView` against the ambient `__cx` context, and ends with `tail`
+    /// `JoinView` against the `cx` context in scope, and ends with `tail`
     /// applied to the join expression.
     ///
     /// Units form a balanced tree of `JoinPair`s, so the join's type nests
@@ -102,7 +102,7 @@ impl Emitter {
         let burst = &self.burst;
         let tail = tail(quote! {
             #topcoat_view::internal::JoinView::new(
-                __cx,
+                cx,
                 #units,
                 move |__b, #contents| {
                     #burst
@@ -116,8 +116,8 @@ impl Emitter {
     }
 
     /// Returns a block that runs the hoist phase and then builds the
-    /// scope's instruction block in one burst against the ambient `__cx`
-    /// context, yielding the handle to the block.
+    /// scope's instruction block in one burst against the `cx` context in
+    /// scope, yielding the handle to the block.
     ///
     /// The block lands in the buffer of the build right where the scope is
     /// evaluated, so the burst may read what the iteration or branch around
@@ -128,7 +128,7 @@ impl Emitter {
         let burst = &self.burst;
         quote! {{
             #hoist
-            #topcoat_view::internal::Builder::block(__cx, |__b| {
+            #topcoat_view::internal::Builder::block(cx, |__b| {
                 #burst
             })
         }}

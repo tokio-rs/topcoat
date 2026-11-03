@@ -9,7 +9,7 @@ mod common;
 use common::send;
 
 #[layout("/")]
-async fn shell(slot: Slot<'_>) -> Result<impl View> {
+async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! { <main>(slot)</main> })
 }
 
@@ -19,13 +19,13 @@ async fn section_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
 }
 
 #[page("/nested/inner")]
-async fn inner() -> Result<impl View> {
+async fn inner(cx: &Cx) -> Result<impl View> {
     Ok(view! { "inner" })
 }
 
 // A layout used as a component: the child view is passed as the `slot` prop.
 #[page("/composed")]
-async fn composed() -> Result<impl View> {
+async fn composed(cx: &Cx) -> Result<impl View> {
     let content = view! { <p>"content"</p> };
     Ok(view! { shell(slot: Slot::new(content)) })
 }
@@ -35,13 +35,13 @@ struct Title(&'static str);
 
 // A layout with route context: each `with(...)` adds one value.
 #[layout("/admin", with(Title("admin")))]
-async fn admin(slot: Slot<'_>) -> Result<impl View> {
+async fn admin(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! { <main>(slot)</main> })
 }
 
 // A layout with route context but no path, derived by the module router.
 #[layout(with(Title("module")))]
-async fn module_admin(slot: Slot<'_>) -> Result<impl View> {
+async fn module_admin(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! { <main>(slot)</main> })
 }
 

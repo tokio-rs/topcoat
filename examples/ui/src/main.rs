@@ -300,7 +300,7 @@ const SECTIONS: [(&str, &str, &str); 4] = [
 
 /// The header's site navigation: panels of links that open on hover, focus, or tap.
 #[component]
-async fn site_navigation() -> Result<impl View> {
+async fn site_navigation(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         navigation_menu(
             attrs: attributes! { class="max-md:hidden" aria-label="Site" },
@@ -376,13 +376,13 @@ async fn site_navigation() -> Result<impl View> {
 
 /// A masonry cell that keeps a demo from splitting across columns.
 #[component]
-async fn demo(#[default] id: Option<&str>, child: Child<'_>) -> Result<impl View> {
+async fn demo(cx: &Cx, #[default] id: Option<&str>, child: Child<'_>) -> Result<impl View> {
     Ok(view! { <div id=(id) class="mb-4 scroll-mt-20 break-inside-avoid">(child)</div> })
 }
 
 /// The button family: variants, sizes, and states at a glance.
 #[component]
-async fn buttons_card() -> Result<impl View> {
+async fn buttons_card(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         card(
             card_header(
@@ -432,7 +432,7 @@ async fn buttons_card() -> Result<impl View> {
 
 /// Alerts displayed without a surrounding card.
 #[component]
-async fn notices() -> Result<impl View> {
+async fn notices(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <div class="flex flex-col gap-3">
             // The leading icon is an ordinary child: the alert lays out a
@@ -473,7 +473,7 @@ const MEMBERS: [(&str, &str, &str, &str); 3] = [
 
 /// A roster showing each person and their role.
 #[component]
-async fn team_card() -> Result<impl View> {
+async fn team_card(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         card(
             card_header(
@@ -525,7 +525,7 @@ async fn team_card() -> Result<impl View> {
 
 /// The badge variants with example deployment counts.
 #[component]
-async fn status_card() -> Result<impl View> {
+async fn status_card(cx: &Cx) -> Result<impl View> {
     const CRATE: &str = "https://crates.io/crates/topcoat";
 
     Ok(view! {
@@ -975,7 +975,7 @@ async fn overview_card(cx: &Cx) -> Result<impl View> {
 
 /// A FAQ whose answers fold away, one open at a time.
 #[component]
-async fn faq_card() -> Result<impl View> {
+async fn faq_card(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         card(
             card_header(
@@ -1242,7 +1242,7 @@ async fn toolbar_card(cx: &Cx) -> Result<impl View> {
 
 /// A short hint shown on hover or focus.
 #[component]
-async fn tooltip_card() -> Result<impl View> {
+async fn tooltip_card(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         card(
             card_header(
@@ -1275,7 +1275,7 @@ async fn tooltip_card() -> Result<impl View> {
 
 /// A preview with richer content, shown on hover or focus.
 #[component]
-async fn hover_card_demo() -> Result<impl View> {
+async fn hover_card_demo(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         card(
             card_header(
@@ -1572,7 +1572,7 @@ fn listed(number: usize, page: usize, pages: usize) -> bool {
 
 /// A breadcrumb trail with a collapsed middle section.
 #[component]
-async fn breadcrumbs_card() -> Result<impl View> {
+async fn breadcrumbs_card(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         card(
             card_header(
@@ -1606,7 +1606,7 @@ async fn breadcrumbs_card() -> Result<impl View> {
 
 /// Individual keys and key combinations.
 #[component]
-async fn keyboard_card() -> Result<impl View> {
+async fn keyboard_card(cx: &Cx) -> Result<impl View> {
     // The browser's own keys for moving through a form.
     const KEYS: [(&str, &[&str]); 3] = [
         ("Move to the next control", &["Tab"]),

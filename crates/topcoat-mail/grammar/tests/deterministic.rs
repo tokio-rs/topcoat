@@ -13,7 +13,7 @@ fn mail() {
             bcc: [Mailbox::new("dan@example.com")?],
             reply_to: Mailbox::new("replies@example.com")?,
             subject: "Analytical engines",
-            html: { cx => <p>"The engine weaves algebraic patterns."</p> },
+            html: { <p>"The engine weaves algebraic patterns."</p> },
             text: "The engine weaves algebraic patterns.",
             attachments: [Attachment::new("invoice.pdf", "application/pdf", b"%PDF-")],
             headers: [("List-Unsubscribe", "<mailto:stop@example.com>")],

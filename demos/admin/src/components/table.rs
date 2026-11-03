@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     view::{Attributes, Child, View, class, component, view},
 };
 
@@ -32,6 +33,7 @@ use topcoat::{
 /// ```
 #[component]
 pub async fn table(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -55,6 +57,7 @@ pub async fn table(
 /// The heading section of a [`table`], holding the row of column headers.
 #[component]
 pub async fn table_header(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -71,6 +74,7 @@ pub async fn table_header(
 /// The body of a table, containing data rows.
 #[component]
 pub async fn table_body(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -87,6 +91,7 @@ pub async fn table_body(
 /// The closing section of a [`table`], for totals and other summaries.
 #[component]
 pub async fn table_footer(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -106,6 +111,7 @@ pub async fn table_footer(
 /// A table row with a separator and hover styling.
 #[component]
 pub async fn table_row(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -125,6 +131,7 @@ pub async fn table_row(
 /// A column header in a [`table_header`]'s row.
 #[component]
 pub async fn table_head(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -145,6 +152,7 @@ pub async fn table_head(
 /// One cell of a [`table_row`].
 #[component]
 pub async fn table_cell(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -164,6 +172,7 @@ pub async fn table_cell(
 /// A caption describing the table.
 #[component]
 pub async fn table_caption(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {

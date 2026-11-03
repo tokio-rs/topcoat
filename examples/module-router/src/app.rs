@@ -1,4 +1,4 @@
-use topcoat::router::module_router;
+use topcoat::{context::Cx, router::module_router};
 
 mod _marketing;
 mod api;
@@ -18,7 +18,7 @@ pub fn router() -> topcoat::router::Router {
 
 // A layout in the root app module wraps every page.
 #[layout]
-async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <html>
             <head>topcoat::dev::script()</head>
@@ -45,7 +45,7 @@ async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
 
 // A page in app.rs renders at /.
 #[page]
-pub async fn page() -> Result<impl View> {
+pub async fn page(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>"home"</h1>
         <p>"src/app.rs -> /"</p>
@@ -56,12 +56,13 @@ pub async fn page() -> Result<impl View> {
 mod about {
     use topcoat::{
         Result,
+        context::Cx,
         router::page,
         view::{View, view},
     };
 
     #[page]
-    pub async fn page() -> Result<impl View> {
+    pub async fn page(cx: &Cx) -> Result<impl View> {
         Ok(view! {
             <h1>"about"</h1>
             <p>"src/app.rs (mod about) -> /about"</p>

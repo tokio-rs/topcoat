@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     view::{Attributes, Child, StaticClass, View, class, component, view},
 };
 
@@ -26,6 +27,7 @@ use super::floating::{
 /// ```
 #[component]
 pub async fn hover_card(
+    cx: &Cx,
     #[default] mut attrs: Attributes,
     #[default] child: Child<'_>,
 ) -> Result<impl View> {
@@ -58,6 +60,7 @@ const PANEL: StaticClass = class!(
 /// other positions if there is not enough room in the window.
 #[component]
 pub async fn hover_card_content(
+    cx: &Cx,
     /// Where the card opens relative to the trigger.
     #[default]
     side: FloatingSide,

@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     router::{Router, Slot, href, layout, page, route},
     view::{View, view},
 };
@@ -30,7 +31,7 @@ fn router() -> Router {
 
 // Wraps every page, because every page path starts with `/`.
 #[layout("/")]
-async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
+async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <html>
             <head>topcoat::dev::script()</head>
@@ -58,7 +59,7 @@ async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
 
 // Wraps `/docs` and every page below it.
 #[layout("/docs")]
-async fn docs_layout(slot: Slot<'_>) -> Result<impl View> {
+async fn docs_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
         <section>
             <p>"docs layout"</p>
@@ -71,7 +72,7 @@ async fn docs_layout(slot: Slot<'_>) -> Result<impl View> {
 
 // A page declares its own path, but still has to be registered in `router`.
 #[page("/")]
-async fn home() -> Result<impl View> {
+async fn home(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>"home"</h1>
         <p>"registered with .page(home)"</p>
@@ -79,7 +80,7 @@ async fn home() -> Result<impl View> {
 }
 
 #[page("/about")]
-async fn about() -> Result<impl View> {
+async fn about(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>"about"</h1>
         <p>"#[page(\"/about\")]"</p>
@@ -87,7 +88,7 @@ async fn about() -> Result<impl View> {
 }
 
 #[page("/docs")]
-async fn docs() -> Result<impl View> {
+async fn docs(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>"docs"</h1>
         <p>"wrapped by #[layout(\"/docs\")]"</p>
@@ -95,7 +96,7 @@ async fn docs() -> Result<impl View> {
 }
 
 #[page("/docs/install")]
-async fn install() -> Result<impl View> {
+async fn install(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>"install"</h1>
         <p>"also wrapped by #[layout(\"/docs\")]"</p>

@@ -18,18 +18,19 @@ use crate::{
 /// ```rust
 /// use topcoat::{
 ///     Result,
+///     context::Cx,
 ///     view::{View, component, error_boundary, view},
 /// };
 ///
 /// #[component]
-/// async fn stats() -> Result<impl View> {
+/// async fn stats(cx: &Cx) -> Result<impl View> {
 ///     let visits = fetch_visits().await?;
 ///     Ok(view! { <p>(visits) " visits"</p> })
 /// }
 /// # async fn fetch_visits() -> Result<u32> { Ok(3) }
 ///
 /// #[component]
-/// async fn dashboard() -> Result<impl View> {
+/// async fn dashboard(cx: &Cx) -> Result<impl View> {
 ///     Ok(view! {
 ///         error_boundary(
 ///             fallback: |error| Ok(view! {

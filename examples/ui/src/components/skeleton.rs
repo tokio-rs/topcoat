@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     view::{Attributes, StaticClass, View, class, component, view},
 };
 
@@ -21,6 +22,6 @@ const SKELETON: StaticClass = class!("animate-pulse rounded-md bg-foreground/10"
 /// }
 /// ```
 #[component]
-pub async fn skeleton(#[default] mut attrs: Attributes) -> Result<impl View> {
+pub async fn skeleton(cx: &Cx, #[default] mut attrs: Attributes) -> Result<impl View> {
     Ok(view! { <div class=(class!(SKELETON, attrs.remove("class"))) (attrs)></div> })
 }

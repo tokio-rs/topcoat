@@ -291,7 +291,7 @@ greeting = Hallo, { $name }!
             Box::new([("name", Argument::from("<b>"))]),
         );
         let cx = &Cx::new().with(locale!("en"));
-        let html = render(view! { cx => <p>(greeting)</p> }, cx).await;
+        let html = render(view! { <p>(greeting)</p> }, cx).await;
         assert_eq!(html, "<p>Hello, \u{2068}&lt;b&gt;\u{2069}!</p>");
     }
 
@@ -302,7 +302,7 @@ greeting = Hallo, { $name }!
             Box::new([]),
         );
         let cx = &Cx::new().with(locale!("en"));
-        let html = render(view! { cx => <input placeholder=(placeholder)> }, cx).await;
+        let html = render(view! { <input placeholder=(placeholder)> }, cx).await;
         assert_eq!(html, r#"<input placeholder="Your name">"#);
     }
 }

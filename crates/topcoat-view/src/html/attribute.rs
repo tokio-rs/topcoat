@@ -35,9 +35,10 @@ impl<K, V> Attribute<K, V> {
 /// [`view!`](https://docs.rs/topcoat/latest/topcoat/view/macro.view.html):
 ///
 /// ```rust
+/// # use topcoat::context::Cx;
 /// # use topcoat::view::{Attributes, View, component, view};
 /// # #[component]
-/// # async fn example() -> topcoat::Result<impl View> {
+/// # async fn example(cx: &Cx) -> topcoat::Result<impl View> {
 /// # let my_value = Attributes::new();
 /// Ok(view! {
 ///     <input (my_value)>
