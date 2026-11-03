@@ -84,7 +84,6 @@ impl Emit for Component {
                         let (cx, __props) = __captured.take();
                         let cx = &cx;
                         let __props = __props #child.build();
-                        #[allow(clippy::default_constructed_unit_structs)]
                         let __view = Component::render(#path::default(), cx, __props).await?;
                         #topcoat_view::internal::MoveView::drive(__view).await
                     }),
