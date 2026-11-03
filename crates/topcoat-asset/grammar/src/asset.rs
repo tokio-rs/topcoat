@@ -1,6 +1,3 @@
-mod option;
-
-pub use option::*;
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
 use syn::{
@@ -22,7 +19,7 @@ use topcoat_core_grammar::common::{CallSite, lenient, paths::topcoat_asset};
 pub struct Asset {
     pub path: lenient::Expr,
     pub comma_token: Option<Token![,]>,
-    pub options: Punctuated<AssetOption, Token![,]>,
+    pub options: Punctuated<lenient::FieldValue, Token![,]>,
 }
 
 impl Asset {
@@ -37,7 +34,7 @@ impl Asset {
             Ok((path, location)) => (path, location, None),
             Err(error) => (String::new(), String::new(), Some(error.to_compile_error())),
         };
-        let fields = self.options.iter().map(AssetOption::field);
+        let fields = self.options.iter().map(Self::option_field);
         quote! {{
             #error
             #[allow(clippy::needless_update)]
@@ -54,6 +51,43 @@ impl Asset {
             static ENCODED: [u8; LEN] = #topcoat_asset::RawAsset::encode(ID, #path, &OPTIONS);
             #topcoat_asset::Asset::new(&ENCODED)
         }}
+    }
+
+    /// The option as a field of an `AssetOptions` struct literal.
+    ///
+    /// The field name keeps its span, so the compiler reports unknown and repeated
+    /// names, and editors complete and document them.
+    fn option_field(option: &lenient::FieldValue) -> TokenStream {
+        let field = option.ident();
+        let value = &option.expr;
+        let error = Self::checksum_error(option).map(|error| error.to_compile_error());
+        quote! {
+            #field: {
+                #error
+                ::core::option::Option::Some(::std::borrow::Cow::Borrowed(#value))
+            }
+        }
+    }
+
+    /// Checks that a literal checksum is written as `sha256:` followed by 64
+    /// lowercase hex digits. Other values are checked when bundling.
+    fn checksum_error(option: &lenient::FieldValue) -> Option<syn::Error> {
+        if option.name() != "checksum" {
+            return None;
+        }
+        let lit = syn::parse2::<LitStr>(option.expr.tokens.clone()).ok()?;
+        let valid = lit.value().strip_prefix("sha256:").is_some_and(|hex| {
+            hex.len() == 64
+                && hex
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        });
+        (!valid).then(|| {
+            syn::Error::new(
+                lit.span(),
+                "expected a checksum written as `\"sha256:<64 lowercase hex digits>\"`",
+            )
+        })
     }
 
     /// Returns the path or URL to embed and the location that identifies the asset.
@@ -233,20 +267,13 @@ mod tests {
     }
 
     #[test]
-    fn a_missing_value_after_a_colon_is_an_error() {
+    fn a_missing_value_is_an_error() {
         let dir = crate_with(&["a.png"]);
-        let expanded = expand(&dir, r#""a.png", rename:"#);
-        assert!(expanded.contains("rename :"), "{expanded}");
-        assert!(expanded.contains("compile_error"), "{expanded}");
-    }
-
-    #[test]
-    fn a_name_without_a_colon_is_a_shorthand_field() {
-        // Only the name keeps its span, so editors complete it as a field name.
-        let dir = crate_with(&["a.png"]);
-        let expanded = expand(&dir, r#""a.png", ren"#);
-        assert!(expanded.contains("ren ,"), "{expanded}");
-        assert!(!expanded.contains("compile_error"), "{expanded}");
+        for input in [r#""a.png", rename"#, r#""a.png", rename:"#] {
+            let expanded = expand(&dir, input);
+            assert!(expanded.contains("rename :"), "{expanded}");
+            assert!(expanded.contains("compile_error"), "{expanded}");
+        }
     }
 
     #[test]

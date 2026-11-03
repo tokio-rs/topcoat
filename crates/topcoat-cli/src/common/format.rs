@@ -116,6 +116,8 @@ pub fn registry() -> Registry {
 
 #[cfg(test)]
 mod tests {
+    use topcoat_core_grammar::common::pretty::pretty_print_str;
+
     use super::*;
 
     #[test]
@@ -125,5 +127,20 @@ mod tests {
             assert!(register(&mut registry, name), "{name}");
         }
         assert!(!register(&mut registry, "println"));
+    }
+
+    #[test]
+    fn formats_a_macro_nested_in_another_macro() {
+        let input = r#"mail! { html: view! {<div><p>"The engine weaves algebraic patterns."</p><p>"Yours, Ada"</p></div>} }"#;
+        let expected = r#"mail! {
+    html: view! {
+        <div>
+            <p>"The engine weaves algebraic patterns."</p>
+            <p>"Yours, Ada"</p>
+        </div>
+    },
+}"#;
+        let formatted = pretty_print_str(&registry(), input).unwrap();
+        assert_eq!(formatted, expected);
     }
 }

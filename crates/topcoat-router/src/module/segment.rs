@@ -47,24 +47,16 @@ pub enum SegmentKind {
 pub struct Segment {
     /// Module path (set automatically by the `segment!` macro via `module_path!()`).
     module_path: &'static str,
-    /// Overridden segment kind, or `None` to use the default (static / group).
-    kind: Option<SegmentKind>,
-    /// Overridden URL name, or `None` to derive from the module name.
-    rename: Option<Cow<'static, str>>,
+    options: SegmentOptions,
 }
 
 impl Segment {
     /// Creates a new segment. Called by the expanded `segment!` macro.
     #[must_use]
-    pub const fn new(
-        module_path: &'static str,
-        kind: Option<SegmentKind>,
-        rename: Option<Cow<'static, str>>,
-    ) -> Self {
+    pub const fn new(module_path: &'static str, options: SegmentOptions) -> Self {
         Self {
             module_path,
-            kind,
-            rename,
+            options,
         }
     }
 
@@ -77,18 +69,36 @@ impl Segment {
     /// Returns the overridden [`SegmentKind`], if any.
     #[must_use]
     pub fn kind(&self) -> Option<&SegmentKind> {
-        self.kind.as_ref()
+        self.options.kind.as_ref()
     }
 
     /// Returns the overridden URL name, if any.
     #[must_use]
     pub fn rename(&self) -> Option<&str> {
-        self.rename.as_deref()
+        self.options.rename.as_deref()
     }
 }
 
 #[cfg(feature = "discover")]
 inventory::collect!(Segment);
+
+/// The options of a `segment!` declaration.
+#[doc(hidden)]
+#[derive(Debug, Clone)]
+pub struct SegmentOptions {
+    /// Overrides the segment kind: `Static`, `Group`, `Param` or `CatchAll`.
+    pub kind: Option<SegmentKind>,
+    /// Overrides the URL name, used as written. Defaults to the module name.
+    pub rename: Option<Cow<'static, str>>,
+}
+
+impl SegmentOptions {
+    /// All options unset.
+    pub const NONE: Self = Self {
+        kind: None,
+        rename: None,
+    };
+}
 
 /// Registry of [`Segment`] declarations, keyed by module path.
 ///
@@ -129,7 +139,13 @@ mod tests {
     use super::*;
 
     fn test_segment() -> Segment {
-        Segment::new("my_crate::test", Some(SegmentKind::Static), None)
+        Segment::new(
+            "my_crate::test",
+            SegmentOptions {
+                kind: Some(SegmentKind::Static),
+                ..SegmentOptions::NONE
+            },
+        )
     }
 
     #[test]

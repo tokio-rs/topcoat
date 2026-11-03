@@ -97,24 +97,8 @@ fn keeps_a_short_list_on_one_line() {
 }
 
 #[test]
-fn formats_the_html_view_body() {
-    assert_format_idempotent(
-        r#"mail! { subject: "Hello", html: {<div><p>"The engine weaves algebraic patterns."</p><p>"Yours, Ada"</p></div>} }"#,
-        r#"mail! {
-    subject: "Hello",
-    html: {
-        <div>
-            <p>"The engine weaves algebraic patterns."</p>
-            <p>"Yours, Ada"</p>
-        </div>
-    },
-}"#,
-    );
-}
-
-#[test]
 fn keeps_a_short_html_body_inline() {
-    let expected = r#"mail! { html: { <p>"Hi"</p> } }"#;
+    let expected = r#"mail! { html: view! { <p>"Hi"</p> } }"#;
     assert_format_idempotent(expected, expected);
 }
 
