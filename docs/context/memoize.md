@@ -4,7 +4,7 @@ The cache belongs to one request. Every new request starts with an empty cache.
 
 # Setup
 
-Add the attribute to a function with a `cx: &Cx` parameter:
+Add the attribute to a function whose first parameter is `cx: &Cx`, even when unused:
 
 ```rust
 # fn main() {}
@@ -20,7 +20,7 @@ async fn get_user(cx: &Cx, id: i64) -> User {
 }
 ```
 
-The first call to `get_user(cx, 42).await` loads the user. Later calls with the same ID can borrow that result if the context values it depends on still match. The macro turns the return type `T` into `&T`. The reference lives as long as the borrowed `cx`. For an `Option` or `Result`, [`as_ref`](#borrowing-option-and-result-contents) lets callers borrow the value inside it instead.
+Pass `cx` explicitly when calling the function. The first call to `get_user(cx, 42).await` loads the user. Later calls with the same ID can borrow that result if the context values it depends on still match. The macro turns the return type `T` into `&T`. The reference lives as long as the borrowed `cx`. For an `Option` or `Result`, [`as_ref`](#borrowing-option-and-result-contents) lets callers borrow the value inside it instead.
 
 # Sync and async
 
@@ -225,7 +225,7 @@ let record = lookup(cx, "alice").await?; // cache hit, no allocation
 
 These requirements are checked at compile time:
 
-- Include a parameter named `cx` with type `&Cx`.
+- Take `cx: &Cx` as the first parameter, even when unused.
 - Use a function without a `self` parameter.
 - Make every argument other than `cx` hashable with `Hash`.
 - Return a value that is `Send + Sync + 'static`.
