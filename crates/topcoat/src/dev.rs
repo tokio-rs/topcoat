@@ -1,14 +1,14 @@
+#[cfg(feature = "serve")]
 use std::net::SocketAddr;
 
 #[cfg(feature = "serve")]
 use futures_util::SinkExt;
 #[cfg(feature = "serve")]
 use tokio_tungstenite::tungstenite::Message;
-#[cfg(feature = "serve")]
-use topcoat::context::Cx;
 
 use crate::{
     Result,
+    context::Cx,
     view::{View, component, view},
 };
 
