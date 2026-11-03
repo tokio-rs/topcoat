@@ -15,8 +15,8 @@ use syn::{
     Visibility,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::{
-    common::CallSite,
+use topcoat_core_grammar::common::{
+    CallSite,
     paths::{topcoat_inventory, topcoat_l10n, topcoat_l10n_fluent_macro},
 };
 
@@ -227,8 +227,8 @@ impl Parse for Messages {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for Messages {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for Messages {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.vis.pretty_print(printer);
         self.path.lit.pretty_print(printer);
     }
@@ -238,7 +238,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for Messages {
 mod tests {
     use std::path::Path;
 
-    use topcoat_core_grammar::testing::assert_deterministic;
+    use topcoat_core_grammar::common::testing::assert_deterministic;
 
     use super::*;
 

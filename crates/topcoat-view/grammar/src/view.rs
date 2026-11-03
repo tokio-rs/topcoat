@@ -21,7 +21,7 @@ pub use nodes::*;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
-use topcoat_core_grammar::{ParseOption, paths::topcoat_context};
+use topcoat_core_grammar::common::{ParseOption, paths::topcoat_context};
 
 use crate::{
     leading_cx::LeadingCx,
@@ -70,8 +70,8 @@ impl ToTokens for View {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for View {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for View {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         if let Some(cx) = &self.cx {
             cx.pretty_print(printer);
         }
@@ -157,5 +157,45 @@ mod tests {
         let tokens = parse("<div></div>").to_token_stream().to_string();
         assert!(tokens.contains("ScopeView :: new ("), "{tokens}");
         assert!(tokens.contains("MoveView :: drive ("), "{tokens}");
+    }
+
+    #[test]
+    fn incomplete_expressions_expand_in_view_and_emit() {
+        for source in [
+            "<p>(value.)</p>",
+            "<input value=(value.)>",
+            "<input (value.)=\"text\">",
+            "<input (value.)>",
+            "<input :value=(value.)>",
+            "<(value.)></(value.)>",
+        ] {
+            let view = parse(source);
+            let emit = syn::parse_str::<crate::live::Emit>(source).unwrap();
+            for expanded in [view.to_token_stream(), emit.to_token_stream()] {
+                assert!(expanded.to_string().contains("value ."), "{expanded}");
+            }
+        }
+    }
+
+    #[cfg(feature = "pretty")]
+    #[test]
+    fn formats_parenthesized_expressions() {
+        use topcoat_core_grammar::common::pretty::{Registry, pretty_print_str};
+
+        let mut registry = Registry::new();
+        registry.register_function_like::<View>("view");
+        registry.register_function_like::<crate::live::Emit>("emit");
+        for name in ["view", "emit"] {
+            for (input, expected) in [
+                ("value . len ()", "value.len()"),
+                ("value.", "value."),
+                ("value /* keep */ .", "value /* keep */ ."),
+            ] {
+                let source = format!("{name}! {{ <p>({input})</p> }}");
+                let formatted = pretty_print_str(&registry, &source).unwrap();
+                assert!(formatted.contains(&format!("({expected})")), "{formatted}");
+                assert_eq!(pretty_print_str(&registry, &formatted).unwrap(), formatted);
+            }
+        }
     }
 }

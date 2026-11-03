@@ -12,7 +12,7 @@ use syn::{
     Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::{
+use topcoat_core_grammar::common::{
     ParseOption,
     paths::{
         topcoat_font, topcoat_font_fontsource, topcoat_font_fontsource_macro, topcoat_font_macro,
@@ -209,8 +209,8 @@ impl Parse for FontsourceFont {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontsourceFont {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontsourceFont {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
 
         // The axes live in fixed fields, so recover their written order from
@@ -218,7 +218,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontsourceFont {
         // optional.
         let mut descriptors: Vec<(
             proc_macro2::LineColumn,
-            &dyn topcoat_core_grammar::pretty::PrettyPrint,
+            &dyn topcoat_core_grammar::common::pretty::PrettyPrint,
         )> = Vec::new();
         if let Some(weight) = &self.weight {
             descriptors.push((weight.key.weight_kw.span().start(), weight));

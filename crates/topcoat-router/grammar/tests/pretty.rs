@@ -1,4 +1,4 @@
-use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
+use topcoat_core_grammar::common::pretty::{Registry, pretty_print_str};
 use topcoat_router_grammar::{
     layer::LayerAttr, layout::LayoutAttr, module_param::ModuleParam, not_found::NotFound,
     page::PageAttr, path_param::PathParam, query_params::QueryParamsAttr, route::RouteAttr,

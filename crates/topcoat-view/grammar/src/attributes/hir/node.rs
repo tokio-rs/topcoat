@@ -1,5 +1,6 @@
 use proc_macro2::TokenStream;
-use syn::{Expr, Pat};
+use syn::Pat;
+use topcoat_core_grammar::common::lenient;
 
 use super::Scope;
 
@@ -18,19 +19,19 @@ pub(crate) enum Node {
     Statement { tokens: TokenStream },
     /// A `for` loop whose body is lowered into a nested scope.
     For {
-        pat: Pat,
-        expr: Box<Expr>,
+        pat: Box<Pat>,
+        expr: lenient::Expr,
         body: Scope,
     },
     /// An `if`/`else` whose branches are lowered into nested scopes.
     If {
-        cond: Expr,
+        cond: lenient::Expr,
         then_branch: Scope,
         else_branch: Scope,
     },
     /// A `match` whose arm bodies are lowered into nested scopes.
     Match {
-        expr: Box<Expr>,
+        expr: lenient::Expr,
         arms: Vec<MatchArm>,
     },
 }
@@ -58,6 +59,6 @@ impl Node {
 /// A single `pat (if guard)? => body` arm of a [`Node::Match`].
 pub(crate) struct MatchArm {
     pub pat: Pat,
-    pub guard: Option<Expr>,
+    pub guard: Option<lenient::Expr>,
     pub body: Scope,
 }

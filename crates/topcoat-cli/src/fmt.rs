@@ -14,7 +14,7 @@ use clap::Args;
 use console::style;
 use ignore::WalkBuilder;
 use tokio::{io::AsyncWriteExt, process::Command};
-use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
+use topcoat_core_grammar::common::pretty::{Registry, pretty_print_str};
 
 use crate::{common::format, fmt::error::Error};
 

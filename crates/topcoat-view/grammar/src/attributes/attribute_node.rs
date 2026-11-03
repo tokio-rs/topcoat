@@ -1,5 +1,5 @@
 use syn::parse::{Parse, ParseStream};
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::common::ParseOption;
 
 use crate::{
     attributes::{
@@ -127,8 +127,8 @@ impl ParseOption for AttributeNode {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for AttributeNode {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for AttributeNode {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match self {
             Self::Attribute(inner) => inner.pretty_print(printer),
             Self::Spread(inner) => inner.pretty_print(printer),

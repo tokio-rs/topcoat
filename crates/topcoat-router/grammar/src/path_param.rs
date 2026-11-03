@@ -6,7 +6,7 @@ use syn::{
     ext::IdentExt,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::{
+use topcoat_core_grammar::common::{
     ParseOption,
     paths::{topcoat_context, topcoat_context_macro, topcoat_router},
 };
@@ -311,8 +311,8 @@ impl Parse for PathParam {
 
 /// Prints the declaration on one line. A trailing comma is dropped.
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for PathParam {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for PathParam {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.visibility.pretty_print(printer);
         self.star_token.pretty_print(printer);
         self.name.pretty_print(printer);
@@ -361,8 +361,8 @@ impl ParseOption for PathParamType {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for PathParamType {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for PathParamType {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.colon_token.pretty_print(printer);
         " ".pretty_print(printer);
         self.ty.pretty_print(printer);
@@ -392,8 +392,8 @@ impl ParseOption for PathParamError {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for PathParamError {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for PathParamError {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.else_token.pretty_print(printer);
         " ".pretty_print(printer);
         self.response.pretty_print(printer);

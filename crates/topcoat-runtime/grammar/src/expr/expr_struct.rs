@@ -3,7 +3,7 @@ use std::fmt::Write;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
 use syn::{ExprStruct, Member, ext::IdentExt, spanned::Spanned};
-use topcoat_core_grammar::paths::topcoat_runtime;
+use topcoat_core_grammar::common::paths::topcoat_runtime;
 
 use super::js::Js;
 use crate::expr::{Expr, name_resolver::NameResolver};

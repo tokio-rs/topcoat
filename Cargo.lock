@@ -5597,7 +5597,6 @@ dependencies = [
  "quote",
  "syn 3.0.6",
  "topcoat-core-grammar",
- "topcoat-mail",
  "topcoat-view-grammar",
 ]
 

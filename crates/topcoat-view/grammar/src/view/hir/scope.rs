@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use topcoat_core_grammar::paths::{topcoat_context, topcoat_view};
+use topcoat_core_grammar::common::paths::{topcoat_context, topcoat_view};
 
 use super::{
     Bindings, Node, StaticSegment,

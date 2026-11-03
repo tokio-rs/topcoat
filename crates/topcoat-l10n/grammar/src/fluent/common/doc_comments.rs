@@ -28,8 +28,8 @@ impl Parse for DocComments {
 
 /// Keeps each doc comment on its own line before the item it documents.
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for DocComments {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for DocComments {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.attrs.pretty_print(printer);
     }
 }

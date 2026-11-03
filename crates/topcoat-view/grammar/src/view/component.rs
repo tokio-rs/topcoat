@@ -3,11 +3,11 @@ use std::collections::HashSet;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::{
-    Expr, Ident, Path, Token, parenthesized,
+    Ident, Path, Token, parenthesized,
     parse::{Parse, ParseStream},
     token::Paren,
 };
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::common::{ParseOption, lenient};
 
 use crate::{
     template::RuntimeExpr,
@@ -37,11 +37,11 @@ pub struct NamedArg {
     pub value: NamedArgValue,
 }
 
-/// The value of a [`NamedArg`]. Either a plain Rust expression or a `$(...)`
-/// runtime expression.
+/// The value of a [`NamedArg`]. Either a plain Rust expression, which ends at
+/// the next `,`, or a `$(...)` runtime expression.
 #[derive(Clone)]
 pub enum NamedArgValue {
-    Expr(Expr),
+    Expr(lenient::Expr),
     Runtime(RuntimeExpr),
 }
 
@@ -65,8 +65,8 @@ impl ToTokens for NamedArgValue {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for NamedArgValue {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for NamedArgValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match self {
             Self::Expr(inner) => inner.pretty_print(printer),
             Self::Runtime(inner) => inner.pretty_print(printer),
@@ -115,11 +115,10 @@ impl Parse for Component {
                         colon,
                         value,
                     });
-                    if content.peek(Token![,]) {
-                        let _: Token![,] = content.parse()?;
-                    } else {
+                    if content.is_empty() {
                         break;
                     }
+                    let _: Token![,] = content.parse()?;
                 }
 
                 named_args
@@ -137,9 +136,9 @@ impl ParseOption for Component {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for Component {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
-        printer.scan_begin(topcoat_core_grammar::pretty::BreakMode::Consistent);
+impl topcoat_core_grammar::common::pretty::PrettyPrint for Component {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
+        printer.scan_begin(topcoat_core_grammar::common::pretty::BreakMode::Consistent);
         self.path.pretty_print(printer);
         "(".pretty_print(printer);
         let total = self.named_args.len() + self.children.len();
@@ -253,6 +252,26 @@ mod tests {
     #[test]
     fn parses_path_qualified_child_component() {
         let component = parse(r"button(prop1: 5, foo::checkbox())");
+        assert_eq!(component.named_args.len(), 1);
+        assert_eq!(component.children.len(), 1);
+    }
+
+    #[test]
+    fn parses_an_incomplete_named_arg_value() {
+        let component = parse(r#"card(title: user., <p>"child"</p>)"#);
+        assert_eq!(component.named_args.len(), 1);
+        assert_eq!(component.children.len(), 1);
+    }
+
+    #[test]
+    fn children_need_a_comma_after_the_last_named_arg() {
+        assert!(syn::parse_str::<Component>(r#"card(title: name "child")"#).is_err());
+        assert!(syn::parse_str::<Component>(r#"card(title: $(name) "child")"#).is_err());
+    }
+
+    #[test]
+    fn parses_a_missing_named_arg_value() {
+        let component = parse(r#"card(title:, "child")"#);
         assert_eq!(component.named_args.len(), 1);
         assert_eq!(component.children.len(), 1);
     }

@@ -8,7 +8,7 @@ use syn::{
     parse::{Parse, ParseStream},
     spanned::Spanned,
 };
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::common::ParseOption;
 
 /// An HTML identifier: a sequence of identifier segments joined by `-`, `:`,
 /// or `.` with no intervening whitespace. Covers names like `data-foo`,
@@ -180,8 +180,8 @@ impl ToTokens for HtmlIdentPart {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for HtmlIdentPart {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for HtmlIdentPart {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match self {
             Self::Ident(ident) => ident.pretty_print(printer),
             Self::Int(int) => int.pretty_print(printer),
@@ -227,8 +227,8 @@ impl ToTokens for HtmlIdent {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for HtmlIdent {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for HtmlIdent {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.first.pretty_print(printer);
         for segment in &self.rest {
             match &segment.separator {

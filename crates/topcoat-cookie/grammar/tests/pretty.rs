@@ -1,5 +1,5 @@
 use topcoat_cookie_grammar::cookie::Cookie;
-use topcoat_core_grammar::pretty::{
+use topcoat_core_grammar::common::pretty::{
     Lexer, MARGIN, Macro, PrettyPrint, Printer, Registry, pretty_print_str,
 };
 
@@ -78,10 +78,13 @@ fn copies_attributes_being_typed() {
 fn formats_calls_in_a_file() {
     let mut registry = Registry::new();
     registry.register_function_like::<Cookie>("cookie");
-    let formatted = pretty_print_str(&registry, r#"let cookie = cookie!(theme="dark";Secure);"#)
-        .unwrap_or_else(|errors| panic!("failed to format: {}", errors[0]));
+    let formatted = pretty_print_str(
+        &registry,
+        r#"fn f() { let cookie = cookie!(theme="dark";Secure); }"#,
+    )
+    .unwrap_or_else(|errors| panic!("failed to format: {}", errors[0]));
     assert_eq!(
         formatted,
-        r#"let cookie = cookie!(theme = "dark"; Secure);"#
+        r#"fn f() { let cookie = cookie!(theme = "dark"; Secure); }"#
     );
 }

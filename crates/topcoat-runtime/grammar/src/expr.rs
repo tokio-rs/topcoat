@@ -29,7 +29,7 @@ mod stmt;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
-use topcoat_core_grammar::paths::topcoat_runtime;
+use topcoat_core_grammar::common::paths::topcoat_runtime;
 
 use crate::expr::{js::Js, name_resolver::NameResolver};
 
@@ -49,9 +49,9 @@ impl Parse for ExprInput {
 /// Formats the body as a Rust expression. A trailing comma is kept only when
 /// the call is split over several lines.
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for ExprInput {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
-        use topcoat_core_grammar::pretty::TextMode;
+impl topcoat_core_grammar::common::pretty::PrettyPrint for ExprInput {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
+        use topcoat_core_grammar::common::pretty::TextMode;
 
         let Ok(expr) = syn::parse2::<Expr>(self.tokens.clone()) else {
             syn::Expr::Verbatim(self.tokens.clone()).pretty_print(printer);

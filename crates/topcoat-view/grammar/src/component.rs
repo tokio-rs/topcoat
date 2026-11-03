@@ -13,7 +13,7 @@ use syn::{
     spanned::Spanned,
     visit_mut::{self, VisitMut},
 };
-use topcoat_core_grammar::paths::{topcoat_context, topcoat_view, topcoat_view_macro};
+use topcoat_core_grammar::common::paths::{topcoat_context, topcoat_view, topcoat_view_macro};
 
 /// A parsed `#[component] async fn ...`. Expands into:
 ///

@@ -4,7 +4,7 @@ use syn::{
     Token, parenthesized,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::{ParseOption, paths::topcoat_runtime_macro};
+use topcoat_core_grammar::common::{ParseOption, paths::topcoat_runtime_macro};
 
 use crate::view::hir::{ExprKind, LowerView, ViewBuilder};
 
@@ -58,8 +58,8 @@ impl ToTokens for RuntimeExpr {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for RuntimeExpr {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for RuntimeExpr {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         "$".pretty_print(printer);
         "(".pretty_print(printer);
         syn::parse2::<syn::Expr>(self.expr.clone())
@@ -106,7 +106,7 @@ mod tests {
     #[cfg(feature = "pretty")]
     #[test]
     fn formats_runtime_tokens() {
-        use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
+        use topcoat_core_grammar::common::pretty::{Registry, pretty_print_str};
 
         let mut registry = Registry::new();
         registry.register_function_like::<crate::view::View>("view");

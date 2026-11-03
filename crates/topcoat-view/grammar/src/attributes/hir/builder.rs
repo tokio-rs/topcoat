@@ -1,6 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{Expr, Pat};
+use syn::Pat;
+use topcoat_core_grammar::common::lenient;
 
 use super::{MatchArm, Node, Scope};
 
@@ -48,19 +49,24 @@ impl AttributeBuilder {
         self.nodes.push(Node::Statement { tokens });
     }
 
-    pub fn for_loop(&mut self, pat: &Pat, expr: &Expr, f: impl FnOnce(&mut AttributeBuilder)) {
+    pub fn for_loop(
+        &mut self,
+        pat: &Pat,
+        expr: &lenient::Expr,
+        f: impl FnOnce(&mut AttributeBuilder),
+    ) {
         let mut body = AttributeBuilder::new();
         f(&mut body);
         self.nodes.push(Node::For {
-            pat: pat.clone(),
-            expr: Box::new(expr.clone()),
+            pat: Box::new(pat.clone()),
+            expr: expr.clone(),
             body: body.finish(),
         });
     }
 
     pub fn if_else(
         &mut self,
-        cond: &Expr,
+        cond: &lenient::Expr,
         f: impl FnOnce(&mut AttributeBuilder, &mut AttributeBuilder),
     ) {
         let mut then_branch = AttributeBuilder::new();
@@ -73,11 +79,11 @@ impl AttributeBuilder {
         });
     }
 
-    pub fn match_expr(&mut self, expr: &Expr, f: impl FnOnce(&mut MatchArmsBuilder)) {
+    pub fn match_expr(&mut self, expr: &lenient::Expr, f: impl FnOnce(&mut MatchArmsBuilder)) {
         let mut builder = MatchArmsBuilder { arms: Vec::new() };
         f(&mut builder);
         self.nodes.push(Node::Match {
-            expr: Box::new(expr.clone()),
+            expr: expr.clone(),
             arms: builder.arms,
         });
     }
@@ -95,7 +101,12 @@ pub(crate) struct MatchArmsBuilder {
 }
 
 impl MatchArmsBuilder {
-    pub fn arm(&mut self, pat: &Pat, guard: Option<&Expr>, f: impl FnOnce(&mut AttributeBuilder)) {
+    pub fn arm(
+        &mut self,
+        pat: &Pat,
+        guard: Option<&lenient::Expr>,
+        f: impl FnOnce(&mut AttributeBuilder),
+    ) {
         let mut body = AttributeBuilder::new();
         f(&mut body);
         self.arms.push(MatchArm {

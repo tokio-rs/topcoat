@@ -10,12 +10,12 @@ use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
 };
-use topcoat_core_grammar::paths::{topcoat_error, topcoat_mail};
+use topcoat_core_grammar::common::paths::{topcoat_error, topcoat_mail};
 
 /// The parsed body of a `mail!` invocation: `name: value` fields in any
 /// order, at most once each. Lowers to an awaited `async` block that
-/// assembles a [`Mail`](topcoat_mail::Mail) through
-/// [`MailBuilder`](topcoat_mail::MailBuilder) and produces a `Result<Mail>`.
+/// assembles a `topcoat_mail::Mail` through a `topcoat_mail::MailBuilder` and
+/// produces a `Result<Mail>`.
 pub struct Mail {
     pub fields: Punctuated<MailField, Token![,]>,
 }
@@ -58,8 +58,8 @@ impl ToTokens for Mail {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for Mail {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for Mail {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.fields.pretty_print(printer);
     }
 }
@@ -211,6 +211,13 @@ mod tests {
         let tokens = expand("subject: , to: a");
         assert!(tokens.contains("__builder . subject ;"), "{tokens}");
         assert!(tokens.contains(". to ("), "{tokens}");
+    }
+
+    #[test]
+    fn incomplete_value_keeps_the_other_fields() {
+        let tokens = expand(r#"to: user., subject: "Hi""#);
+        assert!(tokens.contains("user ."), "{tokens}");
+        assert!(tokens.contains(". subject ("), "{tokens}");
     }
 
     #[test]

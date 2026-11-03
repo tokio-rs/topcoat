@@ -1,4 +1,4 @@
-use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
+use topcoat_core_grammar::common::pretty::{Registry, pretty_print_str};
 use topcoat_runtime_grammar::{
     expr::ExprInput, procedure::ProcedureAttr, record::RecordAttr, shard::ShardAttr,
 };

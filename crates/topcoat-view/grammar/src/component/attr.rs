@@ -14,8 +14,8 @@ impl Parse for ComponentAttr {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for ComponentAttr {
-    fn pretty_print(&self, _printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {}
+impl topcoat_core_grammar::common::pretty::PrettyPrint for ComponentAttr {
+    fn pretty_print(&self, _printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {}
 }
 
 #[cfg(test)]
@@ -42,7 +42,7 @@ mod tests {
     #[cfg(feature = "pretty")]
     #[test]
     fn formats_empty_arguments() {
-        use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
+        use topcoat_core_grammar::common::pretty::{Registry, pretty_print_str};
 
         // `rustfmt` lays out the attribute at file level, so it is formatted
         // inside a macro body that `rustfmt` does not reach.

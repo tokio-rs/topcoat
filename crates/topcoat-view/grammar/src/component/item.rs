@@ -1,27 +1,28 @@
 use syn::{
-    FnArg, ItemFn, Pat, ReturnType,
+    FnArg, Pat, ReturnType,
     parse::{Parse, ParseStream},
     spanned::Spanned,
 };
+use topcoat_core_grammar::common::lenient;
 
 /// The annotated `async fn` that becomes a component. Validates the function
 /// signature: components must be `async`, must declare a return type, must
 /// not take a `self` receiver, and must use identifier patterns for their
 /// arguments.
 pub struct ComponentItem {
-    item: ItemFn,
+    item: lenient::ItemFn,
 }
 
 impl ComponentItem {
     #[must_use]
-    pub fn item(&self) -> &ItemFn {
+    pub fn item(&self) -> &lenient::ItemFn {
         &self.item
     }
 }
 
 impl Parse for ComponentItem {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let item: ItemFn = input.parse()?;
+        let item: lenient::ItemFn = input.parse()?;
         if item.sig.asyncness.is_none() {
             return Err(syn::Error::new(
                 item.sig.fn_token.span(),

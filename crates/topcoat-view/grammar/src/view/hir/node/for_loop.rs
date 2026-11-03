@@ -1,7 +1,10 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use syn::{Expr, Pat};
-use topcoat_core_grammar::paths::{topcoat_context, topcoat_core, topcoat_view};
+use syn::Pat;
+use topcoat_core_grammar::common::{
+    lenient,
+    paths::{topcoat_context, topcoat_core, topcoat_view},
+};
 
 use crate::view::hir::{
     Bindings, Scope,
@@ -11,8 +14,8 @@ use crate::view::hir::{
 /// A `for` loop whose body is lowered into a nested scope.
 pub(crate) struct ForLoop {
     pub pat: Pat,
-    pub expr: Box<Expr>,
-    pub key: Option<Box<Expr>>,
+    pub expr: lenient::Expr,
+    pub key: Option<lenient::Expr>,
     pub ordinal: u32,
     pub body: Scope,
 }

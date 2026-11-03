@@ -17,8 +17,8 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 #[cfg(feature = "asset")]
-use topcoat_core_grammar::paths::{topcoat_asset, topcoat_asset_macro};
-use topcoat_core_grammar::{
+use topcoat_core_grammar::common::paths::{topcoat_asset, topcoat_asset_macro};
+use topcoat_core_grammar::common::{
     ParseOption,
     paths::{topcoat_font, topcoat_font_fontsource},
 };
@@ -222,8 +222,8 @@ impl Parse for FontsourceFontFace {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontsourceFontFace {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontsourceFontFace {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
 
         // The descriptors live in fixed fields, so recover their written order
@@ -231,7 +231,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontsourceFontFace {
         // and `style` are required; the rest are optional.
         let mut descriptors: Vec<(
             proc_macro2::LineColumn,
-            &dyn topcoat_core_grammar::pretty::PrettyPrint,
+            &dyn topcoat_core_grammar::common::pretty::PrettyPrint,
         )> = vec![
             (self.weight.key.weight_kw.span().start(), &self.weight),
             (self.style.key.style_kw.span().start(), &self.style),
@@ -255,14 +255,14 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontsourceFontFace {
 /// otherwise writes one argument per line with a trailing comma.
 #[cfg(feature = "pretty")]
 pub(crate) fn pretty_print_arguments(
-    printer: &mut topcoat_core_grammar::pretty::Printer<'_>,
+    printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>,
     family: &FamilyName,
     descriptors: &[(
         proc_macro2::LineColumn,
-        &dyn topcoat_core_grammar::pretty::PrettyPrint,
+        &dyn topcoat_core_grammar::common::pretty::PrettyPrint,
     )],
 ) {
-    use topcoat_core_grammar::pretty::{PrettyPrint, TextMode};
+    use topcoat_core_grammar::common::pretty::{PrettyPrint, TextMode};
 
     family.pretty_print(printer);
     for (_, descriptor) in descriptors {

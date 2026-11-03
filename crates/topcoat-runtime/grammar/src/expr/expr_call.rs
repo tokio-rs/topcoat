@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{Expr as SynExpr, ExprCall, Token, punctuated::Punctuated};
-use topcoat_core_grammar::paths::topcoat_runtime;
+use topcoat_core_grammar::common::paths::topcoat_runtime;
 
 use super::js::Js;
 use crate::expr::{Expr, name_resolver::NameResolver};

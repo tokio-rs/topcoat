@@ -1,10 +1,10 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::ToTokens;
 use syn::{
-    Expr, Lit, Token,
+    Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::common::{ParseOption, lenient};
 
 mod kw {
     use syn::custom_keyword;
@@ -42,8 +42,8 @@ impl ToTokens for FontFamily {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontFamily {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontFamily {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.key.pretty_print(printer);
         self.colon_token.pretty_print(printer);
         " ".pretty_print(printer);
@@ -74,8 +74,8 @@ impl ParseOption for FontFamilyKey {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontFamilyKey {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontFamilyKey {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
         printer.move_cursor(self.font_kw.span().start());
         "font-family".pretty_print(printer);
@@ -83,7 +83,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontFamilyKey {
     }
 }
 
-pub struct FontFamilyValue(pub Expr);
+pub struct FontFamilyValue(pub lenient::Expr);
 
 impl Parse for FontFamilyValue {
     fn parse(input: ParseStream) -> syn::Result<Self> {
@@ -93,20 +93,13 @@ impl Parse for FontFamilyValue {
 
 impl ToTokens for FontFamilyValue {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let expr = &self.0;
-        if let Expr::Lit(lit) = expr
-            && let Lit::Str(lit_str) = &lit.lit
-        {
-            quote! { #lit_str }.to_tokens(tokens);
-        } else {
-            expr.to_tokens(tokens);
-        }
+        self.0.to_tokens(tokens);
     }
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontFamilyValue {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontFamilyValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.0.pretty_print(printer);
     }
 }

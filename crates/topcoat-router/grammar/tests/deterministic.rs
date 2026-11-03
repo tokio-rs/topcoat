@@ -1,5 +1,5 @@
 use quote::quote;
-use topcoat_core_grammar::testing::assert_deterministic;
+use topcoat_core_grammar::common::testing::assert_deterministic;
 use topcoat_router_grammar::{
     layer::Layer, layout::Layout, module_param::ModuleParam, not_found::NotFound, page::Page,
     path_param::PathParam, query_params::QueryParams, route::Route, segment::Segment,

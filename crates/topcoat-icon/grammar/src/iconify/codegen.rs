@@ -3,7 +3,7 @@ use std::fmt::Write as _;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::Visibility;
-use topcoat_core_grammar::paths::{topcoat_icon, topcoat_view};
+use topcoat_core_grammar::common::paths::{topcoat_icon, topcoat_view};
 use topcoat_icon::iconify::{IconSet, ResolvedIcon};
 
 use crate::iconify::{Selection, suggest::did_you_mean};
@@ -95,7 +95,7 @@ pub(crate) fn set_consts(selection: &Selection, set: &IconSet, vis: &Visibility)
 
 #[cfg(test)]
 mod tests {
-    use topcoat_core_grammar::testing::assert_deterministic;
+    use topcoat_core_grammar::common::testing::assert_deterministic;
 
     use super::*;
 

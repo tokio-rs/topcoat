@@ -60,11 +60,11 @@ impl<T: Parse> Parse for List<T> {
 }
 
 #[cfg(feature = "pretty")]
-impl<T: topcoat_core_grammar::pretty::PrettyPrint> topcoat_core_grammar::pretty::PrettyPrint
-    for List<T>
+impl<T: topcoat_core_grammar::common::pretty::PrettyPrint>
+    topcoat_core_grammar::common::pretty::PrettyPrint for List<T>
 {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
-        use topcoat_core_grammar::pretty::{BreakMode, Delim};
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
+        use topcoat_core_grammar::common::pretty::{BreakMode, Delim};
         match self {
             Self::One(item) => item.pretty_print(printer),
             Self::Many {

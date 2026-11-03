@@ -1,14 +1,14 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
-use topcoat_core_grammar::{ParseOption, paths::topcoat_runtime};
+use topcoat_core_grammar::common::{ParseOption, lenient, paths::topcoat_runtime};
 
-use crate::template::{RuntimeExpr, TemplateExpr};
+use crate::template::RuntimeExpr;
 
 /// An expression that can either be emitted directly or wrapped for runtime use.
 #[derive(Debug, PartialEq)]
 pub enum TemplateOrRuntimeExpr {
-    Template(TemplateExpr),
+    Template(lenient::ExprParen),
     Runtime(RuntimeExpr),
 }
 
@@ -17,7 +17,7 @@ impl Parse for TemplateOrRuntimeExpr {
         let lookahead = input.lookahead1();
         if RuntimeExpr::peek(input) {
             Ok(Self::Runtime(input.parse()?))
-        } else if TemplateExpr::peek(input) {
+        } else if lenient::ExprParen::peek(input) {
             Ok(Self::Template(input.parse()?))
         } else {
             Err(lookahead.error())
@@ -27,7 +27,7 @@ impl Parse for TemplateOrRuntimeExpr {
 
 impl ParseOption for TemplateOrRuntimeExpr {
     fn peek(input: ParseStream) -> bool {
-        RuntimeExpr::peek(input) || TemplateExpr::peek(input)
+        RuntimeExpr::peek(input) || lenient::ExprParen::peek(input)
     }
 }
 
@@ -35,7 +35,8 @@ impl ToTokens for TemplateOrRuntimeExpr {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
             Self::Template(inner) => {
-                quote! { #topcoat_runtime::Expr::from(#inner) }.to_tokens(tokens);
+                let expr = &inner.expr;
+                quote! { #topcoat_runtime::Expr::from(#expr) }.to_tokens(tokens);
             }
             Self::Runtime(inner) => inner.to_tokens(tokens),
         }
@@ -43,8 +44,8 @@ impl ToTokens for TemplateOrRuntimeExpr {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for TemplateOrRuntimeExpr {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for TemplateOrRuntimeExpr {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match self {
             Self::Template(inner) => inner.pretty_print(printer),
             Self::Runtime(inner) => inner.pretty_print(printer),
@@ -55,7 +56,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for TemplateOrRuntimeExpr {
 #[cfg(test)]
 mod tests {
     use quote::{ToTokens, quote};
-    use topcoat_core_grammar::paths::topcoat_runtime_macro;
+    use topcoat_core_grammar::common::paths::topcoat_runtime_macro;
 
     use super::*;
 

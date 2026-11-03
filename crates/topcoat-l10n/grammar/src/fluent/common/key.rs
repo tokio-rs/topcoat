@@ -4,7 +4,7 @@ use syn::{
     parse::{Parse, ParseStream},
     spanned::Spanned,
 };
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::common::ParseOption;
 
 use crate::fluent::FluentIdent;
 
@@ -99,8 +99,8 @@ impl Parse for FluentKey {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FluentKey {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FluentKey {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match self {
             Self::Idents { message, attribute } => {
                 message.pretty_print(printer);
@@ -135,8 +135,8 @@ impl ParseOption for FluentKeyAttribute {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FluentKeyAttribute {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FluentKeyAttribute {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.dot_token.pretty_print(printer);
         self.name.pretty_print(printer);
     }

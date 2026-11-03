@@ -19,7 +19,7 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 pub use tech::*;
-use topcoat_core_grammar::{ParseOption, paths::topcoat_font};
+use topcoat_core_grammar::common::{ParseOption, paths::topcoat_font};
 pub use unicode::*;
 pub use weight::*;
 
@@ -137,15 +137,15 @@ impl ToTokens for FontFace {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontFace {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontFace {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
 
         // The descriptors are stored in fixed fields, so recover their written
         // order from their spans to keep the output faithful and idempotent.
         let mut descriptors: Vec<(
             proc_macro2::LineColumn,
-            &dyn topcoat_core_grammar::pretty::PrettyPrint,
+            &dyn topcoat_core_grammar::common::pretty::PrettyPrint,
         )> = vec![(self.src.key.src_kw.span().start(), &self.src)];
         if let Some(family) = &self.family {
             descriptors.push((family.key.font_kw.span().start(), family));
@@ -177,7 +177,10 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontFace {
                 // A trailing semicolon is only rendered when the block breaks
                 // across lines, which it always does when it has more than the
                 // required two descriptors on separate lines.
-                printer.scan_text(";".into(), topcoat_core_grammar::pretty::TextMode::Break);
+                printer.scan_text(
+                    ";".into(),
+                    topcoat_core_grammar::common::pretty::TextMode::Break,
+                );
                 printer.advance_cursor(";");
             }
         }

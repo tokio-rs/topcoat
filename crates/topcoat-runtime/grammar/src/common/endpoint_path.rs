@@ -5,7 +5,7 @@ use syn::{
     Ident, LitStr,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::common::ParseOption;
 use topcoat_router::{Path, PathSegment};
 
 /// An absolute route path for a procedure or shard endpoint.
@@ -82,8 +82,8 @@ impl ParseOption for EndpointPath {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for EndpointPath {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for EndpointPath {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.lit.pretty_print(printer);
     }
 }

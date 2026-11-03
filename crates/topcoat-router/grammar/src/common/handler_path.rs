@@ -4,7 +4,7 @@ use syn::{
     LitStr,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::{ParseOption, paths::topcoat_router};
+use topcoat_core_grammar::common::{ParseOption, paths::topcoat_router};
 
 /// The path literal a handler attribute accepts, such as the `"/about"` in
 /// `#[page("/about")]`.
@@ -87,8 +87,8 @@ impl ParseOption for HandlerPath {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for HandlerPath {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for HandlerPath {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.lit.pretty_print(printer);
     }
 }

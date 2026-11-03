@@ -1,6 +1,6 @@
 use std::{fmt::Write, path::Path};
 
-use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
+use topcoat_core_grammar::common::pretty::{Registry, pretty_print_str};
 use topcoat_view_grammar::view::View;
 
 fn diff(expected: &str, actual: &str) -> String {
@@ -114,6 +114,7 @@ fixture_test!(if_else_if_else);
 fixture_test!(for_loop);
 fixture_test!(keyed_for_loop);
 fixture_test!(match_expr);
+fixture_test!(match_guard);
 
 // -- Components --------------------------------------------------------------
 

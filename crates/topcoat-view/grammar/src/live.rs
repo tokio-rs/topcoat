@@ -4,7 +4,7 @@ use syn::{
     parse::{Parse, ParseStream},
     spanned::Spanned,
 };
-use topcoat_core_grammar::{
+use topcoat_core_grammar::common::{
     ParseOption,
     paths::{topcoat_context, topcoat_core, topcoat_view},
 };
@@ -65,9 +65,9 @@ impl ToTokens for Live {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for Live {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for Live {
     /// Keeps statements on separate lines, preserving comments and blank lines.
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         use syn::parse::Parser;
 
         self.cx.pretty_print(printer);
@@ -127,8 +127,8 @@ impl ToTokens for Emit {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for Emit {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for Emit {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.view.pretty_print(printer);
     }
 }
@@ -215,7 +215,7 @@ mod tests {
     #[cfg(feature = "pretty")]
     #[test]
     fn incomplete_live_body_formats_verbatim() {
-        use topcoat_core_grammar::pretty::{Registry, pretty_print_str};
+        use topcoat_core_grammar::common::pretty::{Registry, pretty_print_str};
 
         let registry = Registry::one::<Live>("live");
         let body = "let value = source; // keep this comment\n    let next = value.;";

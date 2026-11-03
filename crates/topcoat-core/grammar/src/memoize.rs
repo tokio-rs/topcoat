@@ -1,13 +1,13 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote, quote_spanned};
 use syn::{
-    FnArg, ItemFn, Pat, ReturnType,
+    FnArg, Pat, ReturnType,
     parse::{Parse, ParseStream},
     parse_quote,
     spanned::Spanned,
 };
 
-use crate::paths::topcoat_context;
+use crate::common::{lenient, paths::topcoat_context};
 
 mod kw {
     use syn::custom_keyword;
@@ -40,8 +40,8 @@ impl Parse for MemoizeAttr {
 }
 
 #[cfg(feature = "pretty")]
-impl crate::pretty::PrettyPrint for MemoizeAttr {
-    fn pretty_print(&self, printer: &mut crate::pretty::Printer<'_>) {
+impl crate::common::pretty::PrettyPrint for MemoizeAttr {
+    fn pretty_print(&self, printer: &mut crate::common::pretty::Printer<'_>) {
         if let Some(as_ref) = &self.as_ref {
             printer.move_cursor(as_ref.span.start());
             "as_ref".pretty_print(printer);
@@ -51,12 +51,12 @@ impl crate::pretty::PrettyPrint for MemoizeAttr {
 }
 
 pub struct MemoizeItem {
-    item: ItemFn,
+    item: lenient::ItemFn,
 }
 
 impl Parse for MemoizeItem {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let item: ItemFn = input.parse()?;
+        let item: lenient::ItemFn = input.parse()?;
         let mut has_cx = false;
         for arg in &item.sig.inputs {
             match arg {
@@ -112,6 +112,7 @@ impl ToTokens for Memoize {
         let sig = &item.sig;
         let ident = &sig.ident;
         let asyncness = &sig.asyncness;
+        let inner_attrs = &item.block.inner_attrs;
         let body_stmts = &item.block.stmts;
 
         let mut generics = sig.generics.clone();
@@ -190,7 +191,7 @@ impl ToTokens for Memoize {
                     async |cx, (#(#closure_pats,)*)| {
                         let cx = &cx;
                         #(#destructures)*
-                        #(#body_stmts)*
+                        #body_stmts
                     },
                 ).await
             }
@@ -203,7 +204,7 @@ impl ToTokens for Memoize {
                     |cx, (#(#closure_pats,)*)| {
                         let cx = &cx;
                         #(#destructures)*
-                        #(#body_stmts)*
+                        #body_stmts
                     },
                 )
             }
@@ -220,6 +221,7 @@ impl ToTokens for Memoize {
             #vis #asyncness fn #ident #generics (#(#new_inputs,)*) -> #output_type
             #where_clause
             {
+                #(#inner_attrs)*
                 #output
             }
         }
@@ -230,6 +232,21 @@ impl ToTokens for Memoize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn keeps_inner_attributes_on_the_function() {
+        let memoize = Memoize::parse(
+            TokenStream::new(),
+            quote! { fn add(cx: &Cx, x: i32) -> i32 { #![allow(unused)] x } },
+        )
+        .unwrap();
+        let item: syn::ItemFn = syn::parse2(memoize.to_token_stream()).unwrap();
+        assert!(
+            item.attrs
+                .iter()
+                .any(|attr| matches!(attr.style, syn::AttrStyle::Inner(_)))
+        );
+    }
 
     #[test]
     fn parses_empty_arguments() {
@@ -251,7 +268,7 @@ mod tests {
     #[cfg(feature = "pretty")]
     #[test]
     fn formats_the_arguments() {
-        use crate::pretty::{Registry, pretty_print_str};
+        use crate::common::pretty::{Registry, pretty_print_str};
 
         // `rustfmt` lays out the attribute at file level, so it is formatted
         // inside a macro body that `rustfmt` does not reach.

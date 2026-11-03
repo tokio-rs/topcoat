@@ -8,14 +8,11 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Paren,
 };
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::common::{ParseOption, lenient};
 
-use crate::{
-    template::TemplateExpr,
-    view::{
-        HtmlIdent,
-        hir::{ExprKind, LowerView, ViewBuilder},
-    },
+use crate::view::{
+    HtmlIdent,
+    hir::{ExprKind, LowerView, ViewBuilder},
 };
 
 /// The name part of a single `name=value` attribute on an
@@ -24,7 +21,7 @@ use crate::{
 /// expression that resolves to the attribute name at runtime.
 pub enum AttributeKey {
     Ident(HtmlIdent),
-    Expr(Box<TemplateExpr>),
+    Expr(Box<lenient::ExprParen>),
 }
 
 impl AttributeKey {
@@ -54,7 +51,7 @@ impl AttributeKey {
     }
 
     #[must_use]
-    pub fn as_expr(&self) -> Option<&TemplateExpr> {
+    pub fn as_expr(&self) -> Option<&lenient::ExprParen> {
         if let Self::Expr(v) = self {
             Some(v)
         } else {
@@ -89,7 +86,7 @@ impl Parse for AttributeKey {
 
 impl ParseOption for AttributeKey {
     fn peek(input: ParseStream) -> bool {
-        TemplateExpr::peek(input) || HtmlIdent::peek(input)
+        lenient::ExprParen::peek(input) || HtmlIdent::peek(input)
     }
 }
 
@@ -112,8 +109,8 @@ impl Display for AttributeKey {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for AttributeKey {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for AttributeKey {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         match self {
             Self::Ident(inner) => inner.pretty_print(printer),
             Self::Expr(inner) => inner.pretty_print(printer),

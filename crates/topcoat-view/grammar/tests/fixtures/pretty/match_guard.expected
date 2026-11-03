@@ -1,0 +1,6 @@
+view! {
+    match count {
+        n if n > 0 => "positive",
+        _ => "other",
+    }
+}

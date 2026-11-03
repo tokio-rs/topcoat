@@ -1,12 +1,12 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
-    Expr, Token, parenthesized,
+    Token, parenthesized,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     token::Paren,
 };
-use topcoat_core_grammar::{ParseOption, QuoteOption, paths::topcoat_font};
+use topcoat_core_grammar::common::{ParseOption, QuoteOption, lenient, paths::topcoat_font};
 
 use crate::font_face::{FontFormatHint, FontTechHint};
 
@@ -47,8 +47,8 @@ impl ToTokens for FontSources {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontSources {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontSources {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.key.pretty_print(printer);
         self.colon_token.pretty_print(printer);
         " ".pretty_print(printer);
@@ -75,8 +75,8 @@ impl ParseOption for FontSourcesKey {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontSourcesKey {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontSourcesKey {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
         printer.move_cursor(self.src_kw.span().start());
         "src".pretty_print(printer);
@@ -85,7 +85,7 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontSourcesKey {
 }
 
 pub enum FontSourcesValue {
-    Expr(Box<Expr>),
+    Expr(lenient::Expr),
     Css(Punctuated<FontSource, Token![,]>),
 }
 
@@ -112,9 +112,9 @@ impl ToTokens for FontSourcesValue {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontSourcesValue {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
-        use topcoat_core_grammar::pretty::BreakMode;
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontSourcesValue {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
+        use topcoat_core_grammar::common::pretty::BreakMode;
 
         match self {
             Self::Expr(inner) => inner.pretty_print(printer),
@@ -131,7 +131,7 @@ pub enum FontSource {
     Url {
         url_kw: kw::url,
         paren_token: Paren,
-        expr: Expr,
+        expr: lenient::Expr,
 
         tech: Option<Box<FontTechHint>>,
         format: Option<Box<FontFormatHint>>,
@@ -139,7 +139,7 @@ pub enum FontSource {
     Local {
         local_kw: kw::local,
         paren_token: Paren,
-        expr: Expr,
+        expr: lenient::Expr,
     },
 }
 
@@ -211,10 +211,10 @@ impl ToTokens for FontSource {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontSource {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontSource {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
-        use topcoat_core_grammar::pretty::Delim;
+        use topcoat_core_grammar::common::pretty::Delim;
 
         match self {
             Self::Url {

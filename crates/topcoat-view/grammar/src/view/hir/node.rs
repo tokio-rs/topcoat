@@ -32,7 +32,7 @@ pub(crate) enum Node {
     /// A verbatim Rust statement.
     Statement(Statement),
     /// A `for` loop whose body is lowered into a nested scope.
-    ForLoop(ForLoop),
+    ForLoop(Box<ForLoop>),
     /// An `if`/`else` whose branches are lowered into nested scopes.
     IfElse(IfElse),
     /// A `match` whose arm bodies are lowered into nested scopes.

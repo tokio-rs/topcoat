@@ -1,11 +1,11 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
-    Expr, Lit, parenthesized,
+    LitStr, parenthesized,
     parse::{Parse, ParseStream},
     token::Paren,
 };
-use topcoat_core_grammar::{ParseOption, paths::topcoat_font};
+use topcoat_core_grammar::common::{ParseOption, lenient, paths::topcoat_font};
 
 mod kw {
     use syn::custom_keyword;
@@ -47,10 +47,10 @@ impl ToTokens for FontFormatHint {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontFormatHint {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontFormatHint {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         use syn::spanned::Spanned;
-        use topcoat_core_grammar::pretty::Delim;
+        use topcoat_core_grammar::common::pretty::Delim;
 
         printer.move_cursor(self.format_kw.span().start());
         "format".pretty_print(printer);
@@ -62,44 +62,41 @@ impl topcoat_core_grammar::pretty::PrettyPrint for FontFormatHint {
 
 /// The format inside a [`FontFormatHint`].
 ///
-/// String literals are validated as CSS keywords during parsing. Other
-/// expressions must evaluate to [`topcoat_font::FontFormat`].
-pub struct FontFormat(pub Expr);
+/// A string literal is a CSS keyword, and an unknown keyword expands to a
+/// compile error. Other expressions must evaluate to
+/// [`topcoat_font::FontFormat`].
+pub struct FontFormat(pub lenient::Expr);
 
 impl Parse for FontFormat {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let expr: Expr = input.parse()?;
-        if let Expr::Lit(lit) = &expr
-            && let Lit::Str(keyword) = &lit.lit
-            && format_variant(&keyword.value()).is_none()
-        {
-            return Err(syn::Error::new_spanned(
-                keyword,
-                format!("`{}` is not a valid font format", keyword.value()),
-            ));
-        }
-        Ok(Self(expr))
+        Ok(Self(input.parse()?))
     }
 }
 
 impl ToTokens for FontFormat {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        if let Expr::Lit(lit) = &self.0
-            && let Lit::Str(keyword) = &lit.lit
-        {
-            let name = format_variant(&keyword.value()).expect("validated at parse time");
-            let variant = proc_macro2::Ident::new(name, keyword.span());
-            quote! { #topcoat_font::FontFormat::#variant }.to_tokens(tokens);
+        let Ok(keyword) = syn::parse2::<LitStr>(self.0.tokens.clone()) else {
+            self.0.to_tokens(tokens);
             return;
+        };
+        match format_variant(&keyword.value()) {
+            Some(name) => {
+                let variant = proc_macro2::Ident::new(name, keyword.span());
+                quote! { #topcoat_font::FontFormat::#variant }.to_tokens(tokens);
+            }
+            None => syn::Error::new_spanned(
+                &keyword,
+                format!("`{}` is not a valid font format", keyword.value()),
+            )
+            .to_compile_error()
+            .to_tokens(tokens),
         }
-        let inner = &self.0;
-        inner.to_tokens(tokens);
     }
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for FontFormat {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for FontFormat {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.0.pretty_print(printer);
     }
 }
@@ -116,4 +113,31 @@ fn format_variant(keyword: &str) -> Option<&'static str> {
         "woff2" => "Woff2",
         _ => return None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn expand(source: &str) -> String {
+        syn::parse_str::<FontFormat>(source)
+            .unwrap()
+            .to_token_stream()
+            .to_string()
+    }
+
+    #[test]
+    fn expands_a_keyword_to_its_variant() {
+        assert!(expand(r#""woff2""#).ends_with(":: FontFormat :: Woff2"));
+    }
+
+    #[test]
+    fn expands_an_unknown_keyword_to_a_compile_error() {
+        assert!(expand(r#""wof""#).contains("compile_error"));
+    }
+
+    #[test]
+    fn keeps_an_incomplete_expression() {
+        assert_eq!(expand("format."), "format .");
+    }
 }

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
-use topcoat_core_grammar::paths::topcoat_runtime;
+use topcoat_core_grammar::common::paths::topcoat_runtime;
 
 pub(super) enum ResolvedIdent {
     Local { js_name: String, rust_ident: Ident },

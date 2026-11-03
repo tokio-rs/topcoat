@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::common::{BASE_PLACEHOLDERS, CallSite};
+use super::{BASE_PLACEHOLDERS, CallSite};
 
 /// A file pattern written in a macro call, such as `"./l10n/{locale}/**/*.ftl"`.
 ///

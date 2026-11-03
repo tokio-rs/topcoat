@@ -1,7 +1,6 @@
 use proc_macro2::Span;
 use quote::quote;
-use syn::Expr;
-use topcoat_core_grammar::paths::topcoat_view;
+use topcoat_core_grammar::common::{lenient, paths::topcoat_view};
 
 use crate::view::hir::{
     Bindings, Scope,
@@ -10,7 +9,7 @@ use crate::view::hir::{
 
 /// An `if`/`else` whose branches are lowered into nested scopes.
 pub(crate) struct IfElse {
-    pub expr: Expr,
+    pub expr: lenient::Expr,
     pub then_branch: Scope,
     pub else_branch: Scope,
 }

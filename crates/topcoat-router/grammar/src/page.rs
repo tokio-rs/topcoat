@@ -1,14 +1,14 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
 use syn::{
-    FnArg, ItemFn, Pat, ReturnType, Token,
+    FnArg, Pat, ReturnType, Token,
     parse::{Parse, ParseStream},
     parse_quote,
     punctuated::Punctuated,
     spanned::Spanned,
 };
-use topcoat_core_grammar::{
-    ParseOption,
+use topcoat_core_grammar::common::{
+    ParseOption, lenient,
     paths::{topcoat_context, topcoat_inventory, topcoat_router, topcoat_view, topcoat_view_macro},
 };
 
@@ -44,8 +44,8 @@ impl Parse for PageAttr {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for PageAttr {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for PageAttr {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.methods.pretty_print(printer);
         if self.methods.is_some() && self.path.is_some() {
             " ".pretty_print(printer);
@@ -59,13 +59,13 @@ impl topcoat_core_grammar::pretty::PrettyPrint for PageAttr {
 /// optionally, the request context as `cx` and the request body as one
 /// parameter of any pattern, such as `Form(input): Form<T>`.
 pub struct PageItem {
-    item: ItemFn,
+    item: lenient::ItemFn,
     args: HandlerArgs,
 }
 
 impl Parse for PageItem {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let item: ItemFn = input.parse()?;
+        let item: lenient::ItemFn = input.parse()?;
         if item.sig.asyncness.is_none() {
             return Err(syn::Error::new(
                 item.sig.fn_token.span(),
@@ -131,9 +131,8 @@ impl ToTokens for Page {
                 && !matches!(&*pat_type.pat, Pat::Ident(pat) if pat.ident == "body")
             {
                 let pat = std::mem::replace(&mut *pat_type.pat, parse_quote! { body });
-                face.block
-                    .stmts
-                    .insert(0, parse_quote! { let #pat = body; });
+                let stmts = std::mem::take(&mut face.block.stmts);
+                face.block.stmts = quote! { let #pat = body; #stmts };
             }
         }
         let component = quote! {

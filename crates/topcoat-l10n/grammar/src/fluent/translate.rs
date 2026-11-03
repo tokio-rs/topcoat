@@ -7,7 +7,7 @@ use syn::{
     Ident, Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::paths::topcoat_l10n;
+use topcoat_core_grammar::common::paths::topcoat_l10n;
 
 use crate::fluent::{DocComments, FluentKey};
 
@@ -46,8 +46,8 @@ impl Parse for Translate {
 /// Prints the call on one line if it fits. Otherwise, puts the key and each argument
 /// on their own lines, followed by a comma.
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for Translate {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for Translate {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.docs.pretty_print(printer);
         self.key.pretty_print(printer);
         self.arguments.pretty_print(printer);

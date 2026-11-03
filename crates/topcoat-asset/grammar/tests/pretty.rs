@@ -1,5 +1,5 @@
 use topcoat_asset_grammar::asset::Asset;
-use topcoat_core_grammar::pretty::{
+use topcoat_core_grammar::common::pretty::{
     Lexer, MARGIN, Macro, PrettyPrint, Printer, Registry, pretty_print_str,
 };
 

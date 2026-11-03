@@ -4,7 +4,7 @@ use syn::{
     Ident, Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::{ParseOption, paths::topcoat_context};
+use topcoat_core_grammar::common::{ParseOption, paths::topcoat_context};
 
 /// The leading `cx =>` argument naming the request context a macro body
 /// renders against.
@@ -44,8 +44,8 @@ impl ToTokens for LeadingCx {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for LeadingCx {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for LeadingCx {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.cx.pretty_print(printer);
         " =>".pretty_print(printer);
         // Break after the `cx =>` argument just like between sibling items, so

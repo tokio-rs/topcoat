@@ -1,8 +1,5 @@
-use syn::{
-    Expr,
-    parse::{Parse, ParseStream},
-};
-use topcoat_core_grammar::ParseOption;
+use syn::parse::{Parse, ParseStream};
+use topcoat_core_grammar::common::{ParseOption, lenient};
 
 use crate::{
     template::TemplateForLoop,
@@ -25,7 +22,7 @@ impl ForLoop {
     /// Panics if the attributes were modified to contain an invalid key
     /// after parsing.
     #[must_use]
-    pub fn key(&self) -> Option<Expr> {
+    pub fn key(&self) -> Option<lenient::Expr> {
         self.template
             .attributes
             .first()
@@ -48,7 +45,7 @@ impl Parse for ForLoop {
             if index > 0 {
                 return Err(syn::Error::new_spanned(attribute, "duplicate loop key"));
             }
-            attribute.parse_args::<Expr>()?;
+            attribute.parse_args::<lenient::Expr>()?;
         }
         Ok(loop_)
     }
@@ -74,8 +71,8 @@ impl LowerView for ForLoop {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for ForLoop {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for ForLoop {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.template.pretty_print(printer);
     }
 }
@@ -107,9 +104,7 @@ mod tests {
         for attribute in [
             "#[other(item)]",
             "#[key]",
-            "#[key()]",
             "#[key(a, b)]",
-            "#[key($(item))]",
             "#[key(item)] #[key(item)]",
         ] {
             let source = format!("{attribute} for item in items {{}}");

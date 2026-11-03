@@ -1,12 +1,12 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 use syn::{
-    ItemFn, Visibility,
+    Visibility,
     parse::{Parse, ParseStream},
     parse_quote,
 };
-use topcoat_core_grammar::{
-    ParseOption,
+use topcoat_core_grammar::common::{
+    ParseOption, lenient,
     paths::{topcoat_context, topcoat_inventory, topcoat_router},
 };
 
@@ -25,14 +25,14 @@ impl Parse for LayerAttr {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for LayerAttr {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for LayerAttr {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.path.pretty_print(printer);
     }
 }
 
 pub struct LayerItem {
-    item: ItemFn,
+    item: lenient::ItemFn,
 }
 
 impl Parse for LayerItem {

@@ -5,7 +5,7 @@ use syn::{
     ext::IdentExt,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::paths::{topcoat_mail, topcoat_view};
+use topcoat_core_grammar::common::paths::{topcoat_mail, topcoat_view};
 
 use crate::mail::FieldValue;
 
@@ -101,8 +101,8 @@ impl MailField {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for MailField {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for MailField {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.name.pretty_print(printer);
         self.colon_token.pretty_print(printer);
         if let Some(value) = &self.value {

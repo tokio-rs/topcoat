@@ -1,7 +1,8 @@
 use std::{cell::Cell, rc::Rc};
 
 use proc_macro2::{Span, TokenStream};
-use syn::{Expr, Ident, Pat, Path};
+use syn::{Ident, Pat, Path};
+use topcoat_core_grammar::common::lenient;
 
 use super::{
     Component, ExprKind, ExprNode, ForLoop, IfElse, Local, MatchArm, MatchExpr, Node, Scope,
@@ -136,8 +137,8 @@ impl ViewBuilder {
     pub fn for_loop(
         &mut self,
         pat: &Pat,
-        expr: &Expr,
-        key: Option<Expr>,
+        expr: &lenient::Expr,
+        key: Option<lenient::Expr>,
         f: impl FnOnce(&mut ViewBuilder),
     ) {
         self.flush();
@@ -145,16 +146,20 @@ impl ViewBuilder {
         self.sites.set(ordinal + 1);
         let mut body = self.nested();
         f(&mut body);
-        self.nodes.push(Node::ForLoop(ForLoop {
+        self.nodes.push(Node::ForLoop(Box::new(ForLoop {
             pat: pat.clone(),
-            expr: Box::new(expr.clone()),
-            key: key.map(Box::new),
+            expr: expr.clone(),
+            key,
             ordinal,
             body: body.finish(),
-        }));
+        })));
     }
 
-    pub fn if_else(&mut self, expr: &Expr, f: impl FnOnce(&mut ViewBuilder, &mut ViewBuilder)) {
+    pub fn if_else(
+        &mut self,
+        expr: &lenient::Expr,
+        f: impl FnOnce(&mut ViewBuilder, &mut ViewBuilder),
+    ) {
         self.flush();
         let mut then_branch = self.nested();
         let mut else_branch = self.nested();
@@ -166,7 +171,7 @@ impl ViewBuilder {
         }));
     }
 
-    pub fn match_expr(&mut self, expr: &Expr, f: impl FnOnce(&mut MatchArmsBuilder)) {
+    pub fn match_expr(&mut self, expr: &lenient::Expr, f: impl FnOnce(&mut MatchArmsBuilder)) {
         self.flush();
         let mut builder = MatchArmsBuilder {
             arms: Vec::new(),
@@ -174,7 +179,7 @@ impl ViewBuilder {
         };
         f(&mut builder);
         self.nodes.push(Node::MatchExpr(MatchExpr {
-            expr: Box::new(expr.clone()),
+            expr: expr.clone(),
             arms: builder.arms,
         }));
     }
@@ -196,7 +201,12 @@ pub(crate) struct MatchArmsBuilder {
 }
 
 impl MatchArmsBuilder {
-    pub fn arm(&mut self, pat: &Pat, guard: Option<&Expr>, f: impl FnOnce(&mut ViewBuilder)) {
+    pub fn arm(
+        &mut self,
+        pat: &Pat,
+        guard: Option<&lenient::Expr>,
+        f: impl FnOnce(&mut ViewBuilder),
+    ) {
         let mut body = self.template.nested();
         f(&mut body);
         self.arms.push(MatchArm {

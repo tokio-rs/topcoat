@@ -5,7 +5,7 @@ pub use attr::*;
 pub use item::*;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
-use topcoat_core_grammar::paths::{
+use topcoat_core_grammar::common::paths::{
     topcoat_context, topcoat_error, topcoat_inventory, topcoat_router, topcoat_runtime,
     topcoat_view, topcoat_view_macro,
 };

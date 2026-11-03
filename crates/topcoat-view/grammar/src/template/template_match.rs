@@ -1,9 +1,9 @@
 use syn::{
-    Expr, Pat, Token,
+    Pat, Token,
     parse::{Parse, ParseStream},
     token::Brace,
 };
-use topcoat_core_grammar::ParseOption;
+use topcoat_core_grammar::common::{ParseOption, lenient};
 
 use crate::{
     attributes::hir::{
@@ -15,7 +15,7 @@ use crate::{
 /// A `match expr { ... }` expression in view-body position.
 pub struct TemplateMatch<B> {
     pub match_token: Token![match],
-    pub expr: Box<Expr>,
+    pub expr: lenient::Expr,
     pub brace_token: Brace,
     pub arms: Vec<TemplateMatchArm<B>>,
 }
@@ -45,7 +45,7 @@ impl<B: Parse + MatchArmBody> Parse for TemplateMatch<B> {
         let content;
         Ok(Self {
             match_token: input.parse()?,
-            expr: Box::new(input.call(Expr::parse_without_eager_brace)?),
+            expr: input.call(lenient::Expr::parse_without_eager_brace)?,
             brace_token: syn::braced!(content in input),
             arms: {
                 let mut arms = Vec::new();
@@ -66,12 +66,12 @@ impl<B: Parse + MatchArmBody> ParseOption for TemplateMatch<B> {
 }
 
 #[cfg(feature = "pretty")]
-impl<B> topcoat_core_grammar::pretty::PrettyPrint for TemplateMatch<B>
+impl<B> topcoat_core_grammar::common::pretty::PrettyPrint for TemplateMatch<B>
 where
-    TemplateMatchArm<B>: topcoat_core_grammar::pretty::PrettyPrint,
+    TemplateMatchArm<B>: topcoat_core_grammar::common::pretty::PrettyPrint,
 {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
-        use topcoat_core_grammar::pretty::{BreakMode, Delim};
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
+        use topcoat_core_grammar::common::pretty::{BreakMode, Delim};
 
         self.match_token.pretty_print(printer);
 
@@ -95,7 +95,7 @@ where
 /// A single arm of a [`TemplateMatch`]: `pat (if guard)? => body`.
 pub struct TemplateMatchArm<B> {
     pub pat: Pat,
-    pub guard: Option<(Token![if], Box<Expr>)>,
+    pub guard: Option<(Token![if], lenient::Expr)>,
     pub fat_arrow_token: Token![=>],
     pub body: Box<B>,
     pub comma: Option<Token![,]>,
@@ -114,7 +114,7 @@ impl<B: LowerView> TemplateMatchArm<B> {
     pub(crate) fn lower(&self, arms: &mut MatchArmsBuilder) {
         arms.arm(
             &self.pat,
-            self.guard.as_ref().map(|(_, expr)| expr.as_ref()),
+            self.guard.as_ref().map(|(_, expr)| expr),
             |body| self.body.lower(body),
         );
     }
@@ -125,7 +125,7 @@ impl<B: LowerAttribute> TemplateMatchArm<B> {
     pub(crate) fn lower_attribute(&self, arms: &mut AttributeMatchArmsBuilder) {
         arms.arm(
             &self.pat,
-            self.guard.as_ref().map(|(_, expr)| expr.as_ref()),
+            self.guard.as_ref().map(|(_, expr)| expr),
             |body| self.body.lower(body),
         );
     }
@@ -135,9 +135,7 @@ impl<B: Parse + MatchArmBody> Parse for TemplateMatchArm<B> {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let pat = Pat::parse_multi_with_leading_vert(input)?;
         let guard = if input.peek(Token![if]) {
-            let if_token: Token![if] = input.parse()?;
-            let guard: Expr = input.parse()?;
-            Some((if_token, Box::new(guard)))
+            Some((input.parse()?, input.parse()?))
         } else {
             None
         };
@@ -163,20 +161,20 @@ impl<B: Parse + MatchArmBody> Parse for TemplateMatchArm<B> {
 }
 
 #[cfg(feature = "pretty")]
-impl<B> topcoat_core_grammar::pretty::PrettyPrint for TemplateMatchArm<B>
+impl<B> topcoat_core_grammar::common::pretty::PrettyPrint for TemplateMatchArm<B>
 where
-    B: topcoat_core_grammar::pretty::PrettyPrint + MatchArmBody,
+    B: topcoat_core_grammar::common::pretty::PrettyPrint + MatchArmBody,
 {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.pat.pretty_print(printer);
-        " ".pretty_print(printer);
-        self.fat_arrow_token.pretty_print(printer);
         if let Some((if_token, expr)) = &self.guard {
             " ".pretty_print(printer);
             if_token.pretty_print(printer);
             " ".pretty_print(printer);
             expr.pretty_print(printer);
         }
+        " ".pretty_print(printer);
+        self.fat_arrow_token.pretty_print(printer);
         " ".pretty_print(printer);
         self.body.pretty_print(printer);
         // Block bodies are self-delimiting, so only single-node bodies get a

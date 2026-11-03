@@ -1,5 +1,5 @@
 use quote::quote;
-use topcoat_core_grammar::testing::assert_deterministic;
+use topcoat_core_grammar::common::testing::assert_deterministic;
 use topcoat_runtime_grammar::{
     expr::ExprInput, procedure::Procedure, record::Record, shard::Shard,
 };

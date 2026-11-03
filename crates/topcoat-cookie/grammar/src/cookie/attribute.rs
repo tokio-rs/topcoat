@@ -4,7 +4,7 @@ use syn::{
     Ident, Token,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::{ParseOption, paths::topcoat_cookie};
+use topcoat_core_grammar::common::{ParseOption, paths::topcoat_cookie};
 
 use crate::cookie::{CookieValue, HeaderName};
 
@@ -93,8 +93,8 @@ impl Parse for CookieAttribute {
 }
 
 #[cfg(feature = "pretty")]
-impl topcoat_core_grammar::pretty::PrettyPrint for CookieAttribute {
-    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+impl topcoat_core_grammar::common::pretty::PrettyPrint for CookieAttribute {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.name.pretty_print(printer);
         if let Some(eq_token) = &self.eq_token {
             " ".pretty_print(printer);
