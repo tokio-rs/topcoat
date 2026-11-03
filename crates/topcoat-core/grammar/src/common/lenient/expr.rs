@@ -1,18 +1,19 @@
-use proc_macro2::{Delimiter, Spacing, Span, TokenStream, TokenTree};
+mod scanner;
+
+use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote_spanned};
-use syn::{
-    Token,
-    parse::{Parse, ParseStream},
-    token::Brace,
-};
+use syn::parse::{Parse, ParseStream};
+
+use self::scanner::Scanner;
 
 /// A Rust expression, kept as unparsed tokens.
 ///
-/// A complete expression ends where `syn` would end it, so `"active" if
-/// selected` ends before the `if`. An incomplete expression, such as `user.`
-/// while it is being typed, ends before the next `,`, `;` or `=>` outside of
-/// any group instead, so the macro keeps parsing. An empty expression expands
-/// to a compile error at the position where it was expected.
+/// The expression ends at the first token that cannot continue it, so
+/// `"active" if selected` ends before the `if`. Only whole token trees are
+/// read, never the inside of a group. Code that is still being typed follows
+/// the same rule: `user., name` ends after the `.`, so the macro keeps parsing
+/// the rest of its input. An empty expression expands to a compile error at
+/// the position where it was expected.
 #[derive(Clone)]
 pub struct Expr {
     /// The expression tokens. Empty when no expression was written.
@@ -31,46 +32,39 @@ impl Expr {
     /// Parses an expression that is followed by a `{ ... }` block, like the
     /// condition of an `if` or the iterator of a `for` loop.
     ///
-    /// As with [`syn::Expr::parse_without_eager_brace`], the block is not read as a
-    /// struct literal. An incomplete expression also ends before the next
-    /// `{ ... }` outside of any group.
+    /// As with [`syn::Expr::parse_without_eager_brace`], the block is not read
+    /// as a struct literal. It does not start a block expression either, so an
+    /// empty condition ends before the block.
     ///
     /// # Errors
     ///
-    /// Returns an error if the input contains an invalid token tree.
+    /// Never returns an error. The signature matches other parse functions.
     pub fn parse_without_eager_brace(input: ParseStream) -> syn::Result<Self> {
-        Self::parse_with(input, syn::Expr::parse_without_eager_brace, true)
+        Self::parse_with(input, false)
     }
 
-    /// Takes the tokens `parse` accepts as an expression, or scans for the end
-    /// of an incomplete expression when it accepts none.
-    fn parse_with(
-        input: ParseStream,
-        parse: fn(ParseStream) -> syn::Result<syn::Expr>,
-        stop_at_block: bool,
-    ) -> syn::Result<Self> {
+    /// Takes the tokens of the expression at the start of `input`.
+    fn parse_with(input: ParseStream, allow_brace: bool) -> syn::Result<Self> {
         let span = input.span();
-        let mut tokens = TokenStream::new();
-        let fork = input.fork();
-        if parse(&fork).is_ok() {
-            while input.cursor() != fork.cursor() {
-                tokens.extend([input.parse::<TokenTree>()?]);
-            }
-        } else {
-            let mut scanner = Scanner::default();
-            while !input.is_empty() && !scanner.ends_before(input, stop_at_block) {
-                let token: TokenTree = input.parse()?;
-                scanner.push(&token);
+        input.step(|cursor| {
+            let end = Scanner::new(allow_brace).expr(*cursor);
+            let mut tokens = TokenStream::new();
+            let mut next = *cursor;
+            while next != end {
+                let Some((token, after)) = next.token_tree() else {
+                    break;
+                };
                 tokens.extend([token]);
+                next = after;
             }
-        }
-        Ok(Self { tokens, span })
+            Ok((Self { tokens, span }, end))
+        })
     }
 }
 
 impl Parse for Expr {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        Self::parse_with(input, syn::Expr::parse, false)
+        Self::parse_with(input, true)
     }
 }
 
@@ -112,112 +106,151 @@ impl crate::common::pretty::PrettyPrint for Expr {
     }
 }
 
-/// Finds the end of an incomplete expression.
-///
-/// Commas in `::<...>` generics and a leading closure's signature stay inside the
-/// expression. An unclosed `::<` or `|` keeps the rest of the input in the
-/// expression.
-#[derive(Default)]
-struct Scanner {
-    /// Current depth of angle brackets in `::<...>` generics.
-    angle_depth: usize,
-    /// Current position in a leading closure's signature.
-    closure: ClosureState,
-    /// The last two tokens, recorded only when they are punctuation.
-    previous: [Option<(char, Spacing)>; 2],
-}
-
-impl Scanner {
-    /// Checks whether the expression ends before the next token in `input`: a
-    /// `,`, `;` or `=>`, which cannot appear outside of a group in an
-    /// expression, or a `{ ... }` block when `stop_at_block` is set.
-    fn ends_before(&self, input: ParseStream, stop_at_block: bool) -> bool {
-        let in_signature = self.angle_depth > 0
-            || matches!(
-                self.closure,
-                ClosureState::Params | ClosureState::ReturnType
-            );
-        !in_signature
-            && (input.peek(Token![,])
-                || input.peek(Token![;])
-                || input.peek(Token![=>])
-                || (stop_at_block && input.peek(Brace)))
-    }
-
-    /// Updates the scanner after reading `token`.
-    fn push(&mut self, token: &TokenTree) {
-        let punct = match token {
-            TokenTree::Punct(punct) => Some((punct.as_char(), punct.spacing())),
-            _ => None,
-        };
-        let char = punct.map(|(char, _)| char);
-        let after_arrow = self.previous[1] == Some(('-', Spacing::Joint));
-
-        self.closure = match self.closure {
-            ClosureState::Start => match token {
-                TokenTree::Ident(ident) if ident == "move" || ident == "async" => {
-                    ClosureState::Start
-                }
-                _ if char == Some('|') => ClosureState::Params,
-                _ => ClosureState::None,
-            },
-            ClosureState::Params if char == Some('|') => ClosureState::AfterParams,
-            ClosureState::AfterParams if char == Some('-') => ClosureState::AfterParams,
-            ClosureState::AfterParams if char == Some('>') && after_arrow => {
-                ClosureState::ReturnType
-            }
-            ClosureState::AfterParams => ClosureState::None,
-            ClosureState::ReturnType => match token {
-                TokenTree::Group(group) if group.delimiter() == Delimiter::Brace => {
-                    ClosureState::None
-                }
-                _ => ClosureState::ReturnType,
-            },
-            state => state,
-        };
-
-        if !matches!(
-            self.closure,
-            ClosureState::Params | ClosureState::ReturnType
-        ) {
-            // The second `:` of `::<` is joint with the `<`, so only the first
-            // one's spacing tells a path separator apart from two colons.
-            let after_path_separator = self.previous[0] == Some((':', Spacing::Joint))
-                && matches!(self.previous[1], Some((':', _)));
-            match char {
-                Some('<') if after_path_separator || self.angle_depth > 0 => {
-                    self.angle_depth += 1;
-                }
-                Some('>') if self.angle_depth > 0 && !after_arrow => self.angle_depth -= 1,
-                _ => {}
-            }
-        }
-
-        self.previous = [self.previous[1], punct];
-    }
-}
-
-/// The scanner's position within a closure at the start of an expression.
-#[derive(Default, Clone, Copy)]
-enum ClosureState {
-    /// At the start of the expression, possibly after `move` or `async`.
-    #[default]
-    Start,
-    /// Reading parameters between the opening and closing `|`.
-    Params,
-    /// Finished reading parameters, but not yet in the return type or body.
-    AfterParams,
-    /// Reading a return type before the closure's block.
-    ReturnType,
-    /// Outside a closure signature.
-    None,
-}
-
 #[cfg(test)]
 mod tests {
-    use syn::punctuated::Punctuated;
+    use proc_macro2::TokenTree;
+    use syn::{Token, punctuated::Punctuated};
 
     use super::*;
+
+    /// Complete expressions covering every kind of operand and of token that
+    /// continues an expression.
+    const EXPRESSIONS: &[&str] = &[
+        "x",
+        "42",
+        "-1",
+        r#""text""#,
+        "true",
+        "_",
+        "user.name.len()",
+        "t.0.1",
+        "r#type.r#match",
+        "f(a, b)(c)",
+        "v[0]",
+        "fut.await?",
+        "x.await.y",
+        "a.b::<T>()",
+        "a + b * c - d / e % f",
+        "a == b && c != d || !e",
+        "a << 2 >> 1 & b | c ^ d",
+        "a < b",
+        "a >= b",
+        "a || b",
+        "x = 1",
+        "x <<= 1",
+        "*x += 1",
+        "&mut x",
+        "&&x",
+        "&raw const x",
+        "&*x",
+        "-(-x)",
+        "a..b",
+        "a..",
+        "..b",
+        "..",
+        "a..=b",
+        "x as u8",
+        "x as i64 as f64",
+        "x as u8 + 1",
+        "x as Vec<u8>",
+        "x as Vec<Vec<u8>>",
+        "&x as *const u8",
+        "x as fn(u8) -> u8",
+        "x as &'static str",
+        "x as <T as Tr>::Out",
+        "x as Box<dyn Fn(u8) -> u8>",
+        "Vec::<u8>::new()",
+        "<Vec<u8> as Default>::default()",
+        "::std::mem::take(x)",
+        "iter.collect::<Vec<_>>()",
+        "self.x",
+        "Self::new()",
+        "crate::f()",
+        "super::f()",
+        "Point { x: 1, y }",
+        "Point::<u8> { x }",
+        "Point { x }.x",
+        r#"format!("{}", x)"#,
+        "vec![1, 2]",
+        "m! { a }",
+        "(a, b)",
+        "[a; 3]",
+        "{ a }",
+        "'a: { break 'a 1 }",
+        "if a { b } else { c }",
+        "if a { b } else if c { d } else { e }",
+        "if let Some(x) = y { x } else { 0 }",
+        "if a { b } else { c }.len()",
+        "match x { _ => 1 }",
+        "match x { _ => 1 } + 2",
+        "loop { break 1 }",
+        "while a { b }",
+        "while let Some(x) = it.next() { f(x) }",
+        "for x in xs { f(x) }",
+        "for (a, b) in pairs.iter() { f(a) }",
+        "'outer: loop {}",
+        "unsafe { f() }",
+        "async { 1 }",
+        "async move { 1 }",
+        "const { 1 }",
+        "|| 1",
+        "|a, b| a + b",
+        "move |x| x.y",
+        "|x: u8| -> u8 { x }",
+        "|(a, b): (u8, u8)| a",
+        "|&x| x",
+        "Some(x).map(|y| y + 1).unwrap_or(0)",
+        "return",
+        "return x + 1",
+        "break",
+        "break 'a",
+        "break 'a x",
+        "continue",
+        "continue 'a",
+        "yield x",
+    ];
+
+    /// Conditions of an `if` or `while`, which may contain `let`.
+    const CONDITIONS: &[&str] = &[
+        "let Some(x) = y",
+        "let Point { x, .. } = p",
+        "let 0..=9 = n",
+        "a && let Some(b) = c",
+        "x == y",
+        "f(Point { x })",
+    ];
+
+    /// Tokens that end an expression without being part of it.
+    const ENDINGS: &[&str] = &[
+        "",
+        ", x",
+        "; x",
+        "=> x",
+        " if c",
+        " else c",
+        " in c",
+        r#" "text""#,
+        ": u8",
+    ];
+
+    /// Returns the tokens that `parse` reads at the start of `input`, or
+    /// `None` when it fails.
+    fn read<T>(parse: fn(ParseStream) -> syn::Result<T>, input: &str) -> Option<String> {
+        syn::parse::Parser::parse_str(
+            |input: ParseStream| {
+                let fork = input.fork();
+                parse(&fork)?;
+                let mut tokens = TokenStream::new();
+                while input.cursor() != fork.cursor() {
+                    tokens.extend([input.parse::<TokenTree>()?]);
+                }
+                input.parse::<TokenStream>()?;
+                Ok(tokens.to_string())
+            },
+            input,
+        )
+        .ok()
+    }
 
     /// Splits a comma-separated list into its expressions.
     fn split(input: &str) -> Vec<String> {
@@ -228,28 +261,12 @@ mod tests {
             .collect()
     }
 
-    /// Parses the expression at the start of `input` with `parse`, ignoring
-    /// the rest.
-    fn first_with(parse: fn(ParseStream) -> syn::Result<Expr>, input: &str) -> String {
-        syn::parse::Parser::parse_str(
-            |input: ParseStream| {
-                let expr = parse(input)?;
-                input.parse::<TokenStream>()?;
-                Ok(expr)
-            },
-            input,
-        )
-        .unwrap()
-        .tokens
-        .to_string()
-    }
-
     fn first(input: &str) -> String {
-        first_with(Expr::parse, input)
+        read(Expr::parse, input).unwrap()
     }
 
     fn before_block(input: &str) -> String {
-        first_with(Expr::parse_without_eager_brace, input)
+        read(Expr::parse_without_eager_brace, input).unwrap()
     }
 
     fn tokens(input: &str) -> String {
@@ -258,50 +275,86 @@ mod tests {
 
     #[test]
     fn ends_a_complete_expression_where_syn_does() {
-        assert_eq!(
-            split("max(a, b), HashMap::<K, V>::new(), |a, b| a + b"),
-            [
-                tokens("max(a, b)"),
-                tokens("HashMap::<K, V>::new()"),
-                tokens("|a, b| a + b"),
-            ]
-        );
-        assert_eq!(first(r#""active" if selected"#), tokens(r#""active""#));
-        assert_eq!(first(r#""A" src: local("A")"#), tokens(r#""A""#));
-        assert_eq!(first("item.id => body"), tokens("item.id"));
+        for expr in EXPRESSIONS {
+            assert_eq!(read(syn::Expr::parse, expr), Some(tokens(expr)), "{expr}");
+            for ending in ENDINGS {
+                let input = format!("{expr}{ending}");
+                // An ending such as `if c` after `return` makes the input
+                // invalid; only valid input has an end to compare.
+                if let Some(expected) = read(syn::Expr::parse, &input) {
+                    assert_eq!(first(&input), expected, "{input}");
+                }
+            }
+        }
     }
 
     #[test]
-    fn ends_an_incomplete_expression_at_a_separator() {
+    fn ends_a_condition_where_syn_does() {
+        let conditions = EXPRESSIONS
+            .iter()
+            .filter(|expr| !expr.starts_with('{'))
+            .chain(CONDITIONS);
+        let body = tokens("{ body }");
+        for condition in conditions {
+            let input = format!("{condition} {body}");
+            if let Some(expected) = read(syn::Expr::parse_without_eager_brace, &input) {
+                // `syn` reads the body as the value of `return` or a range,
+                // where a block never starts an operand here.
+                let expected = expected
+                    .strip_suffix(&body)
+                    .map_or(&*expected, str::trim_end);
+                assert_eq!(before_block(&input), expected, "{input}");
+            }
+        }
+    }
+
+    #[test]
+    fn never_reads_past_a_comma_while_typing() {
+        // Unclosed generics and closure parameters keep commas on purpose,
+        // and a lifetime cannot be cut in two.
+        let expressions = EXPRESSIONS
+            .iter()
+            .filter(|expr| !expr.contains(['<', '|', '\'']));
+        for expr in expressions {
+            let trees: Vec<TokenTree> = expr.parse::<TokenStream>().unwrap().into_iter().collect();
+            for len in 1..trees.len() {
+                let prefix: TokenStream = trees[..len].iter().cloned().collect();
+                let input = format!("{prefix}, rest");
+                let read: TokenStream = first(&input).parse().unwrap();
+                assert!(read.into_iter().count() <= len, "{input}");
+            }
+        }
+    }
+
+    #[test]
+    fn ends_incomplete_code_after_its_last_token() {
         assert_eq!(split("user., name"), [tokens("user."), tokens("name")]);
-        assert_eq!(first("a + ; b"), tokens("a +"));
+        assert_eq!(first("user. if selected"), tokens("user."));
         assert_eq!(first("user. => body"), tokens("user."));
+        assert_eq!(first("a + ; b"), tokens("a +"));
+        assert_eq!(first("x as , y"), tokens("x as"));
+        assert_eq!(first("if c { a } else , y"), tokens("if c { a } else"));
+        assert_eq!(first("|a, b| a., y"), tokens("|a, b| a."));
+        assert_eq!(first("foo(user.), y"), tokens("foo(user.)"));
     }
 
     #[test]
-    fn keeps_commas_inside_an_incomplete_signature() {
-        assert_eq!(
-            split("|a, b| a., HashMap::<K, V>::new(."),
-            [tokens("|a, b| a."), tokens("HashMap::<K, V>::new(.)")]
-        );
+    fn keeps_commas_in_unclosed_generics_and_closure_parameters() {
         assert_eq!(
             split("HashMap::<String, name"),
             [tokens("HashMap::<String, name")]
         );
-        assert_eq!(split("|a, name"), [tokens("|a, name")]);
+        assert_eq!(first("|a, name; rest"), tokens("|a, name"));
     }
 
     #[test]
-    fn ends_before_a_block() {
-        assert_eq!(
-            before_block("let Point { x, .. } = point { body }"),
-            tokens("let Point { x, .. } = point")
-        );
+    fn ends_an_incomplete_condition_before_the_body() {
         assert_eq!(
             before_block("let Some(x) = user. { body }"),
             tokens("let Some(x) = user.")
         );
-        assert_eq!(first("Point { x } + y"), tokens("Point { x } + y"));
+        assert_eq!(before_block("a == { body }"), tokens("a =="));
+        assert_eq!(before_block("{ body }"), "");
     }
 
     #[test]
