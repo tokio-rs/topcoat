@@ -108,7 +108,7 @@ mod tests {
             "ki",
             "kind:",
             "kind:, rename: \"path\"",
-            r#"kind: Param,"#,
+            "kind: Param,",
         ] {
             assert!(parse(input).is_ok(), "{input}");
         }
@@ -121,7 +121,7 @@ mod tests {
 
     #[test]
     fn writes_each_option_as_a_field() {
-        let expanded = expand(r#"kind: CatchAll, rename: NAME"#);
+        let expanded = expand("kind: CatchAll, rename: NAME");
         assert!(expanded.contains(&tokens("Some (CatchAll)")), "{expanded}");
         assert!(expanded.contains(&tokens("Borrowed (NAME)")), "{expanded}");
         assert!(!expanded.contains("compile_error"), "{expanded}");
