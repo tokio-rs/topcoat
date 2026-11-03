@@ -1,18 +1,19 @@
+use quote::ToTokens;
 use syn::{
     LitStr,
     parse::{Parse, ParseStream},
     spanned::Spanned,
 };
-use topcoat_core_grammar::common::ParseOption;
+use topcoat_core_grammar::common::{ParseOption, lenient};
 
 use crate::{
     template::{
-        MatchArmBody, RuntimeExpr, TemplateBlock, TemplateBreak, TemplateContinue, TemplateExpr,
-        TemplateIf, TemplateLocal, TemplateMatch,
+        MatchArmBody, RuntimeExpr, TemplateBlock, TemplateBreak, TemplateContinue, TemplateIf,
+        TemplateLocal, TemplateMatch,
     },
     view::{
         Component, DocumentType, Element, ForLoop, Nodes,
-        hir::{LowerView, ViewBuilder},
+        hir::{ExprKind, LowerView, ViewBuilder},
     },
 };
 
@@ -23,7 +24,7 @@ pub enum Node {
     DocumentType(DocumentType),
     Element(Box<Element>),
     Component(Component),
-    Expr(TemplateExpr),
+    Expr(lenient::ExprParen),
     RuntimeExpr(RuntimeExpr),
     If(Box<TemplateIf<Nodes>>),
     Local(TemplateLocal),
@@ -57,7 +58,7 @@ impl LowerView for Node {
             Self::DocumentType(inner) => inner.lower(builder),
             Self::Element(inner) => inner.lower(builder),
             Self::Component(inner) => inner.lower(builder),
-            Self::Expr(inner) => inner.lower(builder),
+            Self::Expr(inner) => builder.expr(ExprKind::Node, inner.expr.to_token_stream()),
             Self::RuntimeExpr(inner) => inner.lower(builder),
             Self::If(inner) => inner.lower(builder),
             Self::Local(inner) => inner.lower(builder),
@@ -78,7 +79,7 @@ impl Parse for Node {
             Self::DocumentType(input.parse()?)
         } else if Element::peek(input) {
             Self::Element(input.parse()?)
-        } else if TemplateExpr::peek(input) {
+        } else if lenient::ExprParen::peek(input) {
             Self::Expr(input.parse()?)
         } else if RuntimeExpr::peek(input) {
             Self::RuntimeExpr(input.parse()?)

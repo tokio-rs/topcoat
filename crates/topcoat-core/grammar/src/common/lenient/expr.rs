@@ -1,4 +1,9 @@
+mod paren;
 mod scanner;
+
+use std::fmt;
+
+pub use paren::*;
 
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote_spanned};
@@ -76,6 +81,21 @@ impl ToTokens for Expr {
         } else {
             self.tokens.to_tokens(tokens);
         }
+    }
+}
+
+/// Compares the tokens, ignoring spans.
+impl PartialEq for Expr {
+    fn eq(&self, other: &Self) -> bool {
+        self.tokens.to_string() == other.tokens.to_string()
+    }
+}
+
+impl fmt::Debug for Expr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Expr")
+            .field(&format_args!("{}", self.tokens))
+            .finish()
     }
 }
 

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::Span;
 use quote::ToTokens;
 use syn::{
     Ident, LitStr,
@@ -9,13 +9,11 @@ use syn::{
     spanned::Spanned,
     token::Paren,
 };
+use topcoat_core_grammar::common::lenient;
 
-use crate::{
-    template::TemplateExpr,
-    view::{
-        HtmlIdent,
-        hir::{ExprKind, LowerView, ViewBuilder},
-    },
+use crate::view::{
+    HtmlIdent,
+    hir::{ExprKind, LowerView, ViewBuilder},
 };
 
 /// The name appearing in an [`Element`](super::Element)'s tag. May be an HTML
@@ -26,7 +24,7 @@ use crate::{
 pub enum ElementName {
     Ident(HtmlIdent),
     LitStr(LitStr),
-    Expr(Box<TemplateExpr>),
+    Expr(Box<lenient::ExprParen>),
 }
 
 impl ElementName {
@@ -47,7 +45,7 @@ impl ElementName {
         match self {
             Self::Ident(inner) => inner.span(),
             Self::LitStr(inner) => inner.span(),
-            Self::Expr(inner) => inner.paren.span.span(),
+            Self::Expr(inner) => inner.paren_token.span.span(),
         }
     }
 
@@ -74,7 +72,7 @@ impl ElementName {
     /// Returns the underlying expression if this name was written as
     /// `(expr)`, otherwise `None`.
     #[must_use]
-    pub fn expr(&self) -> Option<&TokenStream> {
+    pub fn expr(&self) -> Option<&lenient::Expr> {
         match self {
             Self::Expr(inner) => Some(&inner.expr),
             _ => None,

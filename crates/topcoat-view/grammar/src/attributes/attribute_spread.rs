@@ -4,11 +4,10 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Paren,
 };
-use topcoat_core_grammar::common::ParseOption;
+use topcoat_core_grammar::common::{ParseOption, lenient};
 
 use crate::{
     attributes::hir::{AttributeBuilder, LowerAttribute},
-    template::TemplateExpr,
     view::hir::{ExprKind, LowerView, ViewBuilder},
 };
 
@@ -22,7 +21,7 @@ use crate::{
 /// is instead a dynamic attribute key (`(name)="value"`), so spreads are only
 /// recognized when no `=` follows.
 pub struct AttributeSpread {
-    pub expr: TemplateExpr,
+    pub expr: lenient::ExprParen,
 }
 
 impl LowerView for AttributeSpread {
@@ -58,7 +57,7 @@ impl ParseOption for AttributeSpread {
         // looking past the parenthesized group on a fork: a `=` means it is a
         // key, anything else (another attribute, `>`, end of input) a spread.
         let fork = input.fork();
-        fork.parse::<TemplateExpr>().is_ok() && !fork.peek(Token![=])
+        fork.parse::<lenient::ExprParen>().is_ok() && !fork.peek(Token![=])
     }
 }
 

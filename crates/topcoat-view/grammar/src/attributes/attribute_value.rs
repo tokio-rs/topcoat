@@ -5,17 +5,15 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Paren,
 };
+use topcoat_core_grammar::common::lenient;
 
-use crate::{
-    template::TemplateExpr,
-    view::hir::{ExprKind, LowerView, ViewBuilder},
-};
+use crate::view::hir::{ExprKind, LowerView, ViewBuilder};
 
 /// The value part of an [`Attribute`](super::Attribute). Either a string
 /// literal (`"foo"`) or a parenthesized Rust expression (`(expr)`) that is
 /// evaluated at render time.
 pub enum AttributeValue {
-    Expr(Box<TemplateExpr>),
+    Expr(Box<lenient::ExprParen>),
     LitStr(LitStr),
 }
 
@@ -46,7 +44,7 @@ impl Parse for AttributeValue {
 impl ToTokens for AttributeValue {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
-            Self::Expr(inner) => inner.to_tokens(tokens),
+            Self::Expr(inner) => inner.expr.to_tokens(tokens),
             Self::LitStr(inner) => inner.to_tokens(tokens),
         }
     }
