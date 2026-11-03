@@ -74,7 +74,6 @@ async fn hello(cx: &Cx, name: &str) -> Result<impl View> {
 Topcoat renders all markup on the server: components can be async and query the database directly, eliminating all the traditional boilerplate needed for a separate API layer. Interactivity does not have to cost a round-trip, though. A `$(...)` expression is ordinary type-checked Rust that Topcoat evaluates on the server for the initial render and also translates to JavaScript, so it re-runs instantly in the browser. No wasm bundle, no client build step:
 
 ```rust,ignore
-# use topcoat::context::Cx;
 #[component]
 async fn faq(cx: &Cx) -> Result<impl View> {
     let open = signal(cx, || false);
@@ -90,7 +89,6 @@ async fn faq(cx: &Cx) -> Result<impl View> {
 When an update does need the server, like fresh search results, mark the component as a `#[shard]`. Topcoat re-renders it on the server whenever one of its `$(...)` arguments changes and swaps the new HTML in place:
 
 ```rust,ignore
-# use topcoat::context::Cx;
 #[component]
 async fn search(cx: &Cx) -> Result<impl View> {
     let query = signal(cx, String::new);
@@ -164,7 +162,6 @@ src/
 Topcoat UI is a component library based on [Tailwind](https://tailwindcss.com/) inspired by [shadcn/ui](https://ui.shadcn.com/). Components are copied into your project via the `topcoat ui` CLI command, meaning you can freely change their design and functionality to fit your use case:
 
 ```rust,ignore
-# use topcoat::context::Cx;
 #[component]
 async fn delete_card(cx: &Cx) -> Result<impl View> {
     Ok(view! {
