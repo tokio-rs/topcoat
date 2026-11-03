@@ -51,6 +51,7 @@ The [`Signals`] extractor deserializes request signals into your type. It reads 
 use serde::{Deserialize, Serialize};
 use topcoat::{
     Result,
+    context::Cx,
     datastar::{PatchSignals, Signals},
     router::route,
 };
@@ -61,7 +62,7 @@ struct Counter {
 }
 
 #[route(POST)]
-async fn increment(Signals(counter): Signals<Counter>) -> Result<PatchSignals> {
+async fn increment(_cx: &Cx, Signals(counter): Signals<Counter>) -> Result<PatchSignals> {
     PatchSignals::json(&Counter {
         count: counter.count + 1,
     })
@@ -110,11 +111,9 @@ use futures_util::stream;
 use serde::Serialize;
 use topcoat::{
     Result,
+    context::Cx,
     datastar::PatchSignals,
-    router::{
-        content::sse::{Event, KeepAlive, Sse},
-        route,
-    },
+    router::{ content::sse::{Event, KeepAlive, Sse}, route, },
 };
 
 #[derive(Serialize)]
@@ -123,7 +122,7 @@ struct Progress {
 }
 
 #[route(GET)]
-async fn progress() -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
+async fn progress(_cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
     let events = stream::iter((0..=100u8).step_by(20).map(|percent| {
         PatchSignals::json(&Progress { percent }).map(Into::into)
     }));

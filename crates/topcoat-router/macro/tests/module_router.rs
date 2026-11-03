@@ -221,15 +221,15 @@ mod api {
     }
 
     #[route(GET "./status")]
-    async fn status() -> Result<&'static str> {
+    async fn status(_cx: &Cx) -> Result<&'static str> {
         Ok("status")
     }
 
     mod v1 {
-        use topcoat::{Result, router::route};
+        use topcoat::{Result, context::Cx, router::route};
 
         #[route(GET "./health")]
-        async fn health() -> Result<&'static str> {
+        async fn health(_cx: &Cx) -> Result<&'static str> {
             Ok("health")
         }
     }

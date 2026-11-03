@@ -1,13 +1,13 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
-    FnArg, Pat, ReturnType, Token,
+    Pat, ReturnType, Token,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
 };
 use topcoat_core_grammar::common::{
-    ParseOption, lenient,
+    ParseOption, SignatureExt, lenient,
     paths::{topcoat_context, topcoat_inventory, topcoat_router, topcoat_view, topcoat_view_macro},
 };
 
@@ -44,8 +44,7 @@ impl topcoat_core_grammar::common::pretty::PrettyPrint for LayoutAttr {
 }
 
 /// The annotated `async fn` that becomes a layout: a component taking the
-/// child content as its `slot` parameter and, optionally, the request
-/// context as `cx`.
+/// request context as `cx` and the child content as its `slot` parameter.
 pub struct LayoutItem {
     item: lenient::ItemFn,
 }
@@ -66,33 +65,22 @@ impl Parse for LayoutItem {
             ));
         }
 
-        let (mut slot, mut cx) = (false, false);
-        for arg in &item.sig.inputs {
-            let FnArg::Typed(pat_type) = arg else {
-                return Err(syn::Error::new_spanned(
-                    arg,
-                    "layout functions cannot take a `self` receiver",
-                ));
-            };
-            let seen = match &*pat_type.pat {
-                Pat::Ident(pat) if pat.ident == "slot" => &mut slot,
-                Pat::Ident(pat) if pat.ident == "cx" => &mut cx,
-                _ => &mut true,
-            };
-            if *seen {
-                return Err(syn::Error::new_spanned(
-                    pat_type,
-                    "layout functions only accept a `slot: Slot<'_>` and an optional `cx: &Cx` parameter",
-                ));
-            }
-            *seen = true;
-        }
-        if !slot {
+        item.sig.cx_param()?;
+        let mut params = item.sig.params();
+        let slot = params.next();
+        if !slot.is_some_and(|slot| matches!(&*slot.pat, Pat::Ident(pat) if pat.ident == "slot")) {
             return Err(syn::Error::new_spanned(
                 &item.sig,
-                "layout functions must take a `slot: Slot<'_>` parameter",
+                "layout functions must take a `slot: Slot<'_>` parameter after `cx`",
             ));
         }
+        if let Some(extra) = params.next() {
+            return Err(syn::Error::new_spanned(
+                extra,
+                "layout functions only take `cx: &Cx` and `slot: Slot<'_>`",
+            ));
+        }
+        drop(params);
 
         Ok(Self { item })
     }
@@ -222,21 +210,9 @@ mod tests {
     }
 
     #[test]
-    fn accepts_a_slot_parameter() {
-        syn::parse_str::<LayoutItem>(
-            "async fn shell(slot: Slot<'_>) -> Result<impl View> { todo!() }",
-        )
-        .unwrap();
-    }
-
-    #[test]
-    fn accepts_cx_and_slot_in_any_order() {
+    fn accepts_cx_and_slot() {
         syn::parse_str::<LayoutItem>(
             "async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> { todo!() }",
-        )
-        .unwrap();
-        syn::parse_str::<LayoutItem>(
-            "async fn shell(slot: Slot<'_>, cx: &Cx) -> Result<impl View> { todo!() }",
         )
         .unwrap();
     }
@@ -244,7 +220,7 @@ mod tests {
     #[test]
     fn rejects_non_async_fn() {
         assert!(
-            parse_err("fn shell(slot: Slot<'_>) -> Result<impl View> { todo!() }")
+            parse_err("fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> { todo!() }")
                 .contains("must be async")
         );
     }
@@ -252,8 +228,16 @@ mod tests {
     #[test]
     fn rejects_missing_return_type() {
         assert!(
-            parse_err("async fn shell(slot: Slot<'_>) {}").contains("must declare a return type")
+            parse_err("async fn shell(cx: &Cx, slot: Slot<'_>) {}")
+                .contains("must declare a return type")
         );
+    }
+
+    #[test]
+    fn rejects_a_missing_or_misplaced_context_parameter() {
+        let err =
+            parse_err("async fn shell(slot: Slot<'_>, cx: &Cx) -> Result<impl View> { todo!() }");
+        assert!(err.contains("cx: &Cx"));
     }
 
     #[test]
@@ -265,25 +249,10 @@ mod tests {
     }
 
     #[test]
-    fn rejects_self_receiver() {
-        let err =
-            parse_err("async fn shell(&self, slot: Slot<'_>) -> Result<impl View> { todo!() }");
-        assert!(err.contains("cannot take a `self` receiver"));
-    }
-
-    #[test]
-    fn rejects_unknown_parameter_names() {
+    fn rejects_extra_parameters() {
         let err = parse_err(
-            "async fn shell(slot: Slot<'_>, body: Form<A>) -> Result<impl View> { todo!() }",
+            "async fn shell(cx: &Cx, slot: Slot<'_>, body: Form<A>) -> Result<impl View> { todo!() }",
         );
-        assert!(err.contains("only accept"));
-    }
-
-    #[test]
-    fn rejects_duplicate_slot_parameters() {
-        let err = parse_err(
-            "async fn shell(slot: Slot<'_>, slot: Slot<'_>) -> Result<impl View> { todo!() }",
-        );
-        assert!(err.contains("only accept"));
+        assert!(err.contains("only take"));
     }
 }

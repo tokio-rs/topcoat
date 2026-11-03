@@ -22,15 +22,13 @@ async fn main() {
 
 // These values are defaults for all pages. Each page can replace individual fields.
 #[layout(
-    with(
-        Metadata::new()
-            .title("Acme")
-            .description("Acme sells everything you need for tea.")
-            .canonical(Url::Current)
-            .theme_color("#0f766e")
-            .open_graph(|og| og.site_name("Acme"))
-            .twitter(|x| x.site("@acme"))
-    )
+    with(Metadata::new()
+        .title("Acme")
+        .description("Acme sells everything you need for tea.")
+        .canonical(Url::Current)
+        .theme_color("#0f766e")
+        .open_graph(|og| og.site_name("Acme"))
+        .twitter(|x| x.site("@acme")))
 )]
 async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {

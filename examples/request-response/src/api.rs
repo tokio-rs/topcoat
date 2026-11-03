@@ -8,12 +8,12 @@ pub(crate) mod signed;
 pub(crate) mod upload;
 pub(crate) mod users;
 
-use topcoat::{Result, router::route};
+use topcoat::{Result, context::Cx, router::route};
 
 use crate::Csv;
 
 // Returning a custom IntoResponse type lets the handler choose headers and body.
 #[route(GET "./report.csv")]
-pub(crate) async fn report() -> Result<Csv> {
+pub(crate) async fn report(_cx: &Cx) -> Result<Csv> {
     Ok(Csv("name,total\nAda,42\nGrace,64\n".to_string()))
 }

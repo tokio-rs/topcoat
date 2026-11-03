@@ -1,13 +1,13 @@
 use syn::{
-    FnArg, Pat, ReturnType,
+    Pat, ReturnType,
     parse::{Parse, ParseStream},
     spanned::Spanned,
 };
-use topcoat_core_grammar::common::lenient;
+use topcoat_core_grammar::common::{SignatureExt, lenient};
 
 /// The annotated `async fn` that becomes a shard. Validates the function
-/// signature: shards must be `async`, must declare a return type, must not
-/// take a `self` receiver, and must use identifier patterns for their
+/// signature: shards must be `async`, must declare a return type, must take
+/// `cx: &Cx` first, and must use identifier patterns for their other
 /// arguments.
 pub struct ShardItem {
     item: lenient::ItemFn,
@@ -35,23 +35,13 @@ impl Parse for ShardItem {
                 "shards must have a return type",
             ));
         }
-        for arg in &item.sig.inputs {
-            match arg {
-                FnArg::Receiver(r) => {
-                    return Err(syn::Error::new_spanned(
-                        r,
-                        "shard functions cannot take a `self` receiver",
-                    ));
-                }
-                FnArg::Typed(pat_type) => match &*pat_type.pat {
-                    Pat::Ident(_) => {}
-                    _ => {
-                        return Err(syn::Error::new_spanned(
-                            pat_type,
-                            "shard function arguments must be identifier patterns",
-                        ));
-                    }
-                },
+        item.sig.cx_param()?;
+        for pat_type in item.sig.params() {
+            if !matches!(&*pat_type.pat, Pat::Ident(_)) {
+                return Err(syn::Error::new_spanned(
+                    pat_type,
+                    "shard function arguments must be identifier patterns",
+                ));
             }
         }
         Ok(Self { item })
@@ -76,23 +66,22 @@ mod tests {
 
     #[test]
     fn rejects_non_async_fn() {
-        assert!(parse_err("fn counter() -> Result {}").contains("shards must be async"));
+        assert!(parse_err("fn counter(cx: &Cx) -> Result {}").contains("shards must be async"));
     }
 
     #[test]
     fn rejects_missing_return_type() {
-        assert!(parse_err("async fn counter() {}").contains("must have a return type"));
+        assert!(parse_err("async fn counter(cx: &Cx) {}").contains("must have a return type"));
     }
 
     #[test]
-    fn rejects_self_receiver() {
-        let err = parse_err("async fn counter(&self) -> Result {}");
-        assert!(err.contains("cannot take a `self` receiver"));
+    fn rejects_missing_context() {
+        assert!(parse_err("async fn counter(count: i64) -> Result {}").contains("cx: &Cx"));
     }
 
     #[test]
     fn rejects_non_ident_pattern() {
-        let err = parse_err("async fn counter((a, b): (u8, u8)) -> Result {}");
+        let err = parse_err("async fn counter(cx: &Cx, (a, b): (u8, u8)) -> Result {}");
         assert!(err.contains("must be identifier patterns"));
     }
 }

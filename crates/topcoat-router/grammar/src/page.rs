@@ -8,12 +8,12 @@ use syn::{
     spanned::Spanned,
 };
 use topcoat_core_grammar::common::{
-    ParseOption, lenient,
+    ParseOption, SignatureExt, lenient,
     paths::{topcoat_context, topcoat_inventory, topcoat_router, topcoat_view, topcoat_view_macro},
 };
 
 use super::{
-    common::{HandlerArg, HandlerArgs, HandlerPath, RouteContext},
+    common::{HandlerPath, HandlerSignatureExt, RouteContext},
     method::Methods,
 };
 
@@ -55,12 +55,11 @@ impl topcoat_core_grammar::common::pretty::PrettyPrint for PageAttr {
     }
 }
 
-/// The annotated `async fn` that becomes a page: a component taking,
-/// optionally, the request context as `cx` and the request body as one
-/// parameter of any pattern, such as `Form(input): Form<T>`.
+/// The annotated `async fn` that becomes a page: a component taking the
+/// request context as `cx` and, optionally, the request body as one parameter
+/// of any pattern, such as `Form(input): Form<T>`.
 pub struct PageItem {
     item: lenient::ItemFn,
-    args: HandlerArgs,
 }
 
 impl Parse for PageItem {
@@ -79,20 +78,9 @@ impl Parse for PageItem {
             ));
         }
 
-        let args = HandlerArgs::parse(&item, "page")?;
-        for (arg, input) in args.iter().zip(&item.sig.inputs) {
-            let (HandlerArg::Cx, FnArg::Typed(pat_type)) = (arg, input) else {
-                continue;
-            };
-            if !matches!(&*pat_type.pat, Pat::Ident(pat) if pat.ident == "cx") {
-                return Err(syn::Error::new_spanned(
-                    pat_type,
-                    "the request context parameter must be named `cx`",
-                ));
-            }
-        }
-
-        Ok(Self { item, args })
+        item.sig.cx_param()?;
+        item.sig.request_param()?;
+        Ok(Self { item })
     }
 }
 
@@ -120,20 +108,22 @@ impl ToTokens for Page {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let attr = &self.0;
         let item = &self.1.item;
-        let args = &self.1.args;
         let ident = &item.sig.ident;
+        let request_ty = item
+            .sig
+            .request_param()
+            .expect("validated by PageItem")
+            .map(|pat_type| &*pat_type.ty);
 
         // The component takes the request body as its `body` prop, so a body
         // parameter bound to another pattern is rebound from `body` inside.
         let mut face = item.clone();
-        for (arg, input) in args.iter().zip(&mut face.sig.inputs) {
-            if let (HandlerArg::Request(_), FnArg::Typed(pat_type)) = (arg, input)
-                && !matches!(&*pat_type.pat, Pat::Ident(pat) if pat.ident == "body")
-            {
-                let pat = std::mem::replace(&mut *pat_type.pat, parse_quote! { body });
-                let stmts = std::mem::take(&mut face.block.stmts);
-                face.block.stmts = quote! { let #pat = body; #stmts };
-            }
+        if let Some(FnArg::Typed(pat_type)) = face.sig.inputs.iter_mut().nth(1)
+            && !matches!(&*pat_type.pat, Pat::Ident(pat) if pat.ident == "body")
+        {
+            let pat = std::mem::replace(&mut *pat_type.pat, parse_quote! { body });
+            let stmts = std::mem::take(&mut face.block.stmts);
+            face.block.stmts = quote! { let #pat = body; #stmts };
         }
         let component = quote! {
             #[#topcoat_view_macro::component]
@@ -142,7 +132,7 @@ impl ToTokens for Page {
 
         // A request that fails to parse becomes the error the view's stream
         // yields, exactly like an error from the page body.
-        let (parse_request, body_prop) = match args.request() {
+        let (parse_request, body_prop) = match request_ty {
             Some(body_ty) => (
                 quote_spanned! {body_ty.span()=>
                     let body = <#body_ty as #topcoat_router::request::FromRequest>::from_request(&cx, body).await?;
@@ -353,66 +343,52 @@ mod tests {
         assert!(syn::parse_str::<PageAttr>("[GET, post] \"/about\"").is_err());
     }
 
+    fn request_param(source: &str) -> bool {
+        let item = syn::parse_str::<PageItem>(source).unwrap();
+        item.item.sig.request_param().unwrap().is_some()
+    }
+
     #[test]
     fn accepts_async_fn_with_return_type() {
-        let item = syn::parse_str::<PageItem>("async fn home() -> Result { todo!() }").unwrap();
-        assert!(item.args.request().is_none());
+        assert!(!request_param(
+            "async fn home(cx: &Cx) -> Result { todo!() }"
+        ));
     }
 
     #[test]
     fn accepts_a_body_parameter() {
-        let item =
-            syn::parse_str::<PageItem>("async fn search(body: Form<Search>) -> Result { todo!() }")
-                .unwrap();
-        assert!(item.args.request().is_some());
-    }
-
-    #[test]
-    fn accepts_a_destructured_body_parameter() {
-        let item = syn::parse_str::<PageItem>(
-            "async fn search(Form(input): Form<Search>) -> Result { todo!() }",
-        )
-        .unwrap();
-        assert!(item.args.request().is_some());
-    }
-
-    #[test]
-    fn accepts_cx_and_body_in_any_order() {
-        syn::parse_str::<PageItem>(
-            "async fn search(cx: &Cx, body: Form<Search>) -> Result { todo!() }",
-        )
-        .unwrap();
-        syn::parse_str::<PageItem>(
-            "async fn search(body: Form<Search>, cx: &Cx) -> Result { todo!() }",
-        )
-        .unwrap();
+        assert!(request_param(
+            "async fn search(cx: &Cx, body: Form<Search>) -> Result { todo!() }"
+        ));
+        assert!(request_param(
+            "async fn search(cx: &Cx, Form(input): Form<Search>) -> Result { todo!() }"
+        ));
     }
 
     #[test]
     fn rejects_non_async_fn() {
-        assert!(parse_err("fn home() -> Result { todo!() }").contains("must be async"));
+        assert!(parse_err("fn home(cx: &Cx) -> Result { todo!() }").contains("must be async"));
     }
 
     #[test]
     fn rejects_missing_return_type() {
-        assert!(parse_err("async fn home() {}").contains("must declare a return type"));
+        assert!(parse_err("async fn home(cx: &Cx) {}").contains("must declare a return type"));
     }
 
     #[test]
-    fn rejects_self_receiver() {
-        let err = parse_err("async fn home(&self) -> Result { todo!() }");
-        assert!(err.contains("cannot take a `self` receiver"));
-    }
-
-    #[test]
-    fn rejects_a_misnamed_context_parameter() {
-        let err = parse_err("async fn home(context: &Cx) -> Result { todo!() }");
-        assert!(err.contains("must be named `cx`"));
+    fn rejects_a_missing_or_misplaced_context_parameter() {
+        for source in [
+            "async fn home() -> Result { todo!() }",
+            "async fn home(context: &Cx) -> Result { todo!() }",
+            "async fn search(body: Form<Search>, cx: &Cx) -> Result { todo!() }",
+        ] {
+            assert!(parse_err(source).contains("cx: &Cx"), "{source}");
+        }
     }
 
     #[test]
     fn rejects_multiple_request_parameters() {
-        let err = parse_err("async fn home(a: Form<A>, b: Form<B>) -> Result { todo!() }");
+        let err = parse_err("async fn home(cx: &Cx, a: Form<A>, b: Form<B>) -> Result { todo!() }");
         assert!(err.contains("more than one request body parameter"));
     }
 }

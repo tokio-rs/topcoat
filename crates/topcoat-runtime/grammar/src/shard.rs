@@ -5,9 +5,12 @@ pub use attr::*;
 pub use item::*;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
-use topcoat_core_grammar::common::paths::{
-    topcoat_context, topcoat_error, topcoat_inventory, topcoat_router, topcoat_runtime,
-    topcoat_view, topcoat_view_macro,
+use topcoat_core_grammar::common::{
+    SignatureExt,
+    paths::{
+        topcoat_context, topcoat_error, topcoat_inventory, topcoat_router, topcoat_runtime,
+        topcoat_view, topcoat_view_macro,
+    },
 };
 
 use crate::common::EndpointPath;
@@ -47,21 +50,10 @@ impl ToTokens for Shard {
         let output = &item.sig.output;
         let block = &item.block;
 
-        // Split the inputs into the optional `cx` parameter and the value
-        // parameters that become shard arguments.
-        let mut has_cx = false;
+        // The value parameters after `cx` become shard arguments.
         let mut value_idents = Vec::new();
         let mut value_tys = Vec::new();
-        for input in inputs {
-            let syn::FnArg::Typed(pat_type) = input else {
-                unreachable!("validated by ShardItem")
-            };
-            if let syn::Pat::Ident(pat_ident) = &*pat_type.pat
-                && pat_ident.ident == "cx"
-            {
-                has_cx = true;
-                continue;
-            }
+        for pat_type in item.sig.params() {
             let syn::Pat::Ident(pat_ident) = &*pat_type.pat else {
                 unreachable!("validated by ShardItem")
             };
@@ -75,14 +67,6 @@ impl ToTokens for Shard {
             .iter()
             .map(|id| format_ident!("__topcoat_js_{}", id))
             .collect();
-
-        // Arguments forwarded to the hidden implementation: `cx` (when
-        // present) followed by the value parameters.
-        let call_args = has_cx
-            .then(|| quote!(cx))
-            .into_iter()
-            .chain(value_idents.iter().map(|id| quote!(#id)));
-        let call_args: Vec<_> = call_args.collect();
 
         // The component face accepts a value or expression for each parameter.
         // Bound to a local because it is interpolated inside the `#(...)*`
@@ -134,7 +118,7 @@ impl ToTokens for Shard {
                     #url,
                     ::std::vec![#(#js_idents),*],
                     #topcoat_view::HoistView::new(#topcoat_view::internal::ThenView::new(
-                        #ident::handler(#(#call_args),*),
+                        #ident::handler(cx, #(#value_idents),*),
                     )),
                 ))
             }
@@ -198,12 +182,11 @@ impl ToTokens for Shard {
                         // the build, whose content is self-contained.
                         let __owned = cx.clone();
                         let __view = #topcoat_view::internal::MoveView::new(async move {
-                            #[allow(unused_variables)]
                             let cx = &__owned;
                             let __view = #topcoat_view::internal::ScopeView::new(
                                 #topcoat_view::HoistView::new(
                                     #topcoat_view::internal::ThenView::new(
-                                        #ident::handler(#(#call_args),*),
+                                        #ident::handler(cx, #(#value_idents),*),
                                     ),
                                 ),
                             );
@@ -253,7 +236,7 @@ mod tests {
             TokenStream::new(),
             quote! {
                 /// Counts clicks.
-                async fn counter(count: i64) -> Result<impl View> { todo!() }
+                async fn counter(cx: &Cx, count: i64) -> Result<impl View> { todo!() }
             },
         )
         .unwrap();
@@ -268,7 +251,7 @@ mod tests {
         let shard = Shard::parse(
             quote! { "/search" },
             quote! {
-                async fn counter(count: i64) -> Result<impl View> { todo!() }
+                async fn counter(cx: &Cx, count: i64) -> Result<impl View> { todo!() }
             },
         )
         .unwrap();
@@ -282,7 +265,7 @@ mod tests {
         let shard = Shard::parse(
             TokenStream::new(),
             quote! {
-                async fn counter(count: i64) -> Result<impl View> { todo!() }
+                async fn counter(cx: &Cx, count: i64) -> Result<impl View> { todo!() }
             },
         )
         .unwrap();
@@ -295,7 +278,7 @@ mod tests {
         let shard = Shard::parse(
             quote! { "/(api)/search" },
             quote! {
-                async fn counter(count: i64) -> Result<impl View> { todo!() }
+                async fn counter(cx: &Cx, count: i64) -> Result<impl View> { todo!() }
             },
         )
         .unwrap();

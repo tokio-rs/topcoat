@@ -69,7 +69,7 @@ async fn shell(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
 
 /// Handles ordinary form submissions at the same URL as the search page.
 #[route(POST "/search")]
-async fn submit() -> Result<&'static str> {
+async fn submit(_cx: &Cx) -> Result<&'static str> {
     Ok("submitted")
 }
 

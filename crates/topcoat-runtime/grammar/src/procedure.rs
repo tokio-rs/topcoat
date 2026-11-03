@@ -1,13 +1,13 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 use syn::{
-    FnArg, Pat, PatIdent, PatType, ReturnType, Visibility,
+    ReturnType, Visibility,
     parse::{Parse, ParseStream},
     parse_quote,
     spanned::Spanned,
 };
 use topcoat_core_grammar::common::{
-    ParseOption, lenient,
+    ParseOption, SignatureExt, lenient,
     paths::{
         topcoat_context, topcoat_error, topcoat_internal, topcoat_inventory, topcoat_router,
         topcoat_runtime,
@@ -40,8 +40,8 @@ impl topcoat_core_grammar::common::pretty::PrettyPrint for ProcedureAttr {
 }
 
 /// The annotated `async fn` that becomes a procedure. Validates the function
-/// signature: procedures must be `async`, must declare a return type, and must
-/// not take a `self` receiver.
+/// signature: procedures must be `async`, must declare a return type, and
+/// must take `cx: &Cx` first.
 pub struct ProcedureItem {
     item: lenient::ItemFn,
 }
@@ -61,14 +61,7 @@ impl Parse for ProcedureItem {
                 "procedures must have a return type",
             ));
         }
-        for arg in &item.sig.inputs {
-            if let FnArg::Receiver(r) = arg {
-                return Err(syn::Error::new_spanned(
-                    r,
-                    "procedure functions cannot take a `self` receiver",
-                ));
-            }
-        }
+        item.sig.cx_param()?;
         Ok(Self { item })
     }
 }
@@ -124,35 +117,13 @@ impl ToTokens for Procedure {
         // argument tuple from the request body, forwards to the user's
         // function positionally, and serializes the returned value back into
         // a surrogate response.
-        let mut args = Vec::new();
-        let mut args_with_cx = Vec::new();
-        let mut arg_index = 0;
-        for arg in &item.sig.inputs {
-            match arg {
-                FnArg::Typed(PatType { pat, .. }) => match &**pat {
-                    Pat::Ident(PatIdent { ident, .. }) if ident == "cx" => {
-                        args_with_cx.push(ident.clone());
-                    }
-                    _ => {
-                        args.push(format_ident!("arg{arg_index}"));
-                        args_with_cx.push(format_ident!("arg{arg_index}"));
-                        arg_index += 1;
-                    }
-                },
-                FnArg::Receiver(_) => unreachable!("validated by ProcedureItem"),
-            }
-        }
         let arg_tys = item
             .sig
-            .inputs
-            .iter()
-            .filter_map(|arg| match arg {
-                FnArg::Typed(PatType { pat, ty, .. }) => match &**pat {
-                    Pat::Ident(PatIdent { ident, .. }) if ident == "cx" => None,
-                    _ => Some(ty),
-                },
-                FnArg::Receiver(_) => None,
-            })
+            .params()
+            .map(|pat_type| &pat_type.ty)
+            .collect::<Vec<_>>();
+        let args = (0..arg_tys.len())
+            .map(|index| format_ident!("arg{index}"))
             .collect::<Vec<_>>();
         let handler = quote! {
             impl #ident {
@@ -166,7 +137,7 @@ impl ToTokens for Procedure {
                     let #topcoat_router::content::Json(#topcoat_runtime::Arguments(args)) =
                         <#topcoat_router::content::Json<#topcoat_runtime::Arguments<Surrogate>> as #topcoat_router::request::FromRequest>::from_request(cx, body).await?;
                     let (#(#args,)*) = #topcoat_runtime::Surrogate::into_real(args);
-                    let response = #topcoat_runtime::Surrogated::into_surrogate(#ident(#(#args_with_cx),*).await?);
+                    let response = #topcoat_runtime::Surrogated::into_surrogate(#ident(cx, #(#args),*).await?);
                     #topcoat_router::response::IntoResponse::into_response(#topcoat_router::content::Json(response), cx)
                 }
             }
@@ -277,32 +248,31 @@ mod tests {
         // Only argument types reach the generated call, so destructuring
         // patterns stay valid; the re-emitted function unpacks them.
         syn::parse_str::<ProcedureItem>(
-            "async fn shift((x, y): (f64, f64)) -> Result<(f64, f64)> {}",
+            "async fn shift(cx: &Cx, (x, y): (f64, f64)) -> Result<(f64, f64)> {}",
         )
         .unwrap();
     }
 
     #[test]
     fn rejects_non_async_fn() {
-        assert!(parse_err("fn double() -> Result<f64> {}").contains("must be async"));
+        assert!(parse_err("fn double(cx: &Cx) -> Result<f64> {}").contains("must be async"));
     }
 
     #[test]
     fn rejects_missing_return_type() {
-        assert!(parse_err("async fn double() {}").contains("must have a return type"));
+        assert!(parse_err("async fn double(cx: &Cx) {}").contains("must have a return type"));
     }
 
     #[test]
-    fn rejects_self_receiver() {
-        let err = parse_err("async fn double(&self) -> Result<f64> {}");
-        assert!(err.contains("cannot take a `self` receiver"));
+    fn rejects_missing_context() {
+        assert!(parse_err("async fn double(value: f64) -> Result<f64> {}").contains("cx: &Cx"));
     }
 
     #[test]
     fn a_named_path_replaces_the_default_route() {
         let procedure = Procedure::parse(
             quote! { "/api/double" },
-            quote! { async fn double(value: f64) -> Result<f64> { todo!() } },
+            quote! { async fn double(cx: &Cx, value: f64) -> Result<f64> { todo!() } },
         )
         .unwrap();
         let out = procedure.to_token_stream().to_string();
@@ -314,7 +284,7 @@ mod tests {
     fn a_procedure_without_a_path_is_served_below_the_default_prefix() {
         let procedure = Procedure::parse(
             TokenStream::new(),
-            quote! { async fn double(value: f64) -> Result<f64> { todo!() } },
+            quote! { async fn double(cx: &Cx, value: f64) -> Result<f64> { todo!() } },
         )
         .unwrap();
         let out = procedure.to_token_stream().to_string();
@@ -325,7 +295,7 @@ mod tests {
     fn the_surrogate_carries_the_url_without_group_segments() {
         let procedure = Procedure::parse(
             quote! { "/(api)/double" },
-            quote! { async fn double(value: f64) -> Result<f64> { todo!() } },
+            quote! { async fn double(cx: &Cx, value: f64) -> Result<f64> { todo!() } },
         )
         .unwrap();
         let out = procedure.to_token_stream().to_string();

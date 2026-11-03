@@ -63,6 +63,8 @@ assert_eq!(url_form(&cx), UrlForm::Relative);
 assert_eq!(url_form(&email_context(&cx)), UrlForm::Absolute);
 ```
 
+To provide values to a newly constructed view and its nested components, shadow the surrounding binding with `let cx = cx.with(value);` before calling [`view!`](crate::view::view). See the macro's [request context](crate::view::view#request-context) example.
+
 A [layer](crate::router#layers) can add values for the rest of the request by passing a child context to [`next.run`](crate::router::Next::run). For data that code can load when it needs it, such as the current user, prefer [helper functions](#functions-not-middlewares).
 
 To add several values at once, pass a tuple to [`Cx::with_many`]. The result is the same as calling `with` for each value, but it creates one child context instead of one per value, so it is more efficient.

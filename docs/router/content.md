@@ -52,11 +52,12 @@ A tuple builds a response from several parts. The last element is the body, a le
 # #[derive(serde::Serialize)] struct User { name: String }
 use topcoat::{
     Result,
+    context::Cx,
     router::{StatusCode, content::Json, route},
 };
 
 #[route(POST)]
-async fn create_user() -> Result<(StatusCode, Json<User>)> {
+async fn create_user(_cx: &Cx) -> Result<(StatusCode, Json<User>)> {
     let user = User {
         name: "Ada".to_string(),
     };

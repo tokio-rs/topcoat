@@ -1,5 +1,6 @@
 use topcoat::{
     Result,
+    context::Cx,
     router::{content::Json, route},
 };
 
@@ -8,7 +9,7 @@ use crate::User;
 // Option<Json<T>> is None when the request carries no JSON body, and still
 // errors when a malformed body is present.
 #[route(POST)]
-pub(crate) async fn maybe_user(user: Option<Json<User>>) -> Result<String> {
+pub(crate) async fn maybe_user(_cx: &Cx, user: Option<Json<User>>) -> Result<String> {
     match user {
         Some(Json(user)) => Ok(format!("got user {}", user.name)),
         None => Ok("no user provided".to_string()),

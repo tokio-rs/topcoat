@@ -8,6 +8,8 @@ Use `#[layout]` without a path string with [module routing](macro.module_router.
 
 The function must be `async` and return a [`Result`](../type.Result.html) containing a [`View`](../view/trait.View.html). It receives the inner content as `slot: Slot<'_>` and may also take [`cx: &Cx`](../context/struct.Cx.html). The macro recognizes these parameters by name. They may appear in either order, and no other parameters are accepted.
 
+Declare `cx: &Cx` when the body uses [`view!`](../view/macro.view.html) or another macro that requires context.
+
 Render `slot` where the inner content should appear. Wrap it in an [`error_boundary`](../view/struct.error_boundary.html) to show a custom view if it fails. See the [error guide](../router/error/index.html).
 
 # Route context

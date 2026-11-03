@@ -184,7 +184,7 @@ A **procedure** is an async server function called from a runtime expression. Us
 ```rust
 # use topcoat::{Result, context::Cx, runtime::{procedure, signal}, view::*};
 #[procedure]
-async fn double(value: usize) -> Result<usize> {
+async fn double(_cx: &Cx, value: usize) -> Result<usize> {
     Ok(value * 2)
 }
 

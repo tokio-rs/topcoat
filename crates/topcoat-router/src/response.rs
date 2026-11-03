@@ -62,7 +62,7 @@ const APPLICATION_OCTET_STREAM: HeaderValue = HeaderValue::from_static("applicat
 /// }
 ///
 /// #[route(GET "./report.csv")]
-/// async fn report() -> Result<Csv> {
+/// async fn report(_cx: &Cx) -> Result<Csv> {
 ///     Ok(Csv("name,total\nAda,42\n".to_string()))
 /// }
 /// ```

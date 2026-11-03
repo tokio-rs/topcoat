@@ -140,21 +140,21 @@ pub async fn open_graph(
         ({
             let cx = &absolute;
             view! {
-            if let Some(url) = og.url() {
-                <meta property="og:url" content=(url)>
-            }
-            for image in og.images() {
-                <meta property="og:image" content=(&image.url)>
-                if let Some(width) = image.width {
-                    <meta property="og:image:width" content=(width)>
+                if let Some(url) = og.url() {
+                    <meta property="og:url" content=(url)>
                 }
-                if let Some(height) = image.height {
-                    <meta property="og:image:height" content=(height)>
+                for image in og.images() {
+                    <meta property="og:image" content=(&image.url)>
+                    if let Some(width) = image.width {
+                        <meta property="og:image:width" content=(width)>
+                    }
+                    if let Some(height) = image.height {
+                        <meta property="og:image:height" content=(height)>
+                    }
+                    if let Some(alt) = &image.alt {
+                        <meta property="og:image:alt" content=(alt)>
+                    }
                 }
-                if let Some(alt) = &image.alt {
-                    <meta property="og:image:alt" content=(alt)>
-                }
-            }
             }
         })
     })

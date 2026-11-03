@@ -33,7 +33,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
 }
 
 #[route(GET "/api/health")]
-async fn health() -> Result<&'static str> {
+async fn health(_cx: &Cx) -> Result<&'static str> {
     Ok("ok")
 }
 
@@ -56,7 +56,7 @@ Use [`href!`](macro@href) for URLs targeting Topcoat handlers, including navigat
 use topcoat::{context::Cx, router::href, view::view};
 # use topcoat::{Result, router::{page, route}, view::View};
 # #[page("/posts")] async fn posts(cx: &Cx) -> Result<impl View> { Ok(topcoat::view::view! { "Posts" }) }
-# #[route(POST "/posts")] async fn publish() -> Result<()> { Ok(()) }
+# #[route(POST "/posts")] async fn publish(_cx: &Cx) -> Result<()> { Ok(()) }
 # mod post_id {
 #     use super::*;
 #     topcoat::router::path_param!(pub post_id: u64);
@@ -216,10 +216,10 @@ An API route is an async function annotated with [`#[route]`](macro@route) and a
 
 ```rust
 // src/app/api/health.rs
-use topcoat::{Result, router::route};
+use topcoat::{Result, context::Cx, router::route};
 
 #[route(GET)]
-async fn health() -> Result<&'static str> {
+async fn health(_cx: &Cx) -> Result<&'static str> {
     Ok("ok")
 }
 ```
@@ -416,7 +416,7 @@ For routes with explicit paths, register each handler with `.page()`, `.layout()
 # #[page("/")] async fn home(cx: &Cx) -> Result<impl View> { Ok(view! { <h1>"Home"</h1> }) }
 # #[page("/about")] async fn about(cx: &Cx) -> Result<impl View> { Ok(view! { <h1>"About"</h1> }) }
 # #[page("/settings/profile")] async fn profile(cx: &Cx) -> Result<impl View> { Ok(view! { <h1>"Profile"</h1> }) }
-# #[route(GET "/api/health")] async fn health() -> Result<&'static str> { Ok("ok") }
+# #[route(GET "/api/health")] async fn health(_cx: &Cx) -> Result<&'static str> { Ok("ok") }
 use topcoat::router::Router;
 
 pub fn router() -> Router {
@@ -576,13 +576,13 @@ async fn user_profile(cx: &Cx) -> Result<impl View> {
 }
 
 #[route(GET "/api/health")]
-async fn health() -> Result<&'static str> {
+async fn health(_cx: &Cx) -> Result<&'static str> {
     Ok("ok")
 }
 
 // Reads a JSON request body and echoes it back as a JSON response.
 #[route(POST "/api/users")]
-async fn create_user(Json(user): Json<NewUser>) -> Result<Json<NewUser>> {
+async fn create_user(_cx: &Cx, Json(user): Json<NewUser>) -> Result<Json<NewUser>> {
     Ok(Json(user))
 }
 

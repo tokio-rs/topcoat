@@ -4,7 +4,9 @@ use syn::{
     LitStr,
     parse::{Parse, ParseStream},
 };
-use topcoat_core_grammar::common::paths::{topcoat_error, topcoat_router, topcoat_router_macro};
+use topcoat_core_grammar::common::paths::{
+    topcoat_context, topcoat_error, topcoat_router, topcoat_router_macro,
+};
 
 /// The `not_found!` macro input: an optional URL path prefix.
 pub struct NotFound {
@@ -49,7 +51,7 @@ impl ToTokens for NotFound {
                 /// The catch-all page declared by `not_found!`, resolving
                 /// every request it serves to a not-found error.
                 #[#topcoat_router_macro::page(#attr)]
-                pub async fn not_found() -> #result {
+                pub async fn not_found(_cx: &#topcoat_context::Cx) -> #result {
                     ::core::result::Result::Err(#topcoat_router::error::not_found().into())
                 }
             }

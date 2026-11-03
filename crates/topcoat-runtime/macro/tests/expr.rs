@@ -179,7 +179,7 @@ async fn a_signal_is_declared_once_ahead_of_every_capture() {
 }
 
 #[procedure]
-async fn test_procedure(v: String) -> Result<String, std::convert::Infallible> {
+async fn test_procedure(_cx: &Cx, v: String) -> Result<String, std::convert::Infallible> {
     Ok(v)
 }
 
@@ -365,13 +365,11 @@ async fn constants_and_captured_values_render_without_bindings() {
     assert!(expr!(true).is_static());
     let captured = String::from("<&");
     assert!(expr!(captured.to_owned()).is_static());
-    let html = view! {
-        <p :title=$(captured.to_owned())>$(captured.to_owned())</p>
-    }
-    .single()
-    .await
-    .unwrap()
-    .render(cx);
+    let html = view! { <p :title=$(captured.to_owned())>$(captured.to_owned())</p> }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
 
     assert_eq!(html, "<p title=\"<&amp;\">&lt;&amp;</p>");
 }

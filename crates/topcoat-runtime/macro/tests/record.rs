@@ -3,6 +3,7 @@
 use serde_json::json;
 use topcoat::{
     Result,
+    context::Cx,
     runtime::{Expr, Surrogate, Surrogated, expr, procedure, record},
 };
 
@@ -129,7 +130,7 @@ fn records_without_clone_are_usable() {
 }
 
 #[procedure]
-async fn total(order: Order) -> Result<Item> {
+async fn total(_cx: &Cx, order: Order) -> Result<Item> {
     Ok(Item {
         name: order.r#type,
         count: order.items.iter().map(|item| item.count).sum(),

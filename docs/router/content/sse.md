@@ -11,14 +11,12 @@ Return [`Sse`] with the stream of events to send. Build each [`Event`] with [`da
 use futures_core::Stream;
 use topcoat::{
     Result,
-    router::{
-        content::sse::{Event, KeepAlive, Sse},
-        route,
-    },
+    context::Cx,
+    router::{ content::sse::{Event, KeepAlive, Sse}, route, },
 };
 
 #[route(GET)]
-async fn events() -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
+async fn events(_cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
     let events = futures_util::stream::iter(
         ["one", "two", "three"].map(|name| Ok(Event::new().event("named").data(name))),
     );

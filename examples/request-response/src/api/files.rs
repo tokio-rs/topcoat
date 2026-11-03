@@ -1,12 +1,13 @@
 use topcoat::{
     Result,
+    context::Cx,
     router::{content::multipart::Multipart, route},
 };
 
 // Multipart streams multipart/form-data fields, commonly used for file uploads.
 // Available with the `multipart` feature.
 #[route(POST)]
-pub(crate) async fn files(mut multipart: Multipart) -> Result<String> {
+pub(crate) async fn files(_cx: &Cx, mut multipart: Multipart) -> Result<String> {
     let mut total = 0;
 
     while let Some(field) = multipart.next_field().await? {

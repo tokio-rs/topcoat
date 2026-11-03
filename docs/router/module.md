@@ -109,10 +109,10 @@ async fn about(cx: &Cx) -> Result<impl View> {
 An API route declares one method, a method list, or every method:
 
 ```rust
-# use topcoat::{Result, router::route};
+# use topcoat::{Result, context::Cx, router::route};
 // src/app/api/health.rs: GET /api/health
 #[route(GET)]
-async fn health() -> Result<&'static str> {
+async fn health(_cx: &Cx) -> Result<&'static str> {
     Ok("ok")
 }
 ```

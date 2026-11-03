@@ -13,7 +13,10 @@ use syn::{
     spanned::Spanned,
     visit_mut::{self, VisitMut},
 };
-use topcoat_core_grammar::common::paths::{topcoat_context, topcoat_view, topcoat_view_macro};
+use topcoat_core_grammar::common::{
+    SignatureExt,
+    paths::{topcoat_context, topcoat_view, topcoat_view_macro},
+};
 
 /// A parsed `#[component] async fn ...`. Expands into:
 ///
@@ -100,27 +103,20 @@ impl ToTokens for Component {
             params: Vec::new(),
         };
 
-        for input in &self.item.item().sig.inputs {
-            let FnArg::Typed(pat_type) = input else {
-                unreachable!("validated in Parse");
-            };
+        for pat_type in self.item.item().sig.params() {
             let Pat::Ident(pi) = &*pat_type.pat else {
                 unreachable!("validated in Parse");
             };
-            if pi.ident == "cx" {
-                args.push(quote! { __cx });
-            } else {
-                let mut ty = (*pat_type.ty).clone();
-                field_lifetimes.visit_type_mut(&mut ty);
-                impl_traits_visitor.prefix = pi.ident.unraw().to_string().to_pascal_case();
-                impl_traits_visitor.count = 0;
-                impl_traits_visitor.visit_type_mut(&mut ty);
+            let mut ty = (*pat_type.ty).clone();
+            field_lifetimes.visit_type_mut(&mut ty);
+            impl_traits_visitor.prefix = pi.ident.unraw().to_string().to_pascal_case();
+            impl_traits_visitor.count = 0;
+            impl_traits_visitor.visit_type_mut(&mut ty);
 
-                let attrs = &pat_type.attrs;
-                let field_ident = &pi.ident;
-                fields.push(quote! { #(#attrs)* #vis #field_ident: #ty });
-                args.push(quote! { props.#field_ident });
-            }
+            let attrs = &pat_type.attrs;
+            let field_ident = &pi.ident;
+            fields.push(quote! { #(#attrs)* #vis #field_ident: #ty });
+            args.push(quote! { props.#field_ident });
         }
 
         if field_lifetimes.used {
@@ -212,7 +208,7 @@ impl ToTokens for Component {
         let render = quote! {
             fn render<'__a, '__props>(
                 self,
-                __cx: &'__a #topcoat_context::Cx,
+                cx: &'__a #topcoat_context::Cx,
                 props: Self::Props<'__props>,
             ) -> impl Future<Output = #return_ty> + ::core::marker::Send + '__a
             where
@@ -221,7 +217,7 @@ impl ToTokens for Component {
                 Self::Props<'__props>: '__a,
             {
                 #item
-                #ident(#(#args),*)
+                #ident(cx, #(#args),*)
             }
         };
 
@@ -324,7 +320,7 @@ mod tests {
             TokenStream::new(),
             quote! {
                 /// Renders a badge.
-                async fn badge(label: &str) -> Result { todo!() }
+                async fn badge(cx: &Cx, label: &str) -> Result { todo!() }
             },
         )
         .unwrap();

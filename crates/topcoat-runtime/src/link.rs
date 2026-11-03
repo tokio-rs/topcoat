@@ -202,9 +202,7 @@ mod tests {
         let html = render(view! { link(href: "/", "Home") });
         assert!(html.contains(r#"data-topcoat-link="viewport""#), "{html}");
 
-        let explicit = render(view! {
-            link(href: "/", prefetch: PrefetchMode::Never, "Home")
-        });
+        let explicit = render(view! { link(href: "/", prefetch: PrefetchMode::Never, "Home") });
         assert!(
             explicit.contains(r#"data-topcoat-link="never""#),
             "{explicit}"

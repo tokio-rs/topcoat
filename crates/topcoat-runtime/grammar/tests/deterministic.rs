@@ -71,7 +71,7 @@ fn shard_with_path() {
         Shard::parse(
             quote! { "/search/results" },
             quote! {
-                async fn results(query: String) -> Result<impl View> {
+                async fn results(cx: &Cx, query: String) -> Result<impl View> {
                     Ok(view! { <p>(query)</p> })
                 }
             },

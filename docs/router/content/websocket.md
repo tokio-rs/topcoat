@@ -10,15 +10,12 @@ Accept a [`WebSocketUpgrade`] parameter and return the response from [`on_upgrad
 // src/app/echo.rs
 use topcoat::{
     Result,
-    router::{
-        content::websocket::{Message, WebSocketUpgrade},
-        response::Response,
-        route,
-    },
+    context::Cx,
+    router::{ content::websocket::{Message, WebSocketUpgrade}, response::Response, route, },
 };
 
 #[route(GET)]
-async fn echo(upgrade: WebSocketUpgrade) -> Result<Response> {
+async fn echo(_cx: &Cx, upgrade: WebSocketUpgrade) -> Result<Response> {
     upgrade.on_upgrade(|mut socket| async move {
         while let Some(Ok(message)) = socket.recv().await {
             if matches!(message, Message::Text(_) | Message::Binary(_))

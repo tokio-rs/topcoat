@@ -28,6 +28,7 @@ use crate::datastar_request;
 /// use serde::{Deserialize, Serialize};
 /// use topcoat::{
 ///     Result,
+///     context::Cx,
 ///     datastar::{PatchSignals, Signals},
 ///     router::route,
 /// };
@@ -38,7 +39,7 @@ use crate::datastar_request;
 /// }
 ///
 /// #[route(POST)]
-/// async fn increment(Signals(counter): Signals<Counter>) -> Result<PatchSignals> {
+/// async fn increment(_cx: &Cx, Signals(counter): Signals<Counter>) -> Result<PatchSignals> {
 ///     PatchSignals::json(&Counter {
 ///         count: counter.count + 1,
 ///     })

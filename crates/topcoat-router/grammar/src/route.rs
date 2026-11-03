@@ -8,12 +8,12 @@ use syn::{
     spanned::Spanned,
 };
 use topcoat_core_grammar::common::{
-    ParseOption, lenient,
+    ParseOption, SignatureExt, lenient,
     paths::{topcoat_context, topcoat_inventory, topcoat_router},
 };
 
 use super::{
-    common::{HandlerArg, HandlerArgs, HandlerPath, RouteContext, request_ident},
+    common::{HandlerPath, HandlerSignatureExt, RouteContext, request_ident},
     method::Methods,
 };
 
@@ -54,7 +54,6 @@ impl topcoat_core_grammar::common::pretty::PrettyPrint for RouteAttr {
 
 pub struct RouteItem {
     item: lenient::ItemFn,
-    args: HandlerArgs,
 }
 
 impl Parse for RouteItem {
@@ -72,8 +71,9 @@ impl Parse for RouteItem {
                 "route functions must declare a return type",
             ));
         }
-        let args = HandlerArgs::parse(&item, "route")?;
-        Ok(Self { item, args })
+        item.sig.cx_param()?;
+        item.sig.request_param()?;
+        Ok(Self { item })
     }
 }
 
@@ -101,7 +101,6 @@ impl ToTokens for Route {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let attr = &self.0;
         let item = &self.1.item;
-        let args = &self.1.args;
         let vis = &item.vis;
         let ident = &item.sig.ident;
         let output = &item.sig.output;
@@ -129,17 +128,19 @@ impl ToTokens for Route {
         // through the type rather than lexical scope, so `#ident::handler` is
         // callable from the trait implementation below. It forwards to the
         // user's function positionally, in declared parameter order.
-        let body_param = args.request().map(|ty| quote! { , body: #ty });
-        let forward_args = args.iter().map(|arg| match arg {
-            HandlerArg::Cx => quote! { __cx },
-            HandlerArg::Request(_) => quote! { body },
-        });
+        let request_ty = item
+            .sig
+            .request_param()
+            .expect("validated by RouteItem")
+            .map(|pat_type| &*pat_type.ty);
+        let body_param = request_ty.map(|ty| quote! { , body: #ty });
+        let body_arg = request_ty.map(|_| quote! { , body });
         let handler = quote! {
             impl #ident {
-                async fn handler(__cx: &#topcoat_context::Cx #body_param) #output {
+                async fn handler(cx: &#topcoat_context::Cx #body_param) #output {
                     #inner
 
-                    #ident(#(#forward_args),*).await
+                    #ident(cx #body_arg).await
                 }
             }
         };
@@ -149,13 +150,13 @@ impl ToTokens for Route {
         // and converts the returned value into a response. A route with an
         // explicit path is a `Route`; one without derives its path from the
         // module tree through the module router as a `ModuleRoute`.
-        let parse_request = args.request().map(|request_ty| {
+        let parse_request = request_ty.map(|request_ty| {
             let request_ident = request_ident();
             quote_spanned! {request_ty.span()=>
                 let #request_ident = <#request_ty as #topcoat_router::request::FromRequest>::from_request(cx, body).await?;
             }
         });
-        let request_arg = args.request().map(|_| {
+        let request_arg = request_ty.map(|_| {
             let request_ident = request_ident();
             quote! { , #request_ident }
         });
@@ -313,17 +314,27 @@ mod tests {
 
     #[test]
     fn rejects_non_async_fn() {
-        assert!(parse_err("fn ping() -> Result { todo!() }").contains("must be async"));
+        assert!(parse_err("fn ping(cx: &Cx) -> Result { todo!() }").contains("must be async"));
     }
 
     #[test]
     fn rejects_missing_return_type() {
-        assert!(parse_err("async fn ping() {}").contains("must declare a return type"));
+        assert!(parse_err("async fn ping(cx: &Cx) {}").contains("must declare a return type"));
     }
 
     #[test]
-    fn rejects_self_receiver() {
-        let err = parse_err("async fn ping(&self) -> Result { todo!() }");
-        assert!(err.contains("route functions cannot take a `self` receiver"));
+    fn rejects_a_missing_or_misplaced_context_parameter() {
+        for source in [
+            "async fn ping() -> Result { todo!() }",
+            "async fn ping(body: Json<Ping>, cx: &Cx) -> Result { todo!() }",
+        ] {
+            assert!(parse_err(source).contains("cx: &Cx"), "{source}");
+        }
+    }
+
+    #[test]
+    fn rejects_multiple_request_parameters() {
+        let err = parse_err("async fn ping(cx: &Cx, a: Json<A>, b: Json<B>) -> Result { todo!() }");
+        assert!(err.contains("more than one request body parameter"));
     }
 }
