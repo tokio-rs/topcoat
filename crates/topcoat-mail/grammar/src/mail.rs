@@ -14,8 +14,8 @@ use topcoat_core_grammar::common::paths::{topcoat_error, topcoat_mail};
 
 /// The parsed body of a `mail!` invocation: `name: value` fields in any
 /// order, at most once each. Lowers to an awaited `async` block that
-/// assembles a [`Mail`](topcoat_mail::Mail) through
-/// [`MailBuilder`](topcoat_mail::MailBuilder) and produces a `Result<Mail>`.
+/// assembles a `topcoat_mail::Mail` through a `topcoat_mail::MailBuilder` and
+/// produces a `Result<Mail>`.
 pub struct Mail {
     pub fields: Punctuated<MailField, Token![,]>,
 }
