@@ -1,13 +1,13 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote, quote_spanned};
 use syn::{
-    FnArg, ItemFn, Pat, ReturnType,
+    FnArg, Pat, ReturnType,
     parse::{Parse, ParseStream},
     parse_quote,
     spanned::Spanned,
 };
 
-use crate::common::paths::topcoat_context;
+use crate::common::{lenient, paths::topcoat_context};
 
 mod kw {
     use syn::custom_keyword;
@@ -51,12 +51,12 @@ impl crate::common::pretty::PrettyPrint for MemoizeAttr {
 }
 
 pub struct MemoizeItem {
-    item: ItemFn,
+    item: lenient::ItemFn,
 }
 
 impl Parse for MemoizeItem {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let item: ItemFn = input.parse()?;
+        let item: lenient::ItemFn = input.parse()?;
         let mut has_cx = false;
         for arg in &item.sig.inputs {
             match arg {
@@ -190,7 +190,7 @@ impl ToTokens for Memoize {
                     async |cx, (#(#closure_pats,)*)| {
                         let cx = &cx;
                         #(#destructures)*
-                        #(#body_stmts)*
+                        #body_stmts
                     },
                 ).await
             }
@@ -203,7 +203,7 @@ impl ToTokens for Memoize {
                     |cx, (#(#closure_pats,)*)| {
                         let cx = &cx;
                         #(#destructures)*
-                        #(#body_stmts)*
+                        #body_stmts
                     },
                 )
             }

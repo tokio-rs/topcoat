@@ -4,6 +4,10 @@
 //! tokens it does not need to inspect as they are, so incomplete code there
 //! does not stop the macro from expanding.
 
+mod block;
 mod expr;
+mod item;
 
+pub use block::*;
 pub use expr::*;
+pub use item::*;

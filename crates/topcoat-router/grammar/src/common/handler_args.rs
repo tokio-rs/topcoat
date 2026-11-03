@@ -1,6 +1,7 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use syn::{FnArg, Ident, ItemFn, Type};
+use syn::{FnArg, Ident, Type};
+use topcoat_core_grammar::common::lenient;
 
 pub struct HandlerArgs {
     args: Vec<HandlerArg>,
@@ -15,7 +16,7 @@ pub enum HandlerArg {
 }
 
 impl HandlerArgs {
-    pub(crate) fn parse(item: &ItemFn, kind: &str) -> syn::Result<Self> {
+    pub(crate) fn parse(item: &lenient::ItemFn, kind: &str) -> syn::Result<Self> {
         let mut args: Vec<HandlerArg> = Vec::new();
 
         for arg in &item.sig.inputs {

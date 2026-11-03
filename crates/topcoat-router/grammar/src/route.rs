@@ -1,14 +1,14 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
 use syn::{
-    ItemFn, ReturnType, Token, Visibility,
+    ReturnType, Token, Visibility,
     parse::{Parse, ParseStream},
     parse_quote,
     punctuated::Punctuated,
     spanned::Spanned,
 };
 use topcoat_core_grammar::common::{
-    ParseOption,
+    ParseOption, lenient,
     paths::{topcoat_context, topcoat_inventory, topcoat_router},
 };
 
@@ -53,13 +53,13 @@ impl topcoat_core_grammar::common::pretty::PrettyPrint for RouteAttr {
 }
 
 pub struct RouteItem {
-    item: ItemFn,
+    item: lenient::ItemFn,
     args: HandlerArgs,
 }
 
 impl Parse for RouteItem {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let item: ItemFn = input.parse()?;
+        let item: lenient::ItemFn = input.parse()?;
         if item.sig.asyncness.is_none() {
             return Err(syn::Error::new(
                 item.sig.fn_token.span(),
