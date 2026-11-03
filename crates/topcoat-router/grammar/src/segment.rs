@@ -103,13 +103,7 @@ mod tests {
 
     #[test]
     fn parses_options_being_typed() {
-        for input in [
-            "",
-            "ki",
-            "kind:",
-            "kind:, rename: \"path\"",
-            "kind: Param,",
-        ] {
+        for input in ["", "ki", "kind:", "kind:, rename: \"path\"", "kind: Param,"] {
             assert!(parse(input).is_ok(), "{input}");
         }
     }
