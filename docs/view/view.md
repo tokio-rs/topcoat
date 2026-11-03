@@ -1,4 +1,6 @@
-The [`view!`] macro builds HTML from markup and Rust expressions. It follows HTML syntax with a few rules:
+The [`view!`] macro builds HTML from markup and Rust expressions. It captures a variable named `cx` from the surrounding Rust scope to use as its context. See [request context](#request-context) for passing additional values to a view.
+
+It follows HTML syntax with a few rules:
 
 - HTML elements use their real names.
 - HTML void elements, such as `<br>`, `<hr>`, and `<img>`, are written without closing tags.
@@ -548,9 +550,9 @@ A status code in node position never renders text. To display one, render one of
 
 These declarations require the `router` feature (or the `topcoat-view` crate's `http` feature) and take effect when the rendered view becomes a response; rendering a view to a plain string discards them.
 
-# Rendering Outside A Component
+# Request Context
 
-Inside a [`component`], the request context is available implicitly. In a plain function, pass the context at the start of the macro:
+`view!` captures the surrounding variable named `cx`, which can be a `Cx` or `&Cx`. Components called inside the view receive their context automatically. This works the same way inside a [`component`] or an ordinary function:
 
 ```rust
 # use topcoat::{Result, context::Cx, view::*};
@@ -562,6 +564,28 @@ async fn render(cx: &Cx) -> Result<impl View> {
 ```
 
 A view can render on its own or be interpolated into another view.
+
+To add or override context values for a view, shadow `cx` with a child context before constructing it:
+
+```rust
+use topcoat::{
+    Result,
+    context::{Cx, context},
+    view::{View, component, view},
+};
+
+struct Greeting(&'static str);
+
+#[component]
+async fn welcome(cx: &Cx) -> Result<impl View> {
+    let cx = cx.with(Greeting("Hello"));
+    Ok(view! {
+        <p>(context::<Greeting>(cx).0)</p>
+    })
+}
+```
+
+The view and components it calls can read the added value. Like other captured variables, `cx` is captured by move. When it is `&Cx`, the view captures the reference and cannot outlive the borrowed context. When it is an owned `Cx`, as in the example above, the view owns it. The macro does not clone the context automatically.
 
 # Custom Values In Markup
 
