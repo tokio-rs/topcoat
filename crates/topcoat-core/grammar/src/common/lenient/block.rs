@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
-use quote::ToTokens;
+use quote::{ToTokens, TokenStreamExt};
 use syn::{
-    braced,
+    Attribute, braced,
     parse::{Parse, ParseStream},
     token::Brace,
 };
@@ -16,7 +16,10 @@ use crate::common::ParseOption;
 #[derive(Clone)]
 pub struct Block {
     pub brace_token: Brace,
-    /// The tokens between the braces.
+    /// The inner attributes at the start of the block, such as
+    /// `#![allow(unused)]`. They apply to the item the block belongs to.
+    pub inner_attrs: Vec<Attribute>,
+    /// The tokens after the inner attributes.
     pub stmts: TokenStream,
 }
 
@@ -25,6 +28,7 @@ impl Parse for Block {
         let content;
         Ok(Self {
             brace_token: braced!(content in input),
+            inner_attrs: content.call(Attribute::parse_inner)?,
             stmts: content.parse()?,
         })
     }
@@ -38,25 +42,28 @@ impl ParseOption for Block {
 
 impl ToTokens for Block {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.brace_token
-            .surround(tokens, |tokens| self.stmts.to_tokens(tokens));
+        self.brace_token.surround(tokens, |tokens| {
+            tokens.append_all(&self.inner_attrs);
+            self.stmts.to_tokens(tokens);
+        });
     }
 }
 
 /// Formats the statements one per line. A block whose statements do not
-/// parse yet is copied as written.
+/// parse yet, or that has inner attributes, is copied as written.
 #[cfg(feature = "pretty")]
 impl crate::common::pretty::PrettyPrint for Block {
     fn pretty_print(&self, printer: &mut crate::common::pretty::Printer<'_>) {
         use syn::parse::Parser;
 
-        match syn::Block::parse_within.parse2(self.stmts.clone()) {
-            Ok(stmts) => syn::Block {
+        let stmts = syn::Block::parse_within.parse2(self.stmts.clone());
+        match stmts {
+            Ok(stmts) if self.inner_attrs.is_empty() => syn::Block {
                 brace_token: self.brace_token,
                 stmts,
             }
             .pretty_print(printer),
-            Err(_) => syn::Expr::Verbatim(self.to_token_stream()).pretty_print(printer),
+            _ => syn::Expr::Verbatim(self.to_token_stream()).pretty_print(printer),
         }
     }
 }
@@ -75,6 +82,15 @@ mod tests {
             let block: Block = syn::parse_str(&format!("{{ {source} }}")).unwrap();
             assert_eq!(block.stmts.to_string(), tokens(source), "{source}");
         }
+    }
+
+    #[test]
+    fn separates_inner_attributes_from_the_statements() {
+        let source = "{ #![allow(unused)] #[inline] fn f() {} f() }";
+        let block: Block = syn::parse_str(source).unwrap();
+        assert_eq!(block.inner_attrs.len(), 1);
+        assert_eq!(block.stmts.to_string(), tokens("#[inline] fn f() {} f()"));
+        assert_eq!(block.to_token_stream().to_string(), tokens(source));
     }
 
     #[test]
