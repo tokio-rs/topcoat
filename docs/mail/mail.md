@@ -55,7 +55,7 @@ let mail = mail! {
 
 # The HTML Body
 
-A braced `html` value uses [`view!`] syntax and captures the surrounding binding named `cx`:
+A braced `html` value uses [`view!`] syntax. Add a leading `cx =>` when the view needs the request context:
 
 ```rust
 # use topcoat::{Result, context::Cx};

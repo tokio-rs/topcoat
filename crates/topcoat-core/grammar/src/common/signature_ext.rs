@@ -1,9 +1,8 @@
-use syn::{FnArg, Pat, PatType, Signature, Type, spanned::Spanned};
+use syn::{FnArg, Pat, PatType, Signature, Type, parse_quote, spanned::Spanned};
 
 /// Checks on the signature of a function that receives the request context.
 pub trait SignatureExt {
-    /// Returns the `cx: &Cx` parameter, which must come first. A function
-    /// that does not use the context names it `_cx`.
+    /// Returns the `cx: &Cx` parameter, which must come first.
     ///
     /// # Errors
     ///
@@ -13,6 +12,10 @@ pub trait SignatureExt {
     /// Returns the parameters after the context. Only the first parameter can
     /// be a `self` receiver, so these are all typed parameters.
     fn params(&self) -> impl Iterator<Item = &PatType>;
+
+    /// Allows the context parameter to go unused. Every function takes it,
+    /// whether or not its body needs it.
+    fn allow_unused_cx(&mut self);
 }
 
 impl SignatureExt for Signature {
@@ -20,7 +23,7 @@ impl SignatureExt for Signature {
         let first = self.inputs.first();
         if let Some(FnArg::Typed(pat_type)) = first
             && let Pat::Ident(pat) = &*pat_type.pat
-            && (pat.ident == "cx" || pat.ident == "_cx")
+            && pat.ident == "cx"
             && is_cx_ref(&pat_type.ty)
         {
             return Ok(pat_type);
@@ -38,6 +41,14 @@ impl SignatureExt for Signature {
             FnArg::Typed(pat_type) => Some(pat_type),
             FnArg::Receiver(_) => None,
         })
+    }
+
+    fn allow_unused_cx(&mut self) {
+        if let Some(FnArg::Typed(pat_type)) = self.inputs.first_mut() {
+            pat_type
+                .attrs
+                .push(parse_quote! { #[allow(unused_variables)] });
+        }
     }
 }
 
@@ -69,7 +80,7 @@ mod tests {
     #[test]
     fn accepts_a_leading_context() {
         assert!(cx_param("fn a(cx: &Cx)").is_ok());
-        assert!(cx_param("fn a(_cx: &topcoat::context::Cx, label: &str)").is_ok());
+        assert!(cx_param("fn a(cx: &topcoat::context::Cx, label: &str)").is_ok());
     }
 
     #[test]

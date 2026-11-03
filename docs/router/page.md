@@ -12,8 +12,6 @@ Path strings follow the [`Path`](struct.Path.html) syntax.
 
 The function must be `async` and return a [`Result`](../type.Result.html) containing a [`View`](../view/trait.View.html). It may take [`cx: &Cx`](../context/struct.Cx.html) and one body parameter implementing [`FromRequest`](request/trait.FromRequest.html). Both are optional and may appear in either order. The body parameter may use a pattern such as `Json(input): Json<T>`.
 
-Declare `cx: &Cx` when the body uses [`view!`](../view/macro.view.html) or another macro that requires context.
-
 # Route context
 
 Attach metadata with `with(...)`, such as `#[page(with(Title("Products")))]` or `#[page("/products", with(Title("Products")))]`. You can add multiple `with(...)` entries, separated by commas, after any methods and path. The values are initialized when the router is built, so an outer layout can read the page's title before the page runs. See [route context](../context/index.html#route-context) for a complete example.

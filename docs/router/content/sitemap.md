@@ -15,7 +15,7 @@ use topcoat::{
 };
 
 #[route(GET "./sitemap.xml")]
-async fn sitemap(_cx: &Cx) -> Result<Sitemap> {
+async fn sitemap(cx: &Cx) -> Result<Sitemap> {
     let posts = ["first-post", "second-post"];
     Ok(Sitemap::new()
         .url("/")

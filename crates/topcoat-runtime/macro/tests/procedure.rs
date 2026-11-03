@@ -6,27 +6,27 @@ use topcoat::{
 };
 
 #[procedure]
-async fn without_arguments(_cx: &Cx) -> Result<bool> {
+async fn without_arguments(cx: &Cx) -> Result<bool> {
     Ok(true)
 }
 
 #[procedure("/api/double")]
-async fn at_path(_cx: &Cx, value: f64) -> Result<f64> {
+async fn at_path(cx: &Cx, value: f64) -> Result<f64> {
     Ok(value * 2.0)
 }
 
 #[procedure("/(api)/grouped")]
-async fn grouped(_cx: &Cx, value: f64) -> Result<f64> {
+async fn grouped(cx: &Cx, value: f64) -> Result<f64> {
     Ok(value)
 }
 
 #[procedure]
-async fn with_unit(_cx: &Cx, _value: ()) -> Result<bool> {
+async fn with_unit(cx: &Cx, _value: ()) -> Result<bool> {
     Ok(true)
 }
 
 #[procedure]
-async fn with_arguments(_cx: &Cx, enabled: bool, label: String) -> Result<String> {
+async fn with_arguments(cx: &Cx, enabled: bool, label: String) -> Result<String> {
     Ok(if enabled { label } else { String::new() })
 }
 

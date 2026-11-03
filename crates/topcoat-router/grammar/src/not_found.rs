@@ -51,7 +51,7 @@ impl ToTokens for NotFound {
                 /// The catch-all page declared by `not_found!`, resolving
                 /// every request it serves to a not-found error.
                 #[#topcoat_router_macro::page(#attr)]
-                pub async fn not_found(_cx: &#topcoat_context::Cx) -> #result {
+                pub async fn not_found(cx: &#topcoat_context::Cx) -> #result {
                     ::core::result::Result::Err(#topcoat_router::error::not_found().into())
                 }
             }

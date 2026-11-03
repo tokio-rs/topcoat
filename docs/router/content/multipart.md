@@ -15,7 +15,7 @@ use topcoat::{
 };
 
 #[route(POST)]
-async fn upload(_cx: &Cx, mut multipart: Multipart) -> Result<&'static str> {
+async fn upload(cx: &Cx, mut multipart: Multipart) -> Result<&'static str> {
     while let Some(field) = multipart.next_field().await? {
         let name = field.name().map(str::to_owned);
         let data = field.bytes().await?;

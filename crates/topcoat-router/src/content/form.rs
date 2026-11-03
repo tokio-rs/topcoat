@@ -48,7 +48,7 @@ use crate::{
 /// }
 ///
 /// #[route(GET)]
-/// async fn search(_cx: &Cx, Form(input): Form<Search>) -> Result<Json<Search>> {
+/// async fn search(cx: &Cx, Form(input): Form<Search>) -> Result<Json<Search>> {
 ///     Ok(Json(input))
 /// }
 /// ```

@@ -9,7 +9,7 @@ use topcoat::{
 };
 
 #[route(GET)]
-pub(crate) async fn echo(_cx: &Cx, upgrade: WebSocketUpgrade) -> Result<Response> {
+pub(crate) async fn echo(cx: &Cx, upgrade: WebSocketUpgrade) -> Result<Response> {
     upgrade.on_upgrade(|mut socket| async move {
         while let Some(Ok(message)) = socket.recv().await {
             // Ping, pong, and close messages are already handled for us.

@@ -8,6 +8,6 @@ use crate::Search;
 
 // For other methods, Form<T> reads and writes application/x-www-form-urlencoded bodies.
 #[route(POST)]
-pub(crate) async fn form_echo(_cx: &Cx, Form(input): Form<Search>) -> Result<Form<Search>> {
+pub(crate) async fn form_echo(cx: &Cx, Form(input): Form<Search>) -> Result<Form<Search>> {
     Ok(Form(input))
 }

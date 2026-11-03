@@ -54,6 +54,17 @@ impl Component {
 impl ToTokens for Component {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let mut item = self.item.item().clone();
+        // The `#[default]` and `#[into]` helper attributes are only meaningful to
+        // the `Props` derive, which sees them on the generated struct's fields.
+        // They are not valid on the re-emitted function's parameters, so strip
+        // them here to avoid a "cannot find attribute" error.
+        for arg in &mut item.sig.inputs {
+            if let FnArg::Typed(pat_type) = arg {
+                pat_type.attrs.clear();
+            }
+        }
+        item.sig.allow_unused_cx();
+
         let mut generics = item.sig.generics.clone();
         let vis = &item.vis;
         let ident = &item.sig.ident;
@@ -66,15 +77,6 @@ impl ToTokens for Component {
         let attrs = item.attrs;
         // Callers use named props, not this helper's positional arguments.
         item.attrs = vec![parse_quote!(#[allow(clippy::unused_async, clippy::too_many_arguments)])];
-        // The `#[default]` and `#[into]` helper attributes are only meaningful to
-        // the `Props` derive, which sees them on the generated struct's fields.
-        // They are not valid on the re-emitted function's parameters, so strip
-        // them here to avoid a "cannot find attribute" error.
-        for arg in &mut item.sig.inputs {
-            if let FnArg::Typed(pat_type) = arg {
-                pat_type.attrs.clear();
-            }
-        }
 
         // A component's borrows all live for the request: the context and
         // every reference parameter arrive together, and the returned view

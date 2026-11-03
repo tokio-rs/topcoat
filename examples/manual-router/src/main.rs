@@ -107,6 +107,6 @@ async fn install(cx: &Cx) -> Result<impl View> {
 
 // Routes return responses other than pages, and skip the layouts.
 #[route(GET "/api/health")]
-async fn health(_cx: &Cx) -> Result<&'static str> {
+async fn health(cx: &Cx) -> Result<&'static str> {
     Ok("ok")
 }

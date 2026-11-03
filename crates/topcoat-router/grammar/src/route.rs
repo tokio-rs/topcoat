@@ -120,6 +120,7 @@ impl ToTokens for Route {
         // working.
         let mut inner = item.clone();
         inner.vis = Visibility::Inherited;
+        inner.sig.allow_unused_cx();
         inner
             .attrs
             .push(parse_quote! { #[allow(clippy::unused_async)] });

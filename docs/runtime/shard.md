@@ -103,7 +103,7 @@ The [`context`] module covers writing guards as functions on [`Cx`].
 
 Argument types must belong to the shared vocabulary of [`expr!`], since their values cross between Rust and JavaScript. The return type is a [`Result`] of a value implementing [`View`], like a component's.
 
-A parameter named `cx` of type `&Cx` receives the server request context. Callers omit this argument. Declare `cx: &Cx` when the body uses [`view!`] or another macro that requires context.
+A parameter named `cx` of type `&Cx` receives the server request context. Callers omit this argument.
 
 A parameter typed [`Signal<T>`] accepts a signal handle. Passing the handle alone does not make the shard depend on its value. A tracked read in the shard body creates that dependency. Use an untracked read to use the value without triggering renders when it changes:
 

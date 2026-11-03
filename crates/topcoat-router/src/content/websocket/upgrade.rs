@@ -48,7 +48,7 @@ use crate::{
 /// };
 ///
 /// #[route(GET)]
-/// async fn echo(_cx: &Cx, upgrade: WebSocketUpgrade) -> Result<Response> {
+/// async fn echo(cx: &Cx, upgrade: WebSocketUpgrade) -> Result<Response> {
 ///     upgrade.on_upgrade(|mut socket| async move {
 ///         while let Some(Ok(message)) = socket.recv().await {
 ///             if matches!(message, Message::Text(_) | Message::Binary(_))

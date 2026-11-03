@@ -14,8 +14,6 @@ Use `#[route(GET)]` without a path string with [module routing](macro.module_rou
 
 The function must be `async` and return `Result<T>`, where `T` implements [`AsyncIntoResponse`](response/trait.AsyncIntoResponse.html). Every [`IntoResponse`](response/trait.IntoResponse.html) type meets this bound. The handler may take [`cx: &Cx`](../context/struct.Cx.html) and one body parameter implementing [`FromRequest`](request/trait.FromRequest.html). Both are optional and may appear in either order. The body parameter may use a pattern such as `Json(input): Json<T>`.
 
-Declare `cx: &Cx` when the body uses [`view!`](../view/macro.view.html) or another macro that requires context.
-
 # Route context
 
 Attach metadata with `with(...)` after the methods and optional path, such as `#[route(GET, with(Operation("health-check")))]` or `#[route(GET "/health", with(Operation("health-check")))]`. You can add multiple `with(...)` entries, separated by commas. The values are initialized when the router is built and are available to layers before the handler runs. See [route context](../context/index.html#route-context) for reading and combining metadata.
@@ -31,7 +29,7 @@ Module-derived path (in `src/app/api/health.rs` under `module_router!()`, this s
 ```rust
 # use topcoat::{Result, context::Cx, router::route};
 #[route(GET)]
-async fn health(_cx: &Cx) -> Result<&'static str> {
+async fn health(cx: &Cx) -> Result<&'static str> {
     Ok("ok")
 }
 ```
@@ -52,7 +50,7 @@ struct CreateUser {
 }
 
 #[route(POST "/api/users")]
-async fn create_user(_cx: &Cx, Json(input): Json<CreateUser>) -> Result<Json<CreateUser>> {
+async fn create_user(cx: &Cx, Json(input): Json<CreateUser>) -> Result<Json<CreateUser>> {
     Ok(Json(CreateUser { name: input.name }))
 }
 ```
@@ -62,7 +60,7 @@ Path below the module (in `src/app/api.rs` under `module_router!()`, this serves
 ```rust
 # use topcoat::{Result, context::Cx, router::route};
 #[route(GET "./health")]
-async fn health(_cx: &Cx) -> Result<&'static str> {
+async fn health(cx: &Cx) -> Result<&'static str> {
     Ok("ok")
 }
 ```
@@ -75,7 +73,7 @@ mod form {
     use super::*;
 
     #[route([GET, POST])]
-    async fn form(_cx: &Cx) -> Result<&'static str> {
+    async fn form(cx: &Cx) -> Result<&'static str> {
         Ok("form")
     }
 }
@@ -84,7 +82,7 @@ mod webhook {
     use super::*;
 
     #[route(*)]
-    async fn webhook(_cx: &Cx) -> Result<&'static str> {
+    async fn webhook(cx: &Cx) -> Result<&'static str> {
         Ok("received")
     }
 }

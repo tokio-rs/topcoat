@@ -49,7 +49,7 @@ use crate::{
 /// }
 ///
 /// #[route(POST)]
-/// async fn create_user(_cx: &Cx, Json(input): Json<CreateUser>) -> Result<Json<User>> {
+/// async fn create_user(cx: &Cx, Json(input): Json<CreateUser>) -> Result<Json<User>> {
 ///     Ok(Json(User {
 ///         id: 1,
 ///         name: input.name,

@@ -125,7 +125,7 @@ Prefer `#[into]` when the component only needs the converted value.
 
 # Request Context
 
-Components receive the current request context by declaring a `cx` parameter that borrows [`Cx`]. Declare `cx: &Cx` when the body uses [`view!`] or another macro that requires context:
+Components can ask for the current request context by declaring a `cx` parameter that borrows [`Cx`]:
 
 ```rust
 use topcoat::{

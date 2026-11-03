@@ -46,7 +46,9 @@ impl ToTokens for Shard {
         let item = self.item.item();
         let vis = &item.vis;
         let ident = &item.sig.ident;
-        let inputs = &item.sig.inputs;
+        let mut handler_sig = item.sig.clone();
+        handler_sig.allow_unused_cx();
+        let inputs = &handler_sig.inputs;
         let output = &item.sig.output;
         let block = &item.block;
 

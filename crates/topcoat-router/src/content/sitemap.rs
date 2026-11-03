@@ -43,7 +43,7 @@ use crate::{
 /// };
 ///
 /// #[route(GET "./sitemap.xml")]
-/// async fn sitemap(_cx: &Cx) -> Result<Sitemap> {
+/// async fn sitemap(cx: &Cx) -> Result<Sitemap> {
 ///     Ok(Sitemap::new()
 ///         .url("/")
 ///         .url(SitemapUrl::new("/about").change_frequency(ChangeFrequency::Monthly)))

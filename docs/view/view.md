@@ -6,7 +6,7 @@ The [`view!`] macro builds HTML from markup and Rust expressions. It follows HTM
 - Attribute names can use HTML separators like `-`, `:`, and `.`: `data-post-id`, `aria-label`, `xmlns:xlink`, `hx-get`, `class.active`.
 - Rust keywords are still valid HTML attribute names, so `type="button"` and `for="email"` work as expected.
 
-Write text nodes in quotes. The macro captures the surrounding binding named `cx`; see [request context](#request-context).
+Write text nodes in quotes.
 
 ```rust
 # use topcoat::{Result, context::Cx, view::*};
@@ -370,7 +370,7 @@ The key expression is evaluated once per iteration and can use the loop's bindin
 
 The attribute is optional. An unkeyed loop still renders, but its iteration identity is ambiguous. Consuming that identity through a component's context errors with the location of the loop missing its key. Nested keyed loops inherit ambiguity from an unkeyed outer loop.
 
-Inside a loop body, `cx` carries the iteration's identity. Helpers called with `cx` use that identity too. In an ordinary Rust loop outside the markup, derive a context with [`Cx::keyed`](../context/struct.Cx.html#method.keyed), such as `helper(&cx.keyed(item.id))`, when each call needs a distinct identity.
+Ordinary Rust expressions use the context explicitly passed to them. The macro does not rebind context variables inside loops. If a helper needs a distinct identity for each call, pass a context derived with [`Cx::keyed`](../context/struct.Cx.html#method.keyed), such as `helper(&cx.keyed(item.id))`.
 
 ## Element IDs
 
@@ -388,7 +388,7 @@ Ok(view! {
 # }
 ```
 
-When rendering the component in a `view!` loop, add `#[key(...)]` to the loop so each instance has its own identity. Inside a keyed loop body, `element_id(cx)` uses the iteration's identity to create one ID per item.
+When rendering the component in a `view!` loop, add `#[key(...)]` to the loop so each instance has its own identity. To create one ID per item inside a loop body, pass a keyed context, such as `element_id(&cx.keyed(item.id))`.
 
 # Views Are Lazy
 
@@ -548,9 +548,9 @@ A status code in node position never renders text. To display one, render one of
 
 These declarations require the `router` feature (or the `topcoat-view` crate's `http` feature) and take effect when the rendered view becomes a response; rendering a view to a plain string discards them.
 
-# Request Context
+# Rendering Outside A Component
 
-`view!` captures the surrounding binding named `cx`, which can be a `Cx` or `&Cx`. Declare `cx: &Cx` in a component or handler that uses the macro. Plain functions use the same binding:
+Inside a [`component`], the request context is available implicitly. In a plain function, pass the context at the start of the macro:
 
 ```rust
 # use topcoat::{Result, context::Cx, view::*};
@@ -561,22 +561,7 @@ async fn render(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-To provide additional context to a view and its nested components, shadow `cx` before constructing it:
-
-```rust
-# use topcoat::{Result, context::{Cx, context}, view::*};
-# struct Theme(&'static str);
-# #[component]
-# async fn panel(cx: &Cx) -> Result<impl View> { Ok(view! { <section class=(context::<Theme>(cx).0)>"Panel"</section> }) }
-# async fn example(cx: &Cx, theme: Theme) -> Result<impl View> {
-let cx = cx.with(theme);
-Ok(view! {
-    panel()
-})
-# }
-```
-
-An owned `Cx` moves into the view; a borrowed context remains borrowed. The macro does not clone it. A view can render on its own or be interpolated into another view.
+A view can render on its own or be interpolated into another view.
 
 # Custom Values In Markup
 

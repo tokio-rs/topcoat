@@ -16,7 +16,7 @@ use topcoat::{
 };
 
 #[route(GET)]
-async fn events(_cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
+async fn events(cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
     let events = futures_util::stream::iter(
         ["one", "two", "three"].map(|name| Ok(Event::new().event("named").data(name))),
     );

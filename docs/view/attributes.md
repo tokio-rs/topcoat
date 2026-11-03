@@ -1,6 +1,6 @@
 The [`attributes!`] macro builds a [`topcoat::view::Attributes`] value from Topcoat's attribute syntax.
 
-Use it to build attributes separately from the element that renders them. The macro borrows the surrounding binding named `cx`, which can be a `Cx` or `&Cx`, when building the attributes.
+Use it to build attributes separately from the element that renders them.
 
 ```rust
 # #[topcoat::view::component]

@@ -179,7 +179,7 @@ async fn a_signal_is_declared_once_ahead_of_every_capture() {
 }
 
 #[procedure]
-async fn test_procedure(_cx: &Cx, v: String) -> Result<String, std::convert::Infallible> {
+async fn test_procedure(cx: &Cx, v: String) -> Result<String, std::convert::Infallible> {
     Ok(v)
 }
 

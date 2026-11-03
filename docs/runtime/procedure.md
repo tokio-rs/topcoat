@@ -4,7 +4,7 @@ A procedure is an async server function called from a runtime [expression](macro
 use topcoat::{Result, context::Cx, runtime::procedure};
 
 #[procedure]
-async fn double(_cx: &Cx, value: usize) -> Result<usize> {
+async fn double(cx: &Cx, value: usize) -> Result<usize> {
     Ok(value * 2)
 }
 ```
@@ -16,7 +16,7 @@ Inside a runtime expression, call a procedure like an ordinary async function an
 ```rust
 # use topcoat::{Result, context::Cx, view::*, runtime::{procedure, signal}};
 # #[procedure]
-# async fn double(_cx: &Cx, value: usize) -> Result<usize> { Ok(value * 2) }
+# async fn double(cx: &Cx, value: usize) -> Result<usize> { Ok(value * 2) }
 # #[component]
 # async fn example(cx: &Cx) -> Result<impl View> {
 let count = signal(cx, || 1usize);
@@ -69,7 +69,7 @@ Register a procedure on the [`Router`] before calling it from the browser. It im
 use topcoat::{context::Cx, router::module_router};
 # use topcoat::{Result, router::Router, runtime::procedure};
 # #[procedure]
-# async fn double(_cx: &Cx, value: usize) -> Result<usize> { Ok(value * 2) }
+# async fn double(cx: &Cx, value: usize) -> Result<usize> { Ok(value * 2) }
 let router = module_router!().route(double).build();
 ```
 
@@ -83,7 +83,7 @@ Topcoat generates an internal path for each procedure from its name and source l
 use topcoat::{Result, context::Cx, runtime::procedure};
 
 #[procedure("/api/double")]
-async fn double(_cx: &Cx, value: usize) -> Result<usize> {
+async fn double(cx: &Cx, value: usize) -> Result<usize> {
     Ok(value * 2)
 }
 ```

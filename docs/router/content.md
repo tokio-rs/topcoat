@@ -57,7 +57,7 @@ use topcoat::{
 };
 
 #[route(POST)]
-async fn create_user(_cx: &Cx) -> Result<(StatusCode, Json<User>)> {
+async fn create_user(cx: &Cx) -> Result<(StatusCode, Json<User>)> {
     let user = User {
         name: "Ada".to_string(),
     };

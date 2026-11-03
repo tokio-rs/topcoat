@@ -112,7 +112,7 @@ An API route declares one method, a method list, or every method:
 # use topcoat::{Result, context::Cx, router::route};
 // src/app/api/health.rs: GET /api/health
 #[route(GET)]
-async fn health(_cx: &Cx) -> Result<&'static str> {
+async fn health(cx: &Cx) -> Result<&'static str> {
     Ok("ok")
 }
 ```

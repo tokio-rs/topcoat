@@ -181,7 +181,7 @@ static NEXT_ORDER: AtomicU64 = AtomicU64::new(1);
 // Validate the browser's order before accepting it. Return validation errors
 // in the inner `Result` so the page can display them.
 #[procedure]
-pub async fn place_order(_cx: &Cx, order: Order) -> Result<Result<Receipt, String>> {
+pub async fn place_order(cx: &Cx, order: Order) -> Result<Result<Receipt, String>> {
     if !(1..=10).contains(&order.quantity) {
         return Ok(Err("orders are limited to 10 items".to_owned()));
     }

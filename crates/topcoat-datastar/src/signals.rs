@@ -39,7 +39,7 @@ use crate::datastar_request;
 /// }
 ///
 /// #[route(POST)]
-/// async fn increment(_cx: &Cx, Signals(counter): Signals<Counter>) -> Result<PatchSignals> {
+/// async fn increment(cx: &Cx, Signals(counter): Signals<Counter>) -> Result<PatchSignals> {
 ///     PatchSignals::json(&Counter {
 ///         count: counter.count + 1,
 ///     })

@@ -14,7 +14,7 @@ use topcoat::{
 use crate::Progress;
 
 #[route(GET)]
-pub(crate) async fn job(_cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
+pub(crate) async fn job(cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
     // Unlike the ticks, this stream ends: the browser closes the connection
     // once it receives the `done` event.
     let events = stream::unfold(0, |percent| async move {

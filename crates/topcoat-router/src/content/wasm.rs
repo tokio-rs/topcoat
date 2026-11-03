@@ -29,7 +29,7 @@ use crate::{
 /// # const ENGINE: &[u8] = b"\0asm\x01\0\0\0";
 ///
 /// #[route(GET "./engine.wasm")]
-/// async fn engine(_cx: &Cx) -> Result<Wasm<&'static [u8]>> {
+/// async fn engine(cx: &Cx) -> Result<Wasm<&'static [u8]>> {
 ///     Ok(Wasm(ENGINE))
 /// }
 /// ```

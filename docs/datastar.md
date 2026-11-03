@@ -62,7 +62,7 @@ struct Counter {
 }
 
 #[route(POST)]
-async fn increment(_cx: &Cx, Signals(counter): Signals<Counter>) -> Result<PatchSignals> {
+async fn increment(cx: &Cx, Signals(counter): Signals<Counter>) -> Result<PatchSignals> {
     PatchSignals::json(&Counter {
         count: counter.count + 1,
     })
@@ -122,7 +122,7 @@ struct Progress {
 }
 
 #[route(GET)]
-async fn progress(_cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
+async fn progress(cx: &Cx) -> Result<Sse<impl Stream<Item = Result<Event>> + use<>>> {
     let events = stream::iter((0..=100u8).step_by(20).map(|percent| {
         PatchSignals::json(&Progress { percent }).map(Into::into)
     }));

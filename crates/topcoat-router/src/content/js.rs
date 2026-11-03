@@ -24,7 +24,7 @@ use crate::{
 /// };
 ///
 /// #[route(GET "./app.js")]
-/// async fn app_js(_cx: &Cx) -> Result<Js<&'static str>> {
+/// async fn app_js(cx: &Cx) -> Result<Js<&'static str>> {
 ///     Ok(Js("export const ready = true;"))
 /// }
 /// ```

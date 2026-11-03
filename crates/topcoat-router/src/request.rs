@@ -77,7 +77,7 @@ pub type Request<T = Body> = http::Request<T>;
 ///
 /// // Once implemented, use it like the built-in extractors:
 /// #[route(POST)]
-/// async fn signed(_cx: &Cx, SignedJson(input): SignedJson<CreateUser>) -> Result<&'static str> {
+/// async fn signed(cx: &Cx, SignedJson(input): SignedJson<CreateUser>) -> Result<&'static str> {
 ///     let _ = input;
 ///     Ok("ok")
 /// }

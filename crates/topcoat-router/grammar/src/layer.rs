@@ -84,6 +84,7 @@ impl ToTokens for Layer {
         // implementation below.
         let mut inner = item.clone();
         inner.sig.ident = format_ident!("handler", span = ident.span());
+        inner.sig.allow_unused_cx();
         inner.vis = Visibility::Inherited;
         inner
             .attrs
