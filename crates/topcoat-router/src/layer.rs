@@ -388,8 +388,8 @@ mod tests {
         let layers = [layer_at("/admin"), layer_at("/admin")];
         let selected = layers_for_path(&layers, Path::new("/admin/users"));
         assert_eq!(selected.len(), 2);
-        assert!(std::ptr::eq(selected[0], &layers[1]));
-        assert!(std::ptr::eq(selected[1], &layers[0]));
+        assert!(Arc::ptr_eq(&selected[0].0, &layers[1].0));
+        assert!(Arc::ptr_eq(&selected[1].0, &layers[0].0));
     }
 
     #[test]

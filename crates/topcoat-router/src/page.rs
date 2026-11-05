@@ -412,8 +412,8 @@ mod tests {
         let layouts = [layout_at("/admin"), layout_at("/admin")];
         let selected = layouts_for_path(&layouts, Path::new("/admin/users"));
         assert_eq!(selected.len(), 2);
-        assert!(std::ptr::eq(selected[0], &layouts[0]));
-        assert!(std::ptr::eq(selected[1], &layouts[1]));
+        assert!(Arc::ptr_eq(&selected[0].0, &layouts[0].0));
+        assert!(Arc::ptr_eq(&selected[1].0, &layouts[1].0));
     }
 
     #[test]
