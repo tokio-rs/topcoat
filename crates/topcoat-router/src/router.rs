@@ -161,10 +161,10 @@ impl Router {
 
         // Compression runs outside every layer, so layers see uncompressed
         // bodies. The negotiation reads the request headers as the layers
-        // left them.
+        // left them. The configuration is read from the context, so a matched
+        // route's configuration shadows the router's.
         #[cfg(feature = "compression")]
-        let response = inner
-            .compression
+        let response = crate::compression(&cx)
             .compress(crate::request::headers(&cx), response)
             .await;
 
@@ -235,9 +235,6 @@ pub(crate) struct RouterInner {
     pub(crate) context: Arc<ContextMap>,
     /// The proxies trusted to report the client's address.
     pub(crate) trusted_proxies: TrustedProxies,
-    /// The compression applied to responses on their way out.
-    #[cfg(feature = "compression")]
-    pub(crate) compression: crate::Compression,
 }
 
 /// What a request was dispatched to, stored on its context.
@@ -374,8 +371,6 @@ pub(crate) fn test_matched_cx(path: &crate::Path) -> Cx {
         always_layers: Box::new([]),
         context: Arc::new(ContextMap::new()),
         trusted_proxies: TrustedProxies::new(),
-        #[cfg(feature = "compression")]
-        compression: crate::Compression::new(),
     };
     Cx::new()
         .with_shared(Arc::clone(&inner.context))

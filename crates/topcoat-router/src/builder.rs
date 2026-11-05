@@ -51,8 +51,6 @@ pub struct RouterBuilder {
     context: ContextMap,
     trusted_proxies: TrustedProxies,
     trailing_slash: TrailingSlash,
-    #[cfg(feature = "compression")]
-    compression: crate::Compression,
 }
 
 impl RouterBuilder {
@@ -67,8 +65,6 @@ impl RouterBuilder {
             context: ContextMap::new(),
             trusted_proxies: TrustedProxies::new(),
             trailing_slash: TrailingSlash::default(),
-            #[cfg(feature = "compression")]
-            compression: crate::Compression::new(),
         }
     }
 
@@ -224,28 +220,6 @@ impl RouterBuilder {
     #[must_use]
     pub fn trusted_proxies(mut self, trusted_proxies: TrustedProxies) -> Self {
         self.trusted_proxies = trusted_proxies;
-        self
-    }
-
-    /// Configures the compression applied to responses.
-    ///
-    /// By default the router compresses each response with the algorithm
-    /// negotiated from the request's `Accept-Encoding` header. Pass
-    /// [`Compression::off`](crate::Compression::off) to disable compression
-    /// (say, behind a reverse proxy that compresses already), or a tuned
-    /// [`Compression`](crate::Compression) value to adjust it.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use topcoat::router::{Compression, Router};
-    ///
-    /// let router = Router::builder().compression(Compression::off()).build();
-    /// ```
-    #[cfg(feature = "compression")]
-    #[must_use]
-    pub fn compression(mut self, compression: crate::Compression) -> Self {
-        self.compression = compression;
         self
     }
 
@@ -552,8 +526,6 @@ impl RouterBuilder {
             always_layers,
             context: Arc::new(self.context),
             trusted_proxies: self.trusted_proxies,
-            #[cfg(feature = "compression")]
-            compression: self.compression,
         })
     }
 }

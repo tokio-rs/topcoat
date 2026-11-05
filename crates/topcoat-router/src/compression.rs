@@ -1,40 +1,54 @@
 use std::{convert::Infallible, future::ready};
 
 use http::{HeaderMap, header::ACCEPT_ENCODING};
+use topcoat_core::context::{Cx, try_context};
 use tower::{ServiceExt, service_fn};
 use tower_http::compression::predicate::{NotForContentType, Predicate, SizeAbove};
 
 use crate::{Body, response::Response};
 
-/// Configures the compression a [`Router`](crate::Router) applies to
-/// responses.
+/// The compression the router applies to a response.
 ///
 /// The router compresses each response body with the algorithm negotiated
 /// from the request's `Accept-Encoding` header, after every layer has run.
-/// Compression is enabled by default; pass a configuration to
-/// [`RouterBuilder::compression`](crate::RouterBuilder::compression) to tune
-/// or disable it.
+/// By default, gzip and brotli are enabled at the
+/// [`Balanced`](CompressionLevel::Balanced) level, skipping bodies smaller
+/// than 32 bytes.
 ///
 /// Responses remain unchanged when the client accepts no enabled algorithm,
 /// the body is below [`min_size`](Self::min_size), or its headers indicate
 /// that it should not be compressed. This includes already encoded responses,
 /// range responses, and content types unsuitable for compression.
 ///
+/// The router reads the configuration from the request context. Pass a
+/// configuration to [`RouterBuilder::with`](crate::RouterBuilder::with) to
+/// replace the default for the whole application, or to `with(...)` on a
+/// route, page, layout, or layer to replace it for that part of the
+/// application.
+///
 /// # Examples
 ///
 /// ```rust
-/// use topcoat::router::{Compression, CompressionLevel, Router};
+/// use topcoat::{
+///     Result,
+///     context::Cx,
+///     router::{Compression, CompressionLevel, Router, route},
+/// };
 ///
-/// // Disable compression, e.g. when a reverse proxy compresses instead.
-/// let router = Router::builder().compression(Compression::off()).build();
+/// // Serves an archive that is compressed already.
+/// #[route(GET "/export.zip", with(Compression::off()))]
+/// async fn export(cx: &Cx) -> Result<Vec<u8>> {
+///     Ok(Vec::new())
+/// }
 ///
 /// // Trade compression ratio for speed, with gzip only.
 /// let router = Router::builder()
-///     .compression(
-///         Compression::new()
+///     .with(
+///         Compression::default()
 ///             .brotli(false)
 ///             .level(CompressionLevel::Fastest),
 ///     )
+///     .route(export)
 ///     .build();
 /// ```
 #[derive(Clone, Debug)]
@@ -50,23 +64,6 @@ pub struct Compression {
 }
 
 impl Compression {
-    /// Creates the default configuration: gzip and brotli enabled at the
-    /// [`Balanced`](CompressionLevel::Balanced) level, skipping bodies
-    /// smaller than 32 bytes.
-    #[must_use]
-    pub fn new() -> Self {
-        /// Below this size the compressed framing tends to outweigh the
-        /// savings.
-        const DEFAULT_MIN_SIZE: u64 = 32;
-
-        Self {
-            gzip: true,
-            brotli: true,
-            level: CompressionLevel::default(),
-            min_size: DEFAULT_MIN_SIZE,
-        }
-    }
-
     /// Creates a configuration with every algorithm disabled, so responses
     /// are never compressed.
     ///
@@ -77,7 +74,7 @@ impl Compression {
         Self {
             gzip: false,
             brotli: false,
-            ..Self::new()
+            ..Self::default()
         }
     }
 
@@ -159,10 +156,32 @@ impl Compression {
     }
 }
 
+/// Enables gzip and brotli at the [`Balanced`](CompressionLevel::Balanced)
+/// level, skipping bodies smaller than 32 bytes.
 impl Default for Compression {
     fn default() -> Self {
-        Self::new()
+        DEFAULT_COMPRESSION.clone()
     }
+}
+
+/// The configuration that applies when the context holds none.
+static DEFAULT_COMPRESSION: Compression = Compression {
+    gzip: true,
+    brotli: true,
+    level: CompressionLevel::Balanced,
+    // Below this size the compressed framing tends to outweigh the savings.
+    min_size: 32,
+};
+
+/// Returns the [`Compression`] that applies to the response.
+///
+/// This is the configuration from the most specific `with(...)` that covers
+/// the matched route, the configuration passed to
+/// [`RouterBuilder::with`](crate::RouterBuilder::with), or the default
+/// configuration if there is neither.
+#[must_use]
+pub fn compression(cx: &Cx) -> &Compression {
+    try_context(cx).unwrap_or(&DEFAULT_COMPRESSION)
 }
 
 /// The quality a [`Compression`] configuration encodes with, trading
@@ -211,8 +230,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        HeaderMap, Method, Path, RouteFn, RouteFuture, RouteHandlerFn, Router, request::Bytes,
-        response::IntoResponse, to_bytes,
+        HeaderMap, LayerFn, LayerFuture, Method, Next, Path, RouteFn, RouteFuture,
+        RouteHandlerFn, Router, request::Bytes, response::IntoResponse, to_bytes,
     };
 
     // -- Test helpers --
@@ -228,19 +247,25 @@ mod tests {
     /// compression configuration.
     fn router_with(handler: RouteHandlerFn, compression: Compression) -> Router {
         Router::builder()
-            .route(RouteFn::new(
-                Method::GET,
-                Cow::Borrowed(Path::new("/x")),
-                handler,
-            ))
-            .compression(compression)
+            .with(compression)
+            .route(get("/x", handler))
             .build()
+    }
+
+    fn get(path: &'static str, handler: RouteHandlerFn) -> RouteFn {
+        RouteFn::new(Method::GET, Cow::Borrowed(Path::new(path)), handler)
     }
 
     /// Dispatches a GET request for `/x`, optionally with an
     /// `Accept-Encoding` header, and reads the full response.
     fn send(router: &Router, accept_encoding: Option<&str>) -> (HeaderMap, Bytes) {
-        let mut request = http::Request::builder().uri("/x");
+        send_to(router, "/x", accept_encoding)
+    }
+
+    /// Dispatches a GET request for `path`, optionally with an
+    /// `Accept-Encoding` header, and reads the full response.
+    fn send_to(router: &Router, path: &str, accept_encoding: Option<&str>) -> (HeaderMap, Bytes) {
+        let mut request = http::Request::builder().uri(path);
         if let Some(value) = accept_encoding {
             request = request.header(ACCEPT_ENCODING, value);
         }
@@ -275,11 +300,23 @@ mod tests {
         })
     }
 
+    /// Passes the request on unchanged.
+    fn passthrough_layer<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+        next.run(cx, body)
+    }
+
     // -- Compression through the router --
 
     #[test]
+    fn compresses_without_a_registered_configuration() {
+        let router = Router::builder().route(get("/x", long_route)).build();
+        let (headers, _) = send(&router, Some("gzip"));
+        assert_eq!(headers.get(CONTENT_ENCODING).unwrap(), "gzip");
+    }
+
+    #[test]
     fn compresses_with_the_negotiated_algorithm() {
-        let router = router_with(long_route, Compression::new());
+        let router = router_with(long_route, Compression::default());
 
         let (headers, body) = send(&router, Some("gzip"));
         assert_eq!(headers.get(CONTENT_ENCODING).unwrap(), "gzip");
@@ -293,7 +330,7 @@ mod tests {
 
     #[test]
     fn passes_through_without_accept_encoding() {
-        let router = router_with(long_route, Compression::new());
+        let router = router_with(long_route, Compression::default());
         let (headers, body) = send(&router, None);
         assert!(!headers.contains_key(CONTENT_ENCODING));
         assert_eq!(body, long_body());
@@ -309,7 +346,7 @@ mod tests {
 
     #[test]
     fn disabled_algorithms_are_not_offered() {
-        let router = router_with(long_route, Compression::new().gzip(false));
+        let router = router_with(long_route, Compression::default().gzip(false));
 
         // The client only accepts the disabled algorithm.
         let (headers, body) = send(&router, Some("gzip"));
@@ -323,7 +360,7 @@ mod tests {
 
     #[test]
     fn small_bodies_are_not_compressed() {
-        let router = router_with(short_route, Compression::new());
+        let router = router_with(short_route, Compression::default());
         let (headers, body) = send(&router, Some("gzip"));
         assert!(!headers.contains_key(CONTENT_ENCODING));
         assert_eq!(&body[..], b"route");
@@ -331,17 +368,48 @@ mod tests {
 
     #[test]
     fn min_size_lowers_the_compression_threshold() {
-        let router = router_with(short_route, Compression::new().min_size(0));
+        let router = router_with(short_route, Compression::default().min_size(0));
         let (headers, _) = send(&router, Some("gzip"));
         assert_eq!(headers.get(CONTENT_ENCODING).unwrap(), "gzip");
     }
 
     #[test]
     fn already_encoded_responses_pass_through() {
-        let router = router_with(encoded_route, Compression::new());
+        let router = router_with(encoded_route, Compression::default());
         let (headers, body) = send(&router, Some("gzip"));
         // The route's own encoding wins; the body is not compressed again.
         assert_eq!(headers.get(CONTENT_ENCODING).unwrap(), "br");
         assert_eq!(body, long_body());
+    }
+
+    #[test]
+    fn a_route_configuration_replaces_the_router_configuration() {
+        let router = Router::builder()
+            .with(Compression::off())
+            .route(get("/x", long_route).with(Compression::default()))
+            .route(get("/y", long_route))
+            .build();
+
+        let (headers, _) = send_to(&router, "/x", Some("gzip"));
+        assert_eq!(headers.get(CONTENT_ENCODING).unwrap(), "gzip");
+        let (headers, _) = send_to(&router, "/y", Some("gzip"));
+        assert!(!headers.contains_key(CONTENT_ENCODING));
+    }
+
+    #[test]
+    fn a_layer_configuration_applies_to_the_routes_under_it() {
+        let router = Router::builder()
+            .layer(
+                LayerFn::new(Some(Path::new("/quiet")), passthrough_layer)
+                    .with(Compression::off()),
+            )
+            .route(get("/quiet/x", long_route))
+            .route(get("/x", long_route))
+            .build();
+
+        let (headers, _) = send_to(&router, "/quiet/x", Some("gzip"));
+        assert!(!headers.contains_key(CONTENT_ENCODING));
+        let (headers, _) = send_to(&router, "/x", Some("gzip"));
+        assert_eq!(headers.get(CONTENT_ENCODING).unwrap(), "gzip");
     }
 }

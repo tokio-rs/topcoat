@@ -10,8 +10,8 @@ pub(crate) const DEFAULT_BODY_LIMIT: usize = 2 * 1024 * 1024;
 ///
 /// The router reads the limit from the request context. Pass a limit to
 /// [`RouterBuilder::with`](crate::RouterBuilder::with) to replace the default
-/// for the whole application, or to a route's `with(...)` to replace it for
-/// that route. A layout's `with(...)` applies to the pages under it.
+/// for the whole application, or to `with(...)` on a route, page, layout, or
+/// layer to replace it for that part of the application.
 ///
 /// The limit only applies where a buffering extractor enforces it: a handler
 /// that takes the raw [`Body`](crate::Body) streams the request instead and
