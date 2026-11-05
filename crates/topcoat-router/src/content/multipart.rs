@@ -30,9 +30,9 @@ use crate::{
 /// Wrap it in [`Option`] to make the body optional: the extractor yields
 /// [`None`] when the request carries no `multipart/form-data` body.
 ///
-/// The stream reads at most the request's body limit across all fields;
-/// register a [`BodyLimit`](crate::BodyLimit) layer to raise it for an
-/// upload route.
+/// The stream reads at most the request's body limit across all fields. Pass
+/// a [`BodyLimit`](crate::BodyLimit) to an upload route's `with(...)` to
+/// raise it.
 ///
 /// # Examples
 ///

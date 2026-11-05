@@ -1,104 +1,75 @@
-use std::borrow::Cow;
-
 use topcoat_core::context::{Cx, try_context};
 
-use crate::{Body, IntoPath, Layer, LayerFuture, Next, Path};
-
-/// The body limit in bytes applied when no [`BodyLimit`] layer matches the
-/// request.
+/// The body limit in bytes applied when the context holds no [`BodyLimit`].
 pub(crate) const DEFAULT_BODY_LIMIT: usize = 2 * 1024 * 1024;
 
-/// A router layer that overrides the request body size limit for the routes
-/// under its path.
+/// The request body size limit.
 ///
 /// Buffering extractors reject bodies above the limit with
-/// `413 Content Too Large`. The default limit applies without a layer.
-/// Register this layer to override it.
+/// `413 Content Too Large`. The default limit is 2 MiB.
 ///
-/// Create the layer with [`max`](Self::max) or [`disable`](Self::disable) and
-/// register it with [`RouterBuilder::layer`](crate::RouterBuilder::layer). It
-/// covers the whole application by default; scope it to a path prefix with
-/// [`at`](Self::at). Layers nest from least- to most-specific path, so a
-/// scoped layer overrides a broader one for the routes it wraps.
+/// The router reads the limit from the request context. Pass a limit to
+/// [`RouterBuilder::with`](crate::RouterBuilder::with) to replace the default
+/// for the whole application, or to a route's `with(...)` to replace it for
+/// that route. A layout's `with(...)` applies to the pages under it.
 ///
 /// The limit only applies where a buffering extractor enforces it: a handler
-/// that takes the raw [`Body`] streams the request instead and reads it on
-/// its own terms.
+/// that takes the raw [`Body`](crate::Body) streams the request instead and
+/// reads it on its own terms.
 ///
 /// # Examples
 ///
-/// ```rust,no_run
-/// use topcoat::router::{BodyLimit, Router};
+/// ```rust
+/// use topcoat::{
+///     Result,
+///     context::Cx,
+///     router::{BodyLimit, Router, request::Bytes, route},
+/// };
+///
+/// // Accepts uploads of up to 32 MiB.
+/// #[route(POST "/upload", with(BodyLimit::max(32 * 1024 * 1024)))]
+/// async fn upload(cx: &Cx, bytes: Bytes) -> Result<()> {
+///     Ok(())
+/// }
 ///
 /// let router = Router::builder()
-///     // Allow up to 32 MiB under /upload, keep the 2 MiB default elsewhere.
-///     .layer(BodyLimit::max(32 * 1024 * 1024).at("/upload"))
+///     .with(BodyLimit::max(64 * 1024))
+///     .route(upload)
 ///     .build();
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[must_use]
 pub struct BodyLimit {
-    /// The URL path prefix whose routes this layer applies to.
-    path: Cow<'static, Path>,
-    /// The limit the layer registers on the request context.
-    kind: BodyLimitKind,
+    /// The maximum number of bytes an extractor buffers.
+    max: usize,
 }
 
 impl BodyLimit {
-    /// Creates a layer that limits request bodies to `limit` bytes.
-    pub const fn max(limit: usize) -> Self {
-        Self {
-            path: Cow::Borrowed(Path::ROOT),
-            kind: BodyLimitKind::Limit(limit),
-        }
+    /// Creates a limit of `max` bytes.
+    pub const fn max(max: usize) -> Self {
+        Self { max }
     }
 
-    /// Creates a layer that turns the body limit off, letting extractors
-    /// buffer a body of any size.
+    /// Creates a limit that is turned off, letting extractors buffer a body
+    /// of any size.
     pub const fn disable() -> Self {
-        Self {
-            path: Cow::Borrowed(Path::ROOT),
-            kind: BodyLimitKind::Disable,
-        }
-    }
-
-    /// Scopes the layer to the routes under `path`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `path` is a string that is not a well-formed route path.
-    #[track_caller]
-    pub fn at(mut self, path: impl IntoPath) -> Self {
-        self.path = path.into_path();
-        self
+        Self { max: usize::MAX }
     }
 }
 
-impl Layer for BodyLimit {
-    fn path(&self) -> Option<&Path> {
-        Some(&self.path)
-    }
-
-    fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
-        let cx = cx.with(self.kind);
-        Box::pin(async move { next.run(&cx, body).await })
+/// Limits bodies to 2 MiB.
+impl Default for BodyLimit {
+    fn default() -> Self {
+        Self::max(DEFAULT_BODY_LIMIT)
     }
 }
 
-/// The limit a [`BodyLimit`] layer registers on the request context.
-#[derive(Debug, Clone, Copy)]
-enum BodyLimitKind {
-    /// No limit; extractors buffer a body of any size.
-    Disable,
-    /// The maximum number of bytes an extractor buffers.
-    Limit(usize),
-}
-
-/// Returns the request's effective body size limit in bytes.
+/// Returns the request's body size limit in bytes.
 ///
-/// This is the limit registered by the innermost [`BodyLimit`] layer wrapping
-/// the matched route, the default limit when no layer matches, or
-/// [`usize::MAX`] when the limit is disabled.
+/// This is the limit from the most specific `with(...)` that covers the
+/// matched route, the limit passed to
+/// [`RouterBuilder::with`](crate::RouterBuilder::with), or the default limit
+/// if there is neither. A disabled limit is [`usize::MAX`].
 ///
 /// The built-in buffering extractors enforce this limit already. In a custom
 /// [`FromRequest`](crate::request::FromRequest) implementation, prefer delegating the
@@ -126,11 +97,7 @@ enum BodyLimitKind {
 /// ```
 #[must_use]
 pub fn body_limit(cx: &Cx) -> usize {
-    match try_context(cx) {
-        Some(BodyLimitKind::Limit(limit)) => *limit,
-        Some(BodyLimitKind::Disable) => usize::MAX,
-        None => DEFAULT_BODY_LIMIT,
-    }
+    try_context::<BodyLimit>(cx).map_or(DEFAULT_BODY_LIMIT, |limit| limit.max)
 }
 
 #[cfg(test)]
@@ -140,7 +107,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        RouteFn, RouteFuture, Router,
+        Body, RouteFn, RouteFuture, Router,
         request::{Bytes, FromRequest},
         response::{IntoResponse, Response},
         to_bytes,
@@ -149,36 +116,20 @@ mod tests {
     // -- body_limit --
 
     #[test]
-    fn body_limit_defaults_to_two_mebibytes() {
-        assert_eq!(body_limit(&Cx::new()), DEFAULT_BODY_LIMIT);
-    }
-
-    #[test]
-    fn body_limit_reads_the_registered_limit() {
-        let cx = Cx::new().with(BodyLimitKind::Limit(16));
+    fn body_limit_reads_the_context_limit() {
+        let cx = Cx::new().with(BodyLimit::max(16));
         assert_eq!(body_limit(&cx), 16);
     }
 
     #[test]
     fn body_limit_disabled_is_unlimited() {
-        let cx = Cx::new().with(BodyLimitKind::Disable);
+        let cx = Cx::new().with(BodyLimit::disable());
         assert_eq!(body_limit(&cx), usize::MAX);
     }
 
-    // -- BodyLimit as a layer --
-
     #[test]
-    fn layer_defaults_to_the_root_path() {
-        assert_eq!(BodyLimit::max(1).path(), Some(Path::new("/")));
-        assert_eq!(BodyLimit::disable().path(), Some(Path::new("/")));
-    }
-
-    #[test]
-    fn at_scopes_the_layer_path() {
-        assert_eq!(
-            BodyLimit::max(1).at("/upload").path(),
-            Some(Path::new("/upload"))
-        );
+    fn body_limit_without_a_limit_matches_the_default() {
+        assert_eq!(body_limit(&Cx::new()), BodyLimit::default().max);
     }
 
     // -- Test helpers --
@@ -227,10 +178,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn max_overrides_the_default_limit() {
+    async fn a_router_limit_applies_to_every_route() {
         let router = Router::builder()
+            .with(BodyLimit::max(8))
             .route(echo_route("/echo"))
-            .layer(BodyLimit::max(8))
             .build();
 
         // A body at the limit passes; one past it is rejected.
@@ -244,8 +195,8 @@ mod tests {
     #[tokio::test]
     async fn disable_turns_the_limit_off() {
         let router = Router::builder()
+            .with(BodyLimit::disable())
             .route(echo_route("/echo"))
-            .layer(BodyLimit::disable())
             .build();
 
         let response = send(&router, "/echo", DEFAULT_BODY_LIMIT + 1).await;
@@ -253,17 +204,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_scoped_layer_overrides_an_outer_one() {
+    async fn a_route_limit_replaces_the_router_limit() {
         let router = Router::builder()
+            .with(BodyLimit::max(8))
             .route(echo_route("/echo"))
-            .route(echo_route("/upload"))
-            .layer(BodyLimit::max(8))
-            .layer(BodyLimit::max(64).at("/upload"))
+            .route(echo_route("/upload").with(BodyLimit::max(64)))
             .build();
 
-        // The scoped layer runs innermost, so its limit wins under /upload...
         assert_eq!(send(&router, "/upload", 64).await.status(), StatusCode::OK);
-        // ...while other routes keep the outer limit.
         assert_eq!(
             send(&router, "/echo", 64).await.status(),
             StatusCode::PAYLOAD_TOO_LARGE
@@ -280,8 +228,8 @@ mod tests {
         }
 
         let router = Router::builder()
+            .with(BodyLimit::max(4))
             .route(RouteFn::new(Method::POST, "/raw", raw))
-            .layer(BodyLimit::max(4))
             .build();
 
         assert_eq!(send(&router, "/raw", 1024).await.status(), StatusCode::OK);
