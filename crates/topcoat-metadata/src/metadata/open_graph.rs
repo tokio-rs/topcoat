@@ -27,9 +27,14 @@ impl OpenGraphType {
     }
 }
 
-/// Open Graph values from one metadata entry or from the combined page metadata.
-#[derive(Default)]
-pub(crate) struct OpenGraphFields {
+/// Open Graph values for social link previews.
+///
+/// Pass it to [`Metadata::open_graph`](crate::Metadata::open_graph), for
+/// example `.open_graph(OpenGraph::new().site_name("Acme"))`. Unset fields
+/// are inherited. If no metadata sets an Open Graph title, description, or
+/// URL, the corresponding page value is used.
+#[derive(Clone, Default)]
+pub struct OpenGraph {
     pub(crate) title: Field<Text>,
     pub(crate) description: Field<Text>,
     pub(crate) url: Field<Url>,
@@ -38,27 +43,20 @@ pub(crate) struct OpenGraphFields {
     pub(crate) images: Field<Arc<[Image]>>,
 }
 
-fill_fields!(OpenGraphFields {
-    title,
-    description,
-    url,
-    site_name,
-    kind,
-    images,
-});
+impl OpenGraph {
+    /// Creates Open Graph values that inherit every field.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-/// A builder for setting fields through
-/// [`Metadata::open_graph`](crate::Metadata::open_graph).
-pub struct OpenGraphBuilder(pub(crate) OpenGraphFields);
-
-impl OpenGraphBuilder {
     /// Sets the title for social link previews.
     ///
     /// Uses the page's [title](crate::Metadata::title) if no Open Graph title
     /// is set or inherited.
     #[must_use]
     pub fn title(mut self, title: impl Into<Text>) -> Self {
-        self.0.title = Field::Set(title.into());
+        self.title = Field::Set(title.into());
         self
     }
 
@@ -68,7 +66,7 @@ impl OpenGraphBuilder {
     /// Open Graph description is set or inherited.
     #[must_use]
     pub fn description(mut self, description: impl Into<Text>) -> Self {
-        self.0.description = Field::Set(description.into());
+        self.description = Field::Set(description.into());
         self
     }
 
@@ -78,46 +76,55 @@ impl OpenGraphBuilder {
     /// Open Graph URL is set or inherited.
     #[must_use]
     pub fn url(mut self, url: impl Into<Url>) -> Self {
-        self.0.url = Field::Set(url.into());
+        self.url = Field::Set(url.into());
         self
     }
 
     /// Sets the website's name for link previews.
     #[must_use]
     pub fn site_name(mut self, site_name: impl Into<Text>) -> Self {
-        self.0.site_name = Field::Set(site_name.into());
+        self.site_name = Field::Set(site_name.into());
         self
     }
 
     /// Sets the page's Open Graph content type.
     #[must_use]
     pub fn kind(mut self, kind: OpenGraphType) -> Self {
-        self.0.kind = Field::Set(kind);
+        self.kind = Field::Set(kind);
         self
     }
 
     /// Adds an image for social link previews.
     ///
-    /// Repeated calls add images to this metadata entry. This list replaces
-    /// the entire inherited image list.
+    /// Repeated calls add more images. This list replaces the entire
+    /// inherited image list.
     #[must_use]
     pub fn image(mut self, image: impl Into<Image>) -> Self {
-        let mut images = match self.0.images {
+        let mut images = match self.images {
             Field::Set(images) => images.to_vec(),
             Field::Inherit | Field::Removed => Vec::new(),
         };
         images.push(image.into());
-        self.0.images = Field::Set(images.into());
+        self.images = Field::Set(images.into());
         self
     }
 
     /// Clears the preview images and prevents inheriting an image list.
     #[must_use]
     pub fn no_images(mut self) -> Self {
-        self.0.images = Field::Removed;
+        self.images = Field::Removed;
         self
     }
 }
+
+fill_fields!(OpenGraph {
+    title,
+    description,
+    url,
+    site_name,
+    kind,
+    images,
+});
 
 /// The page's Open Graph values for social link previews.
 ///
@@ -125,11 +132,11 @@ impl OpenGraphBuilder {
 /// sets an Open Graph title, description, or URL, the corresponding page
 /// value is used.
 #[derive(Clone, Copy)]
-pub struct OpenGraph<'a> {
+pub struct PageOpenGraph<'a> {
     page: &'a PageMetadata,
 }
 
-impl<'a> OpenGraph<'a> {
+impl<'a> PageOpenGraph<'a> {
     /// Provides access to the Open Graph values in `page`.
     pub(crate) fn new(page: &'a PageMetadata) -> Self {
         Self { page }

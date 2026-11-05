@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     context::{Cx, memoize},
-    metadata::{Image, Metadata},
+    metadata::{Image, Metadata, OpenGraph},
     router::{error::RouterErrorExt, module_param, page, path_param},
     view::{View, view},
 };
@@ -56,11 +56,9 @@ async fn find_product(cx: &Cx) -> Result<Product> {
                     .title(product.name)
                     .description(product.description)
                     .open_graph(
-                        |og| {
-                            og.image(
-                                Image::new(product.image).size(1200, 630).alt(product.name),
-                            )
-                        },
+                        OpenGraph::new().image(
+                            Image::new(product.image).size(1200, 630).alt(product.name),
+                        ),
                     ),
             )
         },

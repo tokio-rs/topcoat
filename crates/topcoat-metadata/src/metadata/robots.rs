@@ -1,45 +1,35 @@
-use crate::field::{Field, fill_fields};
+use crate::{
+    PageMetadata,
+    field::{Field, fill_fields},
+};
 
 /// Instructions asking search engines whether to include a page in search
 /// results and follow its links after fetching it.
 ///
-/// Use [`Metadata::robots`](crate::Metadata::robots) to set these instructions
-/// and [`PageMetadata::robots`](crate::PageMetadata::robots) to read them.
-/// Each setting is inherited separately, with the closest value taking
-/// priority. A layout can set defaults for a whole section. Both indexing
-/// and following links are allowed by default.
-#[derive(Default)]
+/// Pass it to [`Metadata::robots`](crate::Metadata::robots), for example
+/// `.robots(Robots::new().index(false))`. Each setting is inherited
+/// separately, with the closest value taking priority. A layout can set
+/// defaults for a whole section. Both indexing and following links are
+/// allowed by default.
+#[derive(Clone, Default)]
 pub struct Robots {
-    index: Field<bool>,
-    follow: Field<bool>,
+    pub(crate) index: Field<bool>,
+    pub(crate) follow: Field<bool>,
 }
 
 impl Robots {
-    /// Returns whether the page allows search engines to list it in results.
+    /// Creates instructions that inherit every setting.
     #[must_use]
-    pub fn index(&self) -> bool {
-        self.index.value().copied().unwrap_or(true)
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    /// Returns whether the page allows search engines to follow its links.
-    #[must_use]
-    pub fn follow(&self) -> bool {
-        self.follow.value().copied().unwrap_or(true)
-    }
-}
-
-fill_fields!(Robots { index, follow });
-
-/// A builder for search engine instructions in [`Metadata::robots`](crate::Metadata::robots).
-pub struct RobotsBuilder(pub(crate) Robots);
-
-impl RobotsBuilder {
     /// Chooses whether search engines should list the page in results.
     ///
     /// Pass `false` to add `noindex` to the robots tag.
     #[must_use]
     pub fn index(mut self, index: bool) -> Self {
-        self.0.index = Field::Set(index);
+        self.index = Field::Set(index);
         self
     }
 
@@ -48,7 +38,38 @@ impl RobotsBuilder {
     /// Pass `false` to add `nofollow` to the robots tag.
     #[must_use]
     pub fn follow(mut self, follow: bool) -> Self {
-        self.0.follow = Field::Set(follow);
+        self.follow = Field::Set(follow);
         self
+    }
+}
+
+fill_fields!(Robots { index, follow });
+
+/// The page's instructions for search engines.
+///
+/// Call [`PageMetadata::robots`] to read these instructions. Settings that
+/// no metadata sets allow search engines to index the page and follow its
+/// links.
+#[derive(Clone, Copy)]
+pub struct PageRobots<'a> {
+    page: &'a PageMetadata,
+}
+
+impl<'a> PageRobots<'a> {
+    /// Provides access to the search engine instructions in `page`.
+    pub(crate) fn new(page: &'a PageMetadata) -> Self {
+        Self { page }
+    }
+
+    /// Returns whether the page allows search engines to list it in results.
+    #[must_use]
+    pub fn index(self) -> bool {
+        self.page.robots.index.value().copied().unwrap_or(true)
+    }
+
+    /// Returns whether the page allows search engines to follow its links.
+    #[must_use]
+    pub fn follow(self) -> bool {
+        self.page.robots.follow.value().copied().unwrap_or(true)
     }
 }

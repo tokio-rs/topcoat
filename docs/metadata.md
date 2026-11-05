@@ -213,14 +213,12 @@ Use [`no_viewport`](Metadata::no_viewport) to omit the tag, including its defaul
 
 ## Search engine instructions
 
-[`robots`](Metadata::robots) sets whether search engines should include the page in search results and follow its links:
+[`robots`](Metadata::robots) takes a [`Robots`] value that sets whether search engines should include the page in search results and follow its links:
 
 ```rust
-use topcoat::metadata::Metadata;
+use topcoat::metadata::{Metadata, Robots};
 
-let metadata = Metadata::new().robots(|robots| {
-    robots.index(false).follow(false)
-});
+let metadata = Metadata::new().robots(Robots::new().index(false).follow(false));
 ```
 
 `index(false)` adds `noindex` to the robots tag. `follow(false)` adds `nofollow`. Both settings default to `true`, and the tag is omitted when both are allowed.
@@ -241,32 +239,33 @@ There is no default theme color. Use [`no_theme_color`](Metadata::no_theme_color
 
 ## Open Graph
 
-[`open_graph`](Metadata::open_graph) sets the `og:*` tags used in social link previews. Its fields inherit separately, so a layout can set the website name while a page supplies its own image:
+[`open_graph`](Metadata::open_graph) takes an [`OpenGraph`] value that sets the `og:*` tags used in social link previews. Its fields inherit separately, so a layout can set the website name while a page supplies its own image:
 
 ```rust
-use topcoat::metadata::{Image, Metadata, OpenGraphType};
+use topcoat::metadata::{Image, Metadata, OpenGraph, OpenGraphType};
 
-let metadata = Metadata::new().open_graph(|og| {
-    og.site_name("Acme")
+let metadata = Metadata::new().open_graph(
+    OpenGraph::new()
+        .site_name("Acme")
         .kind(OpenGraphType::Article)
         .image(
             Image::new("https://example.com/images/brewing-tea.png")
                 .size(1200, 630)
                 .alt("A teapot beside two cups of tea"),
-        )
-});
+        ),
+);
 ```
 
-The builder supports these fields:
+[`OpenGraph`] supports these fields:
 
 | Method | Purpose | Value when unset |
 | --- | --- | --- |
-| [`title`](OpenGraphBuilder::title) | Title shown in the preview | Page title |
-| [`description`](OpenGraphBuilder::description) | Summary shown in the preview | Page description |
-| [`url`](OpenGraphBuilder::url) | URL that identifies the page | Canonical URL |
-| [`site_name`](OpenGraphBuilder::site_name) | Name of the website | None |
-| [`kind`](OpenGraphBuilder::kind) | Content type, such as a website or article | [`OpenGraphType::Website`] |
-| [`image`](OpenGraphBuilder::image) | Image to show in the preview | No images |
+| [`title`](OpenGraph::title) | Title shown in the preview | Page title |
+| [`description`](OpenGraph::description) | Summary shown in the preview | Page description |
+| [`url`](OpenGraph::url) | URL that identifies the page | Canonical URL |
+| [`site_name`](OpenGraph::site_name) | Name of the website | None |
+| [`kind`](OpenGraph::kind) | Content type, such as a website or article | [`OpenGraphType::Website`] |
+| [`image`](OpenGraph::image) | Image to show in the preview | No images |
 
 These defaults apply after inheritance. For example, an Open Graph title set by a layout takes priority over the page's regular title. Leave the layout's Open Graph title unset if each preview should use its page's title.
 
@@ -277,30 +276,33 @@ Pass a URL directly to `image`, or use [`Image`] to add pixel dimensions and alt
 Bundled assets work directly too:
 
 ```rust
-use topcoat::{asset::asset, metadata::Metadata};
+use topcoat::{
+    asset::asset,
+    metadata::{Metadata, OpenGraph},
+};
 
-let metadata = Metadata::new()
-    .open_graph(|og| og.image(asset!("./preview.png")));
+let metadata = Metadata::new().open_graph(OpenGraph::new().image(asset!("./preview.png")));
 ```
 
 The asset URL is resolved when the tags render, so this does not need `from_fn`. Set up [asset bundling](crate::asset) as usual. Open Graph page and image URLs request the absolute form, so site-relative URLs also need the router's base URL.
 
-Call `image` several times to add several images to one metadata entry. This list replaces all inherited images. Use [`no_images`](OpenGraphBuilder::no_images) to remove the inherited list without adding a replacement.
+Call `image` several times to add several images to one metadata entry. This list replaces all inherited images. Use [`no_images`](OpenGraph::no_images) to remove the inherited list without adding a replacement.
 
 ## X previews
 
-[`twitter`](Metadata::twitter) sets the `twitter:*` tags for link previews on X. X uses the Open Graph title, description, and images for the preview content. The X settings choose the card format and identify the website and author accounts:
+[`twitter`](Metadata::twitter) takes a [`Twitter`] value that sets the `twitter:*` tags for link previews on X. X uses the Open Graph title, description, and images for the preview content. The X settings choose the card format and identify the website and author accounts:
 
 ```rust
-use topcoat::metadata::{Metadata, TwitterCard};
+use topcoat::metadata::{Metadata, Twitter, TwitterCard};
 
-let metadata = Metadata::new().twitter(|x| {
-    x.card(TwitterCard::SummaryLargeImage)
+let metadata = Metadata::new().twitter(
+    Twitter::new()
+        .card(TwitterCard::SummaryLargeImage)
         .site("@acme")
-        .creator("@ada")
-});
+        .creator("@ada"),
+);
 ```
 
-[`card`](TwitterBuilder::card) selects the preview format. [`TwitterCard::Summary`] uses a small image beside the text, while [`TwitterCard::SummaryLargeImage`] uses a large image above it. If no card is set or inherited, pages with Open Graph images use the large image format, and pages without images use the summary format.
+[`card`](Twitter::card) selects the preview format. [`TwitterCard::Summary`] uses a small image beside the text, while [`TwitterCard::SummaryLargeImage`] uses a large image above it. If no card is set or inherited, pages with Open Graph images use the large image format, and pages without images use the summary format.
 
-[`site`](TwitterBuilder::site) identifies the website's account, and [`creator`](TwitterBuilder::creator) identifies the page author's account. Include the `@` prefix. Neither account has a default, and each field inherits separately.
+[`site`](Twitter::site) identifies the website's account, and [`creator`](Twitter::creator) identifies the page author's account. Include the `@` prefix. Neither account has a default, and each field inherits separately.

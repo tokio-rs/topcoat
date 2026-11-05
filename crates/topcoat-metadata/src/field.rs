@@ -7,7 +7,7 @@ pub use text::*;
 pub use url::*;
 
 /// Whether a metadata field is unset, has a value, or has been removed.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(crate) enum Field<T> {
     /// Uses the value from a parent context, if there is one.
     #[default]

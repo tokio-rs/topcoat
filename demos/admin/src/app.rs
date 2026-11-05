@@ -12,7 +12,7 @@ use topcoat::{
     cookie::RouterBuilderCookieExt,
     font::{Font, fontsource::fontsource_font},
     l10n::locale,
-    metadata::Metadata,
+    metadata::{Metadata, Robots},
     router::{
         Body, Next, RouterBuilder, RouterBuilderDiscoverExt, Slot, layer, layout, module_router,
         response::Response,
@@ -46,7 +46,9 @@ async fn set_locale(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
 }
 
 #[layout(
-    with(Metadata::new().title("Backroom").robots(|r| r.index(false).follow(false)))
+    with(Metadata::new()
+        .title("Backroom")
+        .robots(Robots::new().index(false).follow(false)))
 )]
 async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     let theme = theme(cx);

@@ -78,7 +78,7 @@ pub async fn canonical(
     })
 }
 
-/// Writes the page's [search engine instructions](crate::Robots) in a robots tag.
+/// Writes the page's [search engine instructions](crate::PageRobots) in a robots tag.
 ///
 /// Omits the tag when indexing and following links are both allowed, since
 /// those are the defaults without a tag.
@@ -116,7 +116,7 @@ pub async fn theme_color(
     })
 }
 
-/// Writes [Open Graph tags](crate::OpenGraph) for social link previews.
+/// Writes [Open Graph tags](crate::PageOpenGraph) for social link previews.
 /// Requests the absolute form for page and image URLs.
 #[component]
 pub async fn open_graph(
@@ -160,7 +160,7 @@ pub async fn open_graph(
     })
 }
 
-/// Writes the page's [X preview tags](crate::Twitter). X also uses the
+/// Writes the page's [X preview tags](crate::PageTwitter). X also uses the
 /// [Open Graph tags](open_graph) for the preview's content.
 #[component]
 pub async fn twitter(
@@ -186,7 +186,7 @@ mod tests {
     use topcoat_view::ViewExt;
 
     use super::*;
-    use crate::{Metadata, metadata};
+    use crate::{Image, Metadata, OpenGraph, Robots, metadata};
 
     #[tokio::test]
     async fn renders_the_canonical_url_in_the_absolute_form() {
@@ -214,7 +214,7 @@ mod tests {
             .with(
                 Metadata::new()
                     .canonical("/teapot")
-                    .open_graph(|og| og.image(crate::Image::new("/teapot.png").size(1200, 630))),
+                    .open_graph(OpenGraph::new().image(Image::new("/teapot.png").size(1200, 630))),
             );
         let page = metadata(cx).await.unwrap();
 
@@ -249,7 +249,7 @@ mod tests {
             .render(cx);
         assert!(!html.contains("robots"), "{html}");
 
-        let cx = &Cx::new().with(Metadata::new().robots(|r| r.index(false)));
+        let cx = &Cx::new().with(Metadata::new().robots(Robots::new().index(false)));
         let page = metadata(cx).await.unwrap();
         let html = view! { robots(metadata: page) }
             .single()

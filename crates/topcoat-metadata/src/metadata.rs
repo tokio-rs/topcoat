@@ -12,7 +12,10 @@ use topcoat_core::{
 };
 pub use twitter::*;
 
-use crate::{Field, Text, Url};
+use crate::{
+    Text, Url,
+    field::{Field, Fill},
+};
 
 /// Information about a page, including its title and description.
 ///
@@ -50,8 +53,8 @@ pub struct Metadata {
     pub(crate) viewport: Field<Cow<'static, str>>,
     pub(crate) robots: Robots,
     pub(crate) theme_color: Field<Cow<'static, str>>,
-    pub(crate) open_graph: Option<Box<OpenGraphFields>>,
-    pub(crate) twitter: Option<Box<TwitterFields>>,
+    pub(crate) open_graph: Option<Box<OpenGraph>>,
+    pub(crate) twitter: Option<Box<Twitter>>,
     /// Loads fields using the current request. Values set directly on this
     /// metadata override the loaded values.
     pub(crate) load: Option<BoxCxFn<Result<Metadata>>>,
@@ -135,13 +138,15 @@ impl Metadata {
     }
 
     /// Sets the page's instructions for search engines through [`Robots`].
-    /// For example, `.robots(|robots| robots.index(false))` asks them to
+    /// For example, `.robots(Robots::new().index(false))` asks them to
     /// leave the page out of search results.
     ///
-    /// Each directive that `f` leaves unset is inherited separately.
+    /// Each directive left unset is inherited separately. Calling this
+    /// again keeps earlier directives that the new value leaves unset.
     #[must_use]
-    pub fn robots(mut self, f: impl FnOnce(RobotsBuilder) -> RobotsBuilder) -> Self {
-        self.robots = f(RobotsBuilder(self.robots)).0;
+    pub fn robots(mut self, mut robots: Robots) -> Self {
+        robots.fill_from_owned(self.robots);
+        self.robots = robots;
         self
     }
 
@@ -161,27 +166,29 @@ impl Metadata {
     }
 
     /// Sets Open Graph metadata for social link previews.
-    /// For example, `.open_graph(|og| og.site_name("Acme"))`.
+    /// For example, `.open_graph(OpenGraph::new().site_name("Acme"))`.
     ///
     /// Unset fields are inherited. If no metadata sets an Open Graph title,
     /// description, or URL, the corresponding page value is used. Most
-    /// pages only need to add preview images.
+    /// pages only need to add preview images. Calling this again keeps
+    /// earlier fields that the new value leaves unset.
     #[must_use]
-    pub fn open_graph(mut self, f: impl FnOnce(OpenGraphBuilder) -> OpenGraphBuilder) -> Self {
-        let fields = self.open_graph.map(|fields| *fields).unwrap_or_default();
-        self.open_graph = Some(Box::new(f(OpenGraphBuilder(fields)).0));
+    pub fn open_graph(mut self, mut open_graph: OpenGraph) -> Self {
+        open_graph.fill_from_owned(self.open_graph.take());
+        self.open_graph = Some(Box::new(open_graph));
         self
     }
 
     /// Sets metadata for link previews on X.
-    /// For example, `.twitter(|x| x.site("@acme"))`.
+    /// For example, `.twitter(Twitter::new().site("@acme"))`.
     ///
     /// X uses the [Open Graph fields](Self::open_graph) for the preview's
-    /// title, description, and image. Fields left unset by `f` are inherited.
+    /// title, description, and image. Unset fields are inherited. Calling
+    /// this again keeps earlier fields that the new value leaves unset.
     #[must_use]
-    pub fn twitter(mut self, f: impl FnOnce(TwitterBuilder) -> TwitterBuilder) -> Self {
-        let fields = self.twitter.map(|fields| *fields).unwrap_or_default();
-        self.twitter = Some(Box::new(f(TwitterBuilder(fields)).0));
+    pub fn twitter(mut self, mut twitter: Twitter) -> Self {
+        twitter.fill_from_owned(self.twitter.take());
+        self.twitter = Some(Box::new(twitter));
         self
     }
 }
