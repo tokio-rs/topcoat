@@ -2155,7 +2155,10 @@ mod tests {
             .route(RouteFn::new(Method::GET, path("/about"), echo_tags).with(Tag("route")))
             .build();
 
-        assert_eq!(&send(&router, Method::GET, "/admin/x").2[..], b"route,admin,app");
+        assert_eq!(
+            &send(&router, Method::GET, "/admin/x").2[..],
+            b"route,admin,app"
+        );
         assert_eq!(&send(&router, Method::GET, "/about").2[..], b"route,app");
     }
 
