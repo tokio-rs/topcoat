@@ -48,16 +48,18 @@ use topcoat::{
 
 #[route(POST)]
 async fn welcome(cx: &Cx) -> Result<&'static str> {
-    let html = view! {
-        <h1>"Welcome!"</h1>
-        <p>"Your account is ready."</p>
-    };
-
     let mail = Mail::builder()
         .from(Mailbox::named("Topcoat", "welcome@example.com")?)
         .to([Mailbox::new("ada@example.com")?])
         .subject("Welcome, Ada!")
-        .html(html.single().await?)
+        .html(
+            view! {
+                <h1>"Welcome!"</h1>
+                <p>"Your account is ready."</p>
+            }
+            .single()
+            .await?,
+        )
         .build();
 
     send(cx, mail).await?;
@@ -80,14 +82,16 @@ Add files with [`attachments`](MailBuilder::attachments). Use [`Attachment::new`
 # use topcoat::{Result, context::Cx};
 # use topcoat::{mail::{Attachment, Mail}, view::{ViewExt, view}};
 # async fn example(cx: &Cx) -> Result<()> {
-let html = view! {
-    <img src="cid:logo" alt="Example logo">
-    <p>"The invoice is attached."</p>
-};
-
 let mail = Mail::builder()
     .subject("Your invoice")
-    .html(html.single().await?)
+    .html(
+        view! {
+            <img src="cid:logo" alt="Example logo">
+            <p>"The invoice is attached."</p>
+        }
+        .single()
+        .await?,
+    )
     .attachments([
         Attachment::inline("logo", "image/png", b"\x89PNG"),
         Attachment::new("invoice.pdf", "application/pdf", b"%PDF-"),

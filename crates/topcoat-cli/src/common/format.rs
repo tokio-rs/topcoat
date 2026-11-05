@@ -125,8 +125,8 @@ mod tests {
 
     #[test]
     fn formats_a_macro_nested_in_another_macro() {
-        let input = r#"view! { <p>(t!(greeting,name :user . name))</p> }"#;
-        let expected = r#"view! { <p>(t!(greeting, name: user.name))</p> }"#;
+        let input = "view! { <p>(t!(greeting,name :user . name))</p> }";
+        let expected = "view! { <p>(t!(greeting, name: user.name))</p> }";
         let formatted = pretty_print_str(&registry(), input).unwrap();
         assert_eq!(formatted, expected);
     }
