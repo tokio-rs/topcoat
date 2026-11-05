@@ -7,7 +7,7 @@ use topcoat_core::{
 use topcoat_core_macro::memoize;
 
 use crate::{
-    Metadata, OpenGraph, OpenGraphFields, Robots, Text, Twitter, TwitterFields, Url,
+    Metadata, OpenGraph, PageOpenGraph, PageRobots, PageTwitter, Robots, Text, Twitter, Url,
     field::{Field, Fill, fill_fields},
 };
 
@@ -60,10 +60,10 @@ pub struct PageMetadata {
     description: Field<Text>,
     canonical: Field<Url>,
     viewport: Field<Cow<'static, str>>,
-    robots: Robots,
+    pub(crate) robots: Robots,
     theme_color: Field<Cow<'static, str>>,
-    pub(crate) open_graph: OpenGraphFields,
-    pub(crate) twitter: TwitterFields,
+    pub(crate) open_graph: OpenGraph,
+    pub(crate) twitter: Twitter,
 }
 
 impl PageMetadata {
@@ -102,8 +102,8 @@ impl PageMetadata {
 
     /// Returns the page's instructions for search engines.
     #[must_use]
-    pub fn robots(&self) -> &Robots {
-        &self.robots
+    pub fn robots(&self) -> PageRobots<'_> {
+        PageRobots::new(self)
     }
 
     /// Returns the suggested browser theme color, if set.
@@ -114,14 +114,14 @@ impl PageMetadata {
 
     /// Provides access to the page's Open Graph values.
     #[must_use]
-    pub fn open_graph(&self) -> OpenGraph<'_> {
-        OpenGraph::new(self)
+    pub fn open_graph(&self) -> PageOpenGraph<'_> {
+        PageOpenGraph::new(self)
     }
 
     /// Provides access to the page's X preview settings.
     #[must_use]
-    pub fn twitter(&self) -> Twitter<'_> {
-        Twitter::new(self)
+    pub fn twitter(&self) -> PageTwitter<'_> {
+        PageTwitter::new(self)
     }
 }
 
@@ -255,13 +255,13 @@ mod tests {
     #[tokio::test]
     async fn reads_each_robots_directive_from_the_closest_level_that_sets_it() {
         let cx = Cx::new()
-            .with(Metadata::new().robots(|robots| robots.index(false)))
-            .with(Metadata::new().robots(|robots| robots.follow(false)));
+            .with(Metadata::new().robots(Robots::new().index(false)))
+            .with(Metadata::new().robots(Robots::new().follow(false)));
         let robots = metadata(&cx).await.unwrap().robots();
         assert!(!robots.index());
         assert!(!robots.follow());
 
-        let cx = cx.with(Metadata::new().robots(|robots| robots.index(true)));
+        let cx = cx.with(Metadata::new().robots(Robots::new().index(true)));
         assert!(metadata(&cx).await.unwrap().robots().index());
     }
 
@@ -271,7 +271,7 @@ mod tests {
             Metadata::new()
                 .title("Teapot")
                 .description("A sturdy teapot.")
-                .open_graph(|og| og.title("The best teapot")),
+                .open_graph(OpenGraph::new().title("The best teapot")),
         );
         let page = metadata(&cx).await.unwrap();
         let og = page.open_graph();
@@ -287,8 +287,10 @@ mod tests {
     #[tokio::test]
     async fn combines_open_graph_fields_from_every_level() {
         let cx = Cx::new()
-            .with(Metadata::new().open_graph(|og| og.site_name("Acme").image("/acme.png")))
-            .with(Metadata::new().open_graph(|og| og.image("/teapot.png").image("/lid.png")));
+            .with(Metadata::new().open_graph(OpenGraph::new().site_name("Acme").image("/acme.png")))
+            .with(
+                Metadata::new().open_graph(OpenGraph::new().image("/teapot.png").image("/lid.png")),
+            );
         let page = metadata(&cx).await.unwrap();
         let og = page.open_graph();
 
@@ -307,10 +309,27 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn repeated_open_graph_calls_keep_fields_the_later_value_leaves_unset() {
+        let cx = Cx::new().with(
+            Metadata::new()
+                .open_graph(OpenGraph::new().site_name("Acme").title("Shop"))
+                .open_graph(OpenGraph::new().title("Teapot")),
+        );
+        let page = metadata(&cx).await.unwrap();
+        let og = page.open_graph();
+
+        let resolve = |text: Option<&Text>| text.map(|text| text.resolve(&cx).into_owned());
+        assert_eq!(resolve(og.site_name()).as_deref(), Some("Acme"));
+        assert_eq!(resolve(og.title()).as_deref(), Some("Teapot"));
+    }
+
+    #[tokio::test]
     async fn the_twitter_card_defaults_to_a_large_image_when_there_are_images() {
         let without_images = Cx::new();
-        let with_images = Cx::new().with(Metadata::new().open_graph(|og| og.image("/teapot.png")));
-        let explicit = with_images.with(Metadata::new().twitter(|x| x.card(TwitterCard::Summary)));
+        let with_images =
+            Cx::new().with(Metadata::new().open_graph(OpenGraph::new().image("/teapot.png")));
+        let explicit =
+            with_images.with(Metadata::new().twitter(Twitter::new().card(TwitterCard::Summary)));
 
         let card = async |cx| metadata(cx).await.unwrap().twitter().card();
         assert_eq!(card(&without_images).await, TwitterCard::Summary);

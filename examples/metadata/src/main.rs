@@ -3,7 +3,7 @@ mod products;
 use topcoat::{
     Result,
     context::Cx,
-    metadata::{Metadata, Url},
+    metadata::{Metadata, OpenGraph, Twitter, Url},
     router::{Slot, href, layout, module_router, page},
     view::{View, view},
 };
@@ -27,8 +27,8 @@ async fn main() {
         .description("Acme sells everything you need for tea.")
         .canonical(Url::Current)
         .theme_color("#0f766e")
-        .open_graph(|og| og.site_name("Acme"))
-        .twitter(|x| x.site("@acme")))
+        .open_graph(OpenGraph::new().site_name("Acme"))
+        .twitter(Twitter::new().site("@acme")))
 )]
 async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     Ok(view! {
