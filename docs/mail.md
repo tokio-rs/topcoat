@@ -1,4 +1,4 @@
-Declare email with [`mail!`] and deliver it with [`send`]. A [`Transport`] determines how messages are delivered.
+Build email with [`Mail::builder`] and deliver it with [`send`]. A [`Transport`] determines how messages are delivered.
 
 Everything below is re-exported from `topcoat::mail` and gated behind the `mail` feature. The SMTP transport additionally needs the `mail-smtp` feature.
 
@@ -34,29 +34,31 @@ Handlers use the registered transport. You can change delivery settings without 
 
 # Declaring and sending mail
 
-The [`mail!`] macro creates a [`Mail`] from `name: value` fields. Its `html` field accepts a view, such as [`view!`](crate::view::view) markup:
+[`Mail::builder`] creates a [`Mail`]. Render the HTML body from a view, such as [`view!`](crate::view::view) markup, with [`single`](crate::view::ViewExt::single):
 
 ```rust
 // src/app/api/welcome.rs
 use topcoat::{
     Result,
     context::Cx,
-    mail::{mail, send},
+    mail::{Mail, Mailbox, send},
     router::route,
-    view::view,
+    view::{ViewExt, view},
 };
 
 #[route(POST)]
 async fn welcome(cx: &Cx) -> Result<&'static str> {
-    let mail = mail! {
-        from: ("Topcoat", "welcome@example.com"),
-        to: "ada@example.com",
-        subject: "Welcome, Ada!",
-        html: view! {
-            <h1>"Welcome!"</h1>
-            <p>"Your account is ready."</p>
-        },
-    }?;
+    let html = view! {
+        <h1>"Welcome!"</h1>
+        <p>"Your account is ready."</p>
+    };
+
+    let mail = Mail::builder()
+        .from(Mailbox::named("Topcoat", "welcome@example.com")?)
+        .to([Mailbox::new("ada@example.com")?])
+        .subject("Welcome, Ada!")
+        .html(html.single().await?)
+        .build();
 
     send(cx, mail).await?;
 
@@ -64,7 +66,7 @@ async fn welcome(cx: &Cx) -> Result<&'static str> {
 }
 ```
 
-Addresses accept strings, `(name, address)` pairs, or [`Mailbox`] values. Recipient fields also accept collections. Topcoat derives a plain-text body from the HTML by default. See [`mail!`] for field details or use [`MailBuilder`] to create a message without the macro.
+Create addresses with [`Mailbox::new`] or [`Mailbox::named`], or parse the `Ada Lovelace <ada@example.com>` form. Recipient methods take a collection of addresses and add to the recipients on each call. Topcoat derives a plain-text body from the HTML by default. Set [`text`](MailBuilder::text) to supply your own wording, or pass [`TextBody::None`] to send only HTML.
 
 [`send`] returns a [`Receipt`] with the message's `Message-ID`. Use that ID in `in_reply_to` and `references` to link a later reply. The receipt confirms that the transport accepted the message. It does not confirm inbox delivery.
 
@@ -72,23 +74,25 @@ Sending returns a [`SendError`] if the message lacks a sender, recipients, or bo
 
 # Attachments
 
-Add files with the `attachments` field. Use [`Attachment::new`] for a downloadable file or [`Attachment::inline`] for content referenced by a `cid:` URL in the HTML:
+Add files with [`attachments`](MailBuilder::attachments). Use [`Attachment::new`] for a downloadable file or [`Attachment::inline`] for content referenced by a `cid:` URL in the HTML:
 
 ```rust
 # use topcoat::{Result, context::Cx};
-# use topcoat::{mail::{Attachment, mail}, view::view};
+# use topcoat::{mail::{Attachment, Mail}, view::{ViewExt, view}};
 # async fn example(cx: &Cx) -> Result<()> {
-let mail = mail! {
-    subject: "Your invoice",
-    html: view! {
-        <img src="cid:logo" alt="Example logo">
-        <p>"The invoice is attached."</p>
-    },
-    attachments: [
+let html = view! {
+    <img src="cid:logo" alt="Example logo">
+    <p>"The invoice is attached."</p>
+};
+
+let mail = Mail::builder()
+    .subject("Your invoice")
+    .html(html.single().await?)
+    .attachments([
         Attachment::inline("logo", "image/png", b"\x89PNG"),
         Attachment::new("invoice.pdf", "application/pdf", b"%PDF-"),
-    ],
-}?;
+    ])
+    .build();
 # Ok(())
 # }
 ```
@@ -126,7 +130,7 @@ Use [`MemoryTransport`] in tests to collect outgoing messages. Add a `MailConfig
 ```rust
 use topcoat::{
     context::Cx,
-    mail::{MailConfig, MemoryTransport, Mailbox, mail, send},
+    mail::{Mail, MailConfig, Mailbox, MemoryTransport, send},
 };
 
 # async fn test() -> topcoat::Result<()> {
@@ -134,7 +138,13 @@ let transport = MemoryTransport::new();
 let config = MailConfig::builder().transport(transport.clone()).build();
 let cx = Cx::new().with(config);
 
-send(&cx, mail! { from: "ada@example.com", to: "bob@example.com", text: "Hi" }?).await?;
+let mail = Mail::builder()
+    .from(Mailbox::new("ada@example.com")?)
+    .to([Mailbox::new("bob@example.com")?])
+    .text("Hi")
+    .build();
+
+send(&cx, mail).await?;
 
 assert_eq!(transport.sent().len(), 1);
 assert_eq!(transport.sent()[0].to(), [Mailbox::new("bob@example.com")?]);

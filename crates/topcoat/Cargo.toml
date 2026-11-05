@@ -145,7 +145,6 @@ l10n-number = [
 ]
 mail = [
 	"dep:topcoat-mail",
-	"dep:topcoat-mail-macro",
 	"view",
 ]
 mail-smtp = [
@@ -235,7 +234,6 @@ topcoat-icon-macro = { workspace = true, optional = true }
 topcoat-l10n = { workspace = true, optional = true }
 topcoat-l10n-macro = { workspace = true, optional = true }
 topcoat-mail = { workspace = true, optional = true }
-topcoat-mail-macro = { workspace = true, optional = true }
 topcoat-metadata = { workspace = true, optional = true }
 topcoat-router = { workspace = true, optional = true }
 topcoat-router-macro = { workspace = true, optional = true }

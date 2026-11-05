@@ -29,7 +29,6 @@ topcoat-font-grammar = { workspace = true, features = ["fontsource", "pretty"] }
 topcoat-icon-grammar = { workspace = true, features = ["iconify", "pretty"] }
 topcoat-l10n = { workspace = true, features = ["check"] }
 topcoat-l10n-grammar = { workspace = true, features = ["fluent", "pretty"] }
-topcoat-mail-grammar = { workspace = true, features = ["pretty"] }
 topcoat-router = { workspace = true, features = ["websocket"] }
 topcoat-router-grammar = { workspace = true, features = ["pretty"] }
 topcoat-runtime-grammar = { workspace = true, features = ["pretty"] }
