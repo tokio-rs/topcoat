@@ -1,30 +1,48 @@
-use topcoat_core::context::Cx;
+use topcoat_core::context::{Cx, try_context};
 
 use crate::{
-    Body, IntoPath, Layer, LayerFuture, Method, Next, Path, PathBuf,
-    error::forbidden,
+    Method,
+    error::{ForbiddenError, forbidden},
     header,
     request::{headers, method, uri},
 };
 
-/// The cross-origin request policy the router applies to every request.
+/// The cross-origin request policy the router applies to a request.
 ///
 /// By default, rejects state-changing browser requests and WebSocket
 /// handshakes from untrusted origins. This helps protect against cross-site
 /// request forgery and cross-site WebSocket hijacking.
 ///
 /// Requests identified as same-origin or direct navigations pass. Requests
-/// without origin or fetch metadata headers also pass. Register a policy with
-/// [`RouterBuilder::origin_policy`](crate::RouterBuilder::origin_policy) to
-/// trust origins, exempt paths, or disable verification.
+/// without origin or fetch metadata headers also pass. A rejected request
+/// fails with `403 Forbidden` before any layer or route runs.
+///
+/// The router reads the policy from the request context. Pass a policy to
+/// [`RouterBuilder::with`](crate::RouterBuilder::with) to replace the default
+/// for the whole application, or to a route's `with(...)` to replace it for
+/// that route. A layout's `with(...)` applies to the pages under it. A more
+/// specific policy replaces a broader one entirely.
 ///
 /// # Examples
 ///
 /// ```rust
-/// use topcoat::router::{OriginPolicy, Router};
+/// use topcoat::{
+///     Result,
+///     context::Cx,
+///     router::{OriginPolicy, Router, route},
+/// };
+///
+/// // Accepts requests from any site and verifies their signature itself.
+/// #[route(POST "/webhook", with(OriginPolicy::dangerous_disable()))]
+/// async fn webhook(cx: &Cx) -> Result<()> {
+///     Ok(())
+/// }
 ///
 /// let router = Router::builder()
-///     .origin_policy(OriginPolicy::new().trust_origins(["https://accounts.example.com"]))
+///     .with(OriginPolicy::trust_origins([
+///         "https://accounts.example.com",
+///     ]))
+///     .route(webhook)
 ///     .build();
 /// ```
 #[derive(Debug)]
@@ -34,86 +52,40 @@ pub struct OriginPolicy {
 
 #[derive(Debug)]
 enum Inner {
-    /// Verifies every request, trusting the listed cross-origin peers and
-    /// skipping the exempted paths.
-    Verify {
-        trusted_origins: Vec<String>,
-        exempt_paths: Vec<PathBuf>,
-    },
+    /// Verifies every request, trusting the listed cross-origin peers.
+    Verify { trusted_origins: Vec<String> },
     /// No verification at all.
     Disabled,
 }
 
 impl OriginPolicy {
-    /// Creates the default policy: every request is verified, with no trusted
-    /// cross-origin peers and no exempt paths.
-    ///
-    /// Loosen it with [`trust_origins`](Self::trust_origins) and
-    /// [`exempt_paths`](Self::exempt_paths).
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            inner: Inner::Verify {
-                trusted_origins: Vec::new(),
-                exempt_paths: Vec::new(),
-            },
-        }
-    }
-
-    /// Trusts `origins` to send state-changing cross-origin requests and to
-    /// open cross-origin WebSockets.
+    /// Creates a policy that verifies requests like the default policy, but
+    /// also trusts `origins` to send state-changing cross-origin requests and
+    /// to open cross-origin WebSockets.
     ///
     /// Each value is compared against the request's `Origin` header, so pass
     /// the full serialized origin: scheme, host, and any non-default port
     /// (`"https://accounts.example.com"`), with no trailing slash. The
     /// comparison is ASCII case-insensitive.
     #[must_use]
-    pub fn trust_origins<I>(mut self, origins: I) -> Self
+    pub fn trust_origins<I>(origins: I) -> Self
     where
         I: IntoIterator,
         I::Item: Into<String>,
     {
-        if let Inner::Verify {
-            trusted_origins, ..
-        } = &mut self.inner
-        {
-            trusted_origins.extend(origins.into_iter().map(Into::into));
+        Self {
+            inner: Inner::Verify {
+                trusted_origins: origins.into_iter().map(Into::into).collect(),
+            },
         }
-        self
     }
 
-    /// Exempts the routes at `paths` from origin verification.
+    /// Creates a policy that turns origin verification off.
     ///
-    /// A request whose URL matches one of the paths passes unchecked, no
-    /// matter where it comes from. Use this for a route that must accept
-    /// cross-origin requests from anywhere and handles its own protection,
-    /// like a WebSocket endpoint open to other sites. Paths use the route
-    /// path syntax, so `{param}` and `{*rest}` segments match like a route.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use topcoat::router::OriginPolicy;
-    ///
-    /// let policy = OriginPolicy::new().exempt_paths(["/feed/{*rest}"]);
-    /// ```
-    #[must_use]
-    pub fn exempt_paths<I>(mut self, paths: I) -> Self
-    where
-        I: IntoIterator,
-        I::Item: IntoPath,
-    {
-        if let Inner::Verify { exempt_paths, .. } = &mut self.inner {
-            exempt_paths.extend(paths.into_iter().map(|path| path.into_path().into_owned()));
-        }
-        self
-    }
-
-    /// Turns origin verification off entirely.
-    ///
-    /// Without it, nothing rejects state-changing cross-origin requests or
-    /// cross-origin WebSocket handshakes; only use this if the application
-    /// enforces its own defense against cross-site request forgery.
+    /// Without verification, nothing rejects state-changing cross-origin
+    /// requests or cross-origin WebSocket handshakes. Only use this where the
+    /// application enforces its own defense against cross-site request
+    /// forgery, like a webhook that verifies a signature.
     #[must_use]
     pub fn dangerous_disable() -> Self {
         Self {
@@ -121,14 +93,48 @@ impl OriginPolicy {
         }
     }
 
+    /// Checks the current request against this policy and returns a
+    /// forbidden error if the policy rejects it.
+    ///
+    /// The router already checks every request against the policy from
+    /// [`origin_policy`] before any layer or route runs. Call this to apply a
+    /// policy on your own terms, like in a route that disables the check for
+    /// signed requests only.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # fn has_valid_signature(_cx: &Cx) -> bool { true }
+    /// use topcoat::{
+    ///     Result,
+    ///     context::Cx,
+    ///     router::{OriginPolicy, route},
+    /// };
+    ///
+    /// #[route(POST "/webhook", with(OriginPolicy::dangerous_disable()))]
+    /// async fn webhook(cx: &Cx) -> Result<()> {
+    ///     if !has_valid_signature(cx) {
+    ///         OriginPolicy::default().verify(cx)?;
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ForbiddenError`] if the policy rejects the request.
+    pub fn verify(&self, cx: &Cx) -> Result<(), ForbiddenError> {
+        match self.check(cx) {
+            OriginVerdict::Allow => Ok(()),
+            OriginVerdict::Deny => Err(forbidden()),
+        }
+    }
+
     /// Classifies the current request under this policy.
     fn check(&self, cx: &Cx) -> OriginVerdict {
         match &self.inner {
             Inner::Disabled => OriginVerdict::Allow,
-            Inner::Verify {
-                trusted_origins,
-                exempt_paths,
-            } => {
+            Inner::Verify { trusted_origins } => {
                 let headers = headers(cx);
                 let header = |name: &str| headers.get(name).and_then(|value| value.to_str().ok());
 
@@ -140,11 +146,6 @@ impl OriginPolicy {
                 if !upgrades_to_websocket
                     && matches!(method(cx), &Method::GET | &Method::HEAD | &Method::OPTIONS)
                 {
-                    return OriginVerdict::Allow;
-                }
-
-                // An exempted route handles cross-origin requests itself.
-                if exempt_paths.iter().any(|path| path.matches(uri(cx).path())) {
                     return OriginVerdict::Allow;
                 }
 
@@ -194,11 +195,33 @@ impl OriginPolicy {
     }
 }
 
-/// Verifies with no trusted cross-origin peers and no exempt paths.
+/// Verifies with no trusted cross-origin peers.
 impl Default for OriginPolicy {
     fn default() -> Self {
-        Self::new()
+        Self {
+            inner: Inner::Verify {
+                trusted_origins: Vec::new(),
+            },
+        }
     }
+}
+
+/// The policy that applies when the context holds none.
+static DEFAULT_POLICY: OriginPolicy = OriginPolicy {
+    inner: Inner::Verify {
+        trusted_origins: Vec::new(),
+    },
+};
+
+/// Returns the [`OriginPolicy`] that applies to the request.
+///
+/// This is the policy from the most specific `with(...)` that covers the
+/// matched route, the policy passed to
+/// [`RouterBuilder::with`](crate::RouterBuilder::with), or the default policy
+/// if there is neither.
+#[must_use]
+pub fn origin_policy(cx: &Cx) -> &OriginPolicy {
+    try_context(cx).unwrap_or(&DEFAULT_POLICY)
 }
 
 /// The policy's decision about a request's origin.
@@ -210,58 +233,26 @@ enum OriginVerdict {
     Deny,
 }
 
-/// A [`Layer`] enforcing an [`OriginPolicy`].
-///
-/// The router wraps one around every request as its outermost step, built
-/// from the policy registered with
-/// [`RouterBuilder::origin_policy`](crate::RouterBuilder::origin_policy). A
-/// request the policy denies is rejected with `403 Forbidden` before any
-/// inner layer or route runs.
-#[derive(Debug)]
-pub struct OriginLayer {
-    policy: OriginPolicy,
-}
-
-impl OriginLayer {
-    /// Creates a layer enforcing `policy`.
-    #[must_use]
-    pub fn new(policy: OriginPolicy) -> Self {
-        Self { policy }
-    }
-}
-
-impl Layer for OriginLayer {
-    fn path(&self) -> Option<&Path> {
-        None
-    }
-
-    fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
-        match self.policy.check(cx) {
-            OriginVerdict::Allow => next.run(cx, body),
-            OriginVerdict::Deny => Box::pin(async { Err(forbidden().into()) }),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use http::Request;
+    use http::{Request, StatusCode};
+    use topcoat::view::view;
     use topcoat_core::context::Cx;
+    use topcoat_view::{BoxView, ViewExt};
 
     use super::*;
+    use crate::{
+        Body, LayoutFn, PageFn, RouteFn, RouteFuture, Router, Slot, response::IntoResponse,
+    };
 
-    /// Builds a `Cx` for a request with the given method, URL, and headers.
-    fn cx_with(method: Method, uri: &str, headers: &[(&str, &str)]) -> Cx {
-        let mut builder = Request::builder().method(method).uri(uri);
+    /// Classifies a request with the given method and headers under `policy`.
+    fn check(policy: &OriginPolicy, method: Method, headers: &[(&str, &str)]) -> OriginVerdict {
+        let mut builder = Request::builder().method(method).uri("/x");
         for (name, value) in headers {
             builder = builder.header(*name, *value);
         }
         let (parts, ()) = builder.body(()).expect("request should build").into_parts();
-        Cx::new().with(parts)
-    }
-
-    fn check(policy: &OriginPolicy, method: Method, headers: &[(&str, &str)]) -> OriginVerdict {
-        policy.check(&cx_with(method, "/x", headers))
+        policy.check(&Cx::new().with(parts))
     }
 
     // -- default policy --
@@ -269,13 +260,13 @@ mod tests {
     #[test]
     fn non_browser_requests_pass() {
         // Neither an "origin" nor a "sec-fetch-site" header.
-        let policy = OriginPolicy::new();
+        let policy = OriginPolicy::default();
         assert_eq!(check(&policy, Method::POST, &[]), OriginVerdict::Allow);
     }
 
     #[test]
     fn same_origin_requests_pass() {
-        let policy = OriginPolicy::new();
+        let policy = OriginPolicy::default();
         for site in ["same-origin", "none"] {
             assert_eq!(
                 check(&policy, Method::POST, &[("sec-fetch-site", site)]),
@@ -286,7 +277,7 @@ mod tests {
 
     #[test]
     fn cross_origin_safe_methods_pass() {
-        let policy = OriginPolicy::new();
+        let policy = OriginPolicy::default();
         for method in [Method::GET, Method::HEAD, Method::OPTIONS] {
             assert_eq!(
                 check(&policy, method, &[("sec-fetch-site", "cross-site")]),
@@ -297,7 +288,7 @@ mod tests {
 
     #[test]
     fn cross_origin_unsafe_methods_are_denied() {
-        let policy = OriginPolicy::new();
+        let policy = OriginPolicy::default();
         for method in [Method::POST, Method::PUT, Method::DELETE, Method::PATCH] {
             assert_eq!(
                 check(&policy, method, &[("sec-fetch-site", "cross-site")]),
@@ -309,7 +300,7 @@ mod tests {
     #[test]
     fn cross_origin_websocket_upgrades_are_denied() {
         // The handshake is a GET, but upgrading makes it dangerous.
-        let policy = OriginPolicy::new();
+        let policy = OriginPolicy::default();
         assert_eq!(
             check(
                 &policy,
@@ -322,7 +313,7 @@ mod tests {
 
     #[test]
     fn same_origin_websocket_upgrades_pass() {
-        let policy = OriginPolicy::new();
+        let policy = OriginPolicy::default();
         assert_eq!(
             check(
                 &policy,
@@ -337,7 +328,7 @@ mod tests {
 
     #[test]
     fn matching_origin_and_host_pass() {
-        let policy = OriginPolicy::new();
+        let policy = OriginPolicy::default();
         assert_eq!(
             check(
                 &policy,
@@ -350,7 +341,7 @@ mod tests {
 
     #[test]
     fn mismatched_origin_and_host_are_denied_for_unsafe_methods() {
-        let policy = OriginPolicy::new();
+        let policy = OriginPolicy::default();
         let headers = [("origin", "https://evil.example"), ("host", "example.com")];
         assert_eq!(check(&policy, Method::POST, &headers), OriginVerdict::Deny);
         assert_eq!(check(&policy, Method::GET, &headers), OriginVerdict::Allow);
@@ -360,7 +351,7 @@ mod tests {
 
     #[test]
     fn trusted_origins_pass() {
-        let policy = OriginPolicy::new().trust_origins(["https://accounts.example.com"]);
+        let policy = OriginPolicy::trust_origins(["https://accounts.example.com"]);
         assert_eq!(
             check(
                 &policy,
@@ -385,23 +376,6 @@ mod tests {
         );
     }
 
-    // -- exempt paths --
-
-    #[test]
-    fn exempt_paths_pass_unchecked() {
-        let policy = OriginPolicy::new().exempt_paths(["/ws/{id}"]);
-        let headers = [("sec-fetch-site", "cross-site"), ("upgrade", "websocket")];
-        assert_eq!(
-            policy.check(&cx_with(Method::GET, "/ws/42", &headers)),
-            OriginVerdict::Allow
-        );
-        // Other paths are still verified.
-        assert_eq!(
-            policy.check(&cx_with(Method::GET, "/other", &headers)),
-            OriginVerdict::Deny
-        );
-    }
-
     // -- disabled policy --
 
     #[test]
@@ -414,6 +388,110 @@ mod tests {
                 &[("sec-fetch-site", "cross-site"), ("upgrade", "websocket")]
             ),
             OriginVerdict::Allow
+        );
+    }
+
+    // -- the policy through the router --
+
+    /// Answers every request with `200 OK`.
+    fn ok(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { "ok".into_response(cx) })
+    }
+
+    /// Renders an empty page.
+    fn empty_page(cx: &Cx, _body: Body) -> BoxView<'_> {
+        view! {}.boxed()
+    }
+
+    /// Renders the page inside the layout.
+    fn passthrough_layout<'a>(cx: &'a Cx, slot: Slot<'a>) -> BoxView<'a> {
+        view! { (slot) }.boxed()
+    }
+
+    /// Sends a cross-site POST from `https://peer.example` to `path`.
+    async fn send_cross_site(router: &Router, path: &str) -> StatusCode {
+        let request = Request::builder()
+            .method(Method::POST)
+            .uri(path)
+            .header("origin", "https://peer.example")
+            .header("sec-fetch-site", "cross-site")
+            .body(Body::empty())
+            .expect("request should build");
+        router.handle(request).await.status()
+    }
+
+    #[tokio::test]
+    async fn the_default_policy_applies_without_registration() {
+        let router = Router::builder()
+            .route(RouteFn::new(Method::POST, "/x", ok))
+            .build();
+        assert_eq!(send_cross_site(&router, "/x").await, StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn unmatched_requests_are_verified() {
+        // The check runs before the 404 resolves, so an untrusted cross-origin
+        // request learns nothing about which paths exist.
+        let router = Router::builder()
+            .route(RouteFn::new(Method::POST, "/x", ok))
+            .build();
+        assert_eq!(
+            send_cross_site(&router, "/missing").await,
+            StatusCode::FORBIDDEN
+        );
+    }
+
+    #[tokio::test]
+    async fn a_router_policy_applies_to_every_route() {
+        let router = Router::builder()
+            .with(OriginPolicy::trust_origins(["https://peer.example"]))
+            .route(RouteFn::new(Method::POST, "/x", ok))
+            .build();
+        assert_eq!(send_cross_site(&router, "/x").await, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn a_route_policy_replaces_the_router_policy() {
+        let router = Router::builder()
+            .with(OriginPolicy::trust_origins(["https://peer.example"]))
+            .route(RouteFn::new(Method::POST, "/strict", ok).with(OriginPolicy::default()))
+            .route(RouteFn::new(Method::POST, "/x", ok))
+            .build();
+        assert_eq!(
+            send_cross_site(&router, "/strict").await,
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(send_cross_site(&router, "/x").await, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn a_route_policy_does_not_apply_to_unmatched_requests() {
+        let router = Router::builder()
+            .route(RouteFn::new(Method::POST, "/x", ok).with(OriginPolicy::dangerous_disable()))
+            .build();
+        assert_eq!(send_cross_site(&router, "/x").await, StatusCode::OK);
+        assert_eq!(
+            send_cross_site(&router, "/missing").await,
+            StatusCode::FORBIDDEN
+        );
+    }
+
+    #[tokio::test]
+    async fn a_layout_policy_applies_to_the_pages_under_it() {
+        let router = Router::builder()
+            .layout(
+                LayoutFn::new("/feed", passthrough_layout).with(OriginPolicy::dangerous_disable()),
+            )
+            .page(PageFn::new(Method::POST, "/feed/items", empty_page))
+            .page(PageFn::new(Method::POST, "/other", empty_page))
+            .build();
+        assert_eq!(
+            send_cross_site(&router, "/feed/items").await,
+            StatusCode::OK
+        );
+        assert_eq!(
+            send_cross_site(&router, "/other").await,
+            StatusCode::FORBIDDEN
         );
     }
 }

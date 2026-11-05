@@ -12,9 +12,8 @@ use topcoat_core::{
 };
 
 use crate::{
-    Endpoint, EndpointIndex, Endpoints, Layer, Layout, Methods, OriginLayer, OriginPolicy, Page,
-    PageWithLayouts, Path, Route, Router, RouterInner, Routes, TrailingSlash, TrustedProxies,
-    layers_for_path,
+    Endpoint, EndpointIndex, Endpoints, Layer, Layout, Methods, Page, PageWithLayouts, Path, Route,
+    Router, RouterInner, Routes, TrailingSlash, TrustedProxies, layers_for_path,
 };
 
 /// Builds a [`Router`] for a Topcoat application.
@@ -50,7 +49,6 @@ pub struct RouterBuilder {
     layouts: Vec<Arc<dyn Layout>>,
     layers: Vec<Arc<dyn Layer>>,
     context: ContextMap,
-    origin_policy: OriginPolicy,
     trusted_proxies: TrustedProxies,
     trailing_slash: TrailingSlash,
     #[cfg(feature = "compression")]
@@ -67,7 +65,6 @@ impl RouterBuilder {
             layouts: Vec::new(),
             layers: Vec::new(),
             context: ContextMap::new(),
-            origin_policy: OriginPolicy::new(),
             trusted_proxies: TrustedProxies::new(),
             trailing_slash: TrailingSlash::default(),
             #[cfg(feature = "compression")]
@@ -204,17 +201,6 @@ impl RouterBuilder {
             );
             self = self.layer(layer);
         }
-        self
-    }
-
-    /// Registers the [`OriginPolicy`] the router applies to every request.
-    ///
-    /// The default policy denies state-changing cross-origin browser requests
-    /// and cross-origin WebSocket handshakes; pass a policy to trust
-    /// cross-origin peers, exempt individual routes, or opt out entirely.
-    #[must_use]
-    pub fn origin_policy(mut self, origin_policy: OriginPolicy) -> Self {
-        self.origin_policy = origin_policy;
         self
     }
 
@@ -549,7 +535,6 @@ impl RouterBuilder {
             endpoints,
             always_layers,
             context: Arc::new(self.context),
-            origin: OriginLayer::new(self.origin_policy),
             trusted_proxies: self.trusted_proxies,
             #[cfg(feature = "compression")]
             compression: self.compression,
