@@ -1,4 +1,4 @@
-use topcoat_core::context::Cx;
+use topcoat_core::context::{ContextMap, Cx};
 
 use crate::{Body, Layer, LayerFuture, Next, Path, PathBuf};
 
@@ -21,6 +21,14 @@ pub trait ModuleLayer: Send + Sync + 'static {
         None
     }
 
+    /// The values attached to this layer, such as defaults for the routes it
+    /// wraps.
+    ///
+    /// Defaults to an empty map.
+    fn context(&self) -> ContextMap {
+        ContextMap::new()
+    }
+
     /// Handles a request, calling `next` to continue down the chain.
     fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a>;
 }
@@ -32,6 +40,10 @@ impl<L: ModuleLayer + ?Sized> ModuleLayer for &'static L {
 
     fn relative_path(&self) -> Option<&Path> {
         (**self).relative_path()
+    }
+
+    fn context(&self) -> ContextMap {
+        (**self).context()
     }
 
     fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
@@ -58,6 +70,10 @@ impl<L: ModuleLayer> ResolvedLayer<L> {
 impl<L: ModuleLayer> Layer for ResolvedLayer<L> {
     fn path(&self) -> Option<&Path> {
         Some(&self.path)
+    }
+
+    fn context(&self) -> ContextMap {
+        self.layer.context()
     }
 
     fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {

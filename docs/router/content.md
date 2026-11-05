@@ -26,7 +26,7 @@ There can be only one body parameter because the body can be consumed only once.
 
 # The body limit
 
-Extractors that buffer the body reject requests above the body limit with `413 Content Too Large`. The default is 2 MiB. The limit is read from the request context. Pass a [`BodyLimit`](crate::BodyLimit) to [`RouterBuilder::with`](crate::RouterBuilder::with) to change it for the whole application, or to `with(...)` on a route, page, or layout to change it for that part of the application.
+Extractors that buffer the body reject requests above the body limit with `413 Content Too Large`. The default is 2 MiB. The limit is read from the request context. Pass a [`BodyLimit`](crate::BodyLimit) to [`RouterBuilder::with`](crate::RouterBuilder::with) to change it for the whole application, or to `with(...)` on a route, page, layout, or layer to change it for that part of the application.
 
 ```rust
 # use topcoat::{Result, context::Cx, router::{BodyLimit, Router, request::Bytes, route}};

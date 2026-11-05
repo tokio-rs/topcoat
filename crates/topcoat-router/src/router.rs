@@ -2106,6 +2106,11 @@ mod tests {
         Box::pin(async move { tags(cx).into_response(cx) })
     }
 
+    /// Runs the rest of the chain unchanged.
+    fn pass_through<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+        next.run(cx, body)
+    }
+
     /// Adds a tag before running the rest of the chain.
     fn tag_in_layer<'a>(cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
         Box::pin(async move { next.run(&cx.with(Tag("layer")), body).await })
@@ -2144,6 +2149,81 @@ mod tests {
 
         let (_, _, body) = send(&router, Method::GET, "/about");
         assert_eq!(&body[..], b"page");
+    }
+
+    #[test]
+    fn layer_values_reach_only_the_routes_they_wrap() {
+        let router = RouterBuilder::new()
+            .with(Tag("app"))
+            .layer(LayerFn::new(Some(path("/admin")), pass_through).with(Tag("admin")))
+            .route(RouteFn::new(Method::GET, path("/admin/x"), echo_tags).with(Tag("route")))
+            .route(RouteFn::new(Method::GET, path("/about"), echo_tags).with(Tag("route")))
+            .build();
+
+        assert_eq!(&send(&router, Method::GET, "/admin/x").2[..], b"route,admin,app");
+        assert_eq!(&send(&router, Method::GET, "/about").2[..], b"route,app");
+    }
+
+    #[test]
+    fn layout_values_shadow_layer_values_and_inner_layers_shadow_outer_ones() {
+        let router = RouterBuilder::new()
+            // Registered inner first, so the order comes from the paths.
+            .layer(LayerFn::new(Some(path("/admin")), pass_through).with(Tag("inner")))
+            .layer(LayerFn::new(Some(path("/")), pass_through).with(Tag("outer")))
+            .layout(LayoutFn::new(path("/"), layout_root).with(Tag("root")))
+            .page(PageFn::new(Method::GET, path("/admin/users"), render_tags).with(Tag("page")))
+            .build();
+
+        let (_, _, body) = send(&router, Method::GET, "/admin/users");
+        assert_eq!(&body[..], b"R[page,root,inner,outer]");
+    }
+
+    #[test]
+    fn layers_read_their_own_values_before_running() {
+        let router = RouterBuilder::new()
+            .layer(LayerFn::new(None::<&Path>, answer_tags).with(Tag("always")))
+            .route(RouteFn::new(Method::GET, path("/x"), say_route).with(Tag("route")))
+            .build();
+
+        assert_eq!(&send(&router, Method::GET, "/x").2[..], b"route,always");
+        // A pathless layer wraps misses too, but no route matched, so none of
+        // its values are in scope.
+        assert_eq!(&send(&router, Method::GET, "/missing").2[..], b"");
+    }
+
+    #[test]
+    fn the_layer_context_is_built_once_per_router() {
+        static BUILDS: AtomicUsize = AtomicUsize::new(0);
+
+        /// Counts how often the router asks for its context.
+        struct Counted(LayerFn);
+
+        impl Layer for Counted {
+            fn path(&self) -> Option<&Path> {
+                self.0.path()
+            }
+
+            fn context(&self) -> ContextMap {
+                BUILDS.fetch_add(1, Ordering::Relaxed);
+                self.0.context()
+            }
+
+            fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
+                self.0.handle(cx, body, next)
+            }
+        }
+
+        let layer = LayerFn::new(Some(path("/")), pass_through).with(Tag("layer"));
+        let router = RouterBuilder::new()
+            .layer(Counted(layer))
+            .route(RouteFn::new(Method::GET, path("/x"), echo_tags))
+            .route(RouteFn::new(Method::GET, path("/y"), echo_tags))
+            .build();
+        assert_eq!(BUILDS.load(Ordering::Relaxed), 1);
+
+        assert_eq!(&send(&router, Method::GET, "/x").2[..], b"layer");
+        assert_eq!(&send(&router, Method::GET, "/y").2[..], b"layer");
+        assert_eq!(BUILDS.load(Ordering::Relaxed), 1);
     }
 
     #[test]

@@ -1,9 +1,12 @@
 mod strip_prefix;
 
-use std::{borrow::Cow, pin::Pin, sync::Arc};
+use std::{any::Any, borrow::Cow, pin::Pin, sync::Arc};
 
 pub use strip_prefix::*;
-use topcoat_core::{context::Cx, error::Result};
+use topcoat_core::{
+    context::{ContextMap, Cx},
+    error::Result,
+};
 
 use crate::{
     Body, Endpoint, IntoPath, Path, Route,
@@ -68,6 +71,14 @@ pub trait Layer: Send + Sync + 'static {
     /// to wrap every request.
     fn path(&self) -> Option<&Path>;
 
+    /// The values attached to this layer, such as defaults for the routes it
+    /// wraps.
+    ///
+    /// Defaults to an empty map.
+    fn context(&self) -> ContextMap {
+        ContextMap::new()
+    }
+
     /// Handles a request, calling `next` to continue down the chain.
     fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a>;
 }
@@ -75,6 +86,10 @@ pub trait Layer: Send + Sync + 'static {
 impl<L: Layer + ?Sized> Layer for &'static L {
     fn path(&self) -> Option<&Path> {
         (**self).path()
+    }
+
+    fn context(&self) -> ContextMap {
+        (**self).context()
     }
 
     fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
@@ -99,6 +114,8 @@ pub struct LayerFn {
     path: Option<Cow<'static, Path>>,
     /// The handler function that wraps the inner chain.
     handle: LayerHandlerFn,
+    /// The values attached to this layer.
+    context: ContextMap,
 }
 
 impl LayerFn {
@@ -113,13 +130,31 @@ impl LayerFn {
         Self {
             path: path.map(IntoPath::into_path),
             handle,
+            context: ContextMap::new(),
         }
+    }
+
+    /// Adds `value` to the context of this layer.
+    ///
+    /// The value shadows an earlier value of the same type. Read it during
+    /// a request with [`context`](topcoat_core::context::context).
+    #[must_use]
+    pub fn with<T>(mut self, value: T) -> Self
+    where
+        T: Any + Send + Sync,
+    {
+        self.context.insert(value);
+        self
     }
 }
 
 impl Layer for LayerFn {
     fn path(&self) -> Option<&Path> {
         self.path.as_deref()
+    }
+
+    fn context(&self) -> ContextMap {
+        self.context.clone()
     }
 
     fn handle<'a>(&'a self, cx: &'a Cx, body: Body, next: Next<'a>) -> LayerFuture<'a> {
@@ -132,16 +167,22 @@ impl Layer for LayerFn {
 /// most-specific so the outermost layer runs first. A layer without a path is
 /// the least specific of all; among layers that share a path, the later one
 /// in `layers` runs first.
-pub(crate) fn layers_for_path(layers: &[Arc<dyn Layer>], path: &Path) -> Box<[Arc<dyn Layer>]> {
-    let mut matching: Vec<&Arc<dyn Layer>> = layers
+///
+/// Each layer is paired with its context, so the context is built once and
+/// shared by every route the layer wraps.
+pub(crate) fn layers_for_path<'a>(
+    layers: &'a [(Arc<dyn Layer>, ContextMap)],
+    path: &Path,
+) -> Vec<&'a (Arc<dyn Layer>, ContextMap)> {
+    let mut matching: Vec<_> = layers
         .iter()
-        .filter(|layer| layer.path().is_none_or(|prefix| path.starts_with(prefix)))
+        .filter(|(layer, _)| layer.path().is_none_or(|prefix| path.starts_with(prefix)))
         .rev()
         .collect();
     // The root path's backing string is empty, so its length is offset to
     // keep a pathless layer strictly less specific than a layer at `/`.
-    matching.sort_by_key(|layer| layer.path().map_or(0, |path| path.len() + 1));
-    matching.into_iter().cloned().collect()
+    matching.sort_by_key(|(layer, _)| layer.path().map_or(0, |path| path.len() + 1));
+    matching
 }
 
 /// What a [`Next`] chain runs once its layers are exhausted.
@@ -237,26 +278,29 @@ mod tests {
         Cow::Borrowed(Path::new(s))
     }
 
-    /// A layer whose path is all a test cares about; its handler just forwards
-    /// to the rest of the chain and never runs in the selection tests.
-    fn layer_at(p: &'static str) -> Arc<dyn Layer> {
-        Arc::new(LayerFn::new(Some(path(p)), noop_layer))
+    /// A layer whose path is all a test cares about, paired with an empty
+    /// context; its handler just forwards to the rest of the chain and never
+    /// runs in the selection tests.
+    fn layer_at(p: &'static str) -> (Arc<dyn Layer>, ContextMap) {
+        let layer: Arc<dyn Layer> = Arc::new(LayerFn::new(Some(path(p)), noop_layer));
+        (layer, ContextMap::new())
     }
 
     /// A layer without a path, wrapping every request in the selection tests.
-    fn layer_always() -> Arc<dyn Layer> {
-        Arc::new(LayerFn::new(None::<&Path>, noop_layer))
+    fn layer_always() -> (Arc<dyn Layer>, ContextMap) {
+        let layer: Arc<dyn Layer> = Arc::new(LayerFn::new(None::<&Path>, noop_layer));
+        (layer, ContextMap::new())
     }
 
     /// Asserts that `layers_for_path` selects the layers at the `expected`
     /// paths (`None` for a layer without one), in order.
     fn assert_selects(
-        layers: &[Arc<dyn Layer>],
+        layers: &[(Arc<dyn Layer>, ContextMap)],
         p: &'static str,
         expected: &[Option<&'static str>],
     ) {
         let selected = layers_for_path(layers, Path::new(p));
-        let paths: Vec<Option<&Path>> = selected.iter().map(|layer| layer.path()).collect();
+        let paths: Vec<Option<&Path>> = selected.iter().map(|(layer, _)| layer.path()).collect();
         let expected: Vec<Option<&Path>> = expected.iter().map(|e| e.map(Path::new)).collect();
         assert_eq!(paths, expected);
     }
@@ -341,13 +385,11 @@ mod tests {
 
     #[test]
     fn for_path_runs_the_later_of_a_shared_path_first() {
-        let first = layer_at("/admin");
-        let second = layer_at("/admin");
-        let layers = [Arc::clone(&first), Arc::clone(&second)];
+        let layers = [layer_at("/admin"), layer_at("/admin")];
         let selected = layers_for_path(&layers, Path::new("/admin/users"));
         assert_eq!(selected.len(), 2);
-        assert!(Arc::ptr_eq(&selected[0], &second));
-        assert!(Arc::ptr_eq(&selected[1], &first));
+        assert!(std::ptr::eq(selected[0], &layers[1]));
+        assert!(std::ptr::eq(selected[1], &layers[0]));
     }
 
     #[test]
