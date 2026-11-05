@@ -12,9 +12,10 @@ use topcoat_core::{
 };
 
 use crate::{
-    Body, Endpoint, EndpointIndex, Endpoints, Layer, Next, OriginLayer, RawPathParams, Route,
-    RouteId, RouteIndex, RouterBuilder, Routes, Terminal, TrustedProxies,
+    Body, Endpoint, EndpointIndex, Endpoints, Layer, Next, RawPathParams, Route, RouteId,
+    RouteIndex, RouterBuilder, Routes, Terminal, TrustedProxies,
     error::{RewriteChain, RewriteError, internal_server_response, respond},
+    origin_policy,
     proxy::ClientIp,
     request::{OriginalParts, Request},
     response::{Response, ResponseHeaders, response_headers},
@@ -203,8 +204,13 @@ impl Router {
             None => (cx, Next::new(&inner.always_layers, Terminal::NotFound)),
         };
 
-        // The origin check precedes all route and pathless layers.
-        let result = inner.origin.handle(&cx, body, next).await;
+        // The origin check precedes all route and pathless layers. It reads
+        // the policy from the context, so a matched route's policy shadows
+        // the router's.
+        let result = match origin_policy(&cx).verify(&cx) {
+            Ok(()) => next.run(&cx, body).await,
+            Err(error) => Err(error.into()),
+        };
         (cx, result)
     }
 }
@@ -227,8 +233,6 @@ pub(crate) struct RouterInner {
     /// Shared values registered on the router builder and read with
     /// [`context`](topcoat_core::context::context).
     pub(crate) context: Arc<ContextMap>,
-    /// The origin policy wrapping every request as the outermost layer.
-    pub(crate) origin: OriginLayer,
     /// The proxies trusted to report the client's address.
     pub(crate) trusted_proxies: TrustedProxies,
     /// The compression applied to responses on their way out.
@@ -362,8 +366,6 @@ pub fn route_endpoint(cx: &Cx, id: RouteId) -> Option<&Endpoint> {
 pub(crate) fn test_matched_cx(path: &crate::Path) -> Cx {
     use std::borrow::Cow;
 
-    use crate::OriginPolicy;
-
     let mut endpoints = Endpoints::default();
     let endpoint = endpoints.push(Cow::Owned(path.as_str().to_owned()), Endpoint::new(path));
     let inner = RouterInner {
@@ -371,7 +373,6 @@ pub(crate) fn test_matched_cx(path: &crate::Path) -> Cx {
         endpoints,
         always_layers: Box::new([]),
         context: Arc::new(ContextMap::new()),
-        origin: OriginLayer::new(OriginPolicy::new()),
         trusted_proxies: TrustedProxies::new(),
         #[cfg(feature = "compression")]
         compression: crate::Compression::new(),
@@ -408,8 +409,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        Body, HrefTarget, LayerFn, LayerFuture, LayoutFn, Method, Methods, OriginPolicy, PageFn,
-        Path, RemoteAddr, Route, RouteFn, RouteFuture, Slot, TrailingSlash,
+        Body, HrefTarget, LayerFn, LayerFuture, LayoutFn, Method, Methods, PageFn, Path,
+        RemoteAddr, Route, RouteFn, RouteFuture, Slot, TrailingSlash,
         error::rewrite,
         raw_path_params,
         request::{Bytes, client_ip, method, original_method, original_uri, uri},
@@ -1408,56 +1409,6 @@ mod tests {
         let (_, _, body) = send(&router, Method::GET, "/users/7");
         // The endpoint's URL path: groups stripped, params in `{name}` form.
         assert_eq!(&body[..], b"/users/{id}");
-    }
-
-    // -- Router::handle: origin policy --
-
-    #[test]
-    fn untrusted_cross_origin_requests_are_forbidden() {
-        let router = RouterBuilder::new()
-            .route(RouteFn::new(Method::POST, path("/x"), say_posted))
-            .build();
-        let request = http::Request::builder()
-            .method(Method::POST)
-            .uri("/x")
-            .header("sec-fetch-site", "cross-site")
-            .body(Body::empty())
-            .unwrap();
-        let response = block_on(router.handle(request));
-        assert_eq!(response.status(), StatusCode::FORBIDDEN);
-    }
-
-    #[test]
-    fn origin_verification_wraps_unmatched_requests() {
-        // The origin layer runs before the 404 resolves, so an untrusted
-        // cross-origin request learns nothing about which paths exist.
-        let router = RouterBuilder::new()
-            .route(RouteFn::new(Method::POST, path("/x"), say_posted))
-            .build();
-        let request = http::Request::builder()
-            .method(Method::POST)
-            .uri("/missing")
-            .header("sec-fetch-site", "cross-site")
-            .body(Body::empty())
-            .unwrap();
-        let response = block_on(router.handle(request));
-        assert_eq!(response.status(), StatusCode::FORBIDDEN);
-    }
-
-    #[test]
-    fn exempt_paths_skip_origin_verification() {
-        let router = RouterBuilder::new()
-            .route(RouteFn::new(Method::POST, path("/x"), say_posted))
-            .origin_policy(OriginPolicy::new().exempt_paths(["/x"]))
-            .build();
-        let request = http::Request::builder()
-            .method(Method::POST)
-            .uri("/x")
-            .header("sec-fetch-site", "cross-site")
-            .body(Body::empty())
-            .unwrap();
-        let response = block_on(router.handle(request));
-        assert_eq!(response.status(), StatusCode::OK);
     }
 
     // -- Router::handle: client address --

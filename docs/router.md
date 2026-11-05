@@ -402,7 +402,23 @@ See the [`view!`](crate::view::view!) macro docs for the full placement and prec
 
 # Cross-origin requests
 
-The router applies an [`OriginPolicy`] to every request before any layer or handler runs: by default, state-changing cross-origin browser requests and cross-origin WebSocket handshakes are rejected with `403 Forbidden`. Register a policy with [`origin_policy`](RouterBuilder::origin_policy) to trust cross-origin peers, to exempt individual routes, or to opt out; see [`OriginPolicy`] for the exact rules.
+The router applies an [`OriginPolicy`] to every request before any layer or handler runs. By default, state-changing cross-origin browser requests and cross-origin WebSocket handshakes are rejected with `403 Forbidden`. The policy is read from the request context. Pass a policy to [`RouterBuilder::with`] to change it for the whole application, or to `with(...)` on a route, page, or layout to change it for that part of the application. A more specific policy replaces a broader one.
+
+```rust
+# use topcoat::{Result, context::Cx, router::{OriginPolicy, Router, route}};
+// Accepts requests from any site and verifies their signature itself.
+#[route(POST "/webhook", with(OriginPolicy::dangerous_disable()))]
+async fn webhook(cx: &Cx) -> Result<()> {
+    Ok(())
+}
+
+let router = Router::builder()
+    .with(OriginPolicy::trust_origins(["https://accounts.example.com"]))
+    .route(webhook)
+    .build();
+```
+
+See [`OriginPolicy`] for the exact rules.
 
 # Manual registration
 

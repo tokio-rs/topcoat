@@ -107,17 +107,15 @@ pub async fn bind() -> TcpListener {
 pub async fn run(listener: TcpListener, events: EventBus) {
     let router = Router::builder()
         .with(events)
-        .origin_policy(OriginPolicy::new().exempt_paths(["/ws"]))
         .route(RouteFn::new(
             Method::GET,
             Cow::Borrowed(Path::new("/dev.js")),
             serve_dev_js,
         ))
-        .route(RouteFn::new(
-            Method::GET,
-            Cow::Borrowed(Path::new("/ws")),
-            ws_route,
-        ))
+        .route(
+            RouteFn::new(Method::GET, Cow::Borrowed(Path::new("/ws")), ws_route)
+                .with(OriginPolicy::dangerous_disable()),
+        )
         .build();
 
     let _ = internal_serve(listener, RouterService::new(router), future::pending()).await;
