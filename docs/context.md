@@ -98,7 +98,7 @@ Without a router, put the shared values in a [`ContextMap`], wrap it in an `Arc`
 
 # Route context
 
-Use route context to declare metadata that layers and layouts can read before the handler runs. Add it with `with(...)` on a [`#[route]`](macro@crate::router::route), [`#[page]`](crate::router::page), or [`#[layout]`](crate::router::layout). The router puts these values in the request context as soon as it selects the route.
+Use route context to declare metadata that layers and layouts can read before the handler runs. Add it with `with(...)` on a [`#[route]`](macro@crate::router::route), [`#[page]`](crate::router::page), [`#[layout]`](crate::router::layout), or [`#[layer]`](crate::router::layer). The router puts these values in the request context as soon as it selects the route.
 
 For example, a layout can set a default title, and a page can replace it with its own:
 
@@ -135,7 +135,7 @@ let router = Router::builder().layout(shell).page(products).build();
 
 This example uses a custom `Title` to show how route context works. For page titles and other page metadata, use the built-in [`metadata`](crate::metadata) module, which combines values from layouts and pages and renders their HTML tags.
 
-Router builder values are added first, followed by route context, then values added during the request with `cx.with(...)`. Each value shadows earlier values of the same type. For pages, route context follows the layout hierarchy from outermost to innermost, with the page's values last. Repeat `with(...)` to add several values. A request that matches no route has no route context.
+Router builder values are added first, followed by route context, then values added during the request with `cx.with(...)`. Each value shadows earlier values of the same type. Route context follows the way handlers nest: first the values of the layers that wrap the route, from outermost to innermost, then those of its layouts in the same order, and the route's or page's own values last. Repeat `with(...)` to add several values. A request that matches no route has no route context, even inside a layer without a path.
 
 Shadowed values remain available through [`iter_context`], which visits the closest value first. This lets pages and layouts contribute metadata that an outer layout collects and renders together. For breadcrumbs, each layout and page could declare a `Crumb` value. The outer layout collects them with `iter_context::<Crumb>(cx)` and reverses the order to render the trail from root to page.
 

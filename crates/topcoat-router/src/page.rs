@@ -269,6 +269,25 @@ impl Layout for LayoutFn {
     }
 }
 
+/// Selects the layouts in `layouts` wrapping a page at `path`: those whose
+/// path is a prefix of `path`, ordered least- to most-specific so the
+/// outermost layout comes first. Among layouts that share a path, the earlier
+/// one in `layouts` is outside the later one.
+///
+/// Each layout is paired with its context, so the context is built once and
+/// shared by every page the layout wraps.
+pub(crate) fn layouts_for_path<'a>(
+    layouts: &'a [(Arc<dyn Layout>, ContextMap)],
+    path: &Path,
+) -> Vec<&'a (Arc<dyn Layout>, ContextMap)> {
+    let mut matching: Vec<_> = layouts
+        .iter()
+        .filter(|(layout, _)| path.starts_with(layout.path()))
+        .collect();
+    matching.sort_by_key(|(layout, _)| layout.path().len());
+    matching
+}
+
 /// A [`Page`] paired with the [`Layout`]s that wrap it.
 pub struct PageWithLayouts {
     inner: Arc<PageWithLayoutsInner>,
@@ -346,5 +365,60 @@ impl Route for PageWithLayouts {
             });
             view.async_into_response(cx).await
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A layout whose path is all a test cares about, paired with an empty
+    /// context; it never renders in the selection tests.
+    fn layout_at(path: &'static str) -> (Arc<dyn Layout>, ContextMap) {
+        let layout: Arc<dyn Layout> = Arc::new(LayoutFn::new(path, unreachable_layout));
+        (layout, ContextMap::new())
+    }
+
+    fn unreachable_layout<'a>(_cx: &'a Cx, _slot: Slot<'a>) -> BoxView<'a> {
+        unreachable!("selection tests never render layouts")
+    }
+
+    /// Asserts that `layouts_for_path` selects the layouts at the `expected`
+    /// paths, in order.
+    fn assert_selects(
+        layouts: &[(Arc<dyn Layout>, ContextMap)],
+        path: &'static str,
+        expected: &[&'static str],
+    ) {
+        let selected = layouts_for_path(layouts, Path::new(path));
+        let paths: Vec<&Path> = selected.iter().map(|(layout, _)| layout.path()).collect();
+        let expected: Vec<&Path> = expected.iter().copied().map(Path::new).collect();
+        assert_eq!(paths, expected);
+    }
+
+    // -- layouts_for_path --
+
+    #[test]
+    fn for_path_orders_prefix_layouts_least_to_most_specific() {
+        let layouts = [layout_at("/settings"), layout_at("/"), layout_at("/posts")];
+        // The page at /settings/profile is wrapped by the root and /settings
+        // layouts, in that order, regardless of registration order; the
+        // /posts layout does not prefix it.
+        assert_selects(&layouts, "/settings/profile", &["/", "/settings"]);
+    }
+
+    #[test]
+    fn for_path_keeps_the_earlier_of_a_shared_path_outside() {
+        let layouts = [layout_at("/admin"), layout_at("/admin")];
+        let selected = layouts_for_path(&layouts, Path::new("/admin/users"));
+        assert_eq!(selected.len(), 2);
+        assert!(Arc::ptr_eq(&selected[0].0, &layouts[0].0));
+        assert!(Arc::ptr_eq(&selected[1].0, &layouts[1].0));
+    }
+
+    #[test]
+    fn for_path_rejects_partial_segments() {
+        let layouts = [layout_at("/admin")];
+        assert!(layouts_for_path(&layouts, Path::new("/administrator")).is_empty());
     }
 }

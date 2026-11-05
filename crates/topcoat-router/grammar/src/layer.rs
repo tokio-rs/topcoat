@@ -1,25 +1,36 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 use syn::{
-    Visibility,
+    Token, Visibility,
     parse::{Parse, ParseStream},
     parse_quote,
+    punctuated::Punctuated,
 };
 use topcoat_core_grammar::common::{
     ParseOption, SignatureExt, lenient,
     paths::{topcoat_context, topcoat_inventory, topcoat_router},
 };
 
-use super::common::HandlerPath;
+use super::common::{HandlerPath, RouteContext};
 
 pub struct LayerAttr {
-    path: Option<HandlerPath>,
+    pub path: Option<HandlerPath>,
+    /// The comma between the path and the `with(...)` entries.
+    pub comma: Option<Token![,]>,
+    pub context: Punctuated<RouteContext, Token![,]>,
 }
 
 impl Parse for LayerAttr {
     fn parse(input: ParseStream) -> syn::Result<Self> {
+        let path = input.call(HandlerPath::parse_option)?;
         Ok(Self {
-            path: input.call(HandlerPath::parse_option)?,
+            comma: if path.is_some() && !input.is_empty() {
+                Some(input.parse()?)
+            } else {
+                None
+            },
+            path,
+            context: Punctuated::parse_terminated(input)?,
         })
     }
 }
@@ -28,6 +39,7 @@ impl Parse for LayerAttr {
 impl topcoat_core_grammar::common::pretty::PrettyPrint for LayerAttr {
     fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
         self.path.pretty_print(printer);
+        RouteContext::pretty_print_entries(printer, self.comma.as_ref(), &self.context);
     }
 }
 
@@ -116,6 +128,7 @@ impl ToTokens for Layer {
                 })
             }
         };
+        let context = RouteContext::context_method(&attr.context);
         let (layer, submit_as) =
             if let Some(path) = attr.path.as_ref().and_then(HandlerPath::absolute) {
                 let layer = quote! {
@@ -124,6 +137,8 @@ impl ToTokens for Layer {
                             const PATH: &#topcoat_router::Path = #topcoat_router::Path::new(#path);
                             ::core::option::Option::Some(PATH)
                         }
+
+                        #context
 
                         #handle
                     }
@@ -141,6 +156,8 @@ impl ToTokens for Layer {
                         }
 
                         #relative_path
+
+                        #context
 
                         #handle
                     }
@@ -165,5 +182,20 @@ impl ToTokens for Layer {
             };
         }
         .to_tokens(tokens);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn attr_accepts_context_entries_with_or_without_a_path() {
+        let attr: LayerAttr = syn::parse_str("with(a)").unwrap();
+        assert!(attr.path.is_none());
+        assert_eq!(attr.context.len(), 1);
+        let attr: LayerAttr = syn::parse_str("\"/admin\", with(a), with(b)").unwrap();
+        assert!(attr.path.is_some());
+        assert_eq!(attr.context.len(), 2);
     }
 }

@@ -13,7 +13,7 @@ use topcoat_core::{
 
 use crate::{
     Endpoint, EndpointIndex, Endpoints, Layer, Layout, Methods, Page, PageWithLayouts, Path, Route,
-    Router, RouterInner, Routes, TrailingSlash, TrustedProxies, layers_for_path,
+    Router, RouterInner, Routes, TrailingSlash, TrustedProxies, layers_for_path, layouts_for_path,
 };
 
 /// Builds a [`Router`] for a Topcoat application.
@@ -51,8 +51,6 @@ pub struct RouterBuilder {
     context: ContextMap,
     trusted_proxies: TrustedProxies,
     trailing_slash: TrailingSlash,
-    #[cfg(feature = "compression")]
-    compression: crate::Compression,
 }
 
 impl RouterBuilder {
@@ -67,8 +65,6 @@ impl RouterBuilder {
             context: ContextMap::new(),
             trusted_proxies: TrustedProxies::new(),
             trailing_slash: TrailingSlash::default(),
-            #[cfg(feature = "compression")]
-            compression: crate::Compression::new(),
         }
     }
 
@@ -224,28 +220,6 @@ impl RouterBuilder {
     #[must_use]
     pub fn trusted_proxies(mut self, trusted_proxies: TrustedProxies) -> Self {
         self.trusted_proxies = trusted_proxies;
-        self
-    }
-
-    /// Configures the compression applied to responses.
-    ///
-    /// By default the router compresses each response with the algorithm
-    /// negotiated from the request's `Accept-Encoding` header. Pass
-    /// [`Compression::off`](crate::Compression::off) to disable compression
-    /// (say, behind a reverse proxy that compresses already), or a tuned
-    /// [`Compression`](crate::Compression) value to adjust it.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use topcoat::router::{Compression, Router};
-    ///
-    /// let router = Router::builder().compression(Compression::off()).build();
-    /// ```
-    #[cfg(feature = "compression")]
-    #[must_use]
-    pub fn compression(mut self, compression: crate::Compression) -> Self {
-        self.compression = compression;
         self
     }
 
@@ -416,14 +390,19 @@ impl RouterBuilder {
                 (layout, context)
             })
             .collect();
+        // Each layer's values are built once and shared by every route it wraps.
+        let layers: Vec<(Arc<dyn Layer>, ContextMap)> = self
+            .layers
+            .into_iter()
+            .map(|layer| {
+                let context = layer.context();
+                (layer, context)
+            })
+            .collect();
         // Wire each page to the layouts whose path is a prefix of the page's,
         // ordered from least- to most-specific so the page nests innermost.
         for page in self.pages {
-            let mut matching: Vec<_> = layouts
-                .iter()
-                .filter(|(layout, _)| page.path().starts_with(layout.path()))
-                .collect();
-            matching.sort_by_key(|(layout, _)| layout.path().len());
+            let matching = layouts_for_path(&layouts, page.path());
 
             // Outermost layout first and the page last, so each level shadows
             // the levels around it.
@@ -446,15 +425,27 @@ impl RouterBuilder {
         let mut routes = Routes::default();
         let mut endpoints = Endpoints::default();
         let mut grouped: HashMap<Cow<'static, str>, EndpointIndex> = HashMap::new();
-        let mut layers_used = vec![false; self.layers.len()];
-        for (route, context) in registrations {
+        let mut layers_used = vec![false; layers.len()];
+        for (route, route_context) in registrations {
             // The layers wrapping a route are selected against its own path,
             // group segments included, so a layer inside a group wraps only
             // the routes registered through that group.
-            let layer_stack = layers_for_path(&self.layers, route.path());
+            let matching = layers_for_path(&layers, route.path());
+
+            // Outermost layer first and the route last, so each level shadows
+            // the levels around it. Layers run outside layouts, so a route's
+            // layout values shadow its layer values.
+            let mut layer_stack = Vec::with_capacity(matching.len());
+            let mut context = ContextMap::new();
+            for (layer, layer_context) in matching {
+                layer_stack.push(Arc::clone(layer));
+                layer_context.clone().install(&mut context);
+            }
+            route_context.install(&mut context);
+
             // Mark layers as used, with the same prefix rule the selection
             // applies.
-            for (layer, used) in self.layers.iter().zip(&mut layers_used) {
+            for ((layer, _), used) in layers.iter().zip(&mut layers_used) {
                 *used |= layer
                     .path()
                     .is_none_or(|prefix| route.path().starts_with(prefix));
@@ -466,7 +457,7 @@ impl RouterBuilder {
                     endpoints.push(key.clone(), Endpoint::new(Path::new(key)))
                 });
 
-            let route_index = routes.push(route, endpoint_index, layer_stack, context);
+            let route_index = routes.push(route, endpoint_index, layer_stack.into(), context);
             let route = &routes[route_index];
             let endpoint = &mut endpoints[endpoint_index];
 
@@ -503,7 +494,7 @@ impl RouterBuilder {
         // Sanity check for unused layers. Layers without a path always run,
         // and the root path prefixes every route path, so neither can be a
         // mistyped path; only narrower paths can go unused.
-        for (layer, used) in self.layers.iter().zip(layers_used) {
+        for ((layer, _), used) in layers.iter().zip(layers_used) {
             if let Some(path) = layer.path() {
                 assert!(
                     used || path == Path::ROOT,
@@ -519,12 +510,11 @@ impl RouterBuilder {
         // Layers without a path wrap every request, so requests that matched
         // no route still run them. Among them the most recently registered
         // runs first, like layers sharing a path.
-        let always_layers: Box<[Arc<dyn Layer>]> = self
-            .layers
+        let always_layers: Box<[Arc<dyn Layer>]> = layers
             .iter()
-            .filter(|layer| layer.path().is_none())
+            .filter(|(layer, _)| layer.path().is_none())
             .rev()
-            .cloned()
+            .map(|(layer, _)| Arc::clone(layer))
             .collect();
 
         self.trailing_slash
@@ -536,8 +526,6 @@ impl RouterBuilder {
             always_layers,
             context: Arc::new(self.context),
             trusted_proxies: self.trusted_proxies,
-            #[cfg(feature = "compression")]
-            compression: self.compression,
         })
     }
 }

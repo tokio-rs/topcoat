@@ -14,6 +14,10 @@ The function must be `async` and take [`cx: &Cx`](../context/struct.Cx.html) as 
 
 Call [`next.run(cx, body)`](struct.Next.html#method.run) to run the remaining layers and handler. Return directly to answer the request without running them.
 
+# Route context
+
+Attach metadata with `with(...)`, such as `#[layer(with(Section("api")))]` or `#[layer("/api", with(Section("api")))]`. You can add multiple `with(...)` entries, separated by commas. The values are initialized when the router is built and added to the context of every handler the layer wraps, before any layer, layout, or handler runs. Unlike layouts, layers also wrap routes, so this is how to give every route under a path the same values. Inner layers, layouts, and handlers can shadow these values. A layer without a path adds its values to every matched handler, but not to 404 or 405 responses. See [route context](../context/index.html#route-context) for reading and combining metadata.
+
 # Examples
 
 Module-derived path (in `src/app/api.rs` under `module_router!()`, this wraps every request under `/api`):

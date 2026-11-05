@@ -19,9 +19,8 @@ use crate::{
 ///
 /// The router reads the policy from the request context. Pass a policy to
 /// [`RouterBuilder::with`](crate::RouterBuilder::with) to replace the default
-/// for the whole application, or to a route's `with(...)` to replace it for
-/// that route. A layout's `with(...)` applies to the pages under it. A more
-/// specific policy replaces a broader one entirely.
+/// for the whole application, or to `with(...)` on a route, page, layout, or
+/// layer to replace it for that part of the application.
 ///
 /// # Examples
 ///

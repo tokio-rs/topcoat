@@ -22,7 +22,7 @@ pub fn router() -> Router {
         .assets(AssetBundle::load().expect("asset bundle loads; run `topcoat asset bundle`"))
         // Off in every benchmarked framework: the benchmark measures the
         // frameworks, not a compression codec (see the fairness notes).
-        .compression(Compression::off())
+        .with(Compression::off())
         .build()
 }
 

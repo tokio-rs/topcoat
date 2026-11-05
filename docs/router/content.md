@@ -26,15 +26,17 @@ There can be only one body parameter because the body can be consumed only once.
 
 # The body limit
 
-Extractors that buffer the body reject requests above the body limit with `413 Content Too Large`. The default is 2 MiB. Register a [`BodyLimit`](crate::BodyLimit) layer to change it for the application or a path:
+Extractors that buffer the body reject requests above the body limit with `413 Content Too Large`. The default is 2 MiB. The limit is read from the request context. Pass a [`BodyLimit`](crate::BodyLimit) to [`RouterBuilder::with`](crate::RouterBuilder::with) to change it for the whole application, or to `with(...)` on a route, page, layout, or layer to change it for that part of the application.
 
-```rust,no_run
-use topcoat::router::{BodyLimit, module_router};
+```rust
+# use topcoat::{Result, context::Cx, router::{BodyLimit, Router, request::Bytes, route}};
+// Allow up to 32 MiB for this route, keep the 2 MiB default elsewhere.
+#[route(POST "/upload", with(BodyLimit::max(32 * 1024 * 1024)))]
+async fn upload(cx: &Cx, bytes: Bytes) -> Result<()> {
+    Ok(())
+}
 
-let router = module_router!()
-    // Allow up to 32 MiB under /upload, keep the 2 MiB default elsewhere.
-    .layer(BodyLimit::max(32 * 1024 * 1024).at("/upload"))
-    .build();
+let router = Router::builder().route(upload).build();
 ```
 
 Taking [`Body`](crate::Body) directly is not limited, because the handler streams the body instead of buffering it.
