@@ -1,1 +1,0 @@
-../../../../docs/mail/mail.md

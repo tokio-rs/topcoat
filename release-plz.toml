@@ -39,8 +39,6 @@ changelog_include = [
     "topcoat-asset-macro",
     "topcoat-cli",
     "topcoat-cookie",
-    "topcoat-cookie-grammar",
-    "topcoat-cookie-macro",
     "topcoat-core",
     "topcoat-core-grammar",
     "topcoat-core-macro",
@@ -56,8 +54,6 @@ changelog_include = [
     "topcoat-l10n-grammar",
     "topcoat-l10n-macro",
     "topcoat-mail",
-    "topcoat-mail-grammar",
-    "topcoat-mail-macro",
     "topcoat-metadata",
     "topcoat-router",
     "topcoat-router-grammar",
@@ -101,16 +97,6 @@ version_group = "topcoat"
 
 [[package]]
 name = "topcoat-cookie"
-release = true
-version_group = "topcoat"
-
-[[package]]
-name = "topcoat-cookie-grammar"
-release = true
-version_group = "topcoat"
-
-[[package]]
-name = "topcoat-cookie-macro"
 release = true
 version_group = "topcoat"
 
@@ -186,16 +172,6 @@ version_group = "topcoat"
 
 [[package]]
 name = "topcoat-mail"
-release = true
-version_group = "topcoat"
-
-[[package]]
-name = "topcoat-mail-grammar"
-release = true
-version_group = "topcoat"
-
-[[package]]
-name = "topcoat-mail-macro"
 release = true
 version_group = "topcoat"
 

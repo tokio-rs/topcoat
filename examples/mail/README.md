@@ -1,6 +1,6 @@
 # Mail
 
-A welcome email declared with `mail!`, with HTML and plain-text bodies and attached files.
+A welcome email built with `Mail::builder`, with HTML and plain-text bodies and attached files.
 
 Clone the Topcoat repository:
 

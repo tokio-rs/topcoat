@@ -81,7 +81,6 @@ compression = [
 ]
 cookie = [
 	"dep:topcoat-cookie",
-	"dep:topcoat-cookie-macro",
 	"topcoat-session?/cookie",
 ]
 datastar = [
@@ -146,7 +145,6 @@ l10n-number = [
 ]
 mail = [
 	"dep:topcoat-mail",
-	"dep:topcoat-mail-macro",
 	"view",
 ]
 mail-smtp = [
@@ -225,7 +223,6 @@ topcoat-alpine-ajax = { workspace = true, optional = true }
 topcoat-asset = { workspace = true, optional = true }
 topcoat-asset-macro = { workspace = true, optional = true }
 topcoat-cookie = { workspace = true, optional = true }
-topcoat-cookie-macro = { workspace = true, optional = true }
 topcoat-core.workspace = true
 topcoat-core-macro.workspace = true
 topcoat-datastar = { workspace = true, optional = true }
@@ -237,7 +234,6 @@ topcoat-icon-macro = { workspace = true, optional = true }
 topcoat-l10n = { workspace = true, optional = true }
 topcoat-l10n-macro = { workspace = true, optional = true }
 topcoat-mail = { workspace = true, optional = true }
-topcoat-mail-macro = { workspace = true, optional = true }
 topcoat-metadata = { workspace = true, optional = true }
 topcoat-router = { workspace = true, optional = true }
 topcoat-router-macro = { workspace = true, optional = true }

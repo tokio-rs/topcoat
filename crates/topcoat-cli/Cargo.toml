@@ -22,7 +22,6 @@ path = "src/bin/cargo_topcoat.rs"
 [dependencies]
 topcoat-asset = { workspace = true, features = ["bundler"] }
 topcoat-asset-grammar = { workspace = true, features = ["pretty"] }
-topcoat-cookie-grammar = { workspace = true, features = ["pretty"] }
 topcoat-core = { workspace = true, features = ["build"] }
 topcoat-core-grammar = { workspace = true, features = ["pretty"] }
 topcoat-font = { workspace = true, features = ["fontsource"] }
@@ -30,7 +29,6 @@ topcoat-font-grammar = { workspace = true, features = ["fontsource", "pretty"] }
 topcoat-icon-grammar = { workspace = true, features = ["iconify", "pretty"] }
 topcoat-l10n = { workspace = true, features = ["check"] }
 topcoat-l10n-grammar = { workspace = true, features = ["fluent", "pretty"] }
-topcoat-mail-grammar = { workspace = true, features = ["pretty"] }
 topcoat-router = { workspace = true, features = ["websocket"] }
 topcoat-router-grammar = { workspace = true, features = ["pretty"] }
 topcoat-runtime-grammar = { workspace = true, features = ["pretty"] }

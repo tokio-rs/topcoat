@@ -6,7 +6,6 @@ use topcoat_core_grammar::common::pretty::Registry;
 /// attribute macros.
 pub const MACROS: &[&str] = &[
     "asset",
-    "cookie",
     "view",
     "attributes",
     "class",
@@ -18,7 +17,6 @@ pub const MACROS: &[&str] = &[
     "fontsource_font",
     "include",
     "iconify_icon",
-    "mail",
     "messages",
     "t",
     "not_found",
@@ -42,12 +40,10 @@ pub const MACROS: &[&str] = &[
 /// [`MACROS`].
 pub fn register(registry: &mut Registry, name: &str) -> bool {
     use topcoat_asset_grammar::asset::Asset;
-    use topcoat_cookie_grammar::cookie::Cookie;
     use topcoat_core_grammar::memoize::MemoizeAttr;
     use topcoat_font_grammar::{font::Font, font_face::FontFace, fontsource};
     use topcoat_icon_grammar::iconify::{IconifyIcon, Include};
     use topcoat_l10n_grammar::fluent::{Messages, Translate};
-    use topcoat_mail_grammar::mail::Mail;
     use topcoat_router_grammar::{
         layer::LayerAttr, layout::LayoutAttr, module_param::ModuleParam, not_found::NotFound,
         page::PageAttr, path_param::PathParam, query_params::QueryParamsAttr, route::RouteAttr,
@@ -66,7 +62,6 @@ pub fn register(registry: &mut Registry, name: &str) -> bool {
 
     match name {
         "asset" => registry.register_function_like::<Asset>(name),
-        "cookie" => registry.register_function_like::<Cookie>(name),
         "view" => registry.register_function_like::<View>(name),
         "attributes" => registry.register_function_like::<Attributes>(name),
         "class" => registry.register_function_like::<Class>(name),
@@ -82,7 +77,6 @@ pub fn register(registry: &mut Registry, name: &str) -> bool {
         }
         "include" => registry.register_function_like::<Include>(name),
         "iconify_icon" => registry.register_function_like::<IconifyIcon>(name),
-        "mail" => registry.register_function_like::<Mail>(name),
         "messages" => registry.register_function_like::<Messages>(name),
         "t" => registry.register_function_like::<Translate>(name),
         "not_found" => registry.register_function_like::<NotFound>(name),
@@ -131,15 +125,8 @@ mod tests {
 
     #[test]
     fn formats_a_macro_nested_in_another_macro() {
-        let input = r#"mail! { html: view! {<div><p>"The engine weaves algebraic patterns."</p><p>"Yours, Ada"</p></div>} }"#;
-        let expected = r#"mail! {
-    html: view! {
-        <div>
-            <p>"The engine weaves algebraic patterns."</p>
-            <p>"Yours, Ada"</p>
-        </div>
-    },
-}"#;
+        let input = "view! { <p>(t!(greeting,name :user . name))</p> }";
+        let expected = "view! { <p>(t!(greeting, name: user.name))</p> }";
         let formatted = pretty_print_str(&registry(), input).unwrap();
         assert_eq!(formatted, expected);
     }

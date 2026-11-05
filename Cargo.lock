@@ -5228,7 +5228,6 @@ dependencies = [
  "topcoat-asset",
  "topcoat-asset-macro",
  "topcoat-cookie",
- "topcoat-cookie-macro",
  "topcoat-core",
  "topcoat-core-macro",
  "topcoat-datastar",
@@ -5240,7 +5239,6 @@ dependencies = [
  "topcoat-l10n",
  "topcoat-l10n-macro",
  "topcoat-mail",
- "topcoat-mail-macro",
  "topcoat-metadata",
  "topcoat-router",
  "topcoat-router-macro",
@@ -5328,7 +5326,6 @@ dependencies = [
  "topcoat",
  "topcoat-asset",
  "topcoat-asset-grammar",
- "topcoat-cookie-grammar",
  "topcoat-core",
  "topcoat-core-grammar",
  "topcoat-font",
@@ -5336,7 +5333,6 @@ dependencies = [
  "topcoat-icon-grammar",
  "topcoat-l10n",
  "topcoat-l10n-grammar",
- "topcoat-mail-grammar",
  "topcoat-router",
  "topcoat-router-grammar",
  "topcoat-runtime-grammar",
@@ -5358,26 +5354,6 @@ dependencies = [
  "topcoat",
  "topcoat-core",
  "topcoat-router",
-]
-
-[[package]]
-name = "topcoat-cookie-grammar"
-version = "0.11.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 3.0.6",
- "topcoat-core-grammar",
-]
-
-[[package]]
-name = "topcoat-cookie-macro"
-version = "0.11.0"
-dependencies = [
- "quote",
- "syn 3.0.6",
- "topcoat",
- "topcoat-cookie-grammar",
 ]
 
 [[package]]
@@ -5587,27 +5563,6 @@ dependencies = [
  "topcoat-core",
  "topcoat-router",
  "topcoat-view",
-]
-
-[[package]]
-name = "topcoat-mail-grammar"
-version = "0.11.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 3.0.6",
- "topcoat-core-grammar",
-]
-
-[[package]]
-name = "topcoat-mail-macro"
-version = "0.11.0"
-dependencies = [
- "quote",
- "syn 3.0.6",
- "tokio",
- "topcoat",
- "topcoat-mail-grammar",
 ]
 
 [[package]]

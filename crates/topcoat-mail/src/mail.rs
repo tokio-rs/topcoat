@@ -258,60 +258,6 @@ impl MailBuilder {
     }
 }
 
-/// One or more custom headers, converted from a single `(name, value)` pair
-/// or a collection of pairs. The `mail!` macro's `headers` field accepts
-/// anything implementing this trait.
-pub trait IntoHeaders {
-    /// Converts into `(name, value)` header pairs.
-    fn into_headers(self) -> Vec<(String, String)>;
-}
-
-impl<N, V> IntoHeaders for (N, V)
-where
-    N: Into<String>,
-    V: Into<String>,
-{
-    fn into_headers(self) -> Vec<(String, String)> {
-        vec![(self.0.into(), self.1.into())]
-    }
-}
-
-impl<N, V> IntoHeaders for Vec<(N, V)>
-where
-    N: Into<String>,
-    V: Into<String>,
-{
-    fn into_headers(self) -> Vec<(String, String)> {
-        self.into_iter()
-            .map(|(name, value)| (name.into(), value.into()))
-            .collect()
-    }
-}
-
-impl<N, V, const M: usize> IntoHeaders for [(N, V); M]
-where
-    N: Into<String>,
-    V: Into<String>,
-{
-    fn into_headers(self) -> Vec<(String, String)> {
-        self.into_iter()
-            .map(|(name, value)| (name.into(), value.into()))
-            .collect()
-    }
-}
-
-impl<N, V> IntoHeaders for &[(N, V)]
-where
-    N: Clone + Into<String>,
-    V: Clone + Into<String>,
-{
-    fn into_headers(self) -> Vec<(String, String)> {
-        self.iter()
-            .map(|(name, value)| (name.clone().into(), value.clone().into()))
-            .collect()
-    }
-}
-
 /// The plain-text body of a mail: derived, declared, or absent.
 ///
 /// The default, [`FromHtml`](TextBody::FromHtml), derives text from the rendered

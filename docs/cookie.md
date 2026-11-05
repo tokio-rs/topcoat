@@ -98,27 +98,26 @@ async fn report(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-# Building cookies with `cookie!`
+# Cookie attributes
 
-For cookies with several attributes, the [`cookie!`] macro is more compact than the builder. It uses the syntax of the [`Set-Cookie`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie) header: the `name = value` pair first, then any number of `;`-separated attributes, spelled as in the header.
+Chain the builder's methods to set several attributes. `add` and `remove` also accept the builder without a final `build()`:
 
 ```rust
-use topcoat::cookie::{Cookie, cookie};
-
-let plain: Cookie = cookie!(theme = "dark");
+# fn _example(cx: &topcoat::context::Cx) {
+use topcoat::cookie::{Cookie, Cookies, SameSite, cookies, time::Duration};
 
 let token = String::from("abc123");
-let session: Cookie = cookie! {
-    session = (token);
-    Path = "/";
-    Max-Age = 3600;
-    Secure;
-    HttpOnly;
-    SameSite = Lax;
-};
-```
 
-As in [`view!`](crate::view::view), literals are written as they are and Rust expressions go in parentheses, as in `session = (token)` or `Secure = (is_production)`. An integer `Max-Age` counts seconds. Use a string literal for a cookie name that Rust cannot read as tokens, such as `"my.cookie" = "x"`.
+cookies(cx).add(
+    Cookie::build(("session", token))
+        .path("/")
+        .max_age(Duration::hours(1))
+        .secure(true)
+        .http_only(true)
+        .same_site(SameSite::Lax),
+);
+# }
+```
 
 # Default and override attributes
 
@@ -129,7 +128,7 @@ Use the [`Cookies`] methods to apply shared attributes to cookies written throug
 
 ```rust
 # fn _example(cx: &topcoat::context::Cx) {
-use topcoat::cookie::{Cookies, SameSite, cookie, cookies};
+use topcoat::cookie::{Cookies, SameSite, cookies};
 
 let jar = cookies(cx)
     .default_secure(true)
@@ -138,7 +137,7 @@ let jar = cookies(cx)
     .default_path("/");
 
 // Picks up Secure, HttpOnly, SameSite=Lax, Path=/ from the defaults above.
-jar.add(cookie!(session = "abc123"));
+jar.add(("session", "abc123"));
 # }
 ```
 
@@ -184,12 +183,12 @@ Prefix adapters accept both bare names and names that already carry their prefix
 
 ```rust
 # fn _example(cx: &topcoat::context::Cx) {
-use topcoat::cookie::{Cookies, cookie, cookies};
+use topcoat::cookie::{Cookies, cookies};
 
 let jar = cookies(cx).override_prefix_host();
 
 // Stored as `__Host-session`, forced Secure + Path=/, no Domain.
-jar.add(cookie!(session = "abc123"));
+jar.add(("session", "abc123"));
 
 // Looked up under the prefixed name; returns it with the prefix stripped.
 let session = jar.get("session");
@@ -206,12 +205,12 @@ A signed cookie lets the server detect changes to its value. The client can stil
 
 ```rust
 # fn _example(cx: &topcoat::context::Cx) {
-use topcoat::cookie::{Cookies, Key, cookie, cookies};
+use topcoat::cookie::{Cookies, Key, cookies};
 
 let key = Key::generate();
 let jar = cookies(cx).signed(&key);
 
-jar.add(cookie!(user_id = "42"));
+jar.add(("user_id", "42"));
 
 // Returns the cookie only if the signature checks out.
 let user_id = jar.get("user_id");
@@ -224,12 +223,12 @@ A private cookie encrypts and authenticates its value. The client cannot read th
 
 ```rust
 # fn _example(cx: &topcoat::context::Cx) {
-use topcoat::cookie::{Cookies, Key, cookie, cookies};
+use topcoat::cookie::{Cookies, Key, cookies};
 
 let key = Key::generate();
 let jar = cookies(cx).private(&key);
 
-jar.add(cookie!(session = "secret-token"));
+jar.add(("session", "secret-token"));
 
 let session = jar.get("session"); // None if missing or it fails to decrypt
 # }
@@ -263,13 +262,13 @@ Read and write cookies with that key through `signed_cookies(cx)` or `private_co
 use topcoat::{
     Result,
     context::Cx,
-    cookie::{Cookies, cookie, private_cookies},
+    cookie::{Cookie, Cookies, private_cookies},
     router::route,
 };
 
 #[route(POST)]
 async fn login(cx: &Cx) -> Result<&'static str> {
-    private_cookies(cx).add(cookie!(session = "secret-token"; Path = "/"));
+    private_cookies(cx).add(Cookie::build(("session", "secret-token")).path("/"));
     Ok("logged in")
 }
 ```
