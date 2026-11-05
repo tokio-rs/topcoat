@@ -62,6 +62,10 @@ fn formats_context_entries_as_expressions() {
         "#[page(\"/\", with( Head::new().title( \"Home\" ) ))]\nfn home() {}",
         "#[page(\"/\", with(Head::new().title(\"Home\")))]\nfn home() {}",
     );
+    assert_format(
+        "#[layer(\"/api\",with( OriginPolicy::dangerous_disable() ))]\nfn api() {}",
+        "#[layer(\"/api\", with(OriginPolicy::dangerous_disable()))]\nfn api() {}",
+    );
 }
 
 #[test]

@@ -75,7 +75,12 @@ fn layout() {
 
 #[test]
 fn layer() {
-    for attr in [quote! {}, quote! { "./v1" }] {
+    let attrs = [
+        quote! {},
+        quote! { "./v1" },
+        quote! { "/api", with(OriginPolicy::dangerous_disable()) },
+    ];
+    for attr in attrs {
         assert_deterministic(|| {
             Layer::parse(
                 attr.clone(),
