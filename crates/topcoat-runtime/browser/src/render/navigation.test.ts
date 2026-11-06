@@ -489,6 +489,27 @@ it("prefetches a link on hover and uses the prefetch when it is followed", async
 	expect(document.body.textContent).toContain("next page");
 });
 
+it("runs the destination's mount handlers when navigation displays it, not when it is prefetched", async () => {
+	const mounted: string[] = [];
+	(globalThis as typeof globalThis & { mounted: string[] }).mounted = mounted;
+	const handler = (name: string) =>
+		`data-topcoat-on:mount="() => globalThis.mounted.push('${name}')"`;
+	stubFetch(() => snapshot(page("Next", `<p ${handler("next")}></p>`)));
+	mount(
+		`<p ${handler("home")}></p><a data-topcoat-link="intent" href="/next">x</a>`,
+	);
+	await settle();
+
+	link().dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+	await new Promise((resolve) => setTimeout(resolve, 150));
+	await settle();
+	expect(mounted).toEqual(["home"]);
+
+	click(link());
+	await settle();
+	expect(mounted).toEqual(["home", "next"]);
+});
+
 it("prefetches a link as soon as it is focused", async () => {
 	const calls = stubFetch(() => snapshot(page("Next", "")));
 	mount(`<a data-topcoat-link="intent" href="/next">x</a>`);
