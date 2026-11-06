@@ -36,12 +36,12 @@ impl Expr {
     }
 }
 
-enum BuiltinMacro {
+pub(super) enum BuiltinMacro {
     Raw(RawMacro),
 }
 
 impl BuiltinMacro {
-    fn parse(mac: &Macro) -> syn::Result<Self> {
+    pub(super) fn parse(mac: &Macro) -> syn::Result<Self> {
         let ident = mac.path.get_ident().ok_or_else(|| {
             syn::Error::new_spanned(&mac.path, "only single-identifier macros are supported")
         })?;
@@ -65,9 +65,17 @@ impl BuiltinMacro {
             Self::Raw(raw) => raw.lower(rust, js, names),
         }
     }
+
+    /// Whether the macro's JavaScript awaits, which makes the function it
+    /// lowers into `async`.
+    pub(super) fn awaits(&self) -> bool {
+        match self {
+            Self::Raw(raw) => raw.awaits(),
+        }
+    }
 }
 
-struct RawMacro {
+pub(super) struct RawMacro {
     js: LitStr,
     rust: Option<syn::Expr>,
 }
@@ -98,6 +106,15 @@ impl Parse for RawMacro {
 }
 
 impl RawMacro {
+    /// Whether the JavaScript uses the `await` keyword as a word of its own.
+    fn awaits(&self) -> bool {
+        let js = self.js.value();
+        let word = |c: char| c.is_alphanumeric() || c == '_' || c == '$';
+        js.match_indices("await").any(|(at, keyword)| {
+            !js[..at].ends_with(word) && !js[at + keyword.len()..].starts_with(word)
+        })
+    }
+
     fn lower(
         &self,
         rust: &mut TokenStream,
