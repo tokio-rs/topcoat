@@ -2,7 +2,11 @@ use proc_macro2::TokenStream;
 use syn::ExprBlock;
 
 use super::js::Js;
-use crate::expr::{Expr, contains_await::ContainsAwait, name_resolver::NameResolver};
+use crate::expr::{
+    Expr,
+    contains_await::ContainsAwait,
+    name_resolver::{JumpScope, NameResolver},
+};
 
 impl Expr {
     pub(super) fn expr_block(
@@ -21,7 +25,9 @@ impl Expr {
             "(() => "
         };
         js.push_str(predicate);
-        Self::block(&block.block, rust, js, names)?;
+        names.within(JumpScope::Function, |names| {
+            Self::block(&block.block, rust, js, names)
+        })?;
         js.push_str(if is_async { ")())" } else { ")()" });
         Ok(())
     }
