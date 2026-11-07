@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0](https://github.com/tokio-rs/topcoat/compare/topcoat-router-grammar-v0.11.0...topcoat-router-grammar-v0.12.0) - 2026-11-07
+
+### Added
+
+- *(router)* [**breaking**] move more router features into the route context ([#588](https://github.com/tokio-rs/topcoat/pull/588))
+- [**breaking**] unify macro field parsing and use explicit mail views ([#583](https://github.com/tokio-rs/topcoat/pull/583))
+- [**breaking**] require leading `cx: &Cx` and capture context in view macros ([#581](https://github.com/tokio-rs/topcoat/pull/581))
+- [**breaking**] lenient macros ([#580](https://github.com/tokio-rs/topcoat/pull/580))
+- [**breaking**] add formatting with `topcoat fmt` for all topcoat macros ([#579](https://github.com/tokio-rs/topcoat/pull/579))
+- [**breaking**] unify macro syntax ([#571](https://github.com/tokio-rs/topcoat/pull/571))
+- *(router)* route context with `#[route(with(...))]` ([#566](https://github.com/tokio-rs/topcoat/pull/566))
+
+### Fixed
+
+- *(view)* allow props and locals to share component names ([#582](https://github.com/tokio-rs/topcoat/pull/582))
+
 ## [0.10.0](https://github.com/tokio-rs/topcoat/compare/topcoat-router-grammar-v0.9.0...topcoat-router-grammar-v0.10.0) - 2026-10-03
 
 ### Added

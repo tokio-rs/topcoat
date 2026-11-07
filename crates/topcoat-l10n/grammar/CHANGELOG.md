@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0](https://github.com/tokio-rs/topcoat/compare/topcoat-l10n-grammar-v0.11.0...topcoat-l10n-grammar-v0.12.0) - 2026-11-07
+
+### Added
+
+- [**breaking**] lenient macros ([#580](https://github.com/tokio-rs/topcoat/pull/580))
+- [**breaking**] add formatting with `topcoat fmt` for all topcoat macros ([#579](https://github.com/tokio-rs/topcoat/pull/579))
+- [**breaking**] unify macro syntax ([#571](https://github.com/tokio-rs/topcoat/pull/571))
+
 ## [0.11.0](https://github.com/tokio-rs/topcoat/compare/topcoat-l10n-grammar-v0.0.0...topcoat-l10n-grammar-v0.11.0) - 2026-10-24
 
 ### Added
