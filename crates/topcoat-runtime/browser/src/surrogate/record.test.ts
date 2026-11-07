@@ -45,6 +45,23 @@ it("constructs records in expressions", () => {
 	expect(dehydrate(record)).toEqual({ t: "Record", v: { name: "tea" } });
 });
 
+it("updates records from a base", () => {
+	const base = new Record([
+		["name", new RuntimeString("tea")],
+		["price", new F64(1.5)],
+	]);
+	const record = cx().recordWith({ price: new F64(2) }, base);
+	expect(record).toBeInstanceOf(Record);
+	expect(dehydrate(record)).toEqual({
+		t: "Record",
+		v: { name: "tea", price: 2 },
+	});
+	expect(dehydrate(base)).toEqual({
+		t: "Record",
+		v: { name: "tea", price: 1.5 },
+	});
+});
+
 it("keeps a field named like an object setter as data", () => {
 	const record = cx().hydrate(
 		JSON.parse('{"t":"Record","v":{"__proto__":1.5}}'),
