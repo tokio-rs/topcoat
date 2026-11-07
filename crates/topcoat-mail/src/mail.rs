@@ -134,13 +134,6 @@ impl Mail {
 }
 
 /// Assembles a [`Mail`], created by [`Mail::builder`].
-///
-/// The sender must convert into a [`Mailbox`]. Recipient, attachment, and
-/// header setters accept any iterable, such as an array, a `Vec`, or an
-/// iterator, and append on each call.
-///
-/// [`build`](MailBuilder::build) checks that the mail is complete and that
-/// its attachments and headers are valid.
 #[derive(Clone, Debug, Default)]
 pub struct MailBuilder {
     from: Option<Mailbox>,
@@ -162,8 +155,8 @@ pub struct MailBuilder {
 impl MailBuilder {
     /// Sets the `From` address.
     #[must_use]
-    pub fn from(mut self, from: impl Into<Mailbox>) -> Self {
-        self.from = Some(from.into());
+    pub fn from(mut self, from: Mailbox) -> Self {
+        self.from = Some(from);
         self
     }
 
