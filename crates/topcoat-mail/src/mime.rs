@@ -230,7 +230,8 @@ mod tests {
     fn html_derives_its_text_alternative_by_default() {
         let mail = base()
             .html(ViewHandle::unescaped_unchecked("<h1>Hi</h1><p>Bye now</p>"))
-            .build().unwrap();
+            .build()
+            .unwrap();
         let wire = formatted(mail);
 
         assert!(wire.contains("Content-Type: multipart/alternative;"));
@@ -243,7 +244,8 @@ mod tests {
         let mail = base()
             .html(ViewHandle::unescaped_unchecked("<h1>Hi</h1>"))
             .text(TextBody::None)
-            .build().unwrap();
+            .build()
+            .unwrap();
         let wire = formatted(mail);
 
         assert!(wire.contains("Content-Type: text/html; charset=utf-8\r\n"));
@@ -255,7 +257,8 @@ mod tests {
     fn empty_derived_text_is_not_sent() {
         let mail = base()
             .html(ViewHandle::unescaped_unchecked("<img src=\"x.png\">"))
-            .build().unwrap();
+            .build()
+            .unwrap();
         let wire = formatted(mail);
 
         assert!(!wire.contains("text/plain"));
@@ -267,7 +270,8 @@ mod tests {
         let mail = base()
             .text("Hi Bob")
             .html(ViewHandle::unescaped_unchecked("<h1>Hi</h1>"))
-            .build().unwrap();
+            .build()
+            .unwrap();
         let wire = formatted(mail);
 
         assert!(wire.contains("Content-Type: multipart/alternative;"));
@@ -283,7 +287,8 @@ mod tests {
             .text("Hi Bob")
             .html(ViewHandle::unescaped_unchecked("<img src=\"cid:logo\">"))
             .attachments([Attachment::inline("logo", "image/png", b"\x89PNG")])
-            .build().unwrap();
+            .build()
+            .unwrap();
         let wire = formatted(mail);
 
         assert!(wire.contains("Content-Type: multipart/alternative;"));
@@ -297,7 +302,8 @@ mod tests {
         let mail = base()
             .text("Hi Bob")
             .attachments([Attachment::new("invoice.pdf", "application/pdf", b"%PDF-")])
-            .build().unwrap();
+            .build()
+            .unwrap();
         let wire = formatted(mail);
 
         assert!(wire.contains("Content-Type: multipart/mixed;"));
@@ -309,7 +315,8 @@ mod tests {
         let mail = base()
             .bcc([Mailbox::new("dan@example.com").unwrap()])
             .text("Hi")
-            .build().unwrap();
+            .build()
+            .unwrap();
 
         let message = message(&Cx::new(), mail.clone(), BccHeader::Dropped).unwrap();
         let recipients: Vec<String> = message
@@ -330,7 +337,8 @@ mod tests {
         let mail = base()
             .bcc([Mailbox::new("dan@example.com").unwrap()])
             .text("Hi")
-            .build().unwrap();
+            .build()
+            .unwrap();
 
         let message = message(&Cx::new(), mail, BccHeader::Kept).unwrap();
         let wire = String::from_utf8(message.formatted()).unwrap();
@@ -343,7 +351,8 @@ mod tests {
             .text("Hi")
             .message_id("<mail@example.com>")
             .date(std::time::SystemTime::UNIX_EPOCH)
-            .build().unwrap();
+            .build()
+            .unwrap();
         let wire = formatted(mail);
 
         assert!(wire.contains("Message-ID: <mail@example.com>\r\n"));
@@ -364,11 +373,9 @@ mod tests {
     fn custom_headers_are_written() {
         let mail = base()
             .text("Hi")
-            .headers([(
-                "List-Unsubscribe".to_owned(),
-                "<mailto:stop@example.com>".to_owned(),
-            )])
-            .build().unwrap();
+            .headers([("List-Unsubscribe", "<mailto:stop@example.com>")])
+            .build()
+            .unwrap();
         let wire = formatted(mail);
 
         assert!(wire.contains("List-Unsubscribe: <mailto:stop@example.com>\r\n"));
@@ -380,7 +387,8 @@ mod tests {
             .text("Hi")
             .in_reply_to("<earlier@example.com>")
             .references("<earlier@example.com>")
-            .build().unwrap();
+            .build()
+            .unwrap();
         let wire = formatted(mail);
 
         assert!(wire.contains("In-Reply-To: <earlier@example.com>\r\n"));

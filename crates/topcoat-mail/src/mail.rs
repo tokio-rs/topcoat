@@ -135,9 +135,9 @@ impl Mail {
 
 /// Assembles a [`Mail`], created by [`Mail::builder`].
 ///
-/// The sender must convert into a [`Mailbox`]. Recipient setters accept
-/// collections that convert into `Vec<Mailbox>` and append on each call.
-/// Attachment and header setters also append.
+/// The sender must convert into a [`Mailbox`]. Recipient, attachment, and
+/// header setters accept any iterable, such as an array, a `Vec`, or an
+/// iterator, and append on each call.
 ///
 /// [`build`](MailBuilder::build) checks that the mail is complete and that
 /// its attachments and headers are valid.
@@ -169,31 +169,31 @@ impl MailBuilder {
 
     /// Adds `To` recipients.
     #[must_use]
-    pub fn to(mut self, to: impl Into<Vec<Mailbox>>) -> Self {
-        self.to.extend(to.into());
+    pub fn to(mut self, to: impl IntoIterator<Item = Mailbox>) -> Self {
+        self.to.extend(to);
         self
     }
 
     /// Adds `Cc` recipients.
     #[must_use]
-    pub fn cc(mut self, cc: impl Into<Vec<Mailbox>>) -> Self {
-        self.cc.extend(cc.into());
+    pub fn cc(mut self, cc: impl IntoIterator<Item = Mailbox>) -> Self {
+        self.cc.extend(cc);
         self
     }
 
     /// Adds `Bcc` recipients, who receive the mail without appearing in
     /// its headers.
     #[must_use]
-    pub fn bcc(mut self, bcc: impl Into<Vec<Mailbox>>) -> Self {
-        self.bcc.extend(bcc.into());
+    pub fn bcc(mut self, bcc: impl IntoIterator<Item = Mailbox>) -> Self {
+        self.bcc.extend(bcc);
         self
     }
 
     /// Adds `Reply-To` addresses, where replies are directed instead of the
     /// `From` address.
     #[must_use]
-    pub fn reply_to(mut self, reply_to: impl Into<Vec<Mailbox>>) -> Self {
-        self.reply_to.extend(reply_to.into());
+    pub fn reply_to(mut self, reply_to: impl IntoIterator<Item = Mailbox>) -> Self {
+        self.reply_to.extend(reply_to);
         self
     }
 
@@ -225,15 +225,23 @@ impl MailBuilder {
 
     /// Adds attachments.
     #[must_use]
-    pub fn attachments(mut self, attachments: impl Into<Vec<Attachment>>) -> Self {
-        self.attachments.extend(attachments.into());
+    pub fn attachments(mut self, attachments: impl IntoIterator<Item = Attachment>) -> Self {
+        self.attachments.extend(attachments);
         self
     }
 
     /// Adds custom `(name, value)` headers, such as `List-Unsubscribe`.
     #[must_use]
-    pub fn headers(mut self, headers: impl Into<Vec<(String, String)>>) -> Self {
-        self.headers.extend(headers.into());
+    pub fn headers<N, V>(mut self, headers: impl IntoIterator<Item = (N, V)>) -> Self
+    where
+        N: Into<String>,
+        V: Into<String>,
+    {
+        self.headers.extend(
+            headers
+                .into_iter()
+                .map(|(name, value)| (name.into(), value.into())),
+        );
         self
     }
 
@@ -425,10 +433,7 @@ mod tests {
             .html(ViewHandle::empty())
             .text("Hello there")
             .attachments([Attachment::new("invoice.pdf", "application/pdf", b"%PDF-")])
-            .headers([(
-                "List-Unsubscribe".to_owned(),
-                "<mailto:stop@example.com>".to_owned(),
-            )])
+            .headers([("List-Unsubscribe", "<mailto:stop@example.com>")])
             .in_reply_to("<earlier@example.com>")
             .references("<earlier@example.com>")
             .date(SystemTime::UNIX_EPOCH)
@@ -564,7 +569,7 @@ mod tests {
         ));
 
         let header_name = complete()?
-            .headers([("Bad Name".to_owned(), "value".to_owned())])
+            .headers([("Bad Name", "value")])
             .build();
         assert!(matches!(
             header_name,
