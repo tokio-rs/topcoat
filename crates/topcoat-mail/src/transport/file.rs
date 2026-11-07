@@ -5,10 +5,7 @@ use std::{path::PathBuf, time::SystemTime};
 use time::{OffsetDateTime, macros::format_description};
 use topcoat_core::context::Cx;
 
-use crate::{
-    Mail, Receipt, SendError, Transport, TransportFuture,
-    mime::{self, BccHeader},
-};
+use crate::{Mail, Receipt, SendError, Transport, TransportFuture};
 
 /// A [`Transport`] that writes each mail as an `.eml` file instead of
 /// delivering it, for inspecting mail during development.
@@ -21,7 +18,7 @@ use crate::{
 ///
 /// Creates the directory on first send. Filenames include the UTC send time
 /// and part of the `Message-ID`, such as `20260726-143502-1a2b3c4d.eml`.
-/// Files retain the `Bcc` header so you can inspect all recipients.
+/// Like the delivered mail, files omit the `Bcc` header.
 ///
 /// Writes use blocking I/O on the calling task. Use this transport for
 /// development.
@@ -47,21 +44,18 @@ impl FileTransport {
 }
 
 impl Transport for FileTransport {
-    fn send<'a>(&'a self, cx: &'a Cx, mail: Mail) -> TransportFuture<'a> {
+    fn send<'a>(&'a self, _cx: &'a Cx, mail: Mail) -> TransportFuture<'a> {
         Box::pin(async move {
-            let message = mime::message(cx, mail, BccHeader::Kept)?;
-            let message_id = mime::message_id(&message);
-
             let path = self.directory.join(format!(
                 "{}-{}.eml",
                 timestamp(SystemTime::now()),
-                filename_safe(&message_id)
+                filename_safe(mail.message_id())
             ));
 
-            std::fs::create_dir_all(&self.directory).map_err(SendError::delivery)?;
-            std::fs::write(&path, message.formatted()).map_err(SendError::delivery)?;
+            std::fs::create_dir_all(&self.directory).map_err(SendError::new)?;
+            std::fs::write(&path, mail.formatted()).map_err(SendError::new)?;
 
-            Ok(Receipt::new(message_id))
+            Ok(Receipt::new(mail.message_id()))
         })
     }
 }
@@ -111,7 +105,6 @@ mod tests {
         let mail = Mail::builder()
             .from(Mailbox::new("ada@example.com").unwrap())
             .to([Mailbox::new("bob@example.com").unwrap()])
-            .bcc([Mailbox::new("dan@example.com").unwrap()])
             .subject("Hello")
             .text("Hi Bob")
             .build()
@@ -130,7 +123,6 @@ mod tests {
 
         let wire = std::fs::read_to_string(&entries[0]).unwrap();
         assert!(wire.contains("Subject: Hello\r\n"));
-        assert!(wire.contains("Bcc: dan@example.com\r\n"));
         assert!(wire.contains(receipt.message_id()));
 
         std::fs::remove_dir_all(&directory).unwrap();

@@ -68,9 +68,15 @@ impl Mailbox {
         self.address.as_ref()
     }
 
-    /// Converts into the lettre mailbox used during MIME assembly.
-    pub(crate) fn to_lettre(&self) -> lettre::message::Mailbox {
-        lettre::message::Mailbox::new(self.name.clone(), self.address.clone())
+    /// The domain part of the address.
+    pub(crate) fn domain(&self) -> &str {
+        self.address.domain()
+    }
+}
+
+impl From<&Mailbox> for lettre::message::Mailbox {
+    fn from(mailbox: &Mailbox) -> lettre::message::Mailbox {
+        lettre::message::Mailbox::new(mailbox.name.clone(), mailbox.address.clone())
     }
 }
 

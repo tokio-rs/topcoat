@@ -78,11 +78,16 @@ impl Attachment {
     pub fn content(&self) -> &[u8] {
         &self.content
     }
+
+    /// How the attachment is presented to the recipient.
+    pub(crate) fn disposition(&self) -> &Disposition {
+        &self.disposition
+    }
 }
 
 /// How an attachment is presented to the recipient.
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum Disposition {
+pub(crate) enum Disposition {
     /// A file the recipient downloads.
     Attached { filename: String },
     /// Content the HTML body embeds by content id.

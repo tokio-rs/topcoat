@@ -4,15 +4,12 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use topcoat_core::context::Cx;
 
-use crate::{
-    Mail, Receipt, Transport, TransportFuture,
-    mime::{self, BccHeader},
-};
+use crate::{Mail, Receipt, Transport, TransportFuture};
 
 /// A [`Transport`] that captures messages in memory for tests.
 ///
-/// Assembles each message before recording it. Clones share the same
-/// capture, so a test can keep one clone and give another to the application:
+/// Clones share the same capture, so a test can keep one clone and give
+/// another to the application:
 ///
 /// ```
 /// # use topcoat_core::context::Cx;
@@ -67,10 +64,9 @@ impl MemoryTransport {
 }
 
 impl Transport for MemoryTransport {
-    fn send<'a>(&'a self, cx: &'a Cx, mail: Mail) -> TransportFuture<'a> {
+    fn send<'a>(&'a self, _cx: &'a Cx, mail: Mail) -> TransportFuture<'a> {
         Box::pin(async move {
-            let message = mime::message(cx, mail.clone(), BccHeader::Dropped)?;
-            let receipt = Receipt::new(mime::message_id(&message));
+            let receipt = Receipt::new(mail.message_id());
             self.sent
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
@@ -100,8 +96,9 @@ mod tests {
         let transport = MemoryTransport::new();
         let clone = transport.clone();
 
-        let receipt = clone.send(&Cx::new(), mail()).await.unwrap();
-        assert!(receipt.message_id().contains('@'));
+        let mail = mail();
+        let receipt = clone.send(&Cx::new(), mail.clone()).await.unwrap();
+        assert_eq!(receipt.message_id(), mail.message_id());
 
         let sent = transport.sent();
         assert_eq!(sent.len(), 1);

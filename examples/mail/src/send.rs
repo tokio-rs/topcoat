@@ -22,6 +22,7 @@ pub(crate) async fn send_welcome(cx: &Cx, Form(recipient): Form<Recipient>) -> R
         // Mail clients support less CSS than browsers, so the styles stay
         // simple and inline.
         .html(
+            cx,
             view! {
                 <div style="font-family: sans-serif; max-width: 30rem">
                     // `cid:ferris` references the inline attachment below.

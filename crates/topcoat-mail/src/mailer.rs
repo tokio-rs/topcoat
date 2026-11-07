@@ -52,7 +52,7 @@ impl Mailer {
 ///
 /// # Errors
 ///
-/// Returns an error if the message cannot be formatted or delivered.
+/// Returns an error if the transport fails to deliver the message.
 /// See [`SendError`](crate::SendError).
 pub async fn send(cx: &Cx, mail: Mail) -> Result<Receipt> {
     let mailer: &Mailer = context(cx);

@@ -30,7 +30,7 @@ Handlers use the registered transport. You can change delivery settings without 
 
 # Declaring and sending mail
 
-[`Mail::builder`] creates a [`Mail`]. Render the HTML body from a view, such as [`view!`](crate::view::view) markup, with [`single`](crate::view::ViewExt::single):
+[`Mail::builder`] creates a [`Mail`]. Build the HTML body from a view, such as [`view!`](crate::view::view) markup, with [`single`](crate::view::ViewExt::single). [`html`](MailBuilder::html) renders it with the request context:
 
 ```rust
 // src/app/api/welcome.rs
@@ -49,6 +49,7 @@ async fn welcome(cx: &Cx) -> Result<&'static str> {
         .to([Mailbox::new("ada@example.com")?])
         .subject("Welcome, Ada!")
         .html(
+            cx,
             view! {
                 <h1>"Welcome!"</h1>
                 <p>"Your account is ready."</p>
@@ -83,6 +84,7 @@ let mail = Mail::builder()
 #   .to([Mailbox::new("ada@example.com")?])
     .subject("Your invoice")
     .html(
+        cx,
         view! {
             <img src="cid:logo" alt="Example logo">
             <p>"The invoice is attached."</p>
@@ -153,7 +155,7 @@ assert_eq!(transport.sent()[0].to(), [Mailbox::new("bob@example.com")?]);
 # }
 ```
 
-The transport assembles each message before saving it. A passing test does not mean a real mail service will accept the message.
+A passing test does not mean a real mail service will accept the message.
 
 ## Custom transports
 

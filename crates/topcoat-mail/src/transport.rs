@@ -22,9 +22,8 @@ pub type TransportFuture<'a> = Pin<Box<dyn Future<Output = Result<Receipt>> + Se
 
 /// Delivers a [`Mail`] to its recipients.
 ///
-/// Implement this trait to integrate a delivery service. The request context
-/// is available when rendering the HTML body. Use [`Mail::formatted`] for
-/// services that accept a complete RFC 5322 message.
+/// Implement this trait to integrate a delivery service. Use
+/// [`Mail::formatted`] for services that accept a complete RFC 5322 message.
 pub trait Transport: Send + Sync {
     /// Sends the mail, returning a [`Receipt`] once the delivery mechanism
     /// accepts it.
@@ -51,7 +50,7 @@ impl Receipt {
     }
 
     /// The `Message-ID` of the sent mail, as it appears in the header.
-    /// It is generated at send time unless the mail declared one.
+    /// It is generated when the mail is built unless the mail declared one.
     ///
     /// Use it to link a later reply with
     /// [`in_reply_to`](crate::MailBuilder::in_reply_to).
@@ -61,31 +60,16 @@ impl Receipt {
     }
 }
 
-/// The reason a mail could not be sent.
+/// The reason a transport failed to deliver a mail.
 #[derive(Debug, thiserror::Error)]
-#[non_exhaustive]
-pub enum SendError {
-    /// The mail could not be assembled into its wire form.
-    #[error("could not assemble the mail")]
-    Assembly(#[source] Box<dyn std::error::Error + Send + Sync>),
-
-    /// The delivery mechanism failed to accept the mail.
-    #[error("could not deliver the mail")]
-    Delivery(#[source] Box<dyn std::error::Error + Send + Sync>),
-}
+#[error("could not deliver the mail")]
+pub struct SendError(#[source] Box<dyn std::error::Error + Send + Sync>);
 
 impl SendError {
-    /// Wraps a delivery failure. Called by [`Transport`] implementations
-    /// to report errors from the underlying delivery mechanism.
+    /// Wraps an error from the underlying delivery mechanism. Called by
+    /// [`Transport`] implementations.
     #[must_use]
-    pub fn delivery(error: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> SendError {
-        SendError::Delivery(error.into())
-    }
-
-    /// Wraps an assembly failure.
-    pub(crate) fn assembly(
-        error: impl Into<Box<dyn std::error::Error + Send + Sync>>,
-    ) -> SendError {
-        SendError::Assembly(error.into())
+    pub fn new(error: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> SendError {
+        SendError(error.into())
     }
 }

@@ -17,9 +17,10 @@ smtp = ["lettre/smtp-transport", "lettre/tokio1", "lettre/tokio1-rustls-tls", "l
 topcoat-core.workspace = true
 topcoat-view.workspace = true
 
-lettre = { workspace = true, features = ["builder", "hostname"] }
+lettre = { workspace = true, features = ["builder"] }
 thiserror.workspace = true
 time = { workspace = true, features = ["formatting", "macros"] }
+uuid = { workspace = true, features = ["v4"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt"] }

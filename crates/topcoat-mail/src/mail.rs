@@ -2,10 +2,15 @@
 
 use std::time::SystemTime;
 
-use lettre::message::header::{ContentType, HeaderName};
+use lettre::message::{
+    Message,
+    header::{ContentType, HeaderName},
+};
+use topcoat_core::context::Cx;
 use topcoat_view::ViewHandle;
+use uuid::Uuid;
 
-use crate::{Attachment, Mailbox};
+use crate::{Attachment, Mailbox, text::PlainText};
 
 /// An email message ready to be formatted or sent.
 ///
@@ -23,7 +28,7 @@ use crate::{Attachment, Mailbox};
 ///     .build()?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Mail {
     from: Mailbox,
     to: Vec<Mailbox>,
@@ -31,14 +36,13 @@ pub struct Mail {
     bcc: Vec<Mailbox>,
     reply_to: Vec<Mailbox>,
     subject: String,
-    pub(crate) html: Option<ViewHandle>,
-    text: TextBody,
+    body: Body,
     attachments: Vec<Attachment>,
     in_reply_to: Option<String>,
     references: Option<String>,
     headers: Vec<(String, String)>,
-    date: Option<SystemTime>,
-    message_id: Option<String>,
+    date: SystemTime,
+    message_id: String,
 }
 
 impl Mail {
@@ -84,16 +88,22 @@ impl Mail {
         &self.subject
     }
 
-    /// The HTML body, if any.
+    /// The rendered HTML body, if any.
     #[must_use]
-    pub fn html(&self) -> Option<&ViewHandle> {
-        self.html.as_ref()
+    pub fn html(&self) -> Option<&str> {
+        match &self.body {
+            Body::Html { html, .. } => Some(html),
+            Body::Text(_) => None,
+        }
     }
 
-    /// The plain-text body: derived, declared, or absent.
+    /// The plain-text body, if any.
     #[must_use]
-    pub fn text(&self) -> &TextBody {
-        &self.text
+    pub fn text(&self) -> Option<&str> {
+        match &self.body {
+            Body::Html { text, .. } => text.as_deref(),
+            Body::Text(text) => Some(text),
+        }
     }
 
     /// The attachments, downloadable and inline alike.
@@ -120,17 +130,42 @@ impl Mail {
         &self.headers
     }
 
-    /// The `Date` header value, if one was set explicitly.
+    /// The `Date` header value.
     #[must_use]
-    pub fn date(&self) -> Option<SystemTime> {
+    pub fn date(&self) -> SystemTime {
         self.date
     }
 
-    /// The `Message-ID`, if one was set explicitly.
+    /// The `Message-ID` header value.
     #[must_use]
-    pub fn message_id(&self) -> Option<&str> {
-        self.message_id.as_deref()
+    pub fn message_id(&self) -> &str {
+        &self.message_id
     }
+
+    /// The mail in its RFC 5322 wire form: the headers followed by the MIME
+    /// body. The output omits `Bcc` recipients.
+    ///
+    /// Use this for services that accept raw messages or tests that inspect
+    /// message bytes. You do not need to call it before sending.
+    #[must_use]
+    pub fn formatted(&self) -> Vec<u8> {
+        Message::from(self).formatted()
+    }
+
+    /// The HTML and plain-text bodies.
+    pub(crate) fn body(&self) -> &Body {
+        &self.body
+    }
+}
+
+/// The bodies of a [`Mail`]: HTML with an optional plain-text alternative,
+/// or plain text alone.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum Body {
+    /// Rendered HTML, with the plain-text alternative if there is one.
+    Html { html: String, text: Option<String> },
+    /// Plain text alone.
+    Text(String),
 }
 
 /// Assembles a [`Mail`], created by [`Mail::builder`].
@@ -142,7 +177,7 @@ pub struct MailBuilder {
     bcc: Vec<Mailbox>,
     reply_to: Vec<Mailbox>,
     subject: String,
-    html: Option<ViewHandle>,
+    html: Option<String>,
     text: TextBody,
     attachments: Vec<Attachment>,
     in_reply_to: Option<String>,
@@ -197,10 +232,10 @@ impl MailBuilder {
         self
     }
 
-    /// Sets the HTML body.
+    /// Sets the HTML body, rendering the view with `cx`.
     #[must_use]
-    pub fn html(mut self, html: ViewHandle) -> Self {
-        self.html = Some(html);
+    pub fn html(mut self, cx: &Cx, html: ViewHandle) -> Self {
+        self.html = Some(html.render(cx));
         self
     }
 
@@ -208,8 +243,8 @@ impl MailBuilder {
     /// render HTML.
     ///
     /// Accepts the text itself or a [`TextBody`] variant. Without a call,
-    /// the text is derived from the HTML body when the mail is assembled;
-    /// pass [`TextBody::None`] to send the HTML alone.
+    /// the text is derived from the HTML body; pass [`TextBody::None`] to
+    /// send the HTML alone.
     #[must_use]
     pub fn text(mut self, text: impl Into<TextBody>) -> Self {
         self.text = text.into();
@@ -252,23 +287,24 @@ impl MailBuilder {
         self
     }
 
-    /// Sets the `Date` header. Without an explicit date, the send time is
-    /// used.
+    /// Sets the `Date` header. Without an explicit date, the time of
+    /// building is used.
     #[must_use]
     pub fn date(mut self, date: SystemTime) -> Self {
         self.date = Some(date);
         self
     }
 
-    /// Sets the `Message-ID`. Without an explicit id, one is generated at
-    /// send time.
+    /// Sets the `Message-ID`. Without an explicit id, a unique one at the
+    /// sender's domain is generated.
     #[must_use]
     pub fn message_id(mut self, message_id: impl Into<String>) -> Self {
         self.message_id = Some(message_id.into());
         self
     }
 
-    /// Finishes the builder into a [`Mail`].
+    /// Finishes the builder into a [`Mail`], deriving the plain-text body
+    /// from the HTML unless it was declared.
     ///
     /// # Errors
     ///
@@ -278,18 +314,6 @@ impl MailBuilder {
         let from = self.from.ok_or(MailError::MissingFrom)?;
         if self.to.is_empty() && self.cc.is_empty() && self.bcc.is_empty() {
             return Err(MailError::MissingRecipients);
-        }
-        if self.html.is_none() {
-            if !matches!(self.text, TextBody::Text(_)) {
-                return Err(MailError::MissingBody);
-            }
-            if self
-                .attachments
-                .iter()
-                .any(|attachment| attachment.content_id().is_some())
-            {
-                return Err(MailError::InlineWithoutHtml);
-            }
         }
         for attachment in &self.attachments {
             if ContentType::parse(attachment.content_type()).is_err() {
@@ -304,6 +328,35 @@ impl MailBuilder {
             }
         }
 
+        let body = match (self.html, self.text) {
+            (Some(html), TextBody::FromHtml) => {
+                let text = PlainText::from_html(&html);
+                Body::Html {
+                    html,
+                    text: (!text.is_empty()).then_some(text),
+                }
+            }
+            (Some(html), TextBody::None) => Body::Html { html, text: None },
+            (Some(html), TextBody::Text(text)) => Body::Html {
+                html,
+                text: Some(text),
+            },
+            (None, TextBody::Text(text)) => Body::Text(text),
+            (None, TextBody::FromHtml | TextBody::None) => return Err(MailError::MissingBody),
+        };
+        if matches!(body, Body::Text(_))
+            && self
+                .attachments
+                .iter()
+                .any(|attachment| attachment.content_id().is_some())
+        {
+            return Err(MailError::InlineWithoutHtml);
+        }
+
+        let message_id = self
+            .message_id
+            .unwrap_or_else(|| format!("<{}@{}>", Uuid::new_v4().simple(), from.domain()));
+
         Ok(Mail {
             from,
             to: self.to,
@@ -311,14 +364,13 @@ impl MailBuilder {
             bcc: self.bcc,
             reply_to: self.reply_to,
             subject: self.subject,
-            html: self.html,
-            text: self.text,
+            body,
             attachments: self.attachments,
             in_reply_to: self.in_reply_to,
             references: self.references,
             headers: self.headers,
-            date: self.date,
-            message_id: self.message_id,
+            date: self.date.unwrap_or_else(SystemTime::now),
+            message_id,
         })
     }
 }
@@ -373,7 +425,7 @@ pub enum MailError {
 /// ```
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum TextBody {
-    /// Derive the text from the HTML body when the mail is assembled.
+    /// Derive the text from the HTML body when the mail is built.
     #[default]
     FromHtml,
     /// Send no plain-text body.
@@ -413,9 +465,13 @@ mod tests {
             .text("Hi"))
     }
 
+    fn with_html(builder: MailBuilder, html: &'static str) -> MailBuilder {
+        builder.html(&Cx::new(), ViewHandle::unescaped_unchecked(html))
+    }
+
     #[test]
     fn collects_every_field() -> Result<()> {
-        let mail = Mail::builder()
+        let mail = with_html(Mail::builder(), "<p>Hello</p>")
             .from(Mailbox::named("Ada", "ada@example.com")?)
             .to([Mailbox::new("bob@example.com")?])
             .to(vec![Mailbox::named("Grace Hopper", "grace@example.com")?])
@@ -423,7 +479,6 @@ mod tests {
             .bcc([Mailbox::new("dan@example.com")?])
             .reply_to([Mailbox::new("replies@example.com")?])
             .subject("Hello")
-            .html(ViewHandle::empty())
             .text("Hello there")
             .attachments([Attachment::new("invoice.pdf", "application/pdf", b"%PDF-")])
             .headers([("List-Unsubscribe", "<mailto:stop@example.com>")])
@@ -445,8 +500,8 @@ mod tests {
         assert_eq!(mail.bcc(), [Mailbox::new("dan@example.com")?]);
         assert_eq!(mail.reply_to(), [Mailbox::new("replies@example.com")?]);
         assert_eq!(mail.subject(), "Hello");
-        assert!(mail.html().is_some());
-        assert_eq!(mail.text(), &TextBody::Text("Hello there".to_owned()));
+        assert_eq!(mail.html(), Some("<p>Hello</p>"));
+        assert_eq!(mail.text(), Some("Hello there"));
         assert_eq!(mail.attachments().len(), 1);
         assert_eq!(
             mail.headers(),
@@ -457,29 +512,64 @@ mod tests {
         );
         assert_eq!(mail.in_reply_to(), Some("<earlier@example.com>"));
         assert_eq!(mail.references(), Some("<earlier@example.com>"));
-        assert_eq!(mail.date(), Some(SystemTime::UNIX_EPOCH));
-        assert_eq!(mail.message_id(), Some("<mail@example.com>"));
+        assert_eq!(mail.date(), SystemTime::UNIX_EPOCH);
+        assert_eq!(mail.message_id(), "<mail@example.com>");
 
         Ok(())
     }
 
     #[test]
     fn optional_fields_default_to_empty() -> Result<()> {
-        let mail = Mail::builder()
-            .from(Mailbox::new("ada@example.com")?)
-            .to([Mailbox::new("bob@example.com")?])
-            .html(ViewHandle::empty())
-            .build()?;
+        let mail = complete()?.build()?;
 
         assert_eq!(mail.cc(), []);
         assert_eq!(mail.bcc(), []);
         assert_eq!(mail.reply_to(), []);
         assert_eq!(mail.subject(), "");
-        assert_eq!(mail.text(), &TextBody::FromHtml);
+        assert_eq!(mail.html(), None);
         assert_eq!(mail.attachments(), []);
         assert_eq!(mail.headers(), []);
-        assert_eq!(mail.date(), None);
-        assert_eq!(mail.message_id(), None);
+        assert_eq!(mail.in_reply_to(), None);
+        assert_eq!(mail.references(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn text_is_derived_from_the_html_unless_declared() -> Result<()> {
+        let base = || -> Result<MailBuilder> {
+            Ok(Mail::builder()
+                .from(Mailbox::new("ada@example.com")?)
+                .to([Mailbox::new("bob@example.com")?]))
+        };
+
+        let derived = with_html(base()?, "<p>Hi <b>Bob</b></p>").build()?;
+        assert_eq!(derived.text(), Some("Hi Bob"));
+
+        let declared = with_html(base()?, "<p>Hi</p>").text("Hey").build()?;
+        assert_eq!(declared.text(), Some("Hey"));
+
+        let opted_out = with_html(base()?, "<p>Hi</p>")
+            .text(TextBody::None)
+            .build()?;
+        assert_eq!(opted_out.text(), None);
+
+        let nothing_to_derive = with_html(base()?, "<img src=\"cid:logo\">").build()?;
+        assert_eq!(nothing_to_derive.text(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn message_id_and_date_are_generated() -> Result<()> {
+        let before = SystemTime::now();
+        let first = complete()?.build()?;
+        let second = complete()?.build()?;
+
+        assert!(first.message_id().starts_with('<'));
+        assert!(first.message_id().ends_with("@example.com>"));
+        assert_ne!(first.message_id(), second.message_id());
+        assert!(first.date() >= before);
 
         Ok(())
     }
