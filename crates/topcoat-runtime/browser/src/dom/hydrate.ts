@@ -11,6 +11,7 @@ type PendingTextExpression = {
 	start: Comment;
 	js: string;
 	scope: Scope;
+	sync: boolean;
 };
 
 /**
@@ -133,6 +134,7 @@ function processMarker(
 				start: node,
 				js: marker.js,
 				scope: current,
+				sync: marker.sync,
 			});
 			break;
 		}
@@ -147,7 +149,7 @@ function processMarker(
 				node,
 				pending.js,
 				pending.scope,
-				syncText,
+				syncText || pending.sync,
 			);
 			break;
 		}

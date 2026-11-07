@@ -20,6 +20,26 @@ The macro returns an [`Expr`] containing the server result and browser code.
 
 Server evaluation is synchronous. An expression that reads no signals renders as static content. An event-handler closure's body runs only when the browser invokes it.
 
+On the first run in the browser, an expression only subscribes: the runtime keeps the text the server rendered, because the browser is expected to compute the same value. See [Synced expressions](#synced-expressions) for the exception.
+
+# Synced expressions
+
+Some values cannot be computed on the server, such as the visitor's language or timezone. [`Expr::synced`] marks an expression whose browser value wins: the first run in the browser writes it, replacing the text the server rendered.
+
+```rust
+# use topcoat::{Result, context::Cx, runtime::expr, view::*};
+# #[component]
+# async fn greeting(cx: &Cx) -> Result<impl View> {
+let language = expr!(raw!("navigator.language", "en")).synced();
+
+Ok(view! {
+    <p>(language)</p>
+})
+# }
+```
+
+The server still renders the expression, so it needs a value to fall back on. The `raw!` fallback above is what the visitor sees until the browser takes over. Being synced implies dynamic, and it changes text expressions only. An attribute binding writes on every run.
+
 # Captured variables
 
 An identifier that is not defined inside the expression is captured from the surrounding Rust scope:
@@ -107,5 +127,6 @@ Ok(view! {
 Signal reads in the Rust fallback determine whether the expression needs a browser binding. The fallback must therefore read the signals its JavaScript depends on, even if their initial values happen to produce a constant result.
 
 [`Expr`]: struct.Expr.html
+[`Expr::synced`]: struct.Expr.html#method.synced
 [`Signal`]: struct.Signal.html
 [`expr!`]: macro.expr.html
