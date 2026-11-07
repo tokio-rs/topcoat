@@ -4,7 +4,11 @@ use syn::{Expr as SynExpr, ExprIf};
 use topcoat_core_grammar::common::paths::topcoat_runtime;
 
 use super::js::Js;
-use crate::expr::{Expr, contains_await::ContainsAwait, name_resolver::NameResolver};
+use crate::expr::{
+    Expr,
+    contains_await::ContainsAwait,
+    name_resolver::{JumpScope, NameResolver},
+};
 
 impl Expr {
     /// Lowers `if cond { ... } else { ... }`. The JavaScript side is wrapped
@@ -23,7 +27,9 @@ impl Expr {
             "(() => "
         };
         js.push_str(predicate);
-        let rust_if = Self::expr_if_inner(if_expr, js, names)?;
+        let rust_if = names.within(JumpScope::Function, |names| {
+            Self::expr_if_inner(if_expr, js, names)
+        })?;
         js.push_str(if is_async { ")())" } else { ")()" });
         rust_if.to_tokens(rust);
         Ok(())

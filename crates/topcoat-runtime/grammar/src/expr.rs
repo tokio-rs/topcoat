@@ -235,6 +235,27 @@ mod tests {
     }
 
     #[test]
+    fn jumps_must_stay_inside_their_generated_function() {
+        for source in [
+            "|| { loop { if done { break; } break; } }",
+            "|| { while true { if skip { continue; } break; } }",
+            "|| { loop { let value = { break; }; } }",
+        ] {
+            let parsed: Expr = syn::parse_str(source).unwrap();
+            let error = parsed.expr_to_tokens().unwrap_err().to_string();
+            assert!(error.contains("cannot jump out"), "{source}: {error}");
+        }
+        for source in [
+            "|| { loop { break; } }",
+            "|| { while true { continue; } }",
+            "|| { loop { if done { loop { break; } } break; } }",
+        ] {
+            let parsed: Expr = syn::parse_str(source).unwrap();
+            assert!(parsed.expr_to_tokens().is_ok(), "{source}");
+        }
+    }
+
+    #[test]
     fn rejects_missing_or_multiple_expressions() {
         for source in ["", ",", "true, false", "true,,", "true;"] {
             assert!(syn::parse_str::<Expr>(source).is_err(), "{source}");
