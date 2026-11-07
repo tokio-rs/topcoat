@@ -233,6 +233,31 @@ async fn procedure_call_inside_block_is_an_async_func() {
     );
 }
 
+#[tokio::test]
+async fn raw_await_inside_if_is_an_async_func() {
+    let cx = &Cx::new();
+    let html = view! {
+        <button
+            @click=$(async |_e| {
+                if true {
+                    let _v = raw!("await Promise.resolve(1)", 1.0);
+                }
+            })
+        >
+            "Test"
+        </button>
+    }
+    .single()
+    .await
+    .unwrap()
+    .render(cx);
+
+    assert!(
+        html.contains("(await (async ()"),
+        "if block whose raw! awaits must be an async anonymous function: {html}"
+    );
+}
+
 /// `push_str` takes anything that dereferences to a string, so it accepts the
 /// owned surrogate an event field yields. `Event::target.value` is a `String`,
 /// so this is the call the method mostly exists for; the test above passes a
