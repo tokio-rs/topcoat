@@ -478,6 +478,7 @@ mod tests {
 
     #[tokio::test]
     async fn collects_every_field() -> Result<()> {
+        let cx = &Cx::new();
         let mail = Mail::builder()
             .from(Mailbox::named("Ada", "ada@example.com")?)
             .to([Mailbox::new("bob@example.com")?])
@@ -486,7 +487,7 @@ mod tests {
             .bcc([Mailbox::new("dan@example.com")?])
             .reply_to([Mailbox::new("replies@example.com")?])
             .subject("Hello")
-            .html(&Cx::new(), view! { <p>"Hello"</p> })
+            .html(cx, view! { <p>"Hello"</p> })
             .await?
             .text("Hello there")
             .attachments([Attachment::new("invoice.pdf", "application/pdf", b"%PDF-")])
@@ -546,30 +547,30 @@ mod tests {
 
     #[tokio::test]
     async fn text_is_derived_from_the_html_unless_declared() -> Result<()> {
-        let cx = Cx::new();
+        let cx = &Cx::new();
 
         let derived = addressed()?
-            .html(&cx, view! { <p>"Hi " <b>"Bob"</b></p> })
+            .html(cx, view! { <p>"Hi " <b>"Bob"</b></p> })
             .await?
             .build()?;
         assert_eq!(derived.text(), Some("Hi Bob"));
 
         let declared = addressed()?
-            .html(&cx, view! { <p>"Hi"</p> })
+            .html(cx, view! { <p>"Hi"</p> })
             .await?
             .text("Hey")
             .build()?;
         assert_eq!(declared.text(), Some("Hey"));
 
         let opted_out = addressed()?
-            .html(&cx, view! { <p>"Hi"</p> })
+            .html(cx, view! { <p>"Hi"</p> })
             .await?
             .text(TextBody::None)
             .build()?;
         assert_eq!(opted_out.text(), None);
 
         let nothing_to_derive = addressed()?
-            .html(&cx, view! { <img src="cid:logo"> })
+            .html(cx, view! { <img src="cid:logo"> })
             .await?
             .build()?;
         assert_eq!(nothing_to_derive.text(), None);
@@ -607,19 +608,19 @@ mod tests {
 
     #[test]
     fn any_recipient_kind_completes_the_mail() -> Result<()> {
-        let only_bcc = Mail::builder()
+        let blind_copy = Mail::builder()
             .from(Mailbox::new("ada@example.com")?)
             .bcc([Mailbox::new("dan@example.com")?])
             .text("Hi")
             .build();
-        assert!(only_bcc.is_ok());
+        assert!(blind_copy.is_ok());
 
-        let only_cc = Mail::builder()
+        let carbon_copy = Mail::builder()
             .from(Mailbox::new("ada@example.com")?)
             .cc([Mailbox::new("carol@example.com")?])
             .text("Hi")
             .build();
-        assert!(only_cc.is_ok());
+        assert!(carbon_copy.is_ok());
 
         Ok(())
     }

@@ -154,8 +154,9 @@ mod tests {
 
     #[tokio::test]
     async fn html_with_derived_text_is_an_alternative() {
+        let cx = &Cx::new();
         let mail = base()
-            .html(&Cx::new(), view! { <h1>"Hi"</h1> <p>"Bye now"</p> })
+            .html(cx, view! { <h1>"Hi"</h1> <p>"Bye now"</p> })
             .await
             .unwrap()
             .build()
@@ -169,8 +170,9 @@ mod tests {
 
     #[tokio::test]
     async fn html_alone_is_a_single_html_part() {
+        let cx = &Cx::new();
         let mail = base()
-            .html(&Cx::new(), view! { <h1>"Hi"</h1> })
+            .html(cx, view! { <h1>"Hi"</h1> })
             .await
             .unwrap()
             .text(TextBody::None)
@@ -185,9 +187,10 @@ mod tests {
 
     #[tokio::test]
     async fn both_bodies_are_alternatives_with_html_preferred() {
+        let cx = &Cx::new();
         let mail = base()
             .text("Hi Bob")
-            .html(&Cx::new(), view! { <h1>"Hi"</h1> })
+            .html(cx, view! { <h1>"Hi"</h1> })
             .await
             .unwrap()
             .build()
@@ -203,9 +206,10 @@ mod tests {
 
     #[tokio::test]
     async fn inline_attachments_relate_to_the_html_body() {
+        let cx = &Cx::new();
         let mail = base()
             .text("Hi Bob")
-            .html(&Cx::new(), view! { <img src="cid:logo"> })
+            .html(cx, view! { <img src="cid:logo"> })
             .await
             .unwrap()
             .attachments([Attachment::inline("logo", "image/png", b"\x89PNG")])
