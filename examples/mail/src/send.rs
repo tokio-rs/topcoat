@@ -7,7 +7,7 @@ use topcoat::{
         error::{SeeOther, see_other},
         href, route,
     },
-    view::{ViewExt, view},
+    view::view,
 };
 
 use crate::{FERRIS, GETTING_STARTED, Recipient};
@@ -22,6 +22,7 @@ pub(crate) async fn send_welcome(cx: &Cx, Form(recipient): Form<Recipient>) -> R
         // Mail clients support less CSS than browsers, so the styles stay
         // simple and inline.
         .html(
+            cx,
             view! {
                 <div style="font-family: sans-serif; max-width: 30rem">
                     // `cid:ferris` references the inline attachment below.
@@ -35,21 +36,17 @@ pub(crate) async fn send_welcome(cx: &Cx, Form(recipient): Form<Recipient>) -> R
 
                     <p>"Your account is ready. The attached notes get you started."</p>
                 </div>
-            }
-            .single()
-            .await?,
+            },
         )
+        .await?
         // Without a `text` call, the plain-text alternative is derived from
         // the HTML.
         .attachments([
             Attachment::inline("ferris", "image/png", FERRIS),
             Attachment::new("getting-started.txt", "text/plain", GETTING_STARTED),
         ])
-        .headers([(
-            "List-Unsubscribe".to_owned(),
-            "<mailto:unsubscribe@example.com>".to_owned(),
-        )])
-        .build();
+        .headers([("List-Unsubscribe", "<mailto:unsubscribe@example.com>")])
+        .build()?;
 
     send(cx, mail).await?;
 

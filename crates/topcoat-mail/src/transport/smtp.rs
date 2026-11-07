@@ -3,15 +3,12 @@
 use std::time::Duration;
 
 use lettre::{
-    AsyncSmtpTransport, AsyncTransport as _, Tokio1Executor,
+    AsyncSmtpTransport, AsyncTransport as _, Message, Tokio1Executor,
     transport::smtp::{AsyncSmtpTransportBuilder, authentication::Credentials},
 };
 use topcoat_core::context::Cx;
 
-use crate::{
-    Mail, Receipt, SendError, Transport, TransportFuture,
-    mime::{self, BccHeader},
-};
+use crate::{Mail, Receipt, SendError, Transport, TransportFuture};
 
 /// A [`Transport`] that submits mail to an SMTP server.
 ///
@@ -93,15 +90,13 @@ impl SmtpTransport {
 }
 
 impl Transport for SmtpTransport {
-    fn send<'a>(&'a self, cx: &'a Cx, mail: Mail) -> TransportFuture<'a> {
+    fn send<'a>(&'a self, _cx: &'a Cx, mail: Mail) -> TransportFuture<'a> {
         Box::pin(async move {
-            let message = mime::message(cx, mail, BccHeader::Dropped)?;
-            let message_id = mime::message_id(&message);
             self.inner
-                .send(message)
+                .send(Message::from(&mail))
                 .await
-                .map_err(SendError::delivery)?;
-            Ok(Receipt::new(message_id))
+                .map_err(SendError::new)?;
+            Ok(Receipt::new(mail.message_id()))
         })
     }
 }

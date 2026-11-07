@@ -10,22 +10,18 @@ topcoat = { version = "0.11.0", features = ["mail", "mail-smtp"] }
 
 # Setup
 
-Choose a transport in [`MailConfig`] and register it with the router's [`mail`](RouterBuilderMailExt::mail) method:
+Choose a transport, wrap it in a [`Mailer`], and add it to the router's context:
 
 ```rust,standalone_crate
 use topcoat::{
-    mail::{FileTransport, MailConfig, RouterBuilderMailExt},
+    mail::{FileTransport, Mailer},
     router::{Router, RouterBuilderDiscoverExt, module_router},
 };
 
 pub fn router() -> Router {
     module_router!()
         .discover()
-        .mail(
-            MailConfig::builder()
-                .transport(FileTransport::new("target/mail"))
-                .build(),
-        )
+        .with(Mailer::new(FileTransport::new("target/mail")))
         .build()
 }
 ```
@@ -34,7 +30,7 @@ Handlers use the registered transport. You can change delivery settings without 
 
 # Declaring and sending mail
 
-[`Mail::builder`] creates a [`Mail`]. Render the HTML body from a view, such as [`view!`](crate::view::view) markup, with [`single`](crate::view::ViewExt::single):
+[`Mail::builder`] creates a [`Mail`]. [`html`](MailBuilder::html) renders a view, such as [`view!`](crate::view::view) markup, into the HTML body. Mail cannot stream, so the view must not be live:
 
 ```rust
 // src/app/api/welcome.rs
@@ -43,7 +39,7 @@ use topcoat::{
     context::Cx,
     mail::{Mail, Mailbox, send},
     router::route,
-    view::{ViewExt, view},
+    view::view,
 };
 
 #[route(POST)]
@@ -53,14 +49,14 @@ async fn welcome(cx: &Cx) -> Result<&'static str> {
         .to([Mailbox::new("ada@example.com")?])
         .subject("Welcome, Ada!")
         .html(
+            cx,
             view! {
                 <h1>"Welcome!"</h1>
                 <p>"Your account is ready."</p>
-            }
-            .single()
-            .await?,
+            },
         )
-        .build();
+        .await?
+        .build()?;
 
     send(cx, mail).await?;
 
@@ -72,7 +68,7 @@ Create addresses with [`Mailbox::new`] or [`Mailbox::named`], or parse the `Ada 
 
 [`send`] returns a [`Receipt`] with the message's `Message-ID`. Use that ID in `in_reply_to` and `references` to link a later reply. The receipt confirms that the transport accepted the message. It does not confirm inbox delivery.
 
-Sending returns a [`SendError`] if the message lacks a sender, recipients, or body, or if delivery fails.
+[`build`](MailBuilder::build) returns a [`MailError`] if the message lacks a sender, recipients, or body, or if an attachment or header is invalid. Sending returns a [`SendError`] if delivery fails.
 
 # Attachments
 
@@ -80,23 +76,25 @@ Add files with [`attachments`](MailBuilder::attachments). Use [`Attachment::new`
 
 ```rust
 # use topcoat::{Result, context::Cx};
-# use topcoat::{mail::{Attachment, Mail}, view::{ViewExt, view}};
+# use topcoat::{mail::{Attachment, Mail, Mailbox}, view::view};
 # async fn example(cx: &Cx) -> Result<()> {
 let mail = Mail::builder()
+#   .from(Mailbox::new("billing@example.com")?)
+#   .to([Mailbox::new("ada@example.com")?])
     .subject("Your invoice")
     .html(
+        cx,
         view! {
             <img src="cid:logo" alt="Example logo">
             <p>"The invoice is attached."</p>
-        }
-        .single()
-        .await?,
+        },
     )
+    .await?
     .attachments([
         Attachment::inline("logo", "image/png", b"\x89PNG"),
         Attachment::new("invoice.pdf", "application/pdf", b"%PDF-"),
     ])
-    .build();
+    .build()?;
 # Ok(())
 # }
 ```
@@ -129,24 +127,23 @@ let from_url = SmtpTransport::from_url("smtps://user:pass@smtp.example.com:465")
 
 ## Memory in tests
 
-Use [`MemoryTransport`] in tests to collect outgoing messages. Add a `MailConfig` to an empty `Cx`, then call `send` with that context. Keep a clone of the transport to inspect the messages:
+Use [`MemoryTransport`] in tests to collect outgoing messages. Add a `Mailer` to an empty `Cx`, then call `send` with that context. Keep a clone of the transport to inspect the messages:
 
 ```rust
 use topcoat::{
     context::Cx,
-    mail::{Mail, MailConfig, Mailbox, MemoryTransport, send},
+    mail::{Mail, Mailbox, Mailer, MemoryTransport, send},
 };
 
 # async fn test() -> topcoat::Result<()> {
 let transport = MemoryTransport::new();
-let config = MailConfig::builder().transport(transport.clone()).build();
-let cx = Cx::new().with(config);
+let cx = Cx::new().with(Mailer::new(transport.clone()));
 
 let mail = Mail::builder()
     .from(Mailbox::new("ada@example.com")?)
     .to([Mailbox::new("bob@example.com")?])
     .text("Hi")
-    .build();
+    .build()?;
 
 send(&cx, mail).await?;
 
@@ -156,7 +153,7 @@ assert_eq!(transport.sent()[0].to(), [Mailbox::new("bob@example.com")?]);
 # }
 ```
 
-The transport checks message content before saving it. A passing test does not mean a real mail service will accept the message.
+A passing test does not mean a real mail service will accept the message.
 
 ## Custom transports
 
