@@ -125,8 +125,8 @@ impl From<&Mail> for Part {
 
 #[cfg(test)]
 mod tests {
+    use topcoat::view::view;
     use topcoat_core::context::Cx;
-    use topcoat_view::ViewHandle;
 
     use super::*;
     use crate::{MailBuilder, Mailbox, TextBody};
@@ -135,10 +135,6 @@ mod tests {
         Mail::builder()
             .from(Mailbox::named("Ada", "ada@example.com").unwrap())
             .to([Mailbox::new("bob@example.com").unwrap()])
-    }
-
-    fn html(html: &'static str) -> (Cx, ViewHandle) {
-        (Cx::new(), ViewHandle::unescaped_unchecked(html))
     }
 
     fn formatted(mail: &Mail) -> String {
@@ -158,10 +154,14 @@ mod tests {
         assert!(!wire.contains("multipart"));
     }
 
-    #[test]
-    fn html_with_derived_text_is_an_alternative() {
-        let (cx, view) = html("<h1>Hi</h1><p>Bye now</p>");
-        let mail = base().html(&cx, view).build().unwrap();
+    #[tokio::test]
+    async fn html_with_derived_text_is_an_alternative() {
+        let mail = base()
+            .html(&Cx::new(), view! { <h1>"Hi"</h1> <p>"Bye now"</p> })
+            .await
+            .unwrap()
+            .build()
+            .unwrap();
         let wire = formatted(&mail);
 
         assert!(wire.contains("Content-Type: multipart/alternative;"));
@@ -169,10 +169,15 @@ mod tests {
         assert!(wire.contains("Bye now"));
     }
 
-    #[test]
-    fn html_alone_is_a_single_html_part() {
-        let (cx, view) = html("<h1>Hi</h1>");
-        let mail = base().html(&cx, view).text(TextBody::None).build().unwrap();
+    #[tokio::test]
+    async fn html_alone_is_a_single_html_part() {
+        let mail = base()
+            .html(&Cx::new(), view! { <h1>"Hi"</h1> })
+            .await
+            .unwrap()
+            .text(TextBody::None)
+            .build()
+            .unwrap();
         let wire = formatted(&mail);
 
         assert!(wire.contains("Content-Type: text/html; charset=utf-8\r\n"));
@@ -180,10 +185,15 @@ mod tests {
         assert!(!wire.contains("multipart"));
     }
 
-    #[test]
-    fn both_bodies_are_alternatives_with_html_preferred() {
-        let (cx, view) = html("<h1>Hi</h1>");
-        let mail = base().text("Hi Bob").html(&cx, view).build().unwrap();
+    #[tokio::test]
+    async fn both_bodies_are_alternatives_with_html_preferred() {
+        let mail = base()
+            .text("Hi Bob")
+            .html(&Cx::new(), view! { <h1>"Hi"</h1> })
+            .await
+            .unwrap()
+            .build()
+            .unwrap();
         let wire = formatted(&mail);
 
         assert!(wire.contains("Content-Type: multipart/alternative;"));
@@ -193,12 +203,13 @@ mod tests {
         assert!(plain < html);
     }
 
-    #[test]
-    fn inline_attachments_relate_to_the_html_body() {
-        let (cx, view) = html("<img src=\"cid:logo\">");
+    #[tokio::test]
+    async fn inline_attachments_relate_to_the_html_body() {
         let mail = base()
             .text("Hi Bob")
-            .html(&cx, view)
+            .html(&Cx::new(), view! { <img src="cid:logo"> })
+            .await
+            .unwrap()
             .attachments([Attachment::inline("logo", "image/png", b"\x89PNG")])
             .build()
             .unwrap();

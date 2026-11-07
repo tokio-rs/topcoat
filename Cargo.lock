@@ -5548,6 +5548,7 @@ dependencies = [
  "thiserror",
  "time",
  "tokio",
+ "topcoat",
  "topcoat-core",
  "topcoat-view",
  "uuid",

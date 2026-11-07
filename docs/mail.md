@@ -30,7 +30,7 @@ Handlers use the registered transport. You can change delivery settings without 
 
 # Declaring and sending mail
 
-[`Mail::builder`] creates a [`Mail`]. Build the HTML body from a view, such as [`view!`](crate::view::view) markup, with [`single`](crate::view::ViewExt::single). [`html`](MailBuilder::html) renders it with the request context:
+[`Mail::builder`] creates a [`Mail`]. [`html`](MailBuilder::html) renders a view, such as [`view!`](crate::view::view) markup, into the HTML body. Mail cannot stream, so the view must not be live:
 
 ```rust
 // src/app/api/welcome.rs
@@ -39,7 +39,7 @@ use topcoat::{
     context::Cx,
     mail::{Mail, Mailbox, send},
     router::route,
-    view::{ViewExt, view},
+    view::view,
 };
 
 #[route(POST)]
@@ -53,10 +53,9 @@ async fn welcome(cx: &Cx) -> Result<&'static str> {
             view! {
                 <h1>"Welcome!"</h1>
                 <p>"Your account is ready."</p>
-            }
-            .single()
-            .await?,
+            },
         )
+        .await?
         .build()?;
 
     send(cx, mail).await?;
@@ -77,7 +76,7 @@ Add files with [`attachments`](MailBuilder::attachments). Use [`Attachment::new`
 
 ```rust
 # use topcoat::{Result, context::Cx};
-# use topcoat::{mail::{Attachment, Mail, Mailbox}, view::{ViewExt, view}};
+# use topcoat::{mail::{Attachment, Mail, Mailbox}, view::view};
 # async fn example(cx: &Cx) -> Result<()> {
 let mail = Mail::builder()
 #   .from(Mailbox::new("billing@example.com")?)
@@ -88,10 +87,9 @@ let mail = Mail::builder()
         view! {
             <img src="cid:logo" alt="Example logo">
             <p>"The invoice is attached."</p>
-        }
-        .single()
-        .await?,
+        },
     )
+    .await?
     .attachments([
         Attachment::inline("logo", "image/png", b"\x89PNG"),
         Attachment::new("invoice.pdf", "application/pdf", b"%PDF-"),

@@ -7,7 +7,7 @@ use lettre::message::{
     header::{ContentType, HeaderName},
 };
 use topcoat_core::context::Cx;
-use topcoat_view::ViewHandle;
+use topcoat_view::{View, ViewExt};
 use uuid::Uuid;
 
 use crate::{Attachment, Mailbox, text::PlainText};
@@ -232,11 +232,18 @@ impl MailBuilder {
         self
     }
 
-    /// Sets the HTML body, rendering the view with `cx`.
-    #[must_use]
-    pub fn html(mut self, cx: &Cx, html: ViewHandle) -> Self {
-        self.html = Some(html.render(cx));
-        self
+    /// Sets the HTML body, resolving the view and rendering it with `cx`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error the view fails with.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the view is live.
+    pub async fn html(mut self, cx: &Cx, view: impl View) -> topcoat_core::error::Result<Self> {
+        self.html = Some(view.single().await?.render(cx));
+        Ok(self)
     }
 
     /// Sets the plain-text body, the fallback for clients that do not
@@ -454,24 +461,24 @@ impl From<&String> for TextBody {
 
 #[cfg(test)]
 mod tests {
+    use topcoat::view::view;
     use topcoat_core::error::Result;
 
     use super::*;
 
-    fn complete() -> Result<MailBuilder> {
+    fn addressed() -> Result<MailBuilder> {
         Ok(Mail::builder()
             .from(Mailbox::new("ada@example.com")?)
-            .to([Mailbox::new("bob@example.com")?])
-            .text("Hi"))
+            .to([Mailbox::new("bob@example.com")?]))
     }
 
-    fn with_html(builder: MailBuilder, html: &'static str) -> MailBuilder {
-        builder.html(&Cx::new(), ViewHandle::unescaped_unchecked(html))
+    fn complete() -> Result<MailBuilder> {
+        Ok(addressed()?.text("Hi"))
     }
 
-    #[test]
-    fn collects_every_field() -> Result<()> {
-        let mail = with_html(Mail::builder(), "<p>Hello</p>")
+    #[tokio::test]
+    async fn collects_every_field() -> Result<()> {
+        let mail = Mail::builder()
             .from(Mailbox::named("Ada", "ada@example.com")?)
             .to([Mailbox::new("bob@example.com")?])
             .to(vec![Mailbox::named("Grace Hopper", "grace@example.com")?])
@@ -479,6 +486,8 @@ mod tests {
             .bcc([Mailbox::new("dan@example.com")?])
             .reply_to([Mailbox::new("replies@example.com")?])
             .subject("Hello")
+            .html(&Cx::new(), view! { <p>"Hello"</p> })
+            .await?
             .text("Hello there")
             .attachments([Attachment::new("invoice.pdf", "application/pdf", b"%PDF-")])
             .headers([("List-Unsubscribe", "<mailto:stop@example.com>")])
@@ -535,26 +544,34 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn text_is_derived_from_the_html_unless_declared() -> Result<()> {
-        let base = || -> Result<MailBuilder> {
-            Ok(Mail::builder()
-                .from(Mailbox::new("ada@example.com")?)
-                .to([Mailbox::new("bob@example.com")?]))
-        };
+    #[tokio::test]
+    async fn text_is_derived_from_the_html_unless_declared() -> Result<()> {
+        let cx = Cx::new();
 
-        let derived = with_html(base()?, "<p>Hi <b>Bob</b></p>").build()?;
+        let derived = addressed()?
+            .html(&cx, view! { <p>"Hi " <b>"Bob"</b></p> })
+            .await?
+            .build()?;
         assert_eq!(derived.text(), Some("Hi Bob"));
 
-        let declared = with_html(base()?, "<p>Hi</p>").text("Hey").build()?;
+        let declared = addressed()?
+            .html(&cx, view! { <p>"Hi"</p> })
+            .await?
+            .text("Hey")
+            .build()?;
         assert_eq!(declared.text(), Some("Hey"));
 
-        let opted_out = with_html(base()?, "<p>Hi</p>")
+        let opted_out = addressed()?
+            .html(&cx, view! { <p>"Hi"</p> })
+            .await?
             .text(TextBody::None)
             .build()?;
         assert_eq!(opted_out.text(), None);
 
-        let nothing_to_derive = with_html(base()?, "<img src=\"cid:logo\">").build()?;
+        let nothing_to_derive = addressed()?
+            .html(&cx, view! { <img src="cid:logo"> })
+            .await?
+            .build()?;
         assert_eq!(nothing_to_derive.text(), None);
 
         Ok(())
@@ -624,10 +641,10 @@ mod tests {
             Err(MailError::MissingRecipients)
         ));
 
-        let missing_body = complete()?.text(TextBody::FromHtml).build();
+        let missing_body = addressed()?.build();
         assert!(matches!(missing_body, Err(MailError::MissingBody)));
 
-        let opted_out_without_html = complete()?.text(TextBody::None).build();
+        let opted_out_without_html = addressed()?.text(TextBody::None).build();
         assert!(matches!(
             opted_out_without_html,
             Err(MailError::MissingBody)

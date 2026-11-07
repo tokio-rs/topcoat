@@ -7,7 +7,7 @@ use topcoat::{
         error::{SeeOther, see_other},
         href, route,
     },
-    view::{ViewExt, view},
+    view::view,
 };
 
 use crate::{FERRIS, GETTING_STARTED, Recipient};
@@ -36,10 +36,9 @@ pub(crate) async fn send_welcome(cx: &Cx, Form(recipient): Form<Recipient>) -> R
 
                     <p>"Your account is ready. The attached notes get you started."</p>
                 </div>
-            }
-            .single()
-            .await?,
+            },
         )
+        .await?
         // Without a `text` call, the plain-text alternative is derived from
         // the HTML.
         .attachments([

@@ -23,6 +23,8 @@ time = { workspace = true, features = ["formatting", "macros"] }
 uuid = { workspace = true, features = ["v4"] }
 
 [dev-dependencies]
+topcoat = { workspace = true, features = ["view"] }
+
 tokio = { workspace = true, features = ["macros", "rt"] }
 
 [lints]
