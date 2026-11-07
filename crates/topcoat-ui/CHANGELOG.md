@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0](https://github.com/tokio-rs/topcoat/compare/topcoat-ui-v0.11.0...topcoat-ui-v0.12.0) - 2026-11-07
+
+### Added
+
+- [**breaking**] require leading `cx: &Cx` and capture context in view macros ([#581](https://github.com/tokio-rs/topcoat/pull/581))
+
 ## [0.11.0](https://github.com/tokio-rs/topcoat/compare/topcoat-ui-v0.10.0...topcoat-ui-v0.11.0) - 2026-10-24
 
 ### Added

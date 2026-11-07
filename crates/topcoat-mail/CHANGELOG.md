@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0](https://github.com/tokio-rs/topcoat/compare/topcoat-mail-v0.11.0...topcoat-mail-v0.12.0) - 2026-11-07
+
+### Added
+
+- [**breaking**] remove `mail!` and `cookie!` macros ([#585](https://github.com/tokio-rs/topcoat/pull/585))
+- [**breaking**] unify macro field parsing and use explicit mail views ([#583](https://github.com/tokio-rs/topcoat/pull/583))
+- [**breaking**] require leading `cx: &Cx` and capture context in view macros ([#581](https://github.com/tokio-rs/topcoat/pull/581))
+- [**breaking**] lenient macros ([#580](https://github.com/tokio-rs/topcoat/pull/580))
+- *(router)* route context with `#[route(with(...))]` ([#566](https://github.com/tokio-rs/topcoat/pull/566))
+- *(core)* [**breaking**] unify `app_context` and `request_context` into one `context` ([#562](https://github.com/tokio-rs/topcoat/pull/562))
+
+### Other
+
+- *(mail)* [**breaking**] simplify mail crate ([#592](https://github.com/tokio-rs/topcoat/pull/592))
+- *(mail)* drop unused topcoat-mail dependency from the grammar crate
+
 ## [0.10.0](https://github.com/tokio-rs/topcoat/compare/topcoat-mail-v0.9.0...topcoat-mail-v0.10.0) - 2026-10-03
 
 ### Fixed

@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0](https://github.com/tokio-rs/topcoat/compare/v0.11.0...v0.12.0) - 2026-11-07
+
+### Added
+
+- [**breaking**] remove `mail!` and `cookie!` macros ([#585](https://github.com/tokio-rs/topcoat/pull/585))
+- [**breaking**] require leading `cx: &Cx` and capture context in view macros ([#581](https://github.com/tokio-rs/topcoat/pull/581))
+- [**breaking**] lenient macros ([#580](https://github.com/tokio-rs/topcoat/pull/580))
+- [**breaking**] add formatting with `topcoat fmt` for all topcoat macros ([#579](https://github.com/tokio-rs/topcoat/pull/579))
+- *(metadata)* built-in page metadata support ([#570](https://github.com/tokio-rs/topcoat/pull/570))
+- *(core)* [**breaking**] unify `app_context` and `request_context` into one `context` ([#562](https://github.com/tokio-rs/topcoat/pull/562))
+- *(router)* route context with `#[route(with(...))]` ([#566](https://github.com/tokio-rs/topcoat/pull/566))
+- [**breaking**] unify macro field parsing and use explicit mail views ([#583](https://github.com/tokio-rs/topcoat/pull/583))
+- [**breaking**] unify macro syntax ([#571](https://github.com/tokio-rs/topcoat/pull/571))
+- *(core)* `iter_context::<T>(cx)` function to walk through shadowed context values ([#565](https://github.com/tokio-rs/topcoat/pull/565))
+- [**breaking**] simpler metadata builders ([#586](https://github.com/tokio-rs/topcoat/pull/586))
+- *(router)* [**breaking**] move more router features into the route context ([#588](https://github.com/tokio-rs/topcoat/pull/588))
+
+### Fixed
+
+- *(l10n)* expose `accept_language` without `l10n-fluent` ([#577](https://github.com/tokio-rs/topcoat/pull/577))
+- *(cli)* all cli commands that build should honor default bin ([#569](https://github.com/tokio-rs/topcoat/pull/569))
+- *(view)* allow props and locals to share component names ([#582](https://github.com/tokio-rs/topcoat/pull/582))
+- *(tailwind)* verify the default CLI download against a shipped checksum ([#575](https://github.com/tokio-rs/topcoat/pull/575))
+
+### Other
+
+- *(mail)* [**breaking**] simplify mail crate ([#592](https://github.com/tokio-rs/topcoat/pull/592))
+- remove functions not middlewares from readme
+- [**breaking**] context-based origin policy ([#587](https://github.com/tokio-rs/topcoat/pull/587))
+- *(mail)* drop unused topcoat-mail dependency from the grammar crate
+
 ## [0.11.0](https://github.com/tokio-rs/topcoat/compare/v0.10.0...v0.11.0) - 2026-10-24
 
 ### Added
