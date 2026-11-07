@@ -29,7 +29,7 @@ mod about {
 # fn main() {}
 ```
 
-With module routing, this links to `/about`. Add a [`RuntimeLayer`](crate::runtime::RuntimeLayer) to the router, load the asset bundle, and include `topcoat::runtime::script()` in the document head. See the [runtime setup guide] for the full setup.
+With module routing, this links to `/about`. Add a [`RuntimeLayer`](crate::RuntimeLayer) to the router, load the asset bundle, and include `topcoat::runtime::script()` in the document head. See the [runtime setup guide] for the full setup.
 
 The component renders an ordinary `<a>`, so the link also works without JavaScript. Use a plain `<a href=(href!(about::page))>` when you want a normal page load.
 

@@ -24,7 +24,7 @@ async fn sitemap(cx: &Cx) -> Result<Sitemap> {
 }
 ```
 
-The sitemap format requires absolute URLs, so add the [`BaseUrl`](crate::context::BaseUrl) the application is publicly reachable at to the router's context. An entry given as a root-relative path is resolved against it when the response is rendered; an entry that is already an absolute `http` or `https` URL is used as is. Rendering a relative entry without a registered base URL panics.
+The sitemap format requires absolute URLs, so add the [`BaseUrl`](topcoat_core::base_url::BaseUrl) the application is publicly reachable at to the router's context. An entry given as a root-relative path is resolved against it when the response is rendered; an entry that is already an absolute `http` or `https` URL is used as is. Rendering a relative entry without a registered base URL panics.
 
 ```rust,no_run
 use topcoat::{context::BaseUrl, router::module_router};
