@@ -156,7 +156,13 @@ mod tests {
     async fn html_with_derived_text_is_an_alternative() {
         let cx = &Cx::new();
         let mail = base()
-            .html(cx, view! { <h1>"Hi"</h1> <p>"Bye now"</p> })
+            .html(
+                cx,
+                view! {
+                    <h1>"Hi"</h1>
+                    <p>"Bye now"</p>
+                },
+            )
             .await
             .unwrap()
             .build()

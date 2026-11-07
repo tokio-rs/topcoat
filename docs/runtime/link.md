@@ -29,7 +29,7 @@ mod about {
 # fn main() {}
 ```
 
-With module routing, this links to `/about`. Enable `.runtime()` on the router, load the asset bundle, and include `topcoat::runtime::script()` in the document head. See the [runtime setup guide] for the full setup.
+With module routing, this links to `/about`. Add a [`RuntimeLayer`](crate::RuntimeLayer) to the router, load the asset bundle, and include `topcoat::runtime::script()` in the document head. See the [runtime setup guide] for the full setup.
 
 The component renders an ordinary `<a>`, so the link also works without JavaScript. Use a plain `<a href=(href!(about::page))>` when you want a normal page load.
 
@@ -63,17 +63,17 @@ Ok(view! {
 
 Prefetching renders the destination on the server even if the user never opens it. Keep mutations in form submissions or procedures rather than page rendering.
 
-Choose the app's default with [`RouterBuilderRuntimeExt::prefetch`](crate::RouterBuilderRuntimeExt::prefetch):
+Choose the app's default by adding a `PrefetchMode` to the router's context:
 
 ```rust
 use topcoat::{
     router::Router,
-    runtime::{PrefetchMode, RouterBuilderRuntimeExt},
+    runtime::{PrefetchMode, RuntimeLayer},
 };
 
 let router = Router::builder()
-    .runtime()
-    .prefetch(PrefetchMode::Viewport)
+    .layer(RuntimeLayer::new())
+    .with(PrefetchMode::Viewport)
     .build();
 ```
 

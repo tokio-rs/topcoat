@@ -169,7 +169,6 @@ router = [
 	"topcoat-l10n?/http",
 	"topcoat-metadata?/router",
 	"topcoat-runtime?/router",
-	"topcoat-session?/router",
 ]
 serve = [
 	"router",

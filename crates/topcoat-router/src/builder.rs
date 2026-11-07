@@ -2,14 +2,10 @@ use std::{
     any::{Any, type_name},
     borrow::Cow,
     collections::HashMap,
-    fmt,
     sync::Arc,
 };
 
-use topcoat_core::{
-    base_url::BaseUrl,
-    context::{ContextMap, ContextValues},
-};
+use topcoat_core::context::{ContextMap, ContextValues};
 
 use crate::{
     Endpoint, EndpointIndex, Endpoints, Layer, Layout, Methods, Page, PageWithLayouts, Path, Route,
@@ -30,14 +26,14 @@ use crate::{
 /// # impl AppConfig { fn load() -> Self { Self } }
 /// use topcoat::{
 ///     asset::{AssetBundle, RouterBuilderAssetExt},
-///     cookie::RouterBuilderCookieExt,
+///     cookie::CookieLayer,
 ///     router::{Router, RouterBuilderDiscoverExt},
 /// };
 ///
 /// pub fn router() -> Router {
 ///     Router::builder()
 ///         .discover()
-///         .cookies()
+///         .layer(CookieLayer::new())
 ///         .assets(AssetBundle::load().unwrap())
 ///         .with(AppConfig::load())
 ///         .build()
@@ -243,38 +239,6 @@ impl RouterBuilder {
     pub fn trailing_slash(mut self, trailing_slash: TrailingSlash) -> Self {
         self.trailing_slash = trailing_slash;
         self
-    }
-
-    /// Registers the base URL the application is publicly reachable at, like
-    /// `https://example.com`.
-    ///
-    /// This base is used when rendering absolute URLs. Read it with
-    /// [`base_url`](topcoat_core::base_url::base_url) and resolve application
-    /// paths against it with [`BaseUrl::join`](topcoat_core::base_url::BaseUrl::join).
-    ///
-    /// Accepts anything convertible into a [`BaseUrl`]. A string is parsed,
-    /// so it must be an absolute `http` or `https` URL without a query or
-    /// fragment, with an optional path prefix for applications mounted
-    /// under one.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `base_url` cannot be parsed as a valid base URL.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use topcoat::router::Router;
-    ///
-    /// let router = Router::builder().base_url("https://example.com").build();
-    /// ```
-    #[must_use]
-    #[track_caller]
-    pub fn base_url(self, base_url: impl TryInto<BaseUrl, Error: fmt::Display>) -> Self {
-        match base_url.try_into() {
-            Ok(base_url) => self.with(base_url),
-            Err(error) => panic!("{error}"),
-        }
     }
 
     /// Adds a value that all requests to this router can share.
@@ -721,11 +685,5 @@ mod tests {
         assert_eq!(*builder.context::<u32>(), 2);
         assert!(builder.try_context::<Greeting>().is_some());
         assert!(builder.try_context::<u64>().is_none());
-    }
-
-    #[test]
-    #[should_panic(expected = "invalid base URL")]
-    fn invalid_base_url_panics_at_registration() {
-        let _ = RouterBuilder::new().base_url("not a url");
     }
 }

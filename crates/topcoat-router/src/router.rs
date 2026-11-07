@@ -397,6 +397,7 @@ mod tests {
     use http::{HeaderMap, StatusCode};
     use topcoat::view::{DynViewPart, HtmlWriter, NodeViewParts, PartsWriter, view};
     use topcoat_core::{
+        base_url::BaseUrl,
         context::{Cx, context, iter_context},
         error::Result,
     };
@@ -1557,7 +1558,7 @@ mod tests {
     fn base_url_is_available_to_handlers() {
         let router = RouterBuilder::new()
             .route(RouteFn::new(Method::GET, path("/x"), say_base_url))
-            .base_url("https://example.com")
+            .with(BaseUrl::new("https://example.com").unwrap())
             .build();
         let (status, _, body) = send(&router, Method::GET, "/x");
         assert_eq!(status, StatusCode::OK);

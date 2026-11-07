@@ -1,17 +1,28 @@
 use http::HeaderMap;
 use topcoat_core::context::Cx;
-use topcoat_router::{
-    Body, Layer, LayerFuture, Next, Path, RouterBuilder, response::response_headers,
-};
+use topcoat_router::{Body, Layer, LayerFuture, Next, Path, response::response_headers};
 
 use crate::{CookieJarCell, write_cookies};
 
 /// A router layer that makes cookies available for the current request and
 /// writes pending cookie changes onto the response.
 ///
-/// The changes reach the client whether the handler returns a response or an
-/// error: a cookie added before a redirect or an unauthorized error is set by
-/// the redirect or error response.
+/// The layer stores the request's cookie jar in request context, parses the
+/// incoming `Cookie` headers on first access, and appends pending changes as
+/// `Set-Cookie` headers before the response is sent. The changes also reach
+/// the client when the handler returns an error, so a cookie added before a
+/// redirect or an unauthorized error is set by that response.
+///
+/// Add it after other same-path layers that should be able to call
+/// [`cookies`](crate::cookies), because the most recently registered root
+/// layer runs first.
+///
+/// ```rust
+/// use topcoat_cookie::CookieLayer;
+/// use topcoat_router::Router;
+///
+/// let router = Router::builder().layer(CookieLayer::new()).build();
+/// ```
 #[derive(Debug, Clone, Copy, Default)]
 pub struct CookieLayer;
 
@@ -50,27 +61,6 @@ impl Layer for CookieLayer {
     }
 }
 
-/// Installs cookie support on a [`RouterBuilder`].
-///
-/// Register it after other same-path layers that should be able to call
-/// [`cookies`](crate::cookies), because the most recently registered root
-/// layer runs first.
-pub trait RouterBuilderCookieExt {
-    /// Registers the root cookie layer.
-    ///
-    /// The layer stores the request's cookie jar in request context, parses the
-    /// incoming `Cookie` headers on first access, and appends pending changes as
-    /// `Set-Cookie` headers before the response is sent.
-    #[must_use]
-    fn cookies(self) -> Self;
-}
-
-impl RouterBuilderCookieExt for RouterBuilder {
-    fn cookies(self) -> Self {
-        self.layer(CookieLayer::new())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::sync::{Arc, Mutex};
@@ -83,7 +73,7 @@ mod tests {
         response::Response,
     };
 
-    use crate::{Cookies, RouterBuilderCookieExt, cookies};
+    use crate::{CookieLayer, Cookies, cookies};
 
     /// What the route returns after adding its cookie.
     #[derive(Clone, Copy)]
@@ -125,7 +115,10 @@ mod tests {
     /// Sends a `GET /` through a router serving `route` behind the cookie
     /// layer and returns the status and `Set-Cookie` header of the response.
     async fn send(route: AddCookie) -> (StatusCode, Option<String>) {
-        let router = Router::builder().route(route).cookies().build();
+        let router = Router::builder()
+            .route(route)
+            .layer(CookieLayer::new())
+            .build();
         let request = Request::builder()
             .uri("/")
             .body(Body::empty())
@@ -215,7 +208,7 @@ mod tests {
                 handle: Arc::clone(&handle),
                 error,
             })
-            .cookies()
+            .layer(CookieLayer::new())
             .build();
         let request = Request::builder()
             .uri("/")

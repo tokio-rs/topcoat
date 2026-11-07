@@ -48,9 +48,9 @@ impl PrefetchMode {
 /// Returns the context's `PrefetchMode`, falling back to
 /// [`PrefetchMode::Intent`] when no value is set.
 ///
-/// Choose the app's default with
-/// [`RouterBuilderRuntimeExt::prefetch`](crate::RouterBuilderRuntimeExt::prefetch).
-/// Use [`Cx::with`] to override it for links that receive a child context.
+/// Choose the app's default by adding a `PrefetchMode` to the router with
+/// [`RouterBuilder::with`](topcoat_router::RouterBuilder::with). Use
+/// [`Cx::with`] to override it for links that receive a child context.
 #[must_use]
 pub fn prefetch_mode(cx: &Cx) -> PrefetchMode {
     try_context::<PrefetchMode>(cx).copied().unwrap_or_default()

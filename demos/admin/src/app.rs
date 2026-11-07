@@ -9,7 +9,7 @@ use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
     context::Cx,
-    cookie::RouterBuilderCookieExt,
+    cookie::CookieLayer,
     font::{Font, fontsource::fontsource_font},
     l10n::locale,
     metadata::{Metadata, Robots},
@@ -17,8 +17,7 @@ use topcoat::{
         Body, Next, RouterBuilder, RouterBuilderDiscoverExt, Slot, layer, layout, module_router,
         response::Response,
     },
-    runtime::RouterBuilderRuntimeExt,
-    session::{RouterBuilderSessionExt, SessionConfig},
+    runtime::RuntimeLayer,
     tailwind,
     view::{View, view},
 };
@@ -32,10 +31,9 @@ pub fn router() -> RouterBuilder {
     module_router!()
         .discover()
         .assets(AssetBundle::load().unwrap())
-        .cookies()
-        .sessions(SessionConfig::default())
+        .layer(CookieLayer::new())
         // Register the runtime after the application layers so rerenders use them too.
-        .runtime()
+        .layer(RuntimeLayer::new())
 }
 
 /// Sets the language for every request, including shard updates.

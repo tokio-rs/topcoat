@@ -550,7 +550,15 @@ mod tests {
         let cx = &Cx::new();
 
         let derived = addressed()?
-            .html(cx, view! { <p>"Hi " <b>"Bob"</b></p> })
+            .html(
+                cx,
+                view! {
+                    <p>
+                        "Hi "
+                        <b>"Bob"</b>
+                    </p>
+                },
+            )
             .await?
             .build()?;
         assert_eq!(derived.text(), Some("Hi Bob"));

@@ -7,14 +7,15 @@ pub use topcoat_runtime_macro::*;
 ///
 /// # Panics
 ///
-/// Panics if the router was built without
-/// [`runtime()`](RouterBuilderRuntimeExt::runtime).
+/// Panics if the request did not pass through a
+/// [`RuntimeLayer`](crate::runtime::RuntimeLayer).
 #[cfg(feature = "view")]
 #[topcoat::view::component]
 pub async fn script(cx: &topcoat::context::Cx) -> topcoat::Result<impl topcoat::view::View> {
     assert!(
         topcoat::context::try_context::<RuntimeSetup>(cx).is_some(),
-        "the browser runtime is not set up on this router; call `.runtime()` on the router builder",
+        "the browser runtime is not set up on this router; add `.layer(RuntimeLayer::new())` to \
+         the router builder",
     );
     Ok(topcoat::view::view! {
         <script

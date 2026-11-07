@@ -1,15 +1,10 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-mod config;
-#[cfg(feature = "router")]
-mod router;
+mod lifetime;
 mod session;
 mod state;
 mod token;
 
-pub use config::*;
-#[cfg(feature = "router")]
-pub use router::*;
+pub use lifetime::*;
 pub use session::*;
-pub use state::*;
 pub use token::*;

@@ -1,8 +1,11 @@
 use std::{pin::Pin, time::Duration};
 
-use topcoat_core::{context::Cx, error::Result};
+use topcoat_core::{
+    context::{Cx, try_context},
+    error::Result,
+};
 
-use crate::{Token, config};
+use crate::Token;
 
 /// The future returned by [`TokenStore`] methods: a boxed, `Send` future
 /// borrowing the store and the request context.
@@ -27,8 +30,58 @@ pub trait TokenStore: Send + Sync {
     fn delete<'a>(&'a self, cx: &'a Cx) -> TokenStoreFuture<'a, ()>;
 }
 
+/// The [`TokenStore`] that sessions use.
+///
+/// Add it to the router's context to replace the default store, which carries
+/// the token in a cookie when the `cookie` feature is enabled.
+///
+/// ```rust
+/// use topcoat::{
+///     router::Router,
+///     session::{SessionTokenStore, cookie::CookieTokenStore},
+/// };
+///
+/// let router = Router::builder()
+///     .with(SessionTokenStore::new(CookieTokenStore::new().name("id")))
+///     .build();
+/// ```
+pub struct SessionTokenStore(Box<dyn TokenStore>);
+
+impl SessionTokenStore {
+    /// Creates a session token store that uses `store`.
+    #[must_use]
+    pub fn new(store: impl TokenStore + 'static) -> Self {
+        Self(Box::new(store))
+    }
+}
+
+/// Returns the context's token store, or the default store when it has none.
+///
+/// # Panics
+///
+/// Panics when the context has no [`SessionTokenStore`] and the `cookie`
+/// feature is disabled.
+#[track_caller]
 pub(crate) fn token_store(cx: &Cx) -> &dyn TokenStore {
-    &*config(cx).token_store
+    match try_context::<SessionTokenStore>(cx) {
+        Some(store) => &*store.0,
+        None => default_token_store(),
+    }
+}
+
+#[cfg(feature = "cookie")]
+fn default_token_store() -> &'static dyn TokenStore {
+    static STORE: cookie::CookieTokenStore = cookie::CookieTokenStore::new();
+    &STORE
+}
+
+#[cfg(not(feature = "cookie"))]
+#[track_caller]
+fn default_token_store() -> &'static dyn TokenStore {
+    panic!(
+        "no session token store configured: add a `SessionTokenStore` to the context or enable \
+         the `cookie` feature for the default cookie store"
+    )
 }
 
 #[cfg(feature = "cookie")]
@@ -55,8 +108,7 @@ pub mod cookie {
     /// A [`TokenStore`] carrying the token in a hardened cookie: `__Host-`
     /// prefixed, `Secure`, `HttpOnly`, `SameSite=Lax`, and scoped to `/`.
     ///
-    /// Requires the cookie layer (`RouterBuilder::cookies`) to be registered
-    /// on the router.
+    /// Requires the router to have a `CookieLayer`.
     pub struct CookieTokenStore {
         name: Cow<'static, str>,
     }
@@ -64,8 +116,10 @@ pub mod cookie {
     impl CookieTokenStore {
         /// Creates a store using [`SESSION_COOKIE_NAME`].
         #[must_use]
-        pub fn new() -> Self {
-            Self::default()
+        pub const fn new() -> Self {
+            Self {
+                name: Cow::Borrowed(SESSION_COOKIE_NAME),
+            }
         }
 
         /// Overrides the name of the session cookie.
@@ -78,9 +132,7 @@ pub mod cookie {
 
     impl Default for CookieTokenStore {
         fn default() -> Self {
-            Self {
-                name: Cow::Borrowed(SESSION_COOKIE_NAME),
-            }
+            Self::new()
         }
     }
 

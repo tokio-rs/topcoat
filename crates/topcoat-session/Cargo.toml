@@ -14,14 +14,10 @@ rust-version.workspace = true
 cookie = [
 	"dep:topcoat-cookie",
 ]
-router = [
-	"dep:topcoat-router",
-]
 
 [dependencies]
 topcoat-cookie = { workspace = true, optional = true }
 topcoat-core.workspace = true
-topcoat-router = { workspace = true, optional = true }
 
 base64.workspace = true
 getrandom.workspace = true
@@ -37,6 +33,7 @@ getrandom = { workspace = true, features = ["wasm_js"] }
 
 [dev-dependencies]
 topcoat = { workspace = true, features = ["session"] }
+tokio = { workspace = true, features = ["macros", "rt"] }
 
 [lints]
 workspace = true

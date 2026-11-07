@@ -1,11 +1,11 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod jar;
+#[cfg(feature = "router")]
+mod layer;
 mod map;
 mod prefix;
 mod private;
-#[cfg(feature = "router")]
-mod router;
 mod signed;
 mod store;
 
@@ -16,12 +16,12 @@ use std::sync::{
 
 pub use cookie::{Cookie, Expiration, Key, SameSite, time};
 pub use jar::*;
+#[cfg(feature = "router")]
+pub use layer::*;
 pub use map::*;
 use prefix::Conform;
 pub use prefix::*;
 pub use private::*;
-#[cfg(feature = "router")]
-pub use router::*;
 pub use signed::*;
 pub use store::*;
 use topcoat_core::context::{Cx, context, try_context};
@@ -309,7 +309,7 @@ pub fn cookies(cx: &Cx) -> &CookieJar {
         Some(jar) => jar,
         None => panic!(
             "attempted to access cookies, but the cookie layer is not installed; \
-             install it on the router builder with `.cookies()`"
+             install it on the router builder with `.layer(CookieLayer::new())`"
         ),
     }
 }

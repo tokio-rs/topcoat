@@ -1,16 +1,16 @@
-Topcoat reads and writes cookies through a jar shared by the request. Register `.cookies()` on the router, then call `cookies(cx)` to read cookies or queue changes. When the handler returns, Topcoat adds the changes to the response as `Set-Cookie` headers. This also works when the handler returns an error or redirect.
+Topcoat reads and writes cookies through a jar shared by the request. Add a [`CookieLayer`] to the router, then call `cookies(cx)` to read cookies or queue changes. When the handler returns, Topcoat adds the changes to the response as `Set-Cookie` headers. This also works when the handler returns an error or redirect.
 
 Cookies are part of the default feature set, and everything below is re-exported from `topcoat::cookie`. Topcoat builds on the `cookie` crate: a cookie is a [`Cookie`], and signing and encryption use its [`Key`].
 
 ```rust,standalone_crate
 use topcoat::router::module_router;
 use topcoat::{
-    cookie::RouterBuilderCookieExt,
+    cookie::CookieLayer,
     router::Router,
 };
 
 let router = module_router!()
-    .cookies()
+    .layer(CookieLayer::new())
     .build();
 ```
 
@@ -242,14 +242,14 @@ Add a [`Key`] to the router with [`with`](crate::router::RouterBuilder::with) so
 
 ```rust,standalone_crate
 use topcoat::{
-    cookie::{Key, RouterBuilderCookieExt},
+    cookie::{CookieLayer, Key},
     router::{Router, RouterBuilderDiscoverExt, module_router},
 };
 
 pub fn router() -> Router {
     module_router!()
         .discover()
-        .cookies()
+        .layer(CookieLayer::new())
         .with(Key::generate())
         .build()
 }

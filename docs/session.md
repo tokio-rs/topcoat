@@ -22,19 +22,14 @@ Changing the session involves setting cookies, which is only possible if the res
 
 # Setup
 
-Register session support on the router with [`RouterBuilderSessionExt::sessions`]. The default [`SessionConfig`] carries the token in a session cookie, which needs cookie support installed as well:
+By default, sessions carry the token in a cookie. This needs a [`CookieLayer`](crate::cookie::CookieLayer) on the router:
 
 ```rust,standalone_crate
 use topcoat::router::module_router;
-use topcoat::{
-    cookie::RouterBuilderCookieExt,
-    router::Router,
-    session::{RouterBuilderSessionExt, SessionConfig},
-};
+use topcoat::{cookie::CookieLayer, router::Router};
 
 let router = module_router!()
-    .cookies()
-    .sessions(SessionConfig::default())
+    .layer(CookieLayer::new())
     .build();
 ```
 
@@ -155,7 +150,7 @@ async fn logout(cx: &Cx) -> Result<SeeOther> {
 
 # Refreshing and rotating
 
-A session expires after its configured [`lifetime`](SessionConfigBuilder::lifetime). To keep an active session alive, call [`refresh`] after validating it and save the new expiry:
+A session expires after its [`SessionLifetime`]. To keep an active session alive, call [`refresh`] after validating it and save the new expiry:
 
 ```rust
 use topcoat::{Result, context::Cx, session};
@@ -186,20 +181,25 @@ async fn escalate(cx: &Cx) -> Result<()> {
 
 # Configuration
 
-Use [`SessionConfig::builder`] to choose a token store and lifetime. For example, this configuration changes the cookie name and sets a two-week lifetime:
+Add a [`SessionTokenStore`] or a [`SessionLifetime`] to the router's context to change the defaults. For example, this router changes the cookie name and sets a two-week lifetime:
 
 ```rust
 use std::time::Duration;
 
-use topcoat::session::{SessionConfig, cookie::CookieTokenStore};
+use topcoat::{
+    cookie::CookieLayer,
+    router::Router,
+    session::{SessionLifetime, SessionTokenStore, cookie::CookieTokenStore},
+};
 
-let config = SessionConfig::builder()
-    .token_store(CookieTokenStore::new().name("id"))
-    .lifetime(Duration::from_hours(24 * 14))
+let router = Router::builder()
+    .layer(CookieLayer::new())
+    .with(SessionTokenStore::new(CookieTokenStore::new().name("id")))
+    .with(SessionLifetime(Duration::from_hours(24 * 14)))
     .build();
 ```
 
-The lifetime becomes both the `Max-Age` of the issued cookie and the `expires_at` handed to you by [`start`], [`refresh`], and [`rotate`], so the client's cookie and your record expire together.
+Sessions last 30 days when the context has no [`SessionLifetime`]. The lifetime becomes both the `Max-Age` of the issued cookie and the `expires_at` handed to you by [`start`], [`refresh`], and [`rotate`], so the client's cookie and your record expire together.
 
 # Custom token stores
 
@@ -247,7 +247,7 @@ impl TokenStore for BearerTokenStore {
 }
 ```
 
-Serialize the raw token with [`Token::encode`] and parse it back with [`Token::decode`]; both use URL-safe base64.
+Add it to the router with `.with(SessionTokenStore::new(BearerTokenStore))`. Serialize the raw token with [`Token::encode`] and parse it back with [`Token::decode`]; both use URL-safe base64.
 
 # Security notes
 
