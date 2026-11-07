@@ -5561,7 +5561,6 @@ dependencies = [
  "time",
  "tokio",
  "topcoat-core",
- "topcoat-router",
  "topcoat-view",
 ]
 

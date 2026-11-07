@@ -10,22 +10,18 @@ topcoat = { version = "0.11.0", features = ["mail", "mail-smtp"] }
 
 # Setup
 
-Choose a transport in [`MailConfig`] and register it with the router's [`mail`](RouterBuilderMailExt::mail) method:
+Choose a transport, wrap it in a [`Mailer`], and add it to the router's context:
 
 ```rust,standalone_crate
 use topcoat::{
-    mail::{FileTransport, MailConfig, RouterBuilderMailExt},
+    mail::{FileTransport, Mailer},
     router::{Router, RouterBuilderDiscoverExt, module_router},
 };
 
 pub fn router() -> Router {
     module_router!()
         .discover()
-        .mail(
-            MailConfig::builder()
-                .transport(FileTransport::new("target/mail"))
-                .build(),
-        )
+        .with(Mailer::new(FileTransport::new("target/mail")))
         .build()
 }
 ```
@@ -131,18 +127,17 @@ let from_url = SmtpTransport::from_url("smtps://user:pass@smtp.example.com:465")
 
 ## Memory in tests
 
-Use [`MemoryTransport`] in tests to collect outgoing messages. Add a `MailConfig` to an empty `Cx`, then call `send` with that context. Keep a clone of the transport to inspect the messages:
+Use [`MemoryTransport`] in tests to collect outgoing messages. Add a `Mailer` to an empty `Cx`, then call `send` with that context. Keep a clone of the transport to inspect the messages:
 
 ```rust
 use topcoat::{
     context::Cx,
-    mail::{Mail, MailConfig, Mailbox, MemoryTransport, send},
+    mail::{Mail, Mailbox, Mailer, MemoryTransport, send},
 };
 
 # async fn test() -> topcoat::Result<()> {
 let transport = MemoryTransport::new();
-let config = MailConfig::builder().transport(transport.clone()).build();
-let cx = Cx::new().with(config);
+let cx = Cx::new().with(Mailer::new(transport.clone()));
 
 let mail = Mail::builder()
     .from(Mailbox::new("ada@example.com")?)

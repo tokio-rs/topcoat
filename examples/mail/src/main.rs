@@ -1,4 +1,4 @@
-use topcoat::{context::Cx, mail::RouterBuilderMailExt};
+use topcoat::context::Cx;
 
 mod send;
 mod sent;
@@ -6,7 +6,7 @@ mod sent;
 use serde::Deserialize;
 use topcoat::{
     Result,
-    mail::{FileTransport, MailConfig},
+    mail::{FileTransport, Mailer},
     router::{Slot, href, layout, module_router, page},
     view::{View, view},
 };
@@ -18,11 +18,9 @@ async fn main() {
     // The file transport writes every mail as an `.eml` file instead of
     // delivering it, so the example needs no mail server. A real application
     // would use an `SmtpTransport` here.
-    let config = MailConfig::builder()
-        .transport(FileTransport::new(OUTBOX))
-        .build();
+    let mailer = Mailer::new(FileTransport::new(OUTBOX));
 
-    topcoat::start(module_router!().mail(config).build())
+    topcoat::start(module_router!().with(mailer).build())
         .await
         .unwrap();
 }
