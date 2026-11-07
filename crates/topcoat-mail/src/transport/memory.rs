@@ -105,6 +105,6 @@ mod tests {
         assert_eq!(sent[0].subject(), "Hello");
 
         transport.clear();
-        assert!(clone.sent().is_empty());
+        assert_eq!(clone.sent(), []);
     }
 }
