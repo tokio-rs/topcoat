@@ -1,5 +1,3 @@
-use topcoat::{cookie::CookieLayer, session::RouterBuilderSessionExt};
-
 mod login;
 mod logout;
 
@@ -13,8 +11,9 @@ use serde::Deserialize;
 use topcoat::{
     Result,
     context::{Cx, context},
+    cookie::CookieLayer,
     router::{Slot, href, layout, module_router, page},
-    session::{self, SessionConfig, TokenHash},
+    session::{self, TokenHash},
     view::{View, view},
 };
 
@@ -25,7 +24,6 @@ async fn main() {
     topcoat::start(
         module_router!()
             .layer(CookieLayer::new())
-            .sessions(SessionConfig::default())
             .with(Database::default())
             .build(),
     )

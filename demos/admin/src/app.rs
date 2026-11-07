@@ -18,7 +18,6 @@ use topcoat::{
         response::Response,
     },
     runtime::RouterBuilderRuntimeExt,
-    session::{RouterBuilderSessionExt, SessionConfig},
     tailwind,
     view::{View, view},
 };
@@ -33,7 +32,6 @@ pub fn router() -> RouterBuilder {
         .discover()
         .assets(AssetBundle::load().unwrap())
         .layer(CookieLayer::new())
-        .sessions(SessionConfig::default())
         // Register the runtime after the application layers so rerenders use them too.
         .runtime()
 }

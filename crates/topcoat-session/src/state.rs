@@ -1,6 +1,6 @@
 use tokio::sync::Mutex;
 use topcoat_core::{
-    context::{Cx, context},
+    context::{Cx, memoize_cache},
     error::Result,
 };
 
@@ -8,10 +8,10 @@ use crate::{Token, token_store};
 
 /// The current session token for one request.
 ///
-/// The session layer registers this value in request context. It loads the
-/// token on first access and records session changes for later reads.
+/// It loads the token on first access and records session changes for later
+/// reads.
 #[derive(Debug, Default)]
-pub struct SessionState {
+pub(crate) struct SessionState {
     token: Mutex<Load>,
 }
 
@@ -23,12 +23,6 @@ enum Load {
 }
 
 impl SessionState {
-    /// Creates an empty cell; the token is loaded on first access.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Returns the request's current token, reading the token store on first
     /// access. Concurrent callers share the one read.
     pub(crate) async fn token(&self, cx: &Cx) -> Result<Option<Token>> {
@@ -47,6 +41,7 @@ impl SessionState {
     }
 }
 
+/// Returns the session state of the request, creating it on first access.
 pub(crate) fn state(cx: &Cx) -> &SessionState {
-    context(cx)
+    memoize_cache(cx).memoize(cx, (), (), |_, ()| SessionState::default())
 }
