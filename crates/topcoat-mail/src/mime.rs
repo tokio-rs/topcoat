@@ -103,11 +103,9 @@ impl From<&Mail> for Part {
                 match text {
                     None => html,
                     // RFC 2046: alternatives ascend in order of preference.
-                    Some(text) => Part::Multi(
-                        html.append_to(
-                            MultiPart::alternative().singlepart(SinglePart::plain(text.clone())),
-                        ),
-                    ),
+                    Some(text) => Part::Multi(html.append_to(
+                        MultiPart::alternative().singlepart(SinglePart::plain(text.clone())),
+                    )),
                 }
             }
         };

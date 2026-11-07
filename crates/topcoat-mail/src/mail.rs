@@ -668,9 +668,7 @@ mod tests {
             Err(MailError::InvalidContentType { .. })
         ));
 
-        let header_name = complete()?
-            .headers([("Bad Name", "value")])
-            .build();
+        let header_name = complete()?.headers([("Bad Name", "value")]).build();
         assert!(matches!(
             header_name,
             Err(MailError::InvalidHeaderName { .. })
