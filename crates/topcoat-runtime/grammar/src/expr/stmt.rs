@@ -40,28 +40,45 @@ impl Expr {
                 quote! { let #pat = #value; }.to_tokens(rust);
             }
             Stmt::Expr(expr, semi) => {
-                // A trailing expression (no semicolon) is the block's value, so
-                // it becomes the JavaScript `return`.
-                let returns = is_last && semi.is_none();
-                if returns {
-                    js.push_str("return ");
-                }
-
-                let mut value = TokenStream::new();
-                Self::dispatch(expr, &mut value, js, names)?;
-
-                if returns {
-                    js.push(';');
-                    value.to_tokens(rust);
-                } else {
-                    js.push_str("; ");
-                    quote! { #value; }.to_tokens(rust);
-                }
+                Self::expr_stmt(is_last && semi.is_none(), rust, js, |value, js| {
+                    Self::dispatch(expr, value, js, names)
+                })?;
             }
-            Stmt::Macro(stmt_macro) => Self::stmt_macro(stmt_macro, rust, js, names)?,
+            Stmt::Macro(stmt_macro) => {
+                let returns = is_last && stmt_macro.semi_token.is_none();
+                Self::expr_stmt(returns, rust, js, |value, js| {
+                    Self::stmt_macro(stmt_macro, value, js, names)
+                })?;
+            }
             other @ Stmt::Item(_) => {
                 return Err(syn::Error::new_spanned(other, "unsupported statement"));
             }
+        }
+        Ok(())
+    }
+
+    /// Lowers an expression statement with `lower`. A trailing expression with
+    /// no semicolon (`returns`) is the block's value, so it becomes the
+    /// JavaScript `return`; any other ends with its own semicolon.
+    fn expr_stmt(
+        returns: bool,
+        rust: &mut TokenStream,
+        js: &mut Js,
+        lower: impl FnOnce(&mut TokenStream, &mut Js) -> syn::Result<()>,
+    ) -> syn::Result<()> {
+        if returns {
+            js.push_str("return ");
+        }
+
+        let mut value = TokenStream::new();
+        lower(&mut value, js)?;
+
+        if returns {
+            js.push(';');
+            value.to_tokens(rust);
+        } else {
+            js.push_str("; ");
+            quote! { #value; }.to_tokens(rust);
         }
         Ok(())
     }
