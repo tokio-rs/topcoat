@@ -60,7 +60,7 @@ async fn welcome(cx: &Cx) -> Result<&'static str> {
             .single()
             .await?,
         )
-        .build();
+        .build()?;
 
     send(cx, mail).await?;
 
@@ -72,7 +72,7 @@ Create addresses with [`Mailbox::new`] or [`Mailbox::named`], or parse the `Ada 
 
 [`send`] returns a [`Receipt`] with the message's `Message-ID`. Use that ID in `in_reply_to` and `references` to link a later reply. The receipt confirms that the transport accepted the message. It does not confirm inbox delivery.
 
-Sending returns a [`SendError`] if the message lacks a sender, recipients, or body, or if delivery fails.
+[`build`](MailBuilder::build) returns a [`MailError`] if the message lacks a sender, recipients, or body, or if an attachment or header is invalid. Sending returns a [`SendError`] if delivery fails.
 
 # Attachments
 
@@ -80,9 +80,11 @@ Add files with [`attachments`](MailBuilder::attachments). Use [`Attachment::new`
 
 ```rust
 # use topcoat::{Result, context::Cx};
-# use topcoat::{mail::{Attachment, Mail}, view::{ViewExt, view}};
+# use topcoat::{mail::{Attachment, Mail, Mailbox}, view::{ViewExt, view}};
 # async fn example(cx: &Cx) -> Result<()> {
 let mail = Mail::builder()
+#   .from(Mailbox::new("billing@example.com")?)
+#   .to([Mailbox::new("ada@example.com")?])
     .subject("Your invoice")
     .html(
         view! {
@@ -96,7 +98,7 @@ let mail = Mail::builder()
         Attachment::inline("logo", "image/png", b"\x89PNG"),
         Attachment::new("invoice.pdf", "application/pdf", b"%PDF-"),
     ])
-    .build();
+    .build()?;
 # Ok(())
 # }
 ```
@@ -146,7 +148,7 @@ let mail = Mail::builder()
     .from(Mailbox::new("ada@example.com")?)
     .to([Mailbox::new("bob@example.com")?])
     .text("Hi")
-    .build();
+    .build()?;
 
 send(&cx, mail).await?;
 
@@ -156,7 +158,7 @@ assert_eq!(transport.sent()[0].to(), [Mailbox::new("bob@example.com")?]);
 # }
 ```
 
-The transport checks message content before saving it. A passing test does not mean a real mail service will accept the message.
+The transport assembles each message before saving it. A passing test does not mean a real mail service will accept the message.
 
 ## Custom transports
 

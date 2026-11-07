@@ -2,27 +2,30 @@
 
 use std::time::SystemTime;
 
+use lettre::message::header::{ContentType, HeaderName};
 use topcoat_view::ViewHandle;
 
 use crate::{Attachment, Mailbox};
 
 /// An email message ready to be formatted or sent.
 ///
-/// Create one with [`Mail::builder`]. Building a message does not send it:
+/// Create one with [`Mail::builder`]. A mail always has a sender, at least
+/// one recipient, and a body. Building a message does not send it:
 ///
 /// ```
 /// use topcoat_mail::{Mail, Mailbox};
 ///
 /// let mail = Mail::builder()
+///     .from(Mailbox::new("charles@example.com")?)
 ///     .to([Mailbox::named("Ada Lovelace", "ada@example.com")?])
 ///     .subject("Analytical engines")
 ///     .text("The engine weaves algebraic patterns.")
-///     .build();
-/// # Ok::<(), topcoat_mail::AddressError>(())
+///     .build()?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Mail {
-    from: Option<Mailbox>,
+    from: Mailbox,
     to: Vec<Mailbox>,
     cc: Vec<Mailbox>,
     bcc: Vec<Mailbox>,
@@ -45,10 +48,10 @@ impl Mail {
         MailBuilder::default()
     }
 
-    /// The `From` address, if one was set.
+    /// The `From` address.
     #[must_use]
-    pub fn from(&self) -> Option<&Mailbox> {
-        self.from.as_ref()
+    pub fn from(&self) -> &Mailbox {
+        &self.from
     }
 
     /// The `To` recipients.
@@ -136,32 +139,45 @@ impl Mail {
 /// collections that convert into `Vec<Mailbox>` and append on each call.
 /// Attachment and header setters also append.
 ///
-/// Building is infallible. Addresses are validated when constructed, and the
-/// message is checked for completeness when formatted or sent.
+/// [`build`](MailBuilder::build) checks that the mail is complete and that
+/// its attachments and headers are valid.
 #[derive(Clone, Debug, Default)]
 pub struct MailBuilder {
-    mail: Mail,
+    from: Option<Mailbox>,
+    to: Vec<Mailbox>,
+    cc: Vec<Mailbox>,
+    bcc: Vec<Mailbox>,
+    reply_to: Vec<Mailbox>,
+    subject: String,
+    html: Option<ViewHandle>,
+    text: TextBody,
+    attachments: Vec<Attachment>,
+    in_reply_to: Option<String>,
+    references: Option<String>,
+    headers: Vec<(String, String)>,
+    date: Option<SystemTime>,
+    message_id: Option<String>,
 }
 
 impl MailBuilder {
     /// Sets the `From` address.
     #[must_use]
     pub fn from(mut self, from: impl Into<Mailbox>) -> Self {
-        self.mail.from = Some(from.into());
+        self.from = Some(from.into());
         self
     }
 
     /// Adds `To` recipients.
     #[must_use]
     pub fn to(mut self, to: impl Into<Vec<Mailbox>>) -> Self {
-        self.mail.to.extend(to.into());
+        self.to.extend(to.into());
         self
     }
 
     /// Adds `Cc` recipients.
     #[must_use]
     pub fn cc(mut self, cc: impl Into<Vec<Mailbox>>) -> Self {
-        self.mail.cc.extend(cc.into());
+        self.cc.extend(cc.into());
         self
     }
 
@@ -169,7 +185,7 @@ impl MailBuilder {
     /// its headers.
     #[must_use]
     pub fn bcc(mut self, bcc: impl Into<Vec<Mailbox>>) -> Self {
-        self.mail.bcc.extend(bcc.into());
+        self.bcc.extend(bcc.into());
         self
     }
 
@@ -177,21 +193,21 @@ impl MailBuilder {
     /// `From` address.
     #[must_use]
     pub fn reply_to(mut self, reply_to: impl Into<Vec<Mailbox>>) -> Self {
-        self.mail.reply_to.extend(reply_to.into());
+        self.reply_to.extend(reply_to.into());
         self
     }
 
     /// Sets the subject line.
     #[must_use]
     pub fn subject(mut self, subject: impl Into<String>) -> Self {
-        self.mail.subject = subject.into();
+        self.subject = subject.into();
         self
     }
 
     /// Sets the HTML body.
     #[must_use]
     pub fn html(mut self, html: ViewHandle) -> Self {
-        self.mail.html = Some(html);
+        self.html = Some(html);
         self
     }
 
@@ -203,35 +219,35 @@ impl MailBuilder {
     /// pass [`TextBody::None`] to send the HTML alone.
     #[must_use]
     pub fn text(mut self, text: impl Into<TextBody>) -> Self {
-        self.mail.text = text.into();
+        self.text = text.into();
         self
     }
 
     /// Adds attachments.
     #[must_use]
     pub fn attachments(mut self, attachments: impl Into<Vec<Attachment>>) -> Self {
-        self.mail.attachments.extend(attachments.into());
+        self.attachments.extend(attachments.into());
         self
     }
 
     /// Adds custom `(name, value)` headers, such as `List-Unsubscribe`.
     #[must_use]
     pub fn headers(mut self, headers: impl Into<Vec<(String, String)>>) -> Self {
-        self.mail.headers.extend(headers.into());
+        self.headers.extend(headers.into());
         self
     }
 
     /// Marks the mail as a reply to the given message id.
     #[must_use]
     pub fn in_reply_to(mut self, message_id: impl Into<String>) -> Self {
-        self.mail.in_reply_to = Some(message_id.into());
+        self.in_reply_to = Some(message_id.into());
         self
     }
 
     /// Sets the `References` header linking the message ids of the thread.
     #[must_use]
     pub fn references(mut self, references: impl Into<String>) -> Self {
-        self.mail.references = Some(references.into());
+        self.references = Some(references.into());
         self
     }
 
@@ -239,7 +255,7 @@ impl MailBuilder {
     /// used.
     #[must_use]
     pub fn date(mut self, date: SystemTime) -> Self {
-        self.mail.date = Some(date);
+        self.date = Some(date);
         self
     }
 
@@ -247,15 +263,99 @@ impl MailBuilder {
     /// send time.
     #[must_use]
     pub fn message_id(mut self, message_id: impl Into<String>) -> Self {
-        self.mail.message_id = Some(message_id.into());
+        self.message_id = Some(message_id.into());
         self
     }
 
     /// Finishes the builder into a [`Mail`].
-    #[must_use]
-    pub fn build(self) -> Mail {
-        self.mail
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MailError`] if the mail has no sender, no recipients, or
+    /// no body, or if an attachment or header is invalid.
+    pub fn build(self) -> Result<Mail, MailError> {
+        let from = self.from.ok_or(MailError::MissingFrom)?;
+        if self.to.is_empty() && self.cc.is_empty() && self.bcc.is_empty() {
+            return Err(MailError::MissingRecipients);
+        }
+        if self.html.is_none() {
+            if !matches!(self.text, TextBody::Text(_)) {
+                return Err(MailError::MissingBody);
+            }
+            if self
+                .attachments
+                .iter()
+                .any(|attachment| attachment.content_id().is_some())
+            {
+                return Err(MailError::InlineWithoutHtml);
+            }
+        }
+        for attachment in &self.attachments {
+            if ContentType::parse(attachment.content_type()).is_err() {
+                return Err(MailError::InvalidContentType {
+                    content_type: attachment.content_type().to_owned(),
+                });
+            }
+        }
+        for (name, _) in &self.headers {
+            if HeaderName::new_from_ascii(name.clone()).is_err() {
+                return Err(MailError::InvalidHeaderName { name: name.clone() });
+            }
+        }
+
+        Ok(Mail {
+            from,
+            to: self.to,
+            cc: self.cc,
+            bcc: self.bcc,
+            reply_to: self.reply_to,
+            subject: self.subject,
+            html: self.html,
+            text: self.text,
+            attachments: self.attachments,
+            in_reply_to: self.in_reply_to,
+            references: self.references,
+            headers: self.headers,
+            date: self.date,
+            message_id: self.message_id,
+        })
     }
+}
+
+/// The reason a [`MailBuilder`] could not build a [`Mail`].
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum MailError {
+    /// The mail declares no `From` address.
+    #[error("mail has no `From` address")]
+    MissingFrom,
+
+    /// The mail declares no `To`, `Cc`, or `Bcc` recipient.
+    #[error("mail has no recipients")]
+    MissingRecipients,
+
+    /// The mail declares neither an HTML body nor a plain-text body.
+    #[error("mail has no body")]
+    MissingBody,
+
+    /// The mail carries an inline attachment but no HTML body that could
+    /// reference it.
+    #[error("mail has an inline attachment but no HTML body to reference it")]
+    InlineWithoutHtml,
+
+    /// An attachment declares a content type that is not a valid MIME type.
+    #[error("invalid attachment content type {content_type:?}")]
+    InvalidContentType {
+        /// The rejected content type.
+        content_type: String,
+    },
+
+    /// A custom header declares an invalid header name.
+    #[error("invalid header name {name:?}")]
+    InvalidHeaderName {
+        /// The rejected header name.
+        name: String,
+    },
 }
 
 /// The plain-text body of a mail: derived, declared, or absent.
@@ -267,16 +367,12 @@ impl MailBuilder {
 /// ```
 /// use topcoat_mail::{Mail, TextBody};
 ///
-/// let derived = Mail::builder().build();
-/// let declared = Mail::builder().text("The engine weaves.").build();
-/// let html_alone = Mail::builder().text(TextBody::None).build();
-///
-/// assert_eq!(derived.text(), &TextBody::FromHtml);
+/// let declared = Mail::builder().text("The engine weaves.");
+/// let html_alone = Mail::builder().text(TextBody::None);
 /// ```
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum TextBody {
-    /// Derive the text from the HTML body when the mail is assembled. A
-    /// mail without an HTML body sends no text body.
+    /// Derive the text from the HTML body when the mail is assembled.
     #[default]
     FromHtml,
     /// Send no plain-text body.
@@ -305,11 +401,19 @@ impl From<&String> for TextBody {
 
 #[cfg(test)]
 mod tests {
+    use topcoat_core::error::Result;
+
     use super::*;
-    use crate::AddressError;
+
+    fn complete() -> Result<MailBuilder> {
+        Ok(Mail::builder()
+            .from(Mailbox::new("ada@example.com")?)
+            .to([Mailbox::new("bob@example.com")?])
+            .text("Hi"))
+    }
 
     #[test]
-    fn collects_every_field() -> Result<(), AddressError> {
+    fn collects_every_field() -> Result<()> {
         let mail = Mail::builder()
             .from(Mailbox::named("Ada", "ada@example.com")?)
             .to([Mailbox::new("bob@example.com")?])
@@ -329,12 +433,9 @@ mod tests {
             .references("<earlier@example.com>")
             .date(SystemTime::UNIX_EPOCH)
             .message_id("<mail@example.com>")
-            .build();
+            .build()?;
 
-        assert_eq!(
-            mail.from(),
-            Some(&Mailbox::named("Ada", "ada@example.com")?)
-        );
+        assert_eq!(mail.from(), &Mailbox::named("Ada", "ada@example.com")?);
         assert_eq!(
             mail.to(),
             [
@@ -365,33 +466,110 @@ mod tests {
     }
 
     #[test]
-    fn defaults_are_empty() {
-        let mail = Mail::builder().build();
+    fn optional_fields_default_to_empty() -> Result<()> {
+        let mail = Mail::builder()
+            .from(Mailbox::new("ada@example.com")?)
+            .to([Mailbox::new("bob@example.com")?])
+            .html(ViewHandle::empty())
+            .build()?;
 
-        assert_eq!(mail.from(), None);
-        assert_eq!(mail.to(), []);
         assert_eq!(mail.cc(), []);
         assert_eq!(mail.bcc(), []);
         assert_eq!(mail.reply_to(), []);
         assert_eq!(mail.subject(), "");
-        assert!(mail.html().is_none());
         assert_eq!(mail.text(), &TextBody::FromHtml);
         assert_eq!(mail.attachments(), []);
         assert_eq!(mail.headers(), []);
         assert_eq!(mail.date(), None);
+        assert_eq!(mail.message_id(), None);
+
+        Ok(())
     }
 
     #[test]
-    fn recipient_setters_append_across_calls() -> Result<(), AddressError> {
-        let mail = Mail::builder()
-            .to([Mailbox::new("bob@example.com")?])
+    fn recipient_setters_append_across_calls() -> Result<()> {
+        let mail = complete()?
             .to([
                 Mailbox::new("carol@example.com")?,
                 Mailbox::new("dan@example.com")?,
             ])
-            .build();
+            .build()?;
 
         assert_eq!(mail.to().len(), 3);
+
+        Ok(())
+    }
+
+    #[test]
+    fn any_recipient_kind_completes_the_mail() -> Result<()> {
+        let only_bcc = Mail::builder()
+            .from(Mailbox::new("ada@example.com")?)
+            .bcc([Mailbox::new("dan@example.com")?])
+            .text("Hi")
+            .build();
+        assert!(only_bcc.is_ok());
+
+        let only_cc = Mail::builder()
+            .from(Mailbox::new("ada@example.com")?)
+            .cc([Mailbox::new("carol@example.com")?])
+            .text("Hi")
+            .build();
+        assert!(only_cc.is_ok());
+
+        Ok(())
+    }
+
+    #[test]
+    fn incomplete_mail_is_rejected() -> Result<()> {
+        let missing_from = Mail::builder()
+            .to([Mailbox::new("bob@example.com")?])
+            .text("Hi")
+            .build();
+        assert!(matches!(missing_from, Err(MailError::MissingFrom)));
+
+        let missing_recipients = Mail::builder()
+            .from(Mailbox::new("ada@example.com")?)
+            .text("Hi")
+            .build();
+        assert!(matches!(
+            missing_recipients,
+            Err(MailError::MissingRecipients)
+        ));
+
+        let missing_body = complete()?.text(TextBody::FromHtml).build();
+        assert!(matches!(missing_body, Err(MailError::MissingBody)));
+
+        let opted_out_without_html = complete()?.text(TextBody::None).build();
+        assert!(matches!(
+            opted_out_without_html,
+            Err(MailError::MissingBody)
+        ));
+
+        let orphan_inline = complete()?
+            .attachments([Attachment::inline("logo", "image/png", b"\x89PNG")])
+            .build();
+        assert!(matches!(orphan_inline, Err(MailError::InlineWithoutHtml)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn invalid_declarations_are_rejected() -> Result<()> {
+        let content_type = complete()?
+            .attachments([Attachment::new("a.bin", "not a mime type", b"")])
+            .build();
+        assert!(matches!(
+            content_type,
+            Err(MailError::InvalidContentType { .. })
+        ));
+
+        let header_name = complete()?
+            .headers([("Bad Name".to_owned(), "value".to_owned())])
+            .build();
+        assert!(matches!(
+            header_name,
+            Err(MailError::InvalidHeaderName { .. })
+        ));
 
         Ok(())
     }

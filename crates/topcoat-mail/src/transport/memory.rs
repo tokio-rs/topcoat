@@ -11,7 +11,7 @@ use crate::{
 
 /// A [`Transport`] that captures messages in memory for tests.
 ///
-/// Validates message content before recording it. Clones share the same
+/// Assembles each message before recording it. Clones share the same
 /// capture, so a test can keep one clone and give another to the application:
 ///
 /// ```
@@ -25,7 +25,7 @@ use crate::{
 /// #     .to([topcoat_mail::Mailbox::new("bob@example.com")?])
 /// #     .subject("Welcome!")
 /// #     .text("Hi")
-/// #     .build();
+/// #     .build()?;
 /// let transport = MemoryTransport::new();
 ///
 /// transport.send(&cx, mail).await?;
@@ -92,6 +92,7 @@ mod tests {
             .subject("Hello")
             .text("Hi Bob")
             .build()
+            .unwrap()
     }
 
     #[tokio::test]
@@ -108,14 +109,5 @@ mod tests {
 
         transport.clear();
         assert!(clone.sent().is_empty());
-    }
-
-    #[tokio::test]
-    async fn rejects_mail_that_could_not_be_sent() {
-        let transport = MemoryTransport::new();
-        let unsendable = Mail::builder().text("Hi").build();
-
-        assert!(transport.send(&Cx::new(), unsendable).await.is_err());
-        assert!(transport.sent().is_empty());
     }
 }

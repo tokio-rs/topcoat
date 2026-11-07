@@ -114,7 +114,8 @@ mod tests {
             .bcc([Mailbox::new("dan@example.com").unwrap()])
             .subject("Hello")
             .text("Hi Bob")
-            .build();
+            .build()
+            .unwrap();
         let receipt = transport.send(&Cx::new(), mail).await.unwrap();
 
         let entries: Vec<_> = std::fs::read_dir(&directory)

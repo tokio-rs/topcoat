@@ -49,7 +49,7 @@ mod tests {
                     .to([Mailbox::new("bob@example.com")?])
                     .subject("Hello")
                     .text("Hi")
-                    .build();
+                    .build()?;
                 send(cx, mail).await?;
                 Ok(Response::new(Body::empty()))
             })

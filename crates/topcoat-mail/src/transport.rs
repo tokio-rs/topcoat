@@ -65,37 +65,6 @@ impl Receipt {
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum SendError {
-    /// The mail declares no `From` address.
-    #[error("mail has no `From` address")]
-    MissingFrom,
-
-    /// The mail declares no `To`, `Cc`, or `Bcc` recipient.
-    #[error("mail has no recipients")]
-    MissingRecipients,
-
-    /// The mail declares neither an HTML nor a plain-text body.
-    #[error("mail has no body")]
-    MissingBody,
-
-    /// The mail carries an inline attachment but no HTML body that could
-    /// reference it.
-    #[error("mail has an inline attachment but no HTML body to reference it")]
-    InlineWithoutHtml,
-
-    /// An attachment declares a content type that is not a valid MIME type.
-    #[error("invalid attachment content type {content_type:?}")]
-    InvalidContentType {
-        /// The rejected content type.
-        content_type: String,
-    },
-
-    /// A custom header declares an invalid header name.
-    #[error("invalid header name {name:?}")]
-    InvalidHeaderName {
-        /// The rejected header name.
-        name: String,
-    },
-
     /// The mail could not be assembled into its wire form.
     #[error("could not assemble the mail")]
     Assembly(#[source] Box<dyn std::error::Error + Send + Sync>),

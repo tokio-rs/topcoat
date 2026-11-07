@@ -27,7 +27,7 @@ use crate::{Mail, Receipt, Transport};
 ///     .to([Mailbox::new("bob@example.com")?])
 ///     .subject("Analytical engines")
 ///     .text("The engine weaves algebraic patterns.")
-///     .build();
+///     .build()?;
 ///
 /// let receipt = send(&cx, mail).await?;
 /// # Ok(())
@@ -96,15 +96,15 @@ mod tests {
     use topcoat_core::context::Cx;
 
     use super::*;
-    use crate::{AddressError, Mailbox, MemoryTransport};
+    use crate::{Mailbox, MemoryTransport};
 
-    fn mail() -> Result<Mail, AddressError> {
+    fn mail() -> Result<Mail> {
         Ok(Mail::builder()
             .from(Mailbox::new("ada@example.com")?)
             .to([Mailbox::new("bob@example.com")?])
             .subject("Hello")
             .text("Hi")
-            .build())
+            .build()?)
     }
 
     fn cx_with(transport: MemoryTransport) -> Cx {
@@ -126,20 +126,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn propagates_transport_errors() {
-        let cx = cx_with(MemoryTransport::new());
-
-        // No recipients, so assembly fails before anything is captured.
-        let result = send(&cx, Mail::builder().build()).await;
-
-        assert!(result.is_err());
-    }
-
-    #[tokio::test]
     #[should_panic(expected = "attempted to access context")]
     async fn send_panics_without_a_registered_config() {
         let cx = Cx::new();
-        let _ = send(&cx, Mail::builder().build()).await;
+        let _ = send(&cx, mail().unwrap()).await;
     }
 
     #[test]

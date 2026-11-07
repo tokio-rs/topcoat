@@ -21,9 +21,8 @@ impl Mail {
     ///
     /// # Errors
     ///
-    /// Returns [`SendError`] if the mail is incomplete (no `From` address,
-    /// no recipients, or no body) or declares an attachment content type or
-    /// custom header name that is invalid.
+    /// Returns [`SendError`] if the mail cannot be assembled into its wire
+    /// form.
     pub fn formatted(self, cx: &Cx) -> Result<Vec<u8>, SendError> {
         Ok(message(cx, self, BccHeader::Dropped)?.formatted())
     }
@@ -68,14 +67,9 @@ pub(crate) fn message_id(message: &Message) -> String {
         .to_owned()
 }
 
-/// Builds the header section, validating the address requirements.
+/// Builds the header section.
 fn headers(mail: &Mail, bcc: BccHeader) -> Result<MessageBuilder, SendError> {
-    let from = mail.from().ok_or(SendError::MissingFrom)?;
-    if mail.to().is_empty() && mail.cc().is_empty() && mail.bcc().is_empty() {
-        return Err(SendError::MissingRecipients);
-    }
-
-    let mut builder = Message::builder().from(from.to_lettre());
+    let mut builder = Message::builder().from(mail.from().to_lettre());
     for to in mail.to() {
         builder = builder.to(to.to_lettre());
     }
@@ -107,8 +101,8 @@ fn headers(mail: &Mail, bcc: BccHeader) -> Result<MessageBuilder, SendError> {
     }
 
     for (name, value) in mail.headers() {
-        let header_name = HeaderName::new_from_ascii(name.clone())
-            .map_err(|_| SendError::InvalidHeaderName { name: name.clone() })?;
+        let header_name =
+            HeaderName::new_from_ascii(name.clone()).map_err(SendError::assembly)?;
         builder = builder.raw_header(HeaderValue::new(header_name, value.clone()));
     }
 
@@ -137,10 +131,6 @@ fn body(cx: &Cx, mut mail: Mail) -> Result<Content, SendError> {
         .filter(|attachment| attachment.filename().is_some())
         .collect();
 
-    if html.is_none() && !inline.is_empty() {
-        return Err(SendError::InlineWithoutHtml);
-    }
-
     // The text body: declared, derived from the HTML, or absent.
     let text = match mail.text() {
         TextBody::Text(text) => Some(text.clone()),
@@ -168,7 +158,7 @@ fn body(cx: &Cx, mut mail: Mail) -> Result<Content, SendError> {
 
     // The text body as the fallback alternative to the HTML body.
     let content = match (text, html) {
-        (None, None) => return Err(SendError::MissingBody),
+        (None, None) => unreachable!("a built mail has a body"),
         (None, Some(html)) => html,
         (Some(text), None) => Content::Single(SinglePart::plain(text)),
         (Some(text), Some(html)) => {
@@ -196,11 +186,8 @@ fn body(cx: &Cx, mut mail: Mail) -> Result<Content, SendError> {
 
 /// Converts an [`Attachment`] into its MIME part.
 fn attachment_part(attachment: &Attachment) -> Result<SinglePart, SendError> {
-    let content_type = ContentType::parse(attachment.content_type()).map_err(|_| {
-        SendError::InvalidContentType {
-            content_type: attachment.content_type().to_owned(),
-        }
-    })?;
+    let content_type =
+        ContentType::parse(attachment.content_type()).map_err(SendError::assembly)?;
     let part = match (attachment.filename(), attachment.content_id()) {
         (Some(filename), _) => MimeAttachment::new(filename.to_owned()),
         (None, Some(content_id)) => MimeAttachment::new_inline(content_id.to_owned()),
@@ -228,7 +215,7 @@ mod tests {
 
     #[test]
     fn text_only_is_a_single_plain_part() {
-        let mail = base().subject("Hello").text("Hi Bob").build();
+        let mail = base().subject("Hello").text("Hi Bob").build().unwrap();
         let wire = formatted(mail);
 
         assert!(wire.contains("From: Ada <ada@example.com>\r\n"));
@@ -243,7 +230,7 @@ mod tests {
     fn html_derives_its_text_alternative_by_default() {
         let mail = base()
             .html(ViewHandle::unescaped_unchecked("<h1>Hi</h1><p>Bye now</p>"))
-            .build();
+            .build().unwrap();
         let wire = formatted(mail);
 
         assert!(wire.contains("Content-Type: multipart/alternative;"));
@@ -256,7 +243,7 @@ mod tests {
         let mail = base()
             .html(ViewHandle::unescaped_unchecked("<h1>Hi</h1>"))
             .text(TextBody::None)
-            .build();
+            .build().unwrap();
         let wire = formatted(mail);
 
         assert!(wire.contains("Content-Type: text/html; charset=utf-8\r\n"));
@@ -268,7 +255,7 @@ mod tests {
     fn empty_derived_text_is_not_sent() {
         let mail = base()
             .html(ViewHandle::unescaped_unchecked("<img src=\"x.png\">"))
-            .build();
+            .build().unwrap();
         let wire = formatted(mail);
 
         assert!(!wire.contains("text/plain"));
@@ -280,7 +267,7 @@ mod tests {
         let mail = base()
             .text("Hi Bob")
             .html(ViewHandle::unescaped_unchecked("<h1>Hi</h1>"))
-            .build();
+            .build().unwrap();
         let wire = formatted(mail);
 
         assert!(wire.contains("Content-Type: multipart/alternative;"));
@@ -296,7 +283,7 @@ mod tests {
             .text("Hi Bob")
             .html(ViewHandle::unescaped_unchecked("<img src=\"cid:logo\">"))
             .attachments([Attachment::inline("logo", "image/png", b"\x89PNG")])
-            .build();
+            .build().unwrap();
         let wire = formatted(mail);
 
         assert!(wire.contains("Content-Type: multipart/alternative;"));
@@ -310,7 +297,7 @@ mod tests {
         let mail = base()
             .text("Hi Bob")
             .attachments([Attachment::new("invoice.pdf", "application/pdf", b"%PDF-")])
-            .build();
+            .build().unwrap();
         let wire = formatted(mail);
 
         assert!(wire.contains("Content-Type: multipart/mixed;"));
@@ -322,7 +309,7 @@ mod tests {
         let mail = base()
             .bcc([Mailbox::new("dan@example.com").unwrap()])
             .text("Hi")
-            .build();
+            .build().unwrap();
 
         let message = message(&Cx::new(), mail.clone(), BccHeader::Dropped).unwrap();
         let recipients: Vec<String> = message
@@ -343,7 +330,7 @@ mod tests {
         let mail = base()
             .bcc([Mailbox::new("dan@example.com").unwrap()])
             .text("Hi")
-            .build();
+            .build().unwrap();
 
         let message = message(&Cx::new(), mail, BccHeader::Kept).unwrap();
         let wire = String::from_utf8(message.formatted()).unwrap();
@@ -356,7 +343,7 @@ mod tests {
             .text("Hi")
             .message_id("<mail@example.com>")
             .date(std::time::SystemTime::UNIX_EPOCH)
-            .build();
+            .build().unwrap();
         let wire = formatted(mail);
 
         assert!(wire.contains("Message-ID: <mail@example.com>\r\n"));
@@ -365,7 +352,7 @@ mod tests {
 
     #[test]
     fn missing_message_id_and_date_are_generated() {
-        let mail = base().text("Hi").build();
+        let mail = base().text("Hi").build().unwrap();
 
         let message = message(&Cx::new(), mail, BccHeader::Dropped).unwrap();
         let id = message_id(&message);
@@ -381,7 +368,7 @@ mod tests {
                 "List-Unsubscribe".to_owned(),
                 "<mailto:stop@example.com>".to_owned(),
             )])
-            .build();
+            .build().unwrap();
         let wire = formatted(mail);
 
         assert!(wire.contains("List-Unsubscribe: <mailto:stop@example.com>\r\n"));
@@ -393,67 +380,10 @@ mod tests {
             .text("Hi")
             .in_reply_to("<earlier@example.com>")
             .references("<earlier@example.com>")
-            .build();
+            .build().unwrap();
         let wire = formatted(mail);
 
         assert!(wire.contains("In-Reply-To: <earlier@example.com>\r\n"));
         assert!(wire.contains("References: <earlier@example.com>\r\n"));
-    }
-
-    #[test]
-    fn incomplete_mail_is_rejected() {
-        let missing_from = Mail::builder()
-            .to([Mailbox::new("bob@example.com").unwrap()])
-            .text("Hi")
-            .build();
-        assert!(matches!(
-            missing_from.formatted(&Cx::new()),
-            Err(SendError::MissingFrom)
-        ));
-
-        let missing_recipients = Mail::builder()
-            .from(Mailbox::new("ada@example.com").unwrap())
-            .text("Hi")
-            .build();
-        assert!(matches!(
-            missing_recipients.formatted(&Cx::new()),
-            Err(SendError::MissingRecipients)
-        ));
-
-        let missing_body = base().build();
-        assert!(matches!(
-            missing_body.formatted(&Cx::new()),
-            Err(SendError::MissingBody)
-        ));
-
-        let orphan_inline = base()
-            .text("Hi")
-            .attachments([Attachment::inline("logo", "image/png", b"\x89PNG")])
-            .build();
-        assert!(matches!(
-            orphan_inline.formatted(&Cx::new()),
-            Err(SendError::InlineWithoutHtml)
-        ));
-    }
-
-    #[test]
-    fn invalid_declarations_are_rejected() {
-        let content_type = base()
-            .text("Hi")
-            .attachments([Attachment::new("a.bin", "not a mime type", b"")])
-            .build();
-        assert!(matches!(
-            content_type.formatted(&Cx::new()),
-            Err(SendError::InvalidContentType { .. })
-        ));
-
-        let header_name = base()
-            .text("Hi")
-            .headers([("Bad Name".to_owned(), "value".to_owned())])
-            .build();
-        assert!(matches!(
-            header_name.formatted(&Cx::new()),
-            Err(SendError::InvalidHeaderName { .. })
-        ));
     }
 }

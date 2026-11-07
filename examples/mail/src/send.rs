@@ -49,7 +49,7 @@ pub(crate) async fn send_welcome(cx: &Cx, Form(recipient): Form<Recipient>) -> R
             "List-Unsubscribe".to_owned(),
             "<mailto:unsubscribe@example.com>".to_owned(),
         )])
-        .build();
+        .build()?;
 
     send(cx, mail).await?;
 
