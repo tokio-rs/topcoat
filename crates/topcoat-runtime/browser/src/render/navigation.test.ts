@@ -659,3 +659,444 @@ it("moves the connected render to the destination when both pages are live", asy
 		expect.objectContaining({ run: 2, path: "/chat" }),
 	]);
 });
+
+/** A startViewTransition double recording calls and running the updates. */
+function stubViewTransition(
+	throwOnOptions = false,
+	ready: Promise<void> = Promise.resolve(),
+): {
+	calls: unknown[];
+	restore: () => void;
+} {
+	const calls: unknown[] = [];
+	const doc = document as unknown as {
+		startViewTransition: (options: unknown) => unknown;
+	};
+	const original = doc.startViewTransition;
+	doc.startViewTransition = (options: unknown) => {
+		calls.push(options);
+		if (throwOnOptions && typeof options !== "function") {
+			throw new TypeError("not callable");
+		}
+		const update =
+			typeof options === "function"
+				? options
+				: (options as { update: () => void }).update;
+		update();
+		return {
+			updateCallbackDone: Promise.resolve(),
+			ready,
+			finished: Promise.resolve(),
+		};
+	};
+	return {
+		calls,
+		restore: () => {
+			doc.startViewTransition = original;
+		},
+	};
+}
+
+it("swaps inside a typed view transition when the link declares types", async () => {
+	stubFetch(() => snapshot(page("Next", "<p>next page</p>")));
+	const vt = stubViewTransition();
+	mount(
+		`<a data-topcoat-link="intent" data-topcoat-vt-types="game-expand" href="/next">next</a>`,
+	);
+
+	click(link());
+	await settle();
+
+	expect(vt.calls).toHaveLength(1);
+	expect(vt.calls[0]).toEqual({
+		types: ["game-expand"],
+		update: expect.any(Function),
+	});
+	expect(document.body.textContent).toContain("next page");
+	vt.restore();
+});
+
+it("keeps the untyped transition form on engines predating the options form", async () => {
+	stubFetch(() => snapshot(page("Next", "<p>next page</p>")));
+	const vt = stubViewTransition(true);
+	mount(
+		`<a data-topcoat-link="intent" data-topcoat-vt-types="game-expand" href="/next">next</a>`,
+	);
+
+	click(link());
+	await settle();
+
+	expect(vt.calls).toHaveLength(2);
+	expect(typeof vt.calls[1]).toBe("function");
+	expect(document.body.textContent).toContain("next page");
+	vt.restore();
+});
+
+it("navigates without a transition when the link declares no types", async () => {
+	stubFetch(() => snapshot(page("Next", "<p>next page</p>")));
+	const vt = stubViewTransition();
+	mount(`<a data-topcoat-link="intent" href="/next">next</a>`);
+
+	click(link());
+	await settle();
+
+	expect(vt.calls).toHaveLength(0);
+	expect(document.body.textContent).toContain("next page");
+	vt.restore();
+});
+
+it("swaps directly under reduced motion", async () => {
+	stubFetch(() => snapshot(page("Next", "<p>next page</p>")));
+	const vt = stubViewTransition();
+	const reduce = vi
+		.spyOn(window, "matchMedia")
+		.mockReturnValue({ matches: true } as MediaQueryList);
+	mount(
+		`<a data-topcoat-link="intent" data-topcoat-vt-types="game-expand" href="/next">next</a>`,
+	);
+
+	click(link());
+	await settle();
+
+	expect(vt.calls).toHaveLength(0);
+	expect(document.body.textContent).toContain("next page");
+	vt.restore();
+	reduce.mockRestore();
+});
+
+it("announces the committed page so scripts can rebind at a known point", async () => {
+	stubFetch(() => snapshot(page("Next", "<p>next page</p>")));
+	const seen: unknown[] = [];
+	document.addEventListener("topcoat:navigate", (event) => {
+		seen.push((event as CustomEvent).detail);
+	});
+	mount(`<a data-topcoat-link="never" href="/next">next</a>`);
+
+	click(link());
+	await settle();
+
+	expect(seen).toEqual([{ url: "http://localhost:3000/next", mode: "push" }]);
+	// The new page is already in the document when the event fires.
+	expect(document.body.textContent).toContain("next page");
+});
+
+it("announces a back visit with the mode that opened it", async () => {
+	stubFetch(() => snapshot(page("Next", "<p>next page</p>")));
+	const seen: unknown[] = [];
+	document.addEventListener("topcoat:navigate", (event) => {
+		seen.push((event as CustomEvent).detail);
+	});
+	mount(`<a data-topcoat-link="never" href="/next">next</a>`);
+	click(link());
+	await settle();
+	history.replaceState(null, "", "/");
+	window.dispatchEvent(new PopStateEvent("popstate"));
+	await settle();
+
+	expect(seen).toHaveLength(2);
+	expect(seen[1]).toEqual({ url: "http://localhost:3000/", mode: "traverse" });
+});
+
+it("names the clicked element and releases it after the capture", async () => {
+	stubFetch(() => snapshot(page("Next", "<p>next page</p>")));
+	const vt = stubViewTransition();
+	mount(
+		`<a data-topcoat-link="intent" data-topcoat-vt-types="game-expand" href="/next"><img data-topcoat-vt-shared="game-42" src="/shared.jpg" alt=""></a>`,
+	);
+	const shared = link().querySelector("img") as HTMLElement;
+
+	click(link());
+	// The snapshot happens before the response commits, so the name has to
+	// be in place while the click is still being handled.
+	expect(shared.style.getPropertyValue("view-transition-name")).toBe("game-42");
+	expect(shared.style.getPropertyValue("view-transition-class")).toBe(
+		"vt-shared",
+	);
+
+	await settle();
+	// Both pages are named the same from here on if the mark outlived the
+	// swap: two rendered names make the transition skip itself silently.
+	expect(shared.style.getPropertyValue("view-transition-name")).toBe("");
+	expect(shared.style.getPropertyValue("view-transition-class")).toBe("");
+	expect(vt.calls).toHaveLength(1);
+	vt.restore();
+});
+
+it("restores a server-named element after the mark is released", async () => {
+	stubFetch(() => snapshot(page("Next", "<p>next page</p>")));
+	const vt = stubViewTransition();
+	mount(
+		`<a data-topcoat-link="intent" data-topcoat-vt-types="game-expand" href="/next"><img data-topcoat-vt-shared="game-42" src="/shared.jpg" alt="" style="view-transition-name: static-name"></a>`,
+	);
+	const shared = link().querySelector("img") as HTMLElement;
+
+	click(link());
+	expect(shared.style.getPropertyValue("view-transition-name")).toBe("game-42");
+
+	await settle();
+	expect(shared.style.getPropertyValue("view-transition-name")).toBe(
+		"static-name",
+	);
+	vt.restore();
+});
+
+it("keeps the destination's transition styles on a reused element", async () => {
+	stubFetch(() =>
+		snapshot(
+			page(
+				"Next",
+				`<a data-topcoat-link="intent" data-topcoat-vt-types="expand" href="/next"><img id="hero" src="/hero.jpg" alt="" style="view-transition-name: page-hero; view-transition-class: page-class"><img id="plain" src="/plain.jpg" alt=""></a>`,
+			),
+		),
+	);
+	const vt = stubViewTransition();
+	mount(
+		`<a data-topcoat-link="intent" data-topcoat-vt-types="expand" href="/next"><img id="hero" data-topcoat-vt-shared="hero" src="/hero.jpg" alt=""><img id="plain" data-topcoat-vt-shared="plain" src="/plain.jpg" alt=""></a>`,
+	);
+	const hero = document.getElementById("hero") as HTMLElement;
+	const plain = document.getElementById("plain") as HTMLElement;
+
+	click(link());
+	expect(hero.style.getPropertyValue("view-transition-name")).toBe("hero");
+
+	// The swap reuses both elements by id. The destination owns the first
+	// one's inline values, so releasing the mark must not restore the
+	// origin's; the second one has no values of its own, so its mark goes.
+	await settle();
+	expect(hero.style.getPropertyValue("view-transition-name")).toBe("page-hero");
+	expect(hero.style.getPropertyValue("view-transition-class")).toBe(
+		"page-class",
+	);
+	expect(plain.style.getPropertyValue("view-transition-name")).toBe("");
+	expect(plain.style.getPropertyValue("view-transition-class")).toBe("");
+	vt.restore();
+});
+
+it("keeps the destination's name when it matches the mark", async () => {
+	// The documented shape: the destination names its element in the style
+	// with the same name the origin's marker applies.
+	stubFetch(() =>
+		snapshot(
+			page(
+				"Next",
+				`<a data-topcoat-link="intent" data-topcoat-vt-types="expand" href="/next"><img id="hero" src="/hero.jpg" alt="" style="view-transition-name: hero"></a>`,
+			),
+		),
+	);
+	const vt = stubViewTransition();
+	mount(
+		`<a data-topcoat-link="intent" data-topcoat-vt-types="expand" href="/next"><img id="hero" data-topcoat-vt-shared="hero" src="/hero.jpg" alt=""></a>`,
+	);
+	const hero = document.getElementById("hero") as HTMLElement;
+
+	click(link());
+	await settle();
+
+	// The matching value must not make the release mistake the destination's
+	// name for its own mark and take it away.
+	expect(hero.style.getPropertyValue("view-transition-name")).toBe("hero");
+	vt.restore();
+});
+
+it("holds streamed frames until the transition captured the new page", async () => {
+	const stream = streamed();
+	stubFetch(() => stream.response);
+	let capture!: () => void;
+	const ready = new Promise<void>((resolve) => {
+		capture = resolve;
+	});
+	const vt = stubViewTransition(false, ready);
+	mount(
+		`<a data-topcoat-link="never" data-topcoat-vt-types="expand" href="/next">next</a>`,
+	);
+
+	click(link());
+	stream.push({
+		t: "snapshot",
+		html: page(
+			"Next",
+			"<!--::topcoat::region::start(1f)--><p>loading</p><!--::topcoat::region::end(1f)-->",
+		),
+	});
+	stream.push({ t: "swap", region: "1f", html: "<p>loaded</p>" });
+	await settle();
+
+	// The update callback has run, but the browser has not captured the new
+	// page yet, so the buffered swap must wait: applying it now would put it
+	// in the transition's "after" snapshot instead of animating in later.
+	expect(document.body.textContent).toContain("loading");
+	expect(document.body.textContent).not.toContain("loaded");
+
+	capture();
+	stream.close();
+	await settle();
+
+	expect(document.body.textContent).toContain("loaded");
+	vt.restore();
+});
+
+it("releases the previous names before marking another", async () => {
+	stubFetch(() => snapshot(page("Next", "<p>next page</p>")));
+	stubViewTransition();
+	mount(
+		`<a data-topcoat-link="intent" data-topcoat-vt-types="game-expand" href="/next"><img id="a" data-topcoat-vt-shared="game-42" src="/a.jpg" alt=""></a><a data-topcoat-link="intent" data-topcoat-vt-types="game-expand" href="/other"><img id="b" data-topcoat-vt-shared="game-7" src="/b.jpg" alt=""></a>`,
+	);
+	const [first, second] = Array.from(
+		document.querySelectorAll("img"),
+	) as HTMLElement[];
+
+	click(link("#a").closest("a") as Element);
+	click(link("#b").closest("a") as Element);
+
+	// Two live names would make the next transition reject and skip.
+	expect(first?.style.getPropertyValue("view-transition-name")).toBe("");
+	expect(second?.style.getPropertyValue("view-transition-name")).toBe("game-7");
+	await settle();
+});
+
+it("keeps a newer click's name when a superseded navigation settles", async () => {
+	// The first click's request must reject on abort for its navigation to
+	// settle, so the stub honours the signal the runtime passes.
+	const bResponse = snapshot(page("B", "<p>b</p>"));
+	let releaseB: () => void = () => {};
+	vi.stubGlobal("fetch", (input: RequestInfo | URL, init: RequestInit) => {
+		const path = new URL(String(input)).pathname;
+		return new Promise<Response>((resolve, reject) => {
+			init.signal?.addEventListener("abort", () =>
+				reject(new DOMException("aborted", "AbortError")),
+			);
+			if (path === "/a") return;
+			releaseB = () => resolve(bResponse);
+		});
+	});
+	const atSnapshot: string[] = [];
+	(document as unknown as Record<string, unknown>).startViewTransition = (
+		options: unknown,
+	) => {
+		const update =
+			typeof options === "function"
+				? options
+				: (options as { update: () => void }).update;
+		atSnapshot.push(second.style.getPropertyValue("view-transition-name"));
+		update();
+		return {
+			updateCallbackDone: Promise.resolve(),
+			ready: Promise.resolve(),
+			finished: Promise.resolve(),
+		};
+	};
+	mount(
+		`<a id="a" data-topcoat-link="intent" data-topcoat-vt-types="expand" data-topcoat-vt-shared="name-a" href="/a">A</a>` +
+			`<a id="b" data-topcoat-link="intent" data-topcoat-vt-types="expand" href="/b"><img data-topcoat-vt-shared="name-b" src="/b.jpg" alt=""></a>`,
+	);
+	const second = link("#b").querySelector("img") as HTMLElement;
+
+	click(link("#a"));
+	click(link("#b"));
+	// The superseded navigation settles here, before B's response arrives.
+	await settle();
+	releaseB();
+	await settle();
+
+	// B is the transition's origin, so its element still has to be named
+	// when the snapshot is taken.
+	expect(atSnapshot).toEqual(["name-b"]);
+});
+
+it("keeps a duplicate name off the page rather than marking it twice", async () => {
+	stubFetch(() => snapshot(page("Next", "<p>next page</p>")));
+	mount(
+		`<a data-topcoat-link="intent" data-topcoat-vt-types="expand" href="/next"><img id="a" data-topcoat-vt-shared="same" src="/a.jpg" alt=""><span id="b" data-topcoat-vt-shared="same"></span></a>`,
+	);
+	const first = document.getElementById("a") as HTMLElement;
+	const second = document.getElementById("b") as HTMLElement;
+
+	click(link());
+
+	// Two rendered elements sharing a name make the browser reject the
+	// transition outright, so only the first keeps it and the second would
+	// otherwise take the whole animation down with it.
+	expect(first.style.getPropertyValue("view-transition-name")).toBe("same");
+	expect(second.style.getPropertyValue("view-transition-name")).toBe("");
+});
+
+it("names every element the link marks, not only the first", async () => {
+	stubFetch(() => snapshot(page("Next", "<p>next page</p>")));
+	mount(
+		`<a data-topcoat-link="intent" data-topcoat-vt-types="expand" href="/next"><img id="a" data-topcoat-vt-shared="one" src="/a.jpg" alt=""><span id="b" data-topcoat-vt-shared="two"></span></a>`,
+	);
+	const first = document.getElementById("a") as HTMLElement;
+	const second = document.getElementById("b") as HTMLElement;
+
+	click(link());
+	// A link can morph more than one element without the runtime guessing
+	// which: each marked element carries its own name.
+	expect(first.style.getPropertyValue("view-transition-name")).toBe("one");
+	expect(second.style.getPropertyValue("view-transition-name")).toBe("two");
+	expect(first.style.getPropertyValue("view-transition-class")).toBe(
+		"vt-shared",
+	);
+	expect(second.style.getPropertyValue("view-transition-class")).toBe(
+		"vt-shared",
+	);
+
+	await settle();
+	expect(first.style.getPropertyValue("view-transition-name")).toBe("");
+	expect(second.style.getPropertyValue("view-transition-name")).toBe("");
+});
+
+it("names a non-image element when that is what the link marks", async () => {
+	stubFetch(() => snapshot(page("Next", "<p>next page</p>")));
+	mount(
+		`<a data-topcoat-link="intent" data-topcoat-vt-types="expand" href="/next"><img src="/ignored.jpg" alt=""><span id="card" data-topcoat-vt-shared="card-1"></span></a>`,
+	);
+	const image = link().querySelector("img") as HTMLElement;
+	const card = document.getElementById("card") as HTMLElement;
+
+	click(link());
+	expect(card.style.getPropertyValue("view-transition-name")).toBe("card-1");
+	// Only marked elements are named, so an unmarked sibling image stays
+	// out of the transition.
+	expect(image.style.getPropertyValue("view-transition-name")).toBe("");
+	await settle();
+});
+
+it("leaves the element unnamed when the link declares no transition types", async () => {
+	stubFetch(() => snapshot(page("Next", "<p>next page</p>")));
+	mount(
+		`<a data-topcoat-link="intent" data-topcoat-vt-shared="game-42" href="/next"><img src="/shared.jpg" alt=""></a>`,
+	);
+	const shared = link().querySelector("img") as HTMLElement;
+
+	click(link());
+	await settle();
+
+	// Nothing pairs with it without a transition, so it must not linger.
+	expect(shared.style.getPropertyValue("view-transition-name")).toBe("");
+});
+
+it("lets a boot-time listener bind to content the new page brings", async () => {
+	stubFetch(() =>
+		snapshot(
+			page("Next", '<div data-shelf-sentinel="1"><button>load</button></div>'),
+		),
+	);
+	mount(`<a data-topcoat-link="intent" href="/next">next</a>`);
+	// The shape a script outside the runtime uses: bind at boot, rebind on
+	// the announcement.
+	const bound: string[] = [];
+	const init = () => {
+		for (const el of document.querySelectorAll("[data-shelf-sentinel]")) {
+			bound.push(el.getAttribute("data-shelf-sentinel") ?? "");
+		}
+	};
+	init();
+	document.addEventListener("topcoat:navigate", init);
+	expect(bound).toEqual([]);
+
+	click(link());
+	await settle();
+
+	// Same tick as the swap, not "whenever the next mutation happens".
+	expect(bound).toEqual(["1"]);
+});
