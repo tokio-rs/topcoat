@@ -77,7 +77,7 @@ Returning `Ok(EmitToken)` satisfies the return type but does not emit content. T
 
 Call [`connected(cx)`] to keep a live region updating after the HTTP response finishes. During HTTP rendering, it returns `false` and asks the browser to connect the enclosing page or shard. Once the response finishes, the browser opens a WebSocket and renders that page or shard again, with `connected(cx)` returning `true`. Enable `.runtime()` on the router and include `topcoat::runtime::script()` in the document, as shown in the [runtime setup guide].
 
-One WebSocket carries the connected renders of a whole browser tab: one for each connected page or shard that is not inside another one. The server limits how many run at once on each WebSocket and refuses more with `429 Too Many Requests`. The limit is 64 by default; change it with `.max_runs_per_connection(n)` on the router.
+One WebSocket carries the connected renders of a whole browser tab: one for each connected page or shard that is not inside another one. The server limits how many run at once on each WebSocket and refuses more with `429 Too Many Requests`. The limit is 64 by default. Change it by adding a [`MaxRunsPerConnection`](crate::runtime::MaxRunsPerConnection) to the router with `.with(MaxRunsPerConnection(n))`.
 
 The live body starts from the beginning for each render. On the HTTP request, emit the current content and return. On the connected render, emit the latest content and then wait for updates. This chat example listens for message notifications and renders the list again after each one:
 

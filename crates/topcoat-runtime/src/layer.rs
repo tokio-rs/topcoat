@@ -26,8 +26,7 @@ pub const RUNTIME_PROTOCOL: &str = "topcoat-runtime";
 ///   connection describes an HTTP request: a method, a path, a body, and a few runtime headers,
 ///   such as [`RUNTIME_HEADER`] for a page rerun. The layer dispatches it with the handshake's
 ///   other headers as a connected render. Renders run side by side, and each message sent back
-///   names the render it belongs to. A connection may have at most
-///   [`max_runs_per_connection`](crate::RouterBuilderRuntimeExt::max_runs_per_connection) renders
+///   names the render it belongs to. A connection may have at most [`MaxRunsPerConnection`] renders
 ///   at once.
 ///
 /// WebSocket connections are supported on native servers. HTTP page reruns
@@ -60,9 +59,24 @@ impl Layer for RuntimeLayer {
     }
 }
 
-/// The limit set with
-/// [`RouterBuilderRuntimeExt::max_runs_per_connection`](crate::RouterBuilderRuntimeExt::max_runs_per_connection).
+/// Limits the number of renders running at once on a runtime connection.
+/// The default limit is 64.
+///
+/// Each connected page or shard has a render, unless it is inside another
+/// connected page or shard. At the limit, new render requests receive
+/// `429 Too Many Requests`. They can be accepted again once a render
+/// finishes or stops.
+///
+/// Add it to the router's context to change the limit:
+///
+/// ```rust
+/// use topcoat_router::Router;
+/// use topcoat_runtime::{MaxRunsPerConnection, RouterBuilderRuntimeExt};
+///
+/// let router = Router::builder()
+///     .runtime()
+///     .with(MaxRunsPerConnection(128))
+///     .build();
+/// ```
 #[derive(Debug, Clone, Copy)]
-// Read only by the WebSocket handler, which native servers compile.
-#[cfg_attr(target_family = "wasm", allow(dead_code))]
-pub(crate) struct MaxRunsPerConnection(pub(crate) usize);
+pub struct MaxRunsPerConnection(pub usize);

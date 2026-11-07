@@ -63,7 +63,7 @@ Ok(view! {
 
 Prefetching renders the destination on the server even if the user never opens it. Keep mutations in form submissions or procedures rather than page rendering.
 
-Choose the app's default with [`RouterBuilderRuntimeExt::prefetch`](crate::RouterBuilderRuntimeExt::prefetch):
+Choose the app's default by adding a `PrefetchMode` to the router's context:
 
 ```rust
 use topcoat::{
@@ -73,7 +73,7 @@ use topcoat::{
 
 let router = Router::builder()
     .runtime()
-    .prefetch(PrefetchMode::Viewport)
+    .with(PrefetchMode::Viewport)
     .build();
 ```
 
