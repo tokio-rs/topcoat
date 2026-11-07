@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use topcoat::{
     Result,
     context::Cx,
-    cookie::{CookieStore, Cookies, Key, RouterBuilderCookieExt, cookie_store, signed_cookies},
+    cookie::{CookieLayer, CookieStore, Cookies, Key, cookie_store, signed_cookies},
     router::{module_router, page},
     view::{View, view},
 };
@@ -12,9 +12,14 @@ async fn main() {
     // The key signs cookies so the client cannot forge the visit counter.
     // A real application would load a persistent key instead of generating
     // a new one on every start.
-    topcoat::start(module_router!().cookies().with(Key::generate()).build())
-        .await
-        .unwrap();
+    topcoat::start(
+        module_router!()
+            .layer(CookieLayer::new())
+            .with(Key::generate())
+            .build(),
+    )
+    .await
+    .unwrap();
 }
 
 // The jar every handler goes through, so its attribute defaults are set once.

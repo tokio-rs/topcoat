@@ -27,13 +27,13 @@ Register session support on the router with [`RouterBuilderSessionExt::sessions`
 ```rust,standalone_crate
 use topcoat::router::module_router;
 use topcoat::{
-    cookie::RouterBuilderCookieExt,
+    cookie::CookieLayer,
     router::Router,
     session::{RouterBuilderSessionExt, SessionConfig},
 };
 
 let router = module_router!()
-    .cookies()
+    .layer(CookieLayer::new())
     .sessions(SessionConfig::default())
     .build();
 ```

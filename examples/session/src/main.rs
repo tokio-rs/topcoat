@@ -1,4 +1,4 @@
-use topcoat::{cookie::RouterBuilderCookieExt, session::RouterBuilderSessionExt};
+use topcoat::{cookie::CookieLayer, session::RouterBuilderSessionExt};
 
 mod login;
 mod logout;
@@ -24,7 +24,7 @@ async fn main() {
     // live is up to the application, here the in-memory `Database` below.
     topcoat::start(
         module_router!()
-            .cookies()
+            .layer(CookieLayer::new())
             .sessions(SessionConfig::default())
             .with(Database::default())
             .build(),

@@ -30,14 +30,14 @@ use crate::{
 /// # impl AppConfig { fn load() -> Self { Self } }
 /// use topcoat::{
 ///     asset::{AssetBundle, RouterBuilderAssetExt},
-///     cookie::RouterBuilderCookieExt,
+///     cookie::CookieLayer,
 ///     router::{Router, RouterBuilderDiscoverExt},
 /// };
 ///
 /// pub fn router() -> Router {
 ///     Router::builder()
 ///         .discover()
-///         .cookies()
+///         .layer(CookieLayer::new())
 ///         .assets(AssetBundle::load().unwrap())
 ///         .with(AppConfig::load())
 ///         .build()

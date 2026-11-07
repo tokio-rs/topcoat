@@ -9,7 +9,7 @@ use topcoat::{
     Result,
     asset::{AssetBundle, RouterBuilderAssetExt},
     context::Cx,
-    cookie::RouterBuilderCookieExt,
+    cookie::CookieLayer,
     font::{Font, fontsource::fontsource_font},
     l10n::locale,
     metadata::{Metadata, Robots},
@@ -32,7 +32,7 @@ pub fn router() -> RouterBuilder {
     module_router!()
         .discover()
         .assets(AssetBundle::load().unwrap())
-        .cookies()
+        .layer(CookieLayer::new())
         .sessions(SessionConfig::default())
         // Register the runtime after the application layers so rerenders use them too.
         .runtime()
