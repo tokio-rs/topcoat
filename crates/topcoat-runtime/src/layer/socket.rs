@@ -5,10 +5,7 @@ use std::{collections::HashMap, sync::Arc};
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::{sync::mpsc, task::JoinHandle};
-use topcoat_core::{
-    context::{Cx, try_context},
-    error::Result,
-};
+use topcoat_core::{context::Cx, error::Result};
 use topcoat_router::{
     Body, HeaderMap, HeaderName, HeaderValue, Method, RemoteAddr, Router, Uri,
     content::{
@@ -21,12 +18,7 @@ use topcoat_router::{
     router,
 };
 
-use super::MaxRunsPerConnection;
 use crate::{ConnectedRender, RUNTIME_HEADER, RUNTIME_PROTOCOL};
-
-/// How many runs one connection may have at once, unless the router sets
-/// a [`MaxRunsPerConnection`].
-const DEFAULT_MAX_RUNS_PER_CONNECTION: usize = 64;
 
 /// Checks for a `GET` that requests the runtime WebSocket subprotocol.
 pub(super) fn requested(cx: &Cx) -> bool {
@@ -43,12 +35,11 @@ fn requests_runtime_protocol(headers: &HeaderMap) -> bool {
         .any(|protocol| protocol.trim() == RUNTIME_PROTOCOL)
 }
 
-/// Opens the WebSocket and starts handling render requests.
-pub(super) async fn accept(cx: &Cx, body: Body) -> Result<Response> {
+/// Opens the WebSocket and starts handling render requests, at most
+/// `max_runs` at once.
+pub(super) async fn accept(cx: &Cx, body: Body, max_runs: usize) -> Result<Response> {
     let upgrade = WebSocketUpgrade::from_request(cx, body).await?;
     let connection = Arc::new(Connection::from_handshake(cx));
-    let max_runs = try_context::<MaxRunsPerConnection>(cx)
-        .map_or(DEFAULT_MAX_RUNS_PER_CONNECTION, |max| max.0);
     upgrade
         .protocols([RUNTIME_PROTOCOL])
         .on_upgrade(move |socket| run(connection, socket, max_runs))

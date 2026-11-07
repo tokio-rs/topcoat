@@ -14,7 +14,7 @@ mod layer;
 mod link_;
 #[cfg(feature = "router")]
 mod procedure;
-mod router;
+mod setup;
 #[cfg(feature = "router")]
 mod shard;
 #[cfg(feature = "router")]
@@ -33,7 +33,7 @@ pub use layer::*;
 pub use link_::*;
 #[cfg(feature = "router")]
 pub use procedure::*;
-pub use router::*;
+pub use setup::*;
 #[cfg(feature = "router")]
 pub use shard::*;
 #[cfg(feature = "router")]

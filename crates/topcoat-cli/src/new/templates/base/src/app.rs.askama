@@ -35,7 +35,7 @@ use topcoat::{
     router::{Router,{% if toasty %} RouterBuilder,{% endif %} Slot,{% if example %} href,{% endif %} layout, page},
 {%- endmatch %}
 {%- if interaction == Interaction::Topcoat %}
-    runtime::RouterBuilderRuntimeExt,
+    runtime::RuntimeLayer,
 {%- endif %}
 {%- if tailwind %}
     tailwind,
@@ -108,7 +108,7 @@ pub fn router() -> Router {
         .assets(AssetBundle::load().unwrap())
 {%- if interaction == Interaction::Topcoat %}
         // Lets the browser runtime rerun pages; register it after other layers.
-        .runtime()
+        .layer(RuntimeLayer::new())
 {%- endif %}
 {%- if !toasty %}
         .build()

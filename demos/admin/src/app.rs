@@ -17,7 +17,7 @@ use topcoat::{
         Body, Next, RouterBuilder, RouterBuilderDiscoverExt, Slot, layer, layout, module_router,
         response::Response,
     },
-    runtime::RouterBuilderRuntimeExt,
+    runtime::RuntimeLayer,
     tailwind,
     view::{View, view},
 };
@@ -33,7 +33,7 @@ pub fn router() -> RouterBuilder {
         .assets(AssetBundle::load().unwrap())
         .layer(CookieLayer::new())
         // Register the runtime after the application layers so rerenders use them too.
-        .runtime()
+        .layer(RuntimeLayer::new())
 }
 
 /// Sets the language for every request, including shard updates.

@@ -26,9 +26,7 @@ use topcoat::{
         error::{bad_request, redirect},
         page, to_bytes,
     },
-    runtime::{
-        MaxRunsPerConnection, RUNTIME_PROTOCOL, RouterBuilderRuntimeExt, connected, shard, signal,
-    },
+    runtime::{RUNTIME_PROTOCOL, RuntimeLayer, connected, shard, signal},
     view::{View, emit, live, view},
 };
 
@@ -168,11 +166,10 @@ fn builder() -> RouterBuilder {
         .page(away)
         .page(broken)
         .route(feed)
-        .runtime()
 }
 
 fn router() -> Router {
-    builder().build()
+    builder().layer(RuntimeLayer::new()).build()
 }
 
 /// Starts a server on an available port. Sending on the returned channel
@@ -444,7 +441,10 @@ async fn stopping_a_run_drops_its_render() {
 
 #[tokio::test]
 async fn a_connection_refuses_new_runs_beyond_its_limit_until_one_stops() {
-    let (addr, shutdown_tx, server) = serve(builder().with(MaxRunsPerConnection(2)).build()).await;
+    let router = builder()
+        .layer(RuntimeLayer::new().max_runs_per_connection(2))
+        .build();
+    let (addr, shutdown_tx, server) = serve(router).await;
     let mut client = connect(addr, "/slow").await;
 
     // Both runs stay open while connected.
