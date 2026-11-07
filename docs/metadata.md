@@ -180,19 +180,21 @@ Use [`Url::Current`] to use the current request's URL without its query string. 
 
 ```rust
 use topcoat::{
+    context::BaseUrl,
     metadata::{Metadata, Url},
     router::Router,
 };
 
 let router = Router::builder()
-    .base_url("https://example.com")
+    .with(BaseUrl::new("https://example.com")?)
     .with(Metadata::new().canonical(Url::Current))
     .build();
+# Ok::<(), topcoat::context::BaseUrlError>(())
 ```
 
 You can also pass an absolute URL, a path relative to the site root such as `/products`, or [`Url::route(&handler)`](Url::route) for a page without path parameters. For a route with parameters, build its URL with [`href!`](macro@crate::router::href) in a [loading function](#loading-metadata-for-a-request).
 
-Canonical tags request absolute URLs. Set the router's [base URL](crate::router::RouterBuilder::base_url) so Topcoat can turn `/products` into `https://example.com/products`. URLs that are already absolute stay unchanged. Resolving a site-relative URL without the required base URL panics.
+Canonical tags request absolute URLs. Add a [`BaseUrl`](crate::context::BaseUrl) to the router's context so Topcoat can turn `/products` into `https://example.com/products`. URLs that are already absolute stay unchanged. Resolving a site-relative URL without the required base URL panics.
 
 There is no default canonical URL. Use [`no_canonical`](Metadata::no_canonical) to omit an inherited one.
 

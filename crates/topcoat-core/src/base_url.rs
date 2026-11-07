@@ -13,9 +13,9 @@ use crate::context::{Cx, try_context};
 /// path prefix supports applications mounted below the host root, such as
 /// `https://example.com/app`.
 ///
-/// Register one on the router builder with `.base_url(...)`, read it back
-/// with [`base_url`] or [`try_base_url`], and resolve paths against it with
-/// [`join`](BaseUrl::join):
+/// Add one to the router's context with `.with(BaseUrl::new(...)?)`, read it
+/// back with [`base_url`] or [`try_base_url`], and resolve paths against it
+/// with [`join`](BaseUrl::join).
 ///
 /// ```
 /// use topcoat::context::BaseUrl;
@@ -176,12 +176,12 @@ pub enum BaseUrlError {
     HasFragment,
 }
 
-/// Returns the [`BaseUrl`] registered on the router.
+/// Returns the [`BaseUrl`] in the context.
 ///
 /// # Panics
 ///
-/// Panics if no base URL has been registered. Register one on the router
-/// builder with `.base_url(...)`.
+/// Panics if the context has no base URL. Add one to the router's context
+/// with `.with(BaseUrl::new(...)?)`.
 ///
 /// # Examples
 ///
@@ -199,13 +199,12 @@ pub fn base_url(cx: &Cx) -> &BaseUrl {
         Some(base_url) => base_url,
         None => panic!(
             "attempted to access the base URL, but none was registered; \
-             register one on the router builder with `.base_url(...)`"
+             add one to the router builder with `.with(BaseUrl::new(...)?)`"
         ),
     }
 }
 
-/// Returns the [`BaseUrl`] registered on the router, or `None` if none has
-/// been registered.
+/// Returns the [`BaseUrl`] in the context, or `None` if it has none.
 #[must_use]
 pub fn try_base_url(cx: &Cx) -> Option<&BaseUrl> {
     try_context(cx)

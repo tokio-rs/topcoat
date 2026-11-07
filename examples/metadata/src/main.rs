@@ -2,7 +2,7 @@ mod products;
 
 use topcoat::{
     Result,
-    context::Cx,
+    context::{BaseUrl, Cx},
     metadata::{Metadata, OpenGraph, Twitter, Url},
     router::{Slot, href, layout, module_router, page},
     view::{View, view},
@@ -13,7 +13,7 @@ async fn main() {
     topcoat::start(
         module_router!()
             // Set the site's base URL so canonical links can use absolute URLs.
-            .base_url("http://localhost:3000")
+            .with(BaseUrl::new("http://localhost:3000").unwrap())
             .build(),
     )
     .await

@@ -19,9 +19,9 @@ use crate::{
 /// return it from a route serving `/sitemap.xml`. The response is sent with
 /// `Content-Type: application/xml`.
 ///
-/// An entry holding a root-relative path is resolved against the base URL
-/// registered on the router with `.base_url(...)`, because the sitemap
-/// format requires absolute URLs. An entry that is already an absolute
+/// An entry holding a root-relative path is resolved against the
+/// [`BaseUrl`](topcoat_core::base_url::BaseUrl) in the context, because the
+/// sitemap format requires absolute URLs. An entry that is already an absolute
 /// `http` or `https` URL is used as is.
 ///
 /// # Panics
