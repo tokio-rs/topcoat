@@ -109,7 +109,7 @@ use topcoat::{
 # #[topcoat::router::page("/posts")]
 # async fn posts(cx: &Cx) -> Result<impl topcoat::view::View> { Ok(topcoat::view::view! { "Posts" }) }
 
-#[route(POST, "/posts/new")]
+#[route(POST "/posts/new")]
 async fn create_post(cx: &Cx) -> Result<SeeOther> {
     Ok(see_other(href!(posts).resolve(cx)))
 }
