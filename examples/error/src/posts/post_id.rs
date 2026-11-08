@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{error::RouterErrorExt, module_param, page, path_param},
+    router::{error::RouterErrorExt, module_param, page},
     view::{View, view},
 };
 
@@ -10,7 +10,7 @@ module_param!(pub(crate) post_id: u64 else bad_request);
 // ok_or_not_found turns the None into a 404, which the layout's error boundary catches.
 #[page]
 pub(crate) async fn post(cx: &Cx) -> Result<impl View> {
-    let title = match *path_param::<crate::posts::post_id::PostId>(cx)? {
+    let title = match *crate::posts::post_id::post_id(cx)? {
         1 => Some("Hello Topcoat"),
         2 => Some("Error handling"),
         _ => None,

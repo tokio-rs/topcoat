@@ -3,7 +3,7 @@ use topcoat::{
     context::Cx,
     router::{
         error::{SeeOther, see_other},
-        href, path_param, route,
+        href, route,
     },
 };
 
@@ -13,7 +13,7 @@ use crate::{Todo, db, home};
 pub(crate) async fn delete(cx: &Cx) -> Result<SeeOther> {
     Todo::delete_by_id(
         &mut db(cx),
-        *path_param::<crate::todos::todo_id::TodoId>(cx)?,
+        *crate::todos::todo_id::todo_id(cx)?,
     )
     .await?;
 

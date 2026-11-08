@@ -6,7 +6,7 @@ use topcoat::{
     router::{
         content::Form,
         error::{RouterErrorExt, SeeOther, see_other},
-        href, module_param, page, path_param, route,
+        href, module_param, page, route,
     },
     runtime::{Event, link, signal},
     view::{View, attributes, component, element_id, suspense, view},
@@ -41,10 +41,10 @@ use crate::{
 
 module_param!(pub order_id: u64 else not_found);
 
-#[page(with(Crumb::new(async |cx| Ok(format!("#{}", path_param::<OrderId>(cx)?)))))]
+#[page(with(Crumb::new(async |cx| Ok(format!("#{}", order_id(cx)?)))))]
 pub async fn page(cx: &Cx) -> Result<impl View> {
     let user = require_user(cx).await?;
-    let id = *path_param::<OrderId>(cx)?;
+    let id = *order_id(cx)?;
     // Look up the order before streaming starts so a missing order can return 404.
     let order = Order::find(cx, id).await?.ok_or_not_found()?;
     let next = if user.role.can_edit() {
@@ -405,7 +405,7 @@ pub async fn advance(cx: &Cx, Form(form): Form<Advance>) -> Result<SeeOther> {
     let user = require_user(cx).await?;
     user.role.can_edit().then_some(()).ok_or_forbidden()?;
 
-    let id = *path_param::<OrderId>(cx)?;
+    let id = *order_id(cx)?;
     let mut order = Order::find(cx, id).await?.ok_or_not_found()?;
     // Another request may have changed the status since this page was opened.
     // If this transition is no longer allowed, show the current order unchanged.

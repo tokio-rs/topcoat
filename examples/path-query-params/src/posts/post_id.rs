@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{href, module_param, page, path_param},
+    router::{href, module_param, page},
     view::{View, view},
 };
 
@@ -9,7 +9,7 @@ module_param!(pub(crate) post_id: u32 else bad_request("Post ID must be a number
 
 #[page]
 pub(crate) async fn post(cx: &Cx) -> Result<impl View> {
-    let post_id = path_param::<crate::posts::post_id::PostId>(cx)?;
+    let post_id = crate::posts::post_id::post_id(cx)?;
 
     Ok(view! {
         <h1>

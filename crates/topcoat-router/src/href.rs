@@ -453,7 +453,7 @@ pub struct Href<T, P, Q, F> {
     fragment: Option<F>,
 }
 
-impl<T, P> Href<T, P, (), ()> {
+impl<T, P> Href<T, P, (), &'static str> {
     #[doc(hidden)]
     pub fn new(target: T, params: P) -> Self {
         Self {

@@ -5,7 +5,7 @@ use topcoat::{
     context::Cx,
     l10n::{Locale, locale},
     router::{
-        Body, Next, Slot, error::not_found, href, layer, layout, module_param, path_param,
+        Body, Next, Slot, error::not_found, href, layer, layout, module_param,
         response::Response,
     },
     view::{View, component, view},
@@ -19,7 +19,7 @@ module_param!(pub path_locale: Locale else not_found);
 // Sets the locale for every page in this module. Each `t!` translates into it.
 #[layer]
 async fn layer(cx: &Cx, body: Body, next: Next<'_>) -> Result<Response> {
-    let path_locale = path_param::<PathLocale>(cx)?;
+    let path_locale = path_locale(cx)?;
     // Any locale can be typed into the URL, so reject the ones without messages.
     if !t::locales().contains(path_locale) {
         return Err(not_found().into());

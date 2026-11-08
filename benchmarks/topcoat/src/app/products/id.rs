@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     context::{Cx, context},
-    router::{error::RouterErrorExt, module_param, page, path_param},
+    router::{error::RouterErrorExt, module_param, page},
     view::{View, view},
 };
 
@@ -16,7 +16,7 @@ module_param!(product_id: u32 else not_found);
 async fn product_detail(cx: &Cx) -> Result<impl View> {
     let catalog = context::<Catalog>(cx);
     let product = catalog
-        .get(*path_param::<ProductId>(cx)?)
+        .get(*product_id(cx)?)
         .ok_or_not_found()?;
     let related: Vec<&Product> = product
         .related_ids
