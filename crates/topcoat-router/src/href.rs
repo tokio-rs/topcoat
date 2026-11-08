@@ -13,7 +13,7 @@ use topcoat_core::{
 };
 use topcoat_view::{AttributeValueViewParts, NodeViewParts, PartsWriter};
 
-use crate::{Path, PathSegment, PathSegments, request::uri};
+use crate::{CatchAllSegments, Path, PathSegment, request::uri};
 
 /// The destination an [`href`] points at, resolved to the route [`Path`] the
 /// URL is built from.
@@ -111,6 +111,43 @@ pub struct HrefArg<P, V> {
     param: PhantomData<fn() -> P>,
 }
 
+impl<P, V> HrefArg<P, V>
+where
+    P: HrefParam<V>,
+{
+    /// Writes the value into `out` as the parameter `name` of `path`,
+    /// checking that it filled as much of the path as the parameter stands
+    /// for.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a regular parameter is not given exactly one segment, or a
+    /// catch-all none: a catch-all matches at least one segment, so an empty
+    /// one addresses a path its route does not serve.
+    fn fill(&self, name: &str, catch_all: bool, path: &Path, out: &mut String) {
+        let mut segments = HrefSegments {
+            out,
+            name,
+            path,
+            count: 0,
+        };
+        P::segments(&self.value, &mut segments);
+        let count = segments.count;
+
+        if catch_all {
+            assert!(
+                count > 0,
+                "catch-all parameter \"{name}\" in `{path}` was given no segment"
+            );
+        } else {
+            assert!(
+                count == 1,
+                "parameter \"{name}\" fills one segment of `{path}`, but was given {count}"
+            );
+        }
+    }
+}
+
 /// The URL segments a path parameter is filled with.
 ///
 /// [`push`](Self::push) appends one segment. The separating `/` and the
@@ -152,6 +189,175 @@ impl HrefSegments<'_> {
              addresses another path instead of filling a segment"
         );
         self.count += 1;
+    }
+}
+
+/// A list of string segments: the value of a catch-all path parameter
+/// declared without a type.
+///
+/// It is implemented for slices, arrays, and vectors of strings, for
+/// references to them, and for the [`CatchAllSegments`] read from a request.
+pub trait SegmentList {
+    /// Calls `f` with each segment, in order.
+    fn for_each_segment(&self, f: impl FnMut(&str));
+}
+
+impl<S> SegmentList for [S]
+where
+    S: AsRef<str>,
+{
+    fn for_each_segment(&self, mut f: impl FnMut(&str)) {
+        for segment in self {
+            f(segment.as_ref());
+        }
+    }
+}
+
+impl<S, const N: usize> SegmentList for [S; N]
+where
+    S: AsRef<str>,
+{
+    fn for_each_segment(&self, f: impl FnMut(&str)) {
+        self.as_slice().for_each_segment(f);
+    }
+}
+
+impl<S> SegmentList for Vec<S>
+where
+    S: AsRef<str>,
+{
+    fn for_each_segment(&self, f: impl FnMut(&str)) {
+        self.as_slice().for_each_segment(f);
+    }
+}
+
+impl<T> SegmentList for &T
+where
+    T: SegmentList + ?Sized,
+{
+    fn for_each_segment(&self, f: impl FnMut(&str)) {
+        (**self).for_each_segment(f);
+    }
+}
+
+impl SegmentList for CatchAllSegments<'_> {
+    fn for_each_segment(&self, f: impl FnMut(&str)) {
+        self.clone().for_each(f);
+    }
+}
+
+/// The path parameters of an href: a tuple of up to eight [`HrefArg`]s, one
+/// for each parameter of the path, in any order.
+pub trait HrefParams {
+    /// Writes `path` into `out`, filling each parameter with the argument of
+    /// the same name.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the arguments do not line up with the path's parameters: a
+    /// parameter no argument fills, an argument the path declares no parameter
+    /// for, a parameter given two arguments, or an argument that fills its
+    /// parameter with the wrong number of segments. Panics as well if a
+    /// segment renders to nothing, `.`, or `..`.
+    fn assign(&self, path: &Path, out: &mut String);
+}
+
+/// Generates the `HrefParams` impl for a tuple of arguments, each given as its
+/// parameter type and value type.
+///
+/// Each argument is bound to a variable named like its parameter type. The
+/// variable lives in the value namespace and the type in the type namespace,
+/// so both stay reachable.
+macro_rules! impl_href_params_tuples {
+    ( $(($param:ident, $value:ident)),* ) => {
+        #[allow(non_snake_case, unused_mut)]
+        impl<$($param, $value,)*> HrefParams for ($(HrefArg<$param, $value>,)*)
+        where
+            $($param: HrefParam<$value>,)*
+        {
+            fn assign(&self, path: &Path, out: &mut String) {
+                let ($($param,)*) = self;
+                let start = out.len();
+                let mut filled = 0;
+
+                for segment in path.segments() {
+                    let (name, catch_all) = match segment {
+                        PathSegment::Group(_) => continue,
+                        PathSegment::Static(segment) => {
+                            out.push('/');
+                            out.push_str(segment);
+                            continue;
+                        }
+                        PathSegment::Param(name) => (name, false),
+                        PathSegment::CatchAll(name) => (name, true),
+                    };
+                    $(
+                        if <$param as HrefParam<$value>>::NAME == name {
+                            $param.fill(name, catch_all, path, out);
+                            filled += 1;
+                            continue;
+                        }
+                    )*
+                    panic!("no value provided for path parameter \"{name}\" in `{path}`");
+                }
+
+                let names: &[&str] = &[$(<$param as HrefParam<$value>>::NAME,)*];
+                if filled != names.len() {
+                    reject_leftover_args(names, path);
+                }
+
+                // A path with no URL segments, like the root or a group-only
+                // path, still addresses `/`.
+                if out.len() == start {
+                    out.push('/');
+                }
+            }
+        }
+    };
+}
+
+impl_href_params_tuples!();
+impl_href_params_tuples!((P1, V1));
+impl_href_params_tuples!((P1, V1), (P2, V2));
+impl_href_params_tuples!((P1, V1), (P2, V2), (P3, V3));
+impl_href_params_tuples!((P1, V1), (P2, V2), (P3, V3), (P4, V4));
+impl_href_params_tuples!((P1, V1), (P2, V2), (P3, V3), (P4, V4), (P5, V5));
+impl_href_params_tuples!((P1, V1), (P2, V2), (P3, V3), (P4, V4), (P5, V5), (P6, V6));
+impl_href_params_tuples!(
+    (P1, V1),
+    (P2, V2),
+    (P3, V3),
+    (P4, V4),
+    (P5, V5),
+    (P6, V6),
+    (P7, V7)
+);
+impl_href_params_tuples!(
+    (P1, V1),
+    (P2, V2),
+    (P3, V3),
+    (P4, V4),
+    (P5, V5),
+    (P6, V6),
+    (P7, V7),
+    (P8, V8)
+);
+
+/// Panics on the arguments of an href that filled no parameter of `path`.
+///
+/// Every parameter takes the first argument of its name, so an argument left
+/// over names a parameter the path does not declare, or repeats one.
+fn reject_leftover_args(names: &[&str], path: &Path) {
+    for (index, &name) in names.iter().enumerate() {
+        assert!(
+            path.segments()
+                .any(|segment| segment.param_name() == Some(name)),
+            "`{path}` declares no parameter \"{name}\""
+        );
+        assert!(
+            !names[..index].contains(&name),
+            "path parameter \"{name}\" in `{path}` was given more than once"
+        );
     }
 }
 
