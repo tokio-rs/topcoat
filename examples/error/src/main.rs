@@ -25,22 +25,12 @@ async fn home(cx: &Cx) -> Result<impl View> {
         <h1>"Error handling"</h1>
         <ul>
             <li>
-                <a
-                    href=(href!(
-                        crate::posts::post_id::post,
-                        crate::posts::post_id::PostId(1),
-                    ))
-                >
+                <a href=(href!(crate::posts::post_id::post, crate::posts::post_id: 1))>
                     "An existing post"
                 </a>
             </li>
             <li>
-                <a
-                    href=(href!(
-                        crate::posts::post_id::post,
-                        crate::posts::post_id::PostId(7),
-                    ))
-                >
+                <a href=(href!(crate::posts::post_id::post, crate::posts::post_id: 7))>
                     "A missing post (404)"
                 </a>
             </li>

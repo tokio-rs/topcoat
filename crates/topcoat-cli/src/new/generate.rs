@@ -193,6 +193,17 @@ impl Paths {
         }
     }
 
+    /// How `href!` names the parameter declared in the child module `module`, which is
+    /// named after it: the module itself with module routing, where `module_param!`
+    /// makes that work, otherwise the parameter inside the module.
+    fn param_key(self, module: &str) -> String {
+        if self.is_module() {
+            module.to_owned()
+        } else {
+            format!("{module}::{module}")
+        }
+    }
+
     fn is_module(self) -> bool {
         self.0 == Routing::Module
     }

@@ -5612,7 +5612,6 @@ dependencies = [
 name = "topcoat-router-grammar"
 version = "0.11.0"
 dependencies = [
- "heck",
  "proc-macro2",
  "quote",
  "syn 3.0.6",

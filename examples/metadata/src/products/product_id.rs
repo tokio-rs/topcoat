@@ -2,7 +2,7 @@ use topcoat::{
     Result,
     context::{Cx, memoize},
     metadata::{Image, Metadata, OpenGraph},
-    router::{error::RouterErrorExt, module_param, page, path_param},
+    router::{error::RouterErrorExt, module_param, page},
     view::{View, view},
 };
 
@@ -37,7 +37,7 @@ pub(crate) const PRODUCTS: &[Product] = &[
 /// shares the result so a database query added here would run only once.
 #[memoize(as_ref)]
 async fn find_product(cx: &Cx) -> Result<Product> {
-    let id = *path_param::<ProductId>(cx)?;
+    let id = *product_id(cx)?;
     Ok(PRODUCTS
         .iter()
         .find(|product| product.id == id)

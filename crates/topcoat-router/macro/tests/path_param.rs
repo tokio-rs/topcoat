@@ -14,7 +14,7 @@ path_param!(post_id: u32);
 
 #[page("/posts/{post_id}")]
 async fn post(cx: &Cx) -> Result<impl View> {
-    let id = path_param::<PostId>(cx).ok_or_bad_request("post_id must be a number")?;
+    let id = post_id(cx).ok_or_bad_request("post_id must be a number")?;
     Ok(view! {
         "post "
         (id)
@@ -26,7 +26,7 @@ path_param!(slug);
 
 #[page("/tags/{slug}")]
 async fn tag(cx: &Cx) -> Result<impl View> {
-    let slug = path_param::<Slug>(cx);
+    let slug = slug(cx);
     Ok(view! {
         "tag "
         (slug)
@@ -39,7 +39,7 @@ path_param!(user_id: u32 else not_found);
 
 #[page("/users/{user_id}")]
 async fn user(cx: &Cx) -> Result<impl View> {
-    let id = path_param::<UserId>(cx)?;
+    let id = user_id(cx)?;
     Ok(view! {
         "user "
         (id)
@@ -51,7 +51,7 @@ path_param!(item_id: u32 else bad_request);
 
 #[page("/items/{item_id}")]
 async fn item(cx: &Cx) -> Result<impl View> {
-    let id = path_param::<ItemId>(cx)?;
+    let id = item_id(cx)?;
     Ok(view! {
         "item "
         (id)
@@ -63,7 +63,7 @@ path_param!(order_id: u32 else bad_request("order_id must be a number"));
 
 #[page("/orders/{order_id}")]
 async fn order(cx: &Cx) -> Result<impl View> {
-    let id = path_param::<OrderId>(cx)?;
+    let id = order_id(cx)?;
     Ok(view! {
         "order "
         (id)
@@ -75,7 +75,7 @@ path_param!(page_id: u32 else redirect("/pages"));
 
 #[page("/pages/{page_id}")]
 async fn page_detail(cx: &Cx) -> Result<impl View> {
-    let id = path_param::<PageId>(cx)?;
+    let id = page_id(cx)?;
     Ok(view! {
         "page "
         (id)
@@ -86,7 +86,7 @@ path_param!(*doc_path);
 
 #[page("/docs/{*doc_path}")]
 async fn document(cx: &Cx) -> Result<impl View> {
-    let path: CatchAllSegments<'_> = path_param::<DocPath>(cx);
+    let path: CatchAllSegments<'_> = doc_path(cx);
     let path = path.collect::<Vec<_>>().join("][");
     let path = format!("[{path}]");
     Ok(view! { (path) })
@@ -96,16 +96,15 @@ path_param!(*number_path: u32 else bad_request);
 
 #[page("/numbers/{*number_path}")]
 async fn numbers(cx: &Cx) -> Result<impl View> {
-    let number_values = path_param::<NumberPath>(cx)?;
+    let number_values = number_path(cx)?;
     Ok(view! { (format!("{number_values:?}")) })
 }
 
 path_param!(*raw_numbers: u32);
 
 #[page("/raw-numbers/{*raw_numbers}")]
-async fn raw_numbers(cx: &Cx) -> Result<impl View> {
-    let number_values =
-        path_param::<RawNumbers>(cx).ok_or_bad_request("every segment must be a number")?;
+async fn raw_number_list(cx: &Cx) -> Result<impl View> {
+    let number_values = raw_numbers(cx).ok_or_bad_request("every segment must be a number")?;
     Ok(view! { (format!("{number_values:?}")) })
 }
 
@@ -113,7 +112,7 @@ path_param!(missing: u32);
 
 #[page("/missing-param")]
 async fn missing_param(cx: &Cx) -> Result<impl View> {
-    let _ = path_param::<Missing>(cx);
+    let _ = missing(cx);
     Ok(view! { "unreachable" })
 }
 
@@ -126,8 +125,8 @@ path_param!(pub *public_parts);
 #[page("/links")]
 async fn links(cx: &Cx) -> Result<impl View> {
     Ok(view! {
-        <a href=(href!(post, PostId(42)))>"post"</a>
-        <a href=(href!(document, DocPath(["guides", "getting started"])))>"guides"</a>
+        <a href=(href!(post, post_id: 42))>"post"</a>
+        <a href=(href!(document, doc_path: ["guides", "getting started"]))>"guides"</a>
     })
 }
 
@@ -239,7 +238,7 @@ async fn reports_failing_catch_all_segment_index() {
 
 #[tokio::test]
 async fn returns_catch_all_parse_error_to_call_site() {
-    let router = Router::builder().page(raw_numbers).build();
+    let router = Router::builder().page(raw_number_list).build();
     let (status, body) = send(&router, "/raw-numbers/1/nope/3").await;
     assert_eq!(status, 400);
     assert_eq!(body, "bad request: every segment must be a number");
@@ -255,36 +254,20 @@ async fn missing_parameter_panics() {
 }
 
 #[test]
-fn constructs_public_parameter_values() {
-    let id = PublicId(42);
-    assert_eq!(id.0, 42);
-
-    let borrowed = PublicSlug("rust");
-    assert_eq!(borrowed.0, "rust");
-    let owned: PublicSlug = PublicSlug("rust".to_owned());
-    assert_eq!(owned.0, "rust");
-
-    let borrowed = PublicParts(["guides", "start"]);
-    assert_eq!(borrowed.0, ["guides", "start"]);
-    let owned: PublicParts = PublicParts(vec!["guides".to_owned(), "start".to_owned()]);
-    assert_eq!(owned.0, ["guides", "start"]);
-}
-
-#[test]
 fn fills_a_typed_param_into_an_href() {
-    let url = href("/posts/{public_id}", (PublicId(42),)).resolve(&Cx::new());
+    let url = href!("/posts/{public_id}", public_id: 42).resolve(&Cx::new());
     assert_eq!(url, "/posts/42");
 }
 
 #[test]
 fn escapes_an_unparsed_param_filled_into_an_href() {
-    let url = href("/tags/{public_slug}", (PublicSlug("getting started"),)).resolve(&Cx::new());
+    let url = href!("/tags/{public_slug}", public_slug: "getting started").resolve(&Cx::new());
     assert_eq!(url, "/tags/getting%20started");
 }
 
 #[test]
 fn fills_one_href_segment_per_typed_catch_all_element() {
-    let url = href("/archive/{*number_path}", (NumberPath(vec![1, 2, 3]),)).resolve(&Cx::new());
+    let url = href!("/archive/{*number_path}", number_path: vec![1, 2, 3]).resolve(&Cx::new());
     assert_eq!(url, "/archive/1/2/3");
 }
 
@@ -292,7 +275,7 @@ fn fills_one_href_segment_per_typed_catch_all_element() {
 fn fills_one_href_segment_per_unparsed_catch_all_element() {
     // A `/` inside an element is escaped, so it stays within its own segment
     // instead of adding one.
-    let url = href("/docs/{*public_parts}", (PublicParts(["guides", "a/b"]),)).resolve(&Cx::new());
+    let url = href!("/docs/{*public_parts}", public_parts: ["guides", "a/b"]).resolve(&Cx::new());
     assert_eq!(url, "/docs/guides/a%2Fb");
 }
 

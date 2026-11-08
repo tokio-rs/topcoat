@@ -16,10 +16,7 @@ use topcoat::{
 
 use super::{
     Section,
-    orders::{
-        order_id::{self, OrderId},
-        status_badge, time_ago,
-    },
+    orders::{order_id, status_badge, time_ago},
 };
 use crate::{
     app::_common::{money, timestamp},
@@ -272,7 +269,7 @@ async fn open_orders(cx: &Cx) -> Result<impl View> {
                             table_cell(
                                 attrs: attributes! { class="font-medium tabular-nums" },
                                 link(
-                                    href: href!(order_id::page, OrderId(order.id)),
+                                    href: href!(order_id::page, order_id: order.id),
                                     attrs: attributes! { class="after:absolute after:inset-0" },
                                     "#"
                                     (order.id)

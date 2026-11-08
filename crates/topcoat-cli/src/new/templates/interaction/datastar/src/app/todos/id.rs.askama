@@ -2,7 +2,7 @@ use topcoat::{
     Result,
     context::Cx,
     datastar::PatchElements,
-    router::{{ "{" }}{% if paths.is_module() %}module_param, {% endif %}path_param, route},
+    router::{{ "{" }}{{ paths.param() }}, route},
 };
 
 use super::patch_todo_list;
@@ -12,12 +12,12 @@ use crate::features::todo::Todo;
 
 #[route{{ paths.route("PATCH", "/todos/{id}") }}]
 pub async fn toggle(cx: &Cx) -> Result<PatchElements> {
-    Todo::toggle(cx, *path_param::<Id>(cx)?).await?;
+    Todo::toggle(cx, *id(cx)?).await?;
     patch_todo_list(cx).await
 }
 
 #[route{{ paths.route("DELETE", "/todos/{id}") }}]
 pub async fn delete(cx: &Cx) -> Result<PatchElements> {
-    Todo::remove(cx, *path_param::<Id>(cx)?).await?;
+    Todo::remove(cx, *id(cx)?).await?;
     patch_todo_list(cx).await
 }

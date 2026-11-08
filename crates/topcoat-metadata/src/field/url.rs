@@ -8,7 +8,7 @@ use topcoat_core::{
     url_form::{UrlForm, url_form},
 };
 #[cfg(feature = "router")]
-use topcoat_router::{HrefTarget, href, request::uri};
+use topcoat_router::{Href, HrefTarget, request::uri};
 #[cfg(feature = "view")]
 use topcoat_view::{AttributeValueViewParts, PartsWriter};
 
@@ -61,7 +61,7 @@ impl Url {
             #[cfg(feature = "router")]
             Self::Current => in_form(cx, Cow::Borrowed(uri(cx).path())),
             #[cfg(feature = "router")]
-            Self::Route(target) => Cow::Owned(href(*target, ()).resolve(cx)),
+            Self::Route(target) => Cow::Owned(Href::new(*target, ()).resolve(cx)),
             #[cfg(feature = "asset")]
             Self::Asset(asset) => Cow::Owned(asset_config(cx).resolve(cx, *asset)),
         }
@@ -119,7 +119,7 @@ impl AttributeValueViewParts for &Url {
             }
             #[cfg(feature = "router")]
             Url::Route(target) => {
-                AttributeValueViewParts::into_view_parts(href(*target, ()), cx, parts);
+                AttributeValueViewParts::into_view_parts(Href::new(*target, ()), cx, parts);
             }
             #[cfg(feature = "asset")]
             Url::Asset(asset) => {

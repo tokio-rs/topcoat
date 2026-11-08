@@ -1,6 +1,5 @@
-use heck::ToPascalCase;
 use proc_macro2::TokenStream;
-use quote::{ToTokens, format_ident, quote};
+use quote::{ToTokens, quote};
 use syn::{
     Ident, Token, Type, Visibility,
     ext::IdentExt,
@@ -36,93 +35,119 @@ impl PathParam {
         self.error.as_ref().map(|error| &error.response)
     }
 
-    fn type_ident(&self) -> Ident {
-        format_ident!(
-            "{}",
-            self.name.unraw().to_string().to_pascal_case(),
-            span = self.name.span()
-        )
-    }
-
+    /// The name as it appears in the URL, without a raw identifier prefix.
     pub(crate) fn name_string(&self) -> String {
         self.name.unraw().to_string()
     }
 
-    fn item(&self) -> TokenStream {
+    /// Emits the function that reads the parameter from the matched route.
+    fn emit_reader(&self, tokens: &mut TokenStream) {
         let visibility = &self.visibility;
-        let ident = self.type_ident();
-
-        match (self.is_catch_all(), self.param_type()) {
-            (false, Some(param_type)) => {
-                quote! { #visibility struct #ident(#visibility #param_type); }
-            }
-            (true, Some(param_type)) => {
-                quote! {
-                    #visibility struct #ident(
-                        #visibility ::std::vec::Vec<#param_type>
-                    );
-                }
-            }
-            (false, None) => quote! {
-                #visibility struct #ident<
-                    T: ::core::convert::AsRef<str> = ::std::string::String,
-                >(#visibility T);
-            },
-            (true, None) => quote! {
-                #visibility struct #ident<
-                    T: ::core::iter::IntoIterator<Item: ::core::convert::AsRef<str>>
-                        = ::std::vec::Vec<::std::string::String>,
-                >(#visibility T);
-            },
-        }
-    }
-
-    fn path_param_impl(&self) -> TokenStream {
-        let ident = self.type_ident();
-        let (impl_generics, output, body) = match (self.is_catch_all(), self.param_type()) {
-            (false, Some(param_type)) => (
-                quote! {},
-                self.parsed_output(param_type, &quote! { &'__cx #param_type }),
-                self.parse_segment(param_type),
+        let ident = &self.name;
+        let (output, body) = match (self.is_catch_all(), self.param_type()) {
+            (false, Some(ty)) => (
+                self.parsed_output(&quote! { &'__cx #ty }, ty),
+                self.parse_segment(ty),
             ),
-            (true, Some(param_type)) => (
-                quote! {},
-                self.parsed_output(param_type, &quote! { &'__cx [#param_type] }),
-                self.parse_segments(param_type),
+            (true, Some(ty)) => (
+                self.parsed_output(&quote! { &'__cx [#ty] }, ty),
+                self.parse_segments(ty),
             ),
-            (false, None) => (
-                quote! { <T: ::core::convert::AsRef<str>> },
-                quote! { &'__cx str },
-                self.read_segment(),
-            ),
+            (false, None) => (quote! { &'__cx str }, self.read_segment()),
             (true, None) => (
-                quote! {
-                    <T: ::core::iter::IntoIterator<Item: ::core::convert::AsRef<str>>>
-                },
                 quote! { #topcoat_router::CatchAllSegments<'__cx> },
                 self.read_segments(),
             ),
         };
-        let type_generics = self.param_type().is_none().then(|| quote! { <T> });
+
+        // A parameter can be declared only for a route to match it, so an
+        // unread one does not warn.
+        quote! {
+            #[allow(dead_code)]
+            #[track_caller]
+            #visibility fn #ident<'__cx>(cx: &'__cx #topcoat_context::Cx) -> #output {
+                #body
+            }
+        }
+        .to_tokens(tokens);
+    }
+
+    /// Emits the marker type named after the parameter, through which `href!`
+    /// fills the parameter with a value.
+    ///
+    /// The marker is an enum without variants, so it lives only in the type
+    /// namespace and leaves the parameter's name free for the reader. `href!`
+    /// calls its `__href` function, so `post_id: 5` reaches the marker as
+    /// `post_id::__href(5)`.
+    fn emit_marker(&self, tokens: &mut TokenStream) {
+        let visibility = &self.visibility;
+        let ident = &self.name;
+        let name = self.name_string();
+        let bound = self.value_bound();
+        let push_segments = self.push_segments();
 
         quote! {
-            impl #impl_generics #topcoat_router::PathParam for #ident #type_generics {
-                type Output<'__cx> = #output;
+            #[doc(hidden)]
+            #[allow(dead_code, non_camel_case_types)]
+            #visibility enum #ident {}
 
-                #[track_caller]
-                fn path_param(
-                    cx: &#topcoat_context::Cx,
-                    _: #topcoat_router::PathParamSealed,
-                ) -> Self::Output<'_> {
-                    #body
+            impl<V: #bound> #topcoat_router::HrefParam<V> for #ident {
+                const NAME: &'static str = #name;
+
+                fn segments(value: &V, segments: &mut #topcoat_router::HrefSegments<'_>) {
+                    #push_segments
+                }
+            }
+
+            impl #ident {
+                #[doc(hidden)]
+                #[allow(dead_code)]
+                #visibility fn __href<V: #bound>(value: V) -> #topcoat_router::HrefArg<#ident, V> {
+                    <#ident as #topcoat_router::HrefParam<V>>::arg(value)
                 }
             }
         }
+        .to_tokens(tokens);
     }
 
-    fn parsed_output(&self, param_type: &Type, value: &TokenStream) -> TokenStream {
+    /// The bound on the values `href!` accepts for the parameter.
+    pub(crate) fn value_bound(&self) -> TokenStream {
+        match (self.is_catch_all(), self.param_type()) {
+            (false, Some(ty)) => quote! { ::core::borrow::Borrow<#ty> },
+            (true, Some(ty)) => quote! { ::core::convert::AsRef<[#ty]> },
+            (false, None) => quote! { ::core::convert::AsRef<str> },
+            (true, None) => quote! { #topcoat_router::SegmentList },
+        }
+    }
+
+    /// Pushes the segments of `value` onto `segments`: one for a regular
+    /// parameter, one per element for a catch-all.
+    fn push_segments(&self) -> TokenStream {
+        match (self.is_catch_all(), self.param_type()) {
+            (false, Some(ty)) => {
+                quote! { segments.push(::core::borrow::Borrow::<#ty>::borrow(value)); }
+            }
+            (true, Some(ty)) => quote! {
+                for segment in ::core::convert::AsRef::<[#ty]>::as_ref(value) {
+                    segments.push(segment);
+                }
+            },
+            (false, None) => {
+                quote! { segments.push(::core::convert::AsRef::<str>::as_ref(value)); }
+            }
+            (true, None) => quote! {
+                #topcoat_router::SegmentList::for_each_segment(value, |segment| {
+                    segments.push(segment);
+                });
+            },
+        }
+    }
+
+    /// The result of a parsed parameter: the borrowed `value`, or the declared
+    /// error response, or the borrowed parse error without one.
+    fn parsed_output(&self, value: &TokenStream, ty: &Type) -> TokenStream {
         let error = self.error().map_or_else(
-            || quote! { &'__cx <#param_type as ::core::str::FromStr>::Err },
+            || quote! { &'__cx <#ty as ::core::str::FromStr>::Err },
             ErrorResponse::ty,
         );
 
@@ -139,8 +164,8 @@ impl PathParam {
         quote! { #topcoat_router::path_param_segments(cx, #name) }
     }
 
-    fn parse_segment(&self, param_type: &Type) -> TokenStream {
-        let ident = self.type_ident();
+    /// Parses the segment once per request and borrows the cached result.
+    fn parse_segment(&self, ty: &Type) -> TokenStream {
         let segment = self.read_segment();
         let map_err = self.map_err();
 
@@ -148,19 +173,17 @@ impl PathParam {
             #[#topcoat_context_macro::memoize(as_ref)]
             fn parse(
                 cx: &#topcoat_context::Cx,
-            ) -> ::core::result::Result<
-                #ident,
-                <#param_type as ::core::str::FromStr>::Err,
-            > {
-                ::core::str::FromStr::from_str(#segment).map(#ident)
+            ) -> ::core::result::Result<#ty, <#ty as ::core::str::FromStr>::Err> {
+                ::core::str::FromStr::from_str(#segment)
             }
 
-            parse(cx).map(|value| &value.0)#map_err
+            parse(cx)#map_err
         }
     }
 
-    fn parse_segments(&self, param_type: &Type) -> TokenStream {
-        let ident = self.type_ident();
+    /// Parses every segment once per request and borrows the cached result. A
+    /// failure keeps the index of the segment that failed.
+    fn parse_segments(&self, ty: &Type) -> TokenStream {
         let segments = self.read_segments();
         let map_err = self.map_err();
 
@@ -169,8 +192,8 @@ impl PathParam {
             fn parse(
                 cx: &#topcoat_context::Cx,
             ) -> ::core::result::Result<
-                #ident,
-                (usize, <#param_type as ::core::str::FromStr>::Err),
+                ::std::vec::Vec<#ty>,
+                (usize, <#ty as ::core::str::FromStr>::Err),
             > {
                 #segments
                     .enumerate()
@@ -178,11 +201,10 @@ impl PathParam {
                         ::core::str::FromStr::from_str(segment)
                             .map_err(|error| (index, error))
                     })
-                    .collect::<::core::result::Result<::std::vec::Vec<#param_type>, _>>()
-                    .map(#ident)
+                    .collect::<::core::result::Result<::std::vec::Vec<#ty>, _>>()
             }
 
-            parse(cx).map(|value| &value.0[..])#map_err
+            parse(cx).map(|values| &values[..])#map_err
         }
     }
 
@@ -192,12 +214,12 @@ impl PathParam {
         match (self.error(), self.is_catch_all()) {
             (Some(error), false) => error.map_err(quote! {
                 |_| #topcoat_router::error::bad_request(
-                    format!("invalid value for path parameter \"{}\"", #name)
+                    ::std::format!("invalid value for path parameter \"{}\"", #name)
                 )
             }),
             (Some(error), true) => error.map_err(quote! {
                 |(index, _)| #topcoat_router::error::bad_request(
-                    format!(
+                    ::std::format!(
                         "invalid value for path parameter \"{}\" at segment {}",
                         #name,
                         index,
@@ -206,81 +228,6 @@ impl PathParam {
             }),
             (None, false) => quote! {},
             (None, true) => quote! { .map_err(|error| &error.1) },
-        }
-    }
-
-    // The parameter pushes what it fills its path parameter with: one segment
-    // for a regular parameter, one per element for a catch-all, which spans as
-    // many segments as it holds elements. `HrefSegments` writes the separators
-    // and the escaping, so nothing here spells out a `/`.
-    //
-    // Pushing a segment does not render it, so a declared type that cannot be
-    // rendered still gets this implementation. `HrefParams` asks the segment
-    // type for `Display` where the URL is built.
-    fn href_param_impl(&self) -> TokenStream {
-        let ident = self.type_ident();
-        let name = self.name_string();
-        let (impl_generics, where_clause, segment, body) =
-            match (self.is_catch_all(), self.param_type()) {
-                (false, Some(param_type)) => (
-                    quote! {},
-                    quote! {},
-                    quote! { #param_type },
-                    quote! { segments.push(&self.0); },
-                ),
-                (true, Some(param_type)) => (
-                    quote! {},
-                    quote! {},
-                    quote! { #param_type },
-                    quote! {
-                        for value in &self.0 {
-                            segments.push(value);
-                        }
-                    },
-                ),
-                (false, None) => (
-                    quote! { <T: ::core::convert::AsRef<str>> },
-                    quote! {},
-                    quote! { str },
-                    quote! {
-                        segments.push(::core::convert::AsRef::<str>::as_ref(&self.0));
-                    },
-                ),
-                (true, None) => (
-                    quote! {
-                        <T: ::core::iter::IntoIterator<Item: ::core::convert::AsRef<str>>>
-                    },
-                    quote! {
-                        where for<'__iter> &'__iter T:
-                            ::core::iter::IntoIterator<Item: ::core::convert::AsRef<str>>
-                    },
-                    quote! { str },
-                    quote! {
-                        for segment in &self.0 {
-                            segments.push(::core::convert::AsRef::<str>::as_ref(&segment));
-                        }
-                    },
-                ),
-            };
-        let type_generics = self.param_type().is_none().then(|| quote! { <T> });
-
-        quote! {
-            impl #impl_generics #topcoat_router::HrefParam
-                for #ident #type_generics #where_clause
-            {
-                type Segment = #segment;
-
-                fn name(&self) -> &str {
-                    #name
-                }
-
-                fn segments(
-                    &self,
-                    segments: &mut #topcoat_router::HrefSegments<'_, Self::Segment>,
-                ) {
-                    #body
-                }
-            }
         }
     }
 }
@@ -309,6 +256,13 @@ impl Parse for PathParam {
     }
 }
 
+impl ToTokens for PathParam {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.emit_reader(tokens);
+        self.emit_marker(tokens);
+    }
+}
+
 /// Prints the declaration on one line. A trailing comma is dropped.
 #[cfg(feature = "pretty")]
 impl topcoat_core_grammar::common::pretty::PrettyPrint for PathParam {
@@ -323,22 +277,6 @@ impl topcoat_core_grammar::common::pretty::PrettyPrint for PathParam {
         }
     }
 }
-
-impl ToTokens for PathParam {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let item = self.item();
-        let path_param_impl = self.path_param_impl();
-        let href_param_impl = self.href_param_impl();
-
-        quote! {
-            #item
-            #path_param_impl
-            #href_param_impl
-        }
-        .to_tokens(tokens);
-    }
-}
-
 /// A parsed segment type in a `path_param!` declaration.
 pub struct PathParamType {
     pub colon_token: Token![:],
@@ -430,7 +368,6 @@ mod tests {
         );
         assert!(param.error.is_some());
         assert!(param.trailing_comma.is_some());
-        assert_eq!(param.type_ident(), "PostIds");
     }
 
     #[test]
@@ -452,7 +389,6 @@ mod tests {
         assert!(param.param_type.is_none());
         assert!(param.error.is_none());
         assert!(param.trailing_comma.is_none());
-        assert_eq!(param.type_ident(), "Slug");
     }
 
     #[test]
@@ -472,6 +408,5 @@ mod tests {
         let param = parse("r#type: u32");
 
         assert_eq!(param.name_string(), "type");
-        assert_eq!(param.type_ident(), "Type");
     }
 }

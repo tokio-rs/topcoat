@@ -63,7 +63,7 @@ mod posts {
         use topcoat::{
             Result,
             context::Cx,
-            router::{module_param, page, path_param},
+            router::{module_param, page},
             view::{View, view},
         };
 
@@ -71,7 +71,7 @@ mod posts {
 
         #[page]
         async fn post(cx: &Cx) -> Result<impl View> {
-            let id = path_param::<PostId>(cx)?;
+            let id = post_id(cx)?;
             Ok(view! {
                 "post "
                 (id)
@@ -255,7 +255,7 @@ mod threads {
 
     #[page("./{thread_id}")]
     async fn thread(cx: &Cx) -> Result<impl View> {
-        let thread_id = path_param::<ThreadId>(cx)?;
+        let thread_id = thread_id(cx)?;
         Ok(view! {
             "thread "
             (thread_id)
@@ -264,8 +264,8 @@ mod threads {
 
     #[page("./{thread_id}/replies/{reply_id}")]
     async fn reply(cx: &Cx) -> Result<impl View> {
-        let thread_id = path_param::<ThreadId>(cx)?;
-        let reply_id = path_param::<ReplyId>(cx)?;
+        let thread_id = thread_id(cx)?;
+        let reply_id = reply_id(cx)?;
         Ok(view! {
             "reply "
             (reply_id)

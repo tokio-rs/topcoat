@@ -23,6 +23,7 @@ pub const MACROS: &[&str] = &[
     "segment",
     "path_param",
     "module_param",
+    "href",
     "expr",
     "memoize",
     "component",
@@ -45,9 +46,9 @@ pub fn register(registry: &mut Registry, name: &str) -> bool {
     use topcoat_icon_grammar::iconify::{IconifyIcon, Include};
     use topcoat_l10n_grammar::fluent::{Messages, Translate};
     use topcoat_router_grammar::{
-        layer::LayerAttr, layout::LayoutAttr, module_param::ModuleParam, not_found::NotFound,
-        page::PageAttr, path_param::PathParam, query_params::QueryParamsAttr, route::RouteAttr,
-        segment::Segment,
+        href::Href, layer::LayerAttr, layout::LayoutAttr, module_param::ModuleParam,
+        not_found::NotFound, page::PageAttr, path_param::PathParam, query_params::QueryParamsAttr,
+        route::RouteAttr, segment::Segment,
     };
     use topcoat_runtime_grammar::{
         expr::ExprInput, procedure::ProcedureAttr, record::RecordAttr, shard::ShardAttr,
@@ -83,6 +84,7 @@ pub fn register(registry: &mut Registry, name: &str) -> bool {
         "segment" => registry.register_function_like::<Segment>(name),
         "path_param" => registry.register_function_like::<PathParam>(name),
         "module_param" => registry.register_function_like::<ModuleParam>(name),
+        "href" => registry.register_function_like::<Href>(name),
         "expr" => registry.register_function_like::<ExprInput>(name),
         "memoize" => registry.register_attribute::<MemoizeAttr>(name),
         "component" => registry.register_attribute::<ComponentAttr>(name),

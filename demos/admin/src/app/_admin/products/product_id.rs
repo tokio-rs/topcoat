@@ -6,7 +6,7 @@ use topcoat::{
         Body, Method, StatusCode,
         content::Form,
         error::{RouterErrorExt, SeeOther, rewrite, see_other},
-        href, module_param, page, path_param, route,
+        href, module_param, page, route,
     },
     runtime::link,
     view::{Attributes, View, attributes, class, component, element_id, view},
@@ -36,8 +36,7 @@ struct Rejected {
 
 #[memoize(as_ref)]
 async fn product(cx: &Cx) -> Result<Product> {
-    let id = *path_param::<ProductId>(cx)?;
-    Ok(Product::find(cx, id).await?.ok_or_not_found()?)
+    Ok(Product::find(cx, *product_id(cx)?).await?.ok_or_not_found()?)
 }
 
 #[page(with(Crumb::new(async |cx| Ok(product(cx).await?.name.clone()))))]
@@ -81,7 +80,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                     <form
                         id=(&form_id)
                         method="post"
-                        action=(href!(save, ProductId(product.id)))
+                        action=(href!(save, product_id: product.id))
                     >
                         field_set(
                             attrs: attributes! { disabled=((!can_edit).then_some("")) },
@@ -211,12 +210,12 @@ pub async fn save(cx: &Cx, Form(form): Form<ProductForm>) -> Result<SeeOther> {
     let user = require_user(cx).await?;
     user.role.can_edit().then_some(()).ok_or_forbidden()?;
 
-    let id = *path_param::<ProductId>(cx)?;
+    let id = *product_id(cx)?;
     let mut product = Product::find(cx, id).await?.ok_or_not_found()?;
     if let Err(errors) = product.edit(cx, &form).await? {
         // Rewrite the POST to keep the submitted values and errors in the request context.
         return Err(
-            rewrite(href!(page, ProductId(id)).resolve(cx), Body::empty())
+            rewrite(href!(page, product_id: id).resolve(cx), Body::empty())
                 .method(Method::GET)
                 .with(Rejected { form, errors })
                 .into(),

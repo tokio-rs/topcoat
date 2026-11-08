@@ -12,7 +12,6 @@ use topcoat::{
     view::{StaticClass, View, attributes, class, component, element_id, suspense, view},
 };
 
-use self::order_id::OrderId;
 use super::Section;
 use crate::{
     app::_common::{money, timestamp},
@@ -260,7 +259,7 @@ async fn order_rows(
                         table_cell(
                             attrs: attributes! { class="font-medium tabular-nums" },
                             link(
-                                href: href!(order_id::page, OrderId(order.id)),
+                                href: href!(order_id::page, order_id: order.id),
                                 attrs: attributes! { class="after:absolute after:inset-0" },
                                 "#"
                                 (order.id)

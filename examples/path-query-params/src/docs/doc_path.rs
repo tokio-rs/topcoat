@@ -1,7 +1,7 @@
 use topcoat::{
     Result,
     context::Cx,
-    router::{href, module_param, page, path_param},
+    router::{href, module_param, page},
     view::{View, view},
 };
 
@@ -14,7 +14,7 @@ pub(crate) async fn document(cx: &Cx) -> Result<impl View> {
     Ok(view! {
         <h1>"Documentation path"</h1>
         <ul>
-            for segment in path_param::<crate::docs::doc_path::DocPath>(cx) {
+            for segment in crate::docs::doc_path::doc_path(cx) {
                 <li>(segment)</li>
             }
         </ul>

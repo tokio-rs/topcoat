@@ -3,7 +3,7 @@ use topcoat::{
     context::Cx,
     router::{
         error::{SeeOther, see_other},
-        href, path_param, route,
+        href, route,
     },
 };
 
@@ -13,8 +13,7 @@ use crate::{Todo, db, home};
 pub(crate) async fn toggle(cx: &Cx) -> Result<SeeOther> {
     let mut db = db(cx);
 
-    let mut todo =
-        Todo::get_by_id(&mut db, *path_param::<crate::todos::todo_id::TodoId>(cx)?).await?;
+    let mut todo = Todo::get_by_id(&mut db, *crate::todos::todo_id::todo_id(cx)?).await?;
     let done = !todo.done;
 
     toasty::update!(todo { done }).exec(&mut db).await?;

@@ -8,7 +8,7 @@ use topcoat::{
     view::{View, view},
 };
 
-use self::product_id::{PRODUCTS, ProductId};
+use self::product_id::PRODUCTS;
 
 #[page(with(Metadata::new().title("Products")))]
 pub(crate) async fn products(cx: &Cx) -> Result<impl View> {
@@ -17,7 +17,7 @@ pub(crate) async fn products(cx: &Cx) -> Result<impl View> {
         <ul>
             for product in PRODUCTS {
                 <li>
-                    <a href=(href!(product_id::page, ProductId(product.id)))>
+                    <a href=(href!(product_id::page, product_id: product.id))>
                         (product.name)
                     </a>
                 </li>

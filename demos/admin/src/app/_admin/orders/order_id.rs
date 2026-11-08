@@ -6,7 +6,7 @@ use topcoat::{
     router::{
         content::Form,
         error::{RouterErrorExt, SeeOther, see_other},
-        href, module_param, page, path_param, route,
+        href, module_param, page, route,
     },
     runtime::{Event, link, signal},
     view::{View, attributes, component, element_id, suspense, view},
@@ -15,10 +15,7 @@ use topcoat::{
 use super::{status_badge, t};
 use crate::{
     app::{
-        _admin::{
-            Crumb,
-            customers::customer_id::{self, CustomerId},
-        },
+        _admin::{Crumb, customers::customer_id},
         _common::money,
     },
     components::{
@@ -41,12 +38,11 @@ use crate::{
 
 module_param!(pub order_id: u64 else not_found);
 
-#[page(with(Crumb::new(async |cx| Ok(format!("#{}", path_param::<OrderId>(cx)?)))))]
+#[page(with(Crumb::new(async |cx| Ok(format!("#{}", order_id(cx)?)))))]
 pub async fn page(cx: &Cx) -> Result<impl View> {
     let user = require_user(cx).await?;
-    let id = *path_param::<OrderId>(cx)?;
     // Look up the order before streaming starts so a missing order can return 404.
-    let order = Order::find(cx, id).await?.ok_or_not_found()?;
+    let order = Order::find(cx, *order_id(cx)?).await?.ok_or_not_found()?;
     let next = if user.role.can_edit() {
         order.status.next()
     } else {
@@ -229,7 +225,7 @@ async fn customer_details(cx: &Cx, id: u64) -> Result<impl View> {
                 avatar(avatar_fallback((customer.initials())))
                 <div class="flex min-w-0 flex-col">
                     link(
-                        href: href!(customer_id::page, CustomerId(customer.id)),
+                        href: href!(customer_id::page, customer_id: customer.id),
                         attrs: attributes! { class="truncate font-medium hover:underline" },
                         (&customer.name)
                     )
@@ -307,7 +303,7 @@ async fn status_actions(cx: &Cx, id: u64, next: &'static [OrderStatus]) -> Resul
         <form
             id=(&form_id)
             method="post"
-            action=(href!(advance, OrderId(id)))
+            action=(href!(advance, order_id: id))
             class="flex gap-2 sm:ml-auto"
         >
             for &status in next {
@@ -405,11 +401,11 @@ pub async fn advance(cx: &Cx, Form(form): Form<Advance>) -> Result<SeeOther> {
     let user = require_user(cx).await?;
     user.role.can_edit().then_some(()).ok_or_forbidden()?;
 
-    let id = *path_param::<OrderId>(cx)?;
+    let id = *order_id(cx)?;
     let mut order = Order::find(cx, id).await?.ok_or_not_found()?;
     // Another request may have changed the status since this page was opened.
     // If this transition is no longer allowed, show the current order unchanged.
     order.advance(cx, form.status).await?;
 
-    Ok(see_other(href!(page, OrderId(id)).resolve(cx)))
+    Ok(see_other(href!(page, order_id: id).resolve(cx)))
 }

@@ -57,14 +57,14 @@ pub async fn todo_list(cx: &Cx) -> Result<impl View> {
                                 variant: ButtonVariant::Outline,
                                 size: ButtonSize::Sm,
                                 attrs: attributes! {
-                                    data-on:click=(("@patch('", href!(id::toggle, id::Id(todo.id)), "')"))
+                                    data-on:click=(("@patch('", href!(id::toggle, {{ paths.param_key("id") }}: todo.id), "')"))
                                 },
                                 if todo.done { "Undo" } else { "Done" }
                             )
 {%- else %}
                             <button
                                 {{- classes.button }}
-                                data-on:click=(("@patch('", href!(id::toggle, id::Id(todo.id)), "')"))
+                                data-on:click=(("@patch('", href!(id::toggle, {{ paths.param_key("id") }}: todo.id), "')"))
                             >
                                 if todo.done { "Undo" } else { "Done" }
                             </button>
@@ -79,14 +79,14 @@ pub async fn todo_list(cx: &Cx) -> Result<impl View> {
                                 variant: ButtonVariant::Ghost,
                                 size: ButtonSize::Sm,
                                 attrs: attributes! {
-                                    data-on:click=(("@delete('", href!(id::delete, id::Id(todo.id)), "')"))
+                                    data-on:click=(("@delete('", href!(id::delete, {{ paths.param_key("id") }}: todo.id), "')"))
                                 },
                                 "Delete"
                             )
 {%- else %}
                             <button
                                 {{- classes.button }}
-                                data-on:click=(("@delete('", href!(id::delete, id::Id(todo.id)), "')"))
+                                data-on:click=(("@delete('", href!(id::delete, {{ paths.param_key("id") }}: todo.id), "')"))
                             >
                                 "Delete"
                             </button>

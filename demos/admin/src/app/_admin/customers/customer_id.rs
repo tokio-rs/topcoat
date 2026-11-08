@@ -3,7 +3,7 @@ use topcoat::{
     context::{Cx, memoize},
     icon::{IconData, icon, iconify::iconify_icon},
     l10n::Translation,
-    router::{error::RouterErrorExt, href, module_param, page, path_param},
+    router::{error::RouterErrorExt, href, module_param, page},
     runtime::link,
     view::{Child, View, attributes, component, suspense, view},
 };
@@ -13,11 +13,7 @@ use crate::{
     app::{
         _admin::{
             Crumb,
-            orders::{
-                item_count,
-                order_id::{self, OrderId},
-                status_badge, time_ago,
-            },
+            orders::{item_count, order_id, status_badge, time_ago},
         },
         _common::{money, timestamp},
     },
@@ -40,8 +36,7 @@ const SKELETON_ROWS: usize = 5;
 
 #[memoize(as_ref)]
 async fn customer(cx: &Cx) -> Result<Customer> {
-    let id = *path_param::<CustomerId>(cx)?;
-    Ok(Customer::find(cx, id).await?.ok_or_not_found()?)
+    Ok(Customer::find(cx, *customer_id(cx)?).await?.ok_or_not_found()?)
 }
 
 #[page(with(Crumb::new(async |cx| Ok(customer(cx).await?.name.clone()))))]
@@ -131,7 +126,7 @@ async fn customer_orders(cx: &Cx, id: u64) -> Result<impl View> {
                                 table_cell(
                                     attrs: attributes! { class="font-medium tabular-nums" },
                                     link(
-                                        href: href!(order_id::page, OrderId(order.id)),
+                                        href: href!(order_id::page, order_id: order.id),
                                         attrs: attributes! { class="after:absolute after:inset-0" },
                                         "#"
                                         (order.id)

@@ -107,7 +107,7 @@ async fn toggle_checkbox(cx: &Cx, todo: &Todo) -> Result<impl View> {
             method="post"
             action=(href!(
                 crate::todos::todo_id::toggle::toggle,
-                crate::todos::todo_id::TodoId(todo.id),
+                crate::todos::todo_id: todo.id,
             ))
         >
             <input type="checkbox" checked=(todo.done) onchange="this.form.submit()">
@@ -122,7 +122,7 @@ async fn delete_button(cx: &Cx, todo: &Todo) -> Result<impl View> {
             method="post"
             action=(href!(
                 crate::todos::todo_id::delete::delete,
-                crate::todos::todo_id::TodoId(todo.id),
+                crate::todos::todo_id: todo.id,
             ))
         >
             <button type="submit">"delete"</button>

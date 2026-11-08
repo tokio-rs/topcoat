@@ -24,6 +24,6 @@ async fn redirect_to_locale(cx: &Cx) -> Result<impl View> {
         .cloned()
         .unwrap_or(locale!("en"));
     Err::<(), _>(
-        redirect(href!(locale::_page::page, locale::PathLocale(locale)).resolve(cx)).into(),
+        redirect(href!(locale::_page::page, locale::path_locale: locale).resolve(cx)).into(),
     )
 }

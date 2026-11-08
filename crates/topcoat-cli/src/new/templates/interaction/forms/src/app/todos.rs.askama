@@ -41,7 +41,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                 <ul{{ classes.list }}>
                     for todo in todos {
                         <li{{ classes.item }}>
-                            <form method="post" action=(href!(id::toggle, id::Id(todo.id)))>
+                            <form method="post" action=(href!(id::toggle, {{ paths.param_key("id") }}: todo.id))>
 {%- if ui %}
                                 button(
                                     variant: ButtonVariant::Outline,
@@ -60,7 +60,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                             } else {
                                 <span>(&todo.title)</span>
                             }
-                            <form method="post" action=(href!(id::delete, id::Id(todo.id)))>
+                            <form method="post" action=(href!(id::delete, {{ paths.param_key("id") }}: todo.id))>
 {%- if ui %}
                                 button(
                                     variant: ButtonVariant::Ghost,

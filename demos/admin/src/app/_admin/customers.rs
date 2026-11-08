@@ -11,7 +11,6 @@ use topcoat::{
     view::{View, attributes, component, element_id, suspense, view},
 };
 
-use self::customer_id::CustomerId;
 use super::Section;
 use crate::{
     app::_common::money,
@@ -225,7 +224,7 @@ async fn customer_rows(
                                 )
                                 <div class="flex max-w-64 min-w-0 flex-col">
                                     link(
-                                        href: href!(customer_id::page, CustomerId(customer.id)),
+                                        href: href!(customer_id::page, customer_id: customer.id),
                                         attrs: attributes! {
                                             class="truncate font-medium after:absolute after:inset-0"
                                         },
