@@ -682,3 +682,391 @@ where
         parts.push_string(self.resolve(cx));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use topcoat_core::{base_url::BaseUrl, context::Cx};
+
+    use super::*;
+
+    /// Declares a parameter named `$name` that fills one segment with a
+    /// string.
+    macro_rules! segment_param {
+        ($ty:ident = $name:literal) => {
+            struct $ty;
+
+            impl<V: AsRef<str>> HrefParam<V> for $ty {
+                const NAME: &'static str = $name;
+
+                fn segments(value: &V, segments: &mut HrefSegments<'_>) {
+                    segments.push(value.as_ref());
+                }
+            }
+        };
+    }
+
+    /// Declares a parameter named `$name` that fills one segment per element
+    /// of a list.
+    macro_rules! catch_all_param {
+        ($ty:ident = $name:literal) => {
+            struct $ty;
+
+            impl<V: SegmentList> HrefParam<V> for $ty {
+                const NAME: &'static str = $name;
+
+                fn segments(value: &V, segments: &mut HrefSegments<'_>) {
+                    value.for_each_segment(|segment| segments.push(segment));
+                }
+            }
+        };
+    }
+
+    segment_param!(Id = "id");
+    segment_param!(PostId = "post_id");
+    segment_param!(UserId = "user_id");
+    segment_param!(Name = "name");
+    segment_param!(Slug = "slug");
+    segment_param!(Extra = "extra");
+    catch_all_param!(Rest = "rest");
+    catch_all_param!(IdList = "id");
+
+    /// Builds a context carrying `https://example.com` as its base URL.
+    fn cx_with_base_url() -> Cx {
+        Cx::new().with(BaseUrl::new("https://example.com").expect("a valid base URL"))
+    }
+
+    /// Builds a context whose request URI is `uri`.
+    fn cx_with_uri(uri: &str) -> Cx {
+        let (parts, ()) = http::Request::builder()
+            .uri(uri)
+            .body(())
+            .expect("a valid request URI")
+            .into_parts();
+
+        Cx::new().with(parts)
+    }
+
+    /// Assigns `params` to `path` and returns the URL it produces.
+    fn assign(path: &str, params: &impl HrefParams) -> String {
+        let mut out = String::new();
+        params.assign(Path::new(path), &mut out);
+        out
+    }
+
+    /// Appends `queries` to an empty URL and returns the result.
+    fn assign_queries(queries: &impl HrefQueries) -> String {
+        let mut out = String::new();
+        queries.assign(&mut out);
+        out
+    }
+
+    #[test]
+    fn writes_a_static_path_verbatim() {
+        assert_eq!(assign("/users/all", &()), "/users/all");
+    }
+
+    #[test]
+    fn writes_the_root_path_as_a_slash() {
+        assert_eq!(assign("/", &()), "/");
+    }
+
+    #[test]
+    fn fills_parameters_by_name_in_any_order() {
+        assert_eq!(
+            assign(
+                "/users/{id}/posts/{post_id}",
+                &(PostId::arg("7"), Id::arg("42")),
+            ),
+            "/users/42/posts/7"
+        );
+    }
+
+    #[test]
+    fn skips_group_segments() {
+        assert_eq!(
+            assign("/(auth)/users/{id}", &(Id::arg("42"),)),
+            "/users/42"
+        );
+    }
+
+    #[test]
+    fn a_group_only_path_addresses_the_root() {
+        assert_eq!(assign("/(marketing)", &()), "/");
+    }
+
+    #[test]
+    fn fills_a_catch_all_with_one_segment_per_element() {
+        assert_eq!(
+            assign("/docs/{*rest}", &(Rest::arg(["guides", "start"]),)),
+            "/docs/guides/start"
+        );
+    }
+
+    #[test]
+    fn a_catch_all_accepts_owned_and_borrowed_lists() {
+        let owned = vec!["guides".to_owned(), "start".to_owned()];
+
+        assert_eq!(
+            assign("/docs/{*rest}", &(Rest::arg(&owned),)),
+            "/docs/guides/start"
+        );
+        assert_eq!(
+            assign("/docs/{*rest}", &(Rest::arg(owned.as_slice()),)),
+            "/docs/guides/start"
+        );
+        assert_eq!(
+            assign("/docs/{*rest}", &(Rest::arg(owned),)),
+            "/docs/guides/start"
+        );
+    }
+
+    #[test]
+    fn renders_the_same_url_each_time() {
+        let href = Href::new("/docs/{*rest}", (Rest::arg(vec!["a", "b"]),));
+        let cx = Cx::new();
+
+        assert_eq!(href.resolve(&cx), "/docs/a/b");
+        assert_eq!(href.resolve(&cx), "/docs/a/b");
+    }
+
+    #[test]
+    fn percent_encodes_a_segment() {
+        assert_eq!(
+            assign("/users/{id}", &(Id::arg("a/b?c#d e"),)),
+            "/users/a%2Fb%3Fc%23d%20e"
+        );
+    }
+
+    #[test]
+    fn percent_encodes_each_segment_of_a_catch_all() {
+        assert_eq!(
+            assign("/docs/{*rest}", &(Rest::arg(["a/b", "caf\u{e9}"]),)),
+            "/docs/a%2Fb/caf%C3%A9"
+        );
+    }
+
+    #[test]
+    fn leaves_the_unreserved_characters_of_a_segment_alone() {
+        assert_eq!(
+            assign("/docs/{slug}", &(Slug::arg("getting-started_v1.0~x"),)),
+            "/docs/getting-started_v1.0~x"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "no value provided for path parameter \"id\"")]
+    fn rejects_a_value_named_after_another_parameter() {
+        let _ = assign("/users/{id}", &(UserId::arg("42"),));
+    }
+
+    #[test]
+    #[should_panic(expected = "parameter \"id\" fills one segment")]
+    fn rejects_a_parameter_spanning_several_segments() {
+        let _ = assign("/users/{id}", &(IdList::arg(["a", "b"]),));
+    }
+
+    #[test]
+    #[should_panic(expected = "catch-all parameter \"rest\"")]
+    fn rejects_an_empty_catch_all() {
+        let _ = assign("/docs/{*rest}", &(Rest::arg(Vec::<&str>::new()),));
+    }
+
+    #[test]
+    #[should_panic(expected = "parameter \"id\" in `/users/{id}` was given an empty segment")]
+    fn rejects_an_empty_segment() {
+        let _ = assign("/users/{id}", &(Id::arg(""),));
+    }
+
+    #[test]
+    #[should_panic(expected = "parameter \"id\" in `/users/{id}` was given \"..\"")]
+    fn rejects_a_parent_segment() {
+        let _ = assign("/users/{id}", &(Id::arg(".."),));
+    }
+
+    #[test]
+    #[should_panic(expected = "parameter \"rest\" in `/docs/{*rest}` was given \".\"")]
+    fn rejects_a_current_segment_inside_a_catch_all() {
+        let _ = assign("/docs/{*rest}", &(Rest::arg(["guides", "."]),));
+    }
+
+    #[test]
+    fn keeps_a_segment_that_only_starts_with_a_dot() {
+        assert_eq!(
+            assign("/files/{name}", &(Name::arg(".gitignore"),)),
+            "/files/.gitignore"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "declares no parameter \"extra\"")]
+    fn rejects_more_parameters_than_the_path_declares() {
+        let _ = assign("/users/{id}", &(Id::arg("42"), Extra::arg("1")));
+    }
+
+    #[test]
+    #[should_panic(expected = "\"id\" in `/users/{id}` was given more than once")]
+    fn rejects_a_parameter_given_twice() {
+        let _ = assign("/users/{id}", &(Id::arg("42"), Id::arg("7")));
+    }
+
+    #[test]
+    #[should_panic(expected = "no value provided for path parameter \"id\"")]
+    fn rejects_an_unfilled_path_parameter() {
+        let _ = assign("/users/{id}", &());
+    }
+
+    #[test]
+    fn writes_no_query_without_items() {
+        assert_eq!(assign_queries(&()), "");
+    }
+
+    #[test]
+    fn concatenates_query_items() {
+        assert_eq!(
+            assign_queries(&([("tag", "rust")], [("page", "2"), ("sort", "asc")])),
+            "?tag=rust&page=2&sort=asc"
+        );
+    }
+
+    #[test]
+    fn skips_query_items_that_serialize_to_nothing() {
+        #[derive(serde::Serialize)]
+        struct Empty {}
+
+        assert_eq!(
+            assign_queries(&(Empty {}, [("page", "2")], Empty {})),
+            "?page=2"
+        );
+    }
+
+    #[test]
+    fn percent_encodes_query_values() {
+        assert_eq!(assign_queries(&([("tag", "a b&c")],)), "?tag=a+b%26c");
+    }
+
+    #[test]
+    fn resolves_a_relative_url_with_query_and_fragment() {
+        let url = Href::new("/users/{id}", (Id::arg("42"),))
+            .query([("page", "2")])
+            .fragment("bio")
+            .resolve(&Cx::new());
+
+        assert_eq!(url, "/users/42?page=2#bio");
+    }
+
+    #[test]
+    fn a_set_form_overrides_the_context_form() {
+        let cx = Cx::new().with(UrlForm::Absolute);
+        let url = Href::new("/users", ()).relative().resolve(&cx);
+
+        assert_eq!(url, "/users");
+    }
+
+    #[test]
+    fn resolves_an_absolute_url_behind_the_base_url() {
+        let url = Href::new("/users/{id}", (Id::arg("42"),))
+            .query([("page", "2")])
+            .fragment("bio")
+            .absolute()
+            .resolve(&cx_with_base_url());
+
+        assert_eq!(url, "https://example.com/users/42?page=2#bio");
+    }
+
+    #[test]
+    fn an_absolute_root_url_keeps_its_slash() {
+        assert_eq!(
+            Href::new("/", ()).absolute().resolve(&cx_with_base_url()),
+            "https://example.com/"
+        );
+    }
+
+    #[test]
+    fn the_context_form_turns_a_url_absolute() {
+        let cx = cx_with_base_url().with(UrlForm::Absolute);
+
+        assert_eq!(
+            Href::new("/users", ()).resolve(&cx),
+            "https://example.com/users"
+        );
+    }
+
+    #[test]
+    fn is_current_on_the_request_path() {
+        assert!(Href::new("/users", ()).is_current(&cx_with_uri("/users")));
+        assert!(!Href::new("/users", ()).is_current(&cx_with_uri("/users/42")));
+    }
+
+    #[test]
+    fn is_current_fills_in_the_parameters() {
+        let href = Href::new("/users/{id}", (Id::arg("42"),));
+
+        assert!(href.is_current(&cx_with_uri("/users/42")));
+        assert!(!href.is_current(&cx_with_uri("/users/7")));
+    }
+
+    #[test]
+    fn is_current_compares_the_encoded_path() {
+        let href = Href::new("/users/{id}", (Id::arg("a/b"),));
+
+        assert!(href.is_current(&cx_with_uri("/users/a%2Fb")));
+        assert!(!href.is_current(&cx_with_uri("/users/a/b")));
+    }
+
+    #[test]
+    fn the_root_href_is_current_on_the_root() {
+        assert!(Href::new("/", ()).is_current(&cx_with_uri("/")));
+    }
+
+    #[test]
+    fn an_unspecified_query_is_left_out_of_the_comparison() {
+        assert!(Href::new("/users", ()).is_current(&cx_with_uri("/users?page=2")));
+    }
+
+    #[test]
+    fn a_specified_query_must_match_the_request_query() {
+        let href = Href::new("/users", ()).query([("page", "2")]);
+
+        assert!(href.is_current(&cx_with_uri("/users?page=2")));
+        assert!(!href.is_current(&cx_with_uri("/users")));
+        assert!(!href.is_current(&cx_with_uri("/users?page=3")));
+        assert!(!href.is_current(&cx_with_uri("/users?page=2&sort=asc")));
+    }
+
+    #[test]
+    fn the_query_comparison_ignores_order_and_encoding() {
+        let href = Href::new("/users", ()).query([("page", "2"), ("sort", "a b")]);
+
+        assert!(href.is_current(&cx_with_uri("/users?sort=a%20b&page=2")));
+    }
+
+    #[test]
+    fn a_query_that_serializes_to_nothing_demands_a_bare_request() {
+        #[derive(serde::Serialize)]
+        struct Empty {}
+
+        let href = Href::new("/users", ()).query(Empty {});
+
+        assert!(href.is_current(&cx_with_uri("/users")));
+        assert!(!href.is_current(&cx_with_uri("/users?page=2")));
+    }
+
+    #[test]
+    fn the_fragment_is_left_out_of_the_comparison() {
+        let href = Href::new("/users", ()).fragment("bio");
+
+        assert!(href.is_current(&cx_with_uri("/users")));
+    }
+
+    #[test]
+    fn builder_appends_queries_and_replaces_the_fragment() {
+        let href = Href::new("/users", ())
+            .query([("a", "1")])
+            .fragment("one")
+            .query([("b", "2")])
+            .fragment("two");
+
+        assert_eq!(assign_queries(&href.queries), "?a=1&b=2");
+        assert_eq!(href.fragment, Some("two"));
+    }
+}

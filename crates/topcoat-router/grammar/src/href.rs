@@ -93,6 +93,45 @@ impl ToTokens for Href {
     }
 }
 
+/// Prints the target followed by the arguments, breaking the arguments onto
+/// their own lines when they do not fit. A trailing comma without arguments is
+/// dropped.
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::common::pretty::PrettyPrint for Href {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
+        use topcoat_core_grammar::common::pretty::TextMode;
+
+        self.target.pretty_print(printer);
+
+        let Some(comma_token) = &self.comma_token else {
+            return;
+        };
+        if self.args.is_empty() {
+            printer.move_cursor(comma_token.span.end());
+            return;
+        }
+
+        comma_token.pretty_print(printer);
+        for (index, pair) in self.args.pairs().enumerate() {
+            printer.scan_same_line_trivia();
+            printer.scan_break();
+            " ".pretty_print(printer);
+            printer.scan_trivia(true, true);
+            pair.value().pretty_print(printer);
+            if pair.punct().is_some() {
+                printer.scan_no_break_trivia();
+            }
+            match pair.punct() {
+                Some(punct) if index < self.args.len() - 1 => punct.pretty_print(printer),
+                _ => {
+                    printer.scan_text(",".into(), TextMode::Break);
+                    printer.advance_cursor(",");
+                }
+            }
+        }
+    }
+}
+
 /// A `param: value` argument of `href!`, filling the path parameter `param`
 /// with `value`.
 ///
@@ -123,5 +162,17 @@ impl Parse for HrefArg {
             colon_token,
             value,
         })
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::common::pretty::PrettyPrint for HrefArg {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::common::pretty::Printer<'_>) {
+        self.param.pretty_print(printer);
+        self.colon_token.pretty_print(printer);
+        if !self.value.is_empty() {
+            " ".pretty_print(printer);
+            self.value.pretty_print(printer);
+        }
     }
 }
