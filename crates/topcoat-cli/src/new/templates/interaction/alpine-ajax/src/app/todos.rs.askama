@@ -53,7 +53,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                             <li{{ classes.item }}>
                                 <form
                                     method="post"
-                                    action=(href!(id::toggle, id::id: todo.id))
+                                    action=(href!(id::toggle, {{ paths.param_key("id") }}: todo.id))
                                     x-target="todos"
                                 >
 {%- if ui %}
@@ -76,7 +76,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                                 }
                                 <form
                                     method="post"
-                                    action=(href!(id::delete, id::id: todo.id))
+                                    action=(href!(id::delete, {{ paths.param_key("id") }}: todo.id))
                                     x-target="todos"
                                 >
 {%- if ui %}

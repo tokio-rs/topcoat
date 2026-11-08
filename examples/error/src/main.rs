@@ -28,7 +28,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                 <a
                     href=(href!(
                         crate::posts::post_id::post,
-                        crate::posts::post_id::post_id: 1,
+                        crate::posts::post_id: 1,
                     ))
                 >
                     "An existing post"
@@ -38,7 +38,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                 <a
                     href=(href!(
                         crate::posts::post_id::post,
-                        crate::posts::post_id::post_id: 7,
+                        crate::posts::post_id: 7,
                     ))
                 >
                     "A missing post (404)"

@@ -131,7 +131,7 @@ async fn customer_orders(cx: &Cx, id: u64) -> Result<impl View> {
                                 table_cell(
                                     attrs: attributes! { class="font-medium tabular-nums" },
                                     link(
-                                        href: href!(order_id::page, order_id::order_id: order.id),
+                                        href: href!(order_id::page, order_id: order.id),
                                         attrs: attributes! { class="after:absolute after:inset-0" },
                                         "#"
                                         (order.id)

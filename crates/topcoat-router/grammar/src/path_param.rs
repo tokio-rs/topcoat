@@ -76,37 +76,15 @@ impl PathParam {
     /// fills the parameter with a value.
     ///
     /// The marker is an enum without variants, so it lives only in the type
-    /// namespace and leaves the parameter's name free for the reader.
+    /// namespace and leaves the parameter's name free for the reader. `href!`
+    /// calls its `__href` function, so `post_id: 5` reaches the marker as
+    /// `post_id::__href(5)`.
     fn emit_marker(&self, tokens: &mut TokenStream) {
         let visibility = &self.visibility;
         let ident = &self.name;
         let name = self.name_string();
-        let (bound, body) = match (self.is_catch_all(), self.param_type()) {
-            (false, Some(ty)) => (
-                quote! { ::core::borrow::Borrow<#ty> },
-                quote! { segments.push(::core::borrow::Borrow::<#ty>::borrow(value)); },
-            ),
-            (true, Some(ty)) => (
-                quote! { ::core::convert::AsRef<[#ty]> },
-                quote! {
-                    for segment in ::core::convert::AsRef::<[#ty]>::as_ref(value) {
-                        segments.push(segment);
-                    }
-                },
-            ),
-            (false, None) => (
-                quote! { ::core::convert::AsRef<str> },
-                quote! { segments.push(::core::convert::AsRef::<str>::as_ref(value)); },
-            ),
-            (true, None) => (
-                quote! { #topcoat_router::SegmentList },
-                quote! {
-                    #topcoat_router::SegmentList::for_each_segment(value, |segment| {
-                        segments.push(segment);
-                    });
-                },
-            ),
-        };
+        let bound = self.value_bound();
+        let push_segments = self.push_segments();
 
         quote! {
             #[doc(hidden)]
@@ -117,11 +95,52 @@ impl PathParam {
                 const NAME: &'static str = #name;
 
                 fn segments(value: &V, segments: &mut #topcoat_router::HrefSegments<'_>) {
-                    #body
+                    #push_segments
+                }
+            }
+
+            impl #ident {
+                #[doc(hidden)]
+                #[allow(dead_code)]
+                #visibility fn __href<V: #bound>(value: V) -> #topcoat_router::HrefArg<#ident, V> {
+                    <#ident as #topcoat_router::HrefParam<V>>::arg(value)
                 }
             }
         }
         .to_tokens(tokens);
+    }
+
+    /// The bound on the values `href!` accepts for the parameter.
+    pub(crate) fn value_bound(&self) -> TokenStream {
+        match (self.is_catch_all(), self.param_type()) {
+            (false, Some(ty)) => quote! { ::core::borrow::Borrow<#ty> },
+            (true, Some(ty)) => quote! { ::core::convert::AsRef<[#ty]> },
+            (false, None) => quote! { ::core::convert::AsRef<str> },
+            (true, None) => quote! { #topcoat_router::SegmentList },
+        }
+    }
+
+    /// Pushes the segments of `value` onto `segments`: one for a regular
+    /// parameter, one per element for a catch-all.
+    fn push_segments(&self) -> TokenStream {
+        match (self.is_catch_all(), self.param_type()) {
+            (false, Some(ty)) => {
+                quote! { segments.push(::core::borrow::Borrow::<#ty>::borrow(value)); }
+            }
+            (true, Some(ty)) => quote! {
+                for segment in ::core::convert::AsRef::<[#ty]>::as_ref(value) {
+                    segments.push(segment);
+                }
+            },
+            (false, None) => {
+                quote! { segments.push(::core::convert::AsRef::<str>::as_ref(value)); }
+            }
+            (true, None) => quote! {
+                #topcoat_router::SegmentList::for_each_segment(value, |segment| {
+                    segments.push(segment);
+                });
+            },
+        }
     }
 
     /// The result of a parsed parameter: the borrowed `value`, or the declared
@@ -182,7 +201,7 @@ impl PathParam {
                         ::core::str::FromStr::from_str(segment)
                             .map_err(|error| (index, error))
                     })
-                    .collect()
+                    .collect::<::core::result::Result<::std::vec::Vec<#ty>, _>>()
             }
 
             parse(cx).map(|values| &values[..])#map_err

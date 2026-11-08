@@ -59,7 +59,7 @@ pub async fn todo_list(cx: &Cx) -> Result<impl View> {
                                 variant: ButtonVariant::Outline,
                                 size: ButtonSize::Sm,
                                 attrs: attributes! {
-                                    hx-patch=(href!(id::toggle, id::id: todo.id))
+                                    hx-patch=(href!(id::toggle, {{ paths.param_key("id") }}: todo.id))
                                     hx-target="#todos"
                                     hx-swap="outerHTML"
                                 },
@@ -68,7 +68,7 @@ pub async fn todo_list(cx: &Cx) -> Result<impl View> {
 {%- else %}
                             <button
                                 {{- classes.button }}
-                                hx-patch=(href!(id::toggle, id::id: todo.id))
+                                hx-patch=(href!(id::toggle, {{ paths.param_key("id") }}: todo.id))
                                 hx-target="#todos"
                                 hx-swap="outerHTML"
                             >
@@ -85,7 +85,7 @@ pub async fn todo_list(cx: &Cx) -> Result<impl View> {
                                 variant: ButtonVariant::Ghost,
                                 size: ButtonSize::Sm,
                                 attrs: attributes! {
-                                    hx-delete=(href!(id::delete, id::id: todo.id))
+                                    hx-delete=(href!(id::delete, {{ paths.param_key("id") }}: todo.id))
                                     hx-target="#todos"
                                     hx-swap="outerHTML"
                                 },
@@ -94,7 +94,7 @@ pub async fn todo_list(cx: &Cx) -> Result<impl View> {
 {%- else %}
                             <button
                                 {{- classes.button }}
-                                hx-delete=(href!(id::delete, id::id: todo.id))
+                                hx-delete=(href!(id::delete, {{ paths.param_key("id") }}: todo.id))
                                 hx-target="#todos"
                                 hx-swap="outerHTML"
                             >

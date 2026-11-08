@@ -48,7 +48,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                 <a
                     href=(href!(
                         crate::posts::post_id::post,
-                        crate::posts::post_id::post_id: 42,
+                        crate::posts::post_id: 42,
                     ))
                 >
                     "path param: /posts/42"
@@ -58,7 +58,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                 <a
                     href=(href!(
                         crate::docs::doc_path::document,
-                        crate::docs::doc_path::doc_path: ["guides", "getting-started"],
+                        crate::docs::doc_path: ["guides", "getting-started"],
                     ))
                 >
                     "catch-all param: /docs/guides/getting-started"

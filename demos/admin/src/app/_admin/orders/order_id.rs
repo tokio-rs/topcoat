@@ -229,7 +229,7 @@ async fn customer_details(cx: &Cx, id: u64) -> Result<impl View> {
                 avatar(avatar_fallback((customer.initials())))
                 <div class="flex min-w-0 flex-col">
                     link(
-                        href: href!(customer_id::page, customer_id::customer_id: customer.id),
+                        href: href!(customer_id::page, customer_id: customer.id),
                         attrs: attributes! { class="truncate font-medium hover:underline" },
                         (&customer.name)
                     )

@@ -224,7 +224,7 @@ async fn customer_rows(
                                 )
                                 <div class="flex max-w-64 min-w-0 flex-col">
                                     link(
-                                        href: href!(customer_id::page, customer_id::customer_id: customer.id),
+                                        href: href!(customer_id::page, customer_id: customer.id),
                                         attrs: attributes! {
                                             class="truncate font-medium after:absolute after:inset-0"
                                         },

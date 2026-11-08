@@ -17,7 +17,7 @@ pub(crate) async fn products(cx: &Cx) -> Result<impl View> {
         <ul>
             for product in PRODUCTS {
                 <li>
-                    <a href=(href!(product_id::page, product_id::product_id: product.id))>
+                    <a href=(href!(product_id::page, product_id: product.id))>
                         (product.name)
                     </a>
                 </li>

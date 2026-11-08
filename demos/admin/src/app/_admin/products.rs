@@ -256,7 +256,7 @@ async fn product_rows(
                         table_cell(
                             <div class="flex max-w-80 min-w-0 flex-col">
                                 link(
-                                    href: href!(product_id::page, product_id::product_id: product.id),
+                                    href: href!(product_id::page, product_id: product.id),
                                     attrs: attributes! {
                                         class="truncate font-medium after:absolute after:inset-0"
                                     },
