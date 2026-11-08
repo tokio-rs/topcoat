@@ -41,9 +41,8 @@ module_param!(pub order_id: u64 else not_found);
 #[page(with(Crumb::new(async |cx| Ok(format!("#{}", order_id(cx)?)))))]
 pub async fn page(cx: &Cx) -> Result<impl View> {
     let user = require_user(cx).await?;
-    let id = *order_id(cx)?;
     // Look up the order before streaming starts so a missing order can return 404.
-    let order = Order::find(cx, id).await?.ok_or_not_found()?;
+    let order = Order::find(cx, *order_id(cx)?).await?.ok_or_not_found()?;
     let next = if user.role.can_edit() {
         order.status.next()
     } else {
