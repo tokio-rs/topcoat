@@ -54,7 +54,7 @@ async fn nav(cx: &Cx) -> Result<impl View> {
         <nav>
             for link_locale in t::locales() {
                 <a
-                    href=(href!(_page::page, PathLocale(link_locale.clone())))
+                    href=(href!(_page::page, path_locale: link_locale))
                     lang=(link_locale.id())
                     if link_locale == locale(cx) {
                         aria-current="page"

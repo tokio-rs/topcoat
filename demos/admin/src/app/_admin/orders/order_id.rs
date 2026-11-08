@@ -17,7 +17,7 @@ use crate::{
     app::{
         _admin::{
             Crumb,
-            customers::customer_id::{self, CustomerId},
+            customers::customer_id,
         },
         _common::money,
     },
@@ -229,7 +229,7 @@ async fn customer_details(cx: &Cx, id: u64) -> Result<impl View> {
                 avatar(avatar_fallback((customer.initials())))
                 <div class="flex min-w-0 flex-col">
                     link(
-                        href: href!(customer_id::page, CustomerId(customer.id)),
+                        href: href!(customer_id::page, customer_id::customer_id: customer.id),
                         attrs: attributes! { class="truncate font-medium hover:underline" },
                         (&customer.name)
                     )
@@ -307,7 +307,7 @@ async fn status_actions(cx: &Cx, id: u64, next: &'static [OrderStatus]) -> Resul
         <form
             id=(&form_id)
             method="post"
-            action=(href!(advance, OrderId(id)))
+            action=(href!(advance, order_id: id))
             class="flex gap-2 sm:ml-auto"
         >
             for &status in next {
@@ -411,5 +411,5 @@ pub async fn advance(cx: &Cx, Form(form): Form<Advance>) -> Result<SeeOther> {
     // If this transition is no longer allowed, show the current order unchanged.
     order.advance(cx, form.status).await?;
 
-    Ok(see_other(href!(page, OrderId(id)).resolve(cx)))
+    Ok(see_other(href!(page, order_id: id).resolve(cx)))
 }

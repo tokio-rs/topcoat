@@ -11,7 +11,6 @@ use topcoat::{
     view::{StaticClass, View, attributes, class, component, element_id, suspense, view},
 };
 
-use self::product_id::ProductId;
 use super::Section;
 use crate::{
     app::_common::money,
@@ -257,7 +256,7 @@ async fn product_rows(
                         table_cell(
                             <div class="flex max-w-80 min-w-0 flex-col">
                                 link(
-                                    href: href!(product_id::page, ProductId(product.id)),
+                                    href: href!(product_id::page, product_id::product_id: product.id),
                                     attrs: attributes! {
                                         class="truncate font-medium after:absolute after:inset-0"
                                     },

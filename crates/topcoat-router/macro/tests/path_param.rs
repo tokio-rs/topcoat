@@ -126,8 +126,8 @@ path_param!(pub *public_parts);
 #[page("/links")]
 async fn links(cx: &Cx) -> Result<impl View> {
     Ok(view! {
-        <a href=(href!(post, PostId(42)))>"post"</a>
-        <a href=(href!(document, DocPath(["guides", "getting started"])))>"guides"</a>
+        <a href=(href!(post, post_id: 42))>"post"</a>
+        <a href=(href!(document, doc_path: ["guides", "getting started"]))>"guides"</a>
     })
 }
 
@@ -255,36 +255,20 @@ async fn missing_parameter_panics() {
 }
 
 #[test]
-fn constructs_public_parameter_values() {
-    let id = PublicId(42);
-    assert_eq!(id.0, 42);
-
-    let borrowed = PublicSlug("rust");
-    assert_eq!(borrowed.0, "rust");
-    let owned: PublicSlug = PublicSlug("rust".to_owned());
-    assert_eq!(owned.0, "rust");
-
-    let borrowed = PublicParts(["guides", "start"]);
-    assert_eq!(borrowed.0, ["guides", "start"]);
-    let owned: PublicParts = PublicParts(vec!["guides".to_owned(), "start".to_owned()]);
-    assert_eq!(owned.0, ["guides", "start"]);
-}
-
-#[test]
 fn fills_a_typed_param_into_an_href() {
-    let url = href("/posts/{public_id}", (PublicId(42),)).resolve(&Cx::new());
+    let url = href!("/posts/{public_id}", public_id: 42).resolve(&Cx::new());
     assert_eq!(url, "/posts/42");
 }
 
 #[test]
 fn escapes_an_unparsed_param_filled_into_an_href() {
-    let url = href("/tags/{public_slug}", (PublicSlug("getting started"),)).resolve(&Cx::new());
+    let url = href!("/tags/{public_slug}", public_slug: "getting started").resolve(&Cx::new());
     assert_eq!(url, "/tags/getting%20started");
 }
 
 #[test]
 fn fills_one_href_segment_per_typed_catch_all_element() {
-    let url = href("/archive/{*number_path}", (NumberPath(vec![1, 2, 3]),)).resolve(&Cx::new());
+    let url = href!("/archive/{*number_path}", number_path: vec![1, 2, 3]).resolve(&Cx::new());
     assert_eq!(url, "/archive/1/2/3");
 }
 
@@ -292,7 +276,7 @@ fn fills_one_href_segment_per_typed_catch_all_element() {
 fn fills_one_href_segment_per_unparsed_catch_all_element() {
     // A `/` inside an element is escaped, so it stays within its own segment
     // instead of adding one.
-    let url = href("/docs/{*public_parts}", (PublicParts(["guides", "a/b"]),)).resolve(&Cx::new());
+    let url = href!("/docs/{*public_parts}", public_parts: ["guides", "a/b"]).resolve(&Cx::new());
     assert_eq!(url, "/docs/guides/a%2Fb");
 }
 

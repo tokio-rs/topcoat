@@ -81,7 +81,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
                     <form
                         id=(&form_id)
                         method="post"
-                        action=(href!(save, ProductId(product.id)))
+                        action=(href!(save, product_id: product.id))
                     >
                         field_set(
                             attrs: attributes! { disabled=((!can_edit).then_some("")) },
@@ -216,7 +216,7 @@ pub async fn save(cx: &Cx, Form(form): Form<ProductForm>) -> Result<SeeOther> {
     if let Err(errors) = product.edit(cx, &form).await? {
         // Rewrite the POST to keep the submitted values and errors in the request context.
         return Err(
-            rewrite(href!(page, ProductId(id)).resolve(cx), Body::empty())
+            rewrite(href!(page, product_id: id).resolve(cx), Body::empty())
                 .method(Method::GET)
                 .with(Rejected { form, errors })
                 .into(),
