@@ -42,7 +42,7 @@ async fn dashboard(cx: &Cx) -> Result<impl View> {
 }
 ```
 
-The methods mirror the constructors: [`ok_or_not_found`](RouterErrorExt::ok_or_not_found) for [`not_found`], [`ok_or_redirect`](RouterErrorExt::ok_or_redirect) for [`redirect`], and so on. A failed `path_param::<T>(cx)` or `query_params::<T>(cx)` parse feeds the same constructors through the declaration's `error = ...` option.
+The methods mirror the constructors: [`ok_or_not_found`](RouterErrorExt::ok_or_not_found) for [`not_found`], [`ok_or_redirect`](RouterErrorExt::ok_or_redirect) for [`redirect`], and so on. A path parameter declared with an `else` clause, or a query struct declared with `error = ...`, uses the same constructors when parsing fails.
 
 # Catching an error
 

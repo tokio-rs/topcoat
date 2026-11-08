@@ -13,7 +13,19 @@ use crate::{
     app::{
         _admin::{
             Crumb,
-            orders::{item_count, order_id,equire_user,omer::{Customer, Spending},
+            orders::{item_count, order_id, status_badge, time_ago},
+        },
+        _common::{money, timestamp},
+    },
+    components::{
+        avatar::{AvatarSize, avatar, avatar_fallback},
+        card::{card, card_description, card_header, card_title},
+        skeleton::skeleton,
+        table::{table, table_body, table_cell, table_head, table_header, table_row},
+    },
+    features::{
+        auth::require_user,
+        customer::{Customer, Spending},
         order::Order,
     },
 };

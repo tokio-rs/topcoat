@@ -50,7 +50,7 @@ You can also combine the approaches. `module_router!()` collects module-derived 
 
 # Linking to pages and routes
 
-Use [`href!`](macro@href) for URLs targeting Topcoat handlers, including navigation links, form actions, and redirects. Pass the handler's Rust name so the URL follows its registered path when you rename a module or change an explicit path. Pass each path parameter as a `path_param!` value:
+Use [`href!`](macro@href) for URLs targeting Topcoat handlers, including navigation links, form actions, and redirects. Pass the handler's Rust name so the URL follows its registered path when you rename a module or change an explicit path. Fill each path parameter with `name: value`.
 
 ```rust
 use topcoat::{context::Cx, router::href, view::view};
@@ -59,13 +59,13 @@ use topcoat::{context::Cx, router::href, view::view};
 # #[route(POST "/posts")] async fn publish(cx: &Cx) -> Result<()> { Ok(()) }
 # mod post_id {
 #     use super::*;
-#     topcoat::router::path_param!(pub post_id: u64);
-#     #[page("/posts/{post_id}")] pub async fn post(cx: &Cx) -> Result<impl View> { Ok(topcoat::view::view! { "Post" }) }
+#     topcoat::router::module_param!(pub post_id: u64);
+#     #[page] pub async fn post(cx: &Cx) -> Result<impl View> { Ok(topcoat::view::view! { "Post" }) }
 # }
 # #[page] async fn example(cx: &Cx) -> Result<impl View> {
 Ok(view! {
     <a href=(href!(posts))>"All posts"</a>
-    <a href=(href!(post_id::post, post_id::PostId(1)))>"First post"</a>
+    <a href=(href!(post_id::post, post_id: 1))>"First post"</a>
     <form method="post" action=(href!(publish))>
         <button>"Publish"</button>
     </form>
@@ -257,12 +257,12 @@ Read path and query values from [`Cx`](crate::context::Cx). Any helper with acce
 
 ## Path parameters
 
-[`path_param!`](macro@path_param) declares a path parameter and generates a Pascal-cased type, so `path_param!(post_id: u64)` declares `PostId` for `{post_id}`. For module routing, use [`module_param!`](macro@module_param). It makes the same declaration and also sets the module's URL segment to that parameter.
+[`path_param!`](macro@path_param) declares a path parameter and generates a function with the same name that reads it, so `path_param!(post_id: u64)` gives you `post_id(cx)` for `{post_id}`. For module routing, use [`module_param!`](macro@module_param). It makes the same declaration and also sets the module's URL segment to that parameter.
 
-Both macros accept the same options, and you read their values with `path_param::<T>(cx)`:
+Both macros accept the same options.
 
-- After `path_param!(slug)`, `path_param::<Slug>(cx)` returns the percent-decoded segment as `&str`.
-- A type after `:` is parsed with [`FromStr`](std::str::FromStr). The default return type is `Result<&T, &<T as FromStr>::Err>`.
+- After `path_param!(slug)`, `slug(cx)` returns the percent-decoded segment as `&str`.
+- A type after `:` is parsed with [`FromStr`](std::str::FromStr). The function then returns `Result<&T, &<T as FromStr>::Err>`.
 - An `else` clause after the type, such as `else not_found`, maps parse failures to a router error. See [`path_param!`](macro@path_param) for the supported forms.
 
 ```rust
@@ -270,7 +270,7 @@ Both macros accept the same options, and you read their values with `path_param:
 use topcoat::{
     Result,
     context::Cx,
-    router::{module_param, page, path_param},
+    router::{module_param, page},
     view::{View, view},
 };
 
@@ -278,14 +278,14 @@ module_param!(post_id: u64 else bad_request);
 
 #[page]
 async fn post(cx: &Cx) -> Result<impl View> {
-    let post_id = path_param::<PostId>(cx)?;
+    let post_id = post_id(cx)?;
     Ok(view! { <h1>"Post " (post_id)</h1> })
 }
 ```
 
 Parsing occurs once per request and the result is memoized.
 
-Prefix the name with `*` to capture the remaining path as decoded segments. After `path_param!(*doc_path)`, `path_param::<DocPath>(cx)` returns [`CatchAllSegments`]. After `path_param!(*ids: u32)`, `path_param::<Ids>(cx)` returns `Result<&[u32], _>`.
+Prefix the name with `*` to capture the remaining path as decoded segments. After `path_param!(*doc_path)`, `doc_path(cx)` returns [`CatchAllSegments`]. After `path_param!(*ids: u32)`, `ids(cx)` returns `Result<&[u32], _>`.
 
 See [`module_router!`] for nested modules and catch-all routes, or [`path_param!`](macro@path_param) for parameters in explicit handler paths.
 
