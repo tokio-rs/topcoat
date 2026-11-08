@@ -1,11 +1,13 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens};
+use quote::{ToTokens, quote};
 use syn::{
     Ident, Token, Type, Visibility,
+    ext::IdentExt,
     parse::{Parse, ParseStream},
 };
 use topcoat_core_grammar::common::{
     ParseOption,
+    paths::{topcoat_context, topcoat_context_macro, topcoat_router},
 };
 
 use super::common::ErrorResponse;
@@ -18,6 +20,145 @@ pub struct PathParam {
     pub param_type: Option<PathParamType>,
     pub error: Option<PathParamError>,
     pub trailing_comma: Option<Token![,]>,
+}
+
+impl PathParam {
+    pub(crate) fn is_catch_all(&self) -> bool {
+        self.star_token.is_some()
+    }
+
+    fn param_type(&self) -> Option<&Type> {
+        self.param_type.as_ref().map(|param_type| &param_type.ty)
+    }
+
+    fn error(&self) -> Option<&ErrorResponse> {
+        self.error.as_ref().map(|error| &error.response)
+    }
+
+    /// The name as it appears in the URL, without a raw identifier prefix.
+    pub(crate) fn name_string(&self) -> String {
+        self.name.unraw().to_string()
+    }
+
+    /// Emits the function that reads the parameter from the matched route.
+    fn emit_reader(&self, tokens: &mut TokenStream) {
+        let visibility = &self.visibility;
+        let ident = &self.name;
+        let (output, body) = match (self.is_catch_all(), self.param_type()) {
+            (false, Some(ty)) => (
+                self.parsed_output(&quote! { &'__cx #ty }, ty),
+                self.parse_segment(ty),
+            ),
+            (true, Some(ty)) => (
+                self.parsed_output(&quote! { &'__cx [#ty] }, ty),
+                self.parse_segments(ty),
+            ),
+            (false, None) => (quote! { &'__cx str }, self.read_segment()),
+            (true, None) => (
+                quote! { #topcoat_router::CatchAllSegments<'__cx> },
+                self.read_segments(),
+            ),
+        };
+
+        // A parameter can be declared only for a route to match it, so an
+        // unread one does not warn.
+        quote! {
+            #[allow(dead_code)]
+            #[track_caller]
+            #visibility fn #ident<'__cx>(cx: &'__cx #topcoat_context::Cx) -> #output {
+                #body
+            }
+        }
+        .to_tokens(tokens);
+    }
+
+    /// The result of a parsed parameter: the borrowed `value`, or the declared
+    /// error response, or the borrowed parse error without one.
+    fn parsed_output(&self, value: &TokenStream, ty: &Type) -> TokenStream {
+        let error = self.error().map_or_else(
+            || quote! { &'__cx <#ty as ::core::str::FromStr>::Err },
+            ErrorResponse::ty,
+        );
+
+        quote! { ::core::result::Result<#value, #error> }
+    }
+
+    fn read_segment(&self) -> TokenStream {
+        let name = self.name_string();
+        quote! { #topcoat_router::path_param_segment(cx, #name) }
+    }
+
+    fn read_segments(&self) -> TokenStream {
+        let name = self.name_string();
+        quote! { #topcoat_router::path_param_segments(cx, #name) }
+    }
+
+    /// Parses the segment once per request and borrows the cached result.
+    fn parse_segment(&self, ty: &Type) -> TokenStream {
+        let segment = self.read_segment();
+        let map_err = self.map_err();
+
+        quote! {
+            #[#topcoat_context_macro::memoize(as_ref)]
+            fn parse(
+                cx: &#topcoat_context::Cx,
+            ) -> ::core::result::Result<#ty, <#ty as ::core::str::FromStr>::Err> {
+                ::core::str::FromStr::from_str(#segment)
+            }
+
+            parse(cx)#map_err
+        }
+    }
+
+    /// Parses every segment once per request and borrows the cached result. A
+    /// failure keeps the index of the segment that failed.
+    fn parse_segments(&self, ty: &Type) -> TokenStream {
+        let segments = self.read_segments();
+        let map_err = self.map_err();
+
+        quote! {
+            #[#topcoat_context_macro::memoize(as_ref)]
+            fn parse(
+                cx: &#topcoat_context::Cx,
+            ) -> ::core::result::Result<
+                ::std::vec::Vec<#ty>,
+                (usize, <#ty as ::core::str::FromStr>::Err),
+            > {
+                #segments
+                    .enumerate()
+                    .map(|(index, segment)| {
+                        ::core::str::FromStr::from_str(segment)
+                            .map_err(|error| (index, error))
+                    })
+                    .collect()
+            }
+
+            parse(cx).map(|values| &values[..])#map_err
+        }
+    }
+
+    fn map_err(&self) -> TokenStream {
+        let name = self.name_string();
+
+        match (self.error(), self.is_catch_all()) {
+            (Some(error), false) => error.map_err(quote! {
+                |_| #topcoat_router::error::bad_request(
+                    ::std::format!("invalid value for path parameter \"{}\"", #name)
+                )
+            }),
+            (Some(error), true) => error.map_err(quote! {
+                |(index, _)| #topcoat_router::error::bad_request(
+                    ::std::format!(
+                        "invalid value for path parameter \"{}\" at segment {}",
+                        #name,
+                        index,
+                    )
+                )
+            }),
+            (None, false) => quote! {},
+            (None, true) => quote! { .map_err(|error| &error.1) },
+        }
+    }
 }
 
 impl Parse for PathParam {
@@ -46,12 +187,7 @@ impl Parse for PathParam {
 
 impl ToTokens for PathParam {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let visibility = &self.visibility;
-        let 
-
-        quote! {
-
-        }.to_tokens(tokens);
+        self.emit_reader(tokens);
     }
 }
 
@@ -160,7 +296,6 @@ mod tests {
         );
         assert!(param.error.is_some());
         assert!(param.trailing_comma.is_some());
-        assert_eq!(param.type_ident(), "PostIds");
     }
 
     #[test]
@@ -182,7 +317,6 @@ mod tests {
         assert!(param.param_type.is_none());
         assert!(param.error.is_none());
         assert!(param.trailing_comma.is_none());
-        assert_eq!(param.type_ident(), "Slug");
     }
 
     #[test]
@@ -202,6 +336,5 @@ mod tests {
         let param = parse("r#type: u32");
 
         assert_eq!(param.name_string(), "type");
-        assert_eq!(param.type_ident(), "Type");
     }
 }

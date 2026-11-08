@@ -1,6 +1,7 @@
 use std::{
     borrow::Cow,
     fmt::{self, Display, Write},
+    marker::PhantomData,
 };
 
 use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
@@ -73,6 +74,84 @@ impl Write for PercentEncoded<'_> {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         self.0.extend(utf8_percent_encode(s, SEGMENT));
         Ok(())
+    }
+}
+
+/// A path parameter that accepts values of type `V` in an href.
+///
+/// `path_param!` implements this trait for the marker type it declares, which
+/// is named after the parameter. `href!` uses it to turn a `param: value`
+/// argument into URL segments.
+pub trait HrefParam<V> {
+    /// The parameter's name in the route path.
+    const NAME: &'static str;
+
+    /// Pushes the segments `value` fills the parameter with: one for a regular
+    /// parameter, one per element for a catch-all.
+    fn segments(value: &V, segments: &mut HrefSegments<'_>);
+
+    /// Wraps `value` as an argument of an href.
+    fn arg(value: V) -> HrefArg<Self, V>
+    where
+        Self: Sized,
+    {
+        HrefArg {
+            value,
+            param: PhantomData,
+        }
+    }
+}
+
+/// A value passed to `href!` for the path parameter `P`.
+///
+/// The value is kept as passed and written into the URL each time the href
+/// renders.
+pub struct HrefArg<P, V> {
+    value: V,
+    param: PhantomData<fn() -> P>,
+}
+
+/// The URL segments a path parameter is filled with.
+///
+/// [`push`](Self::push) appends one segment. The separating `/` and the
+/// escaping are written here, so a value never spells out either itself.
+pub struct HrefSegments<'out> {
+    out: &'out mut String,
+    name: &'out str,
+    path: &'out Path,
+    count: usize,
+}
+
+impl HrefSegments<'_> {
+    /// Appends one path segment, percent-encoded.
+    ///
+    /// The segment is written with [`Display`] and lands in the URL escaped,
+    /// so a value that contains `/`, `?`, or `#` fills exactly this one
+    /// segment instead of reshaping the URL around it.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the segment's [`Display`] implementation fails, or if it
+    /// renders to nothing, `.`, or `..`. A browser resolves those against the
+    /// rest of the path instead of reading them as one segment, and encoding
+    /// them does not take that meaning away, so they are rejected.
+    pub fn push(&mut self, segment: &(impl Display + ?Sized)) {
+        let (name, path) = (self.name, self.path);
+        let start = self.out.len();
+        self.out.push('/');
+        write!(PercentEncoded(self.out), "{segment}").unwrap();
+
+        let rendered = &self.out[start + 1..];
+        assert!(
+            !rendered.is_empty(),
+            "parameter \"{name}\" in `{path}` was given an empty segment"
+        );
+        assert!(
+            !matches!(rendered, "." | ".."),
+            "parameter \"{name}\" in `{path}` was given \"{rendered}\", which \
+             addresses another path instead of filling a segment"
+        );
+        self.count += 1;
     }
 }
 
