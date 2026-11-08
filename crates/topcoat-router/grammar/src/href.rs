@@ -83,7 +83,7 @@ impl ToTokens for Href {
             let key = &arg.param;
             let value = &arg.value;
             quote! {
-                <#key as #topcoat_router::HrefParam>::__href(#value)
+                <#key as #topcoat_router::HrefParam<_>>::arg(#value)
             }
         });
         quote! {

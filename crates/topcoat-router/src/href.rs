@@ -15,7 +15,7 @@ use topcoat_view::{AttributeValueViewParts, NodeViewParts, PartsWriter};
 
 use crate::{CatchAllSegments, Path, PathSegment, request::uri};
 
-/// The destination an [`href`] points at, resolved to the route [`Path`] the
+/// The destination an `href!` points at, resolved to the route [`Path`] the
 /// URL is built from.
 pub trait HrefTarget {
     /// Returns the route path the URL is built from.
@@ -270,7 +270,7 @@ pub trait HrefParams {
 /// so both stay reachable.
 macro_rules! impl_href_params_tuples {
     ( $(($param:ident, $value:ident)),* ) => {
-        #[allow(non_snake_case, unused_mut)]
+        #[allow(non_snake_case, unused_mut, unused_variables)]
         impl<$($param, $value,)*> HrefParams for ($(HrefArg<$param, $value>,)*)
         where
             $($param: HrefParam<$value>,)*
@@ -361,7 +361,83 @@ fn reject_leftover_args(names: &[&str], path: &Path) {
     }
 }
 
-/// A URL being built by [`href`].
+/// The query of an href: a tuple of up to eight [`Serialize`] items,
+/// collected by [`Href::query`].
+pub trait HrefQueries {
+    /// Whether a query was specified: `true` when the tuple holds at least
+    /// one item, even one that serializes to nothing.
+    const SPECIFIED: bool;
+
+    /// Appends the items, serialized and concatenated into one query string,
+    /// to the URL in `out`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an item does not serialize to a URL query string.
+    fn assign(&self, out: &mut String);
+}
+
+/// The empty tuple: no query was specified, and nothing is appended.
+impl HrefQueries for () {
+    const SPECIFIED: bool = false;
+
+    fn assign(&self, _out: &mut String) {}
+}
+
+/// Generates the `HrefQueries` impl for a non-empty tuple of query items
+/// `Q1..Qn`.
+///
+/// Each item serializes to a query string on its own; the non-empty results
+/// are concatenated, the first behind `?` and the rest behind `&`.
+macro_rules! impl_href_queries_tuples {
+    ( $($ty:ident),+ ) => {
+        #[allow(non_snake_case, unused_assignments)]
+        impl<$($ty,)+> HrefQueries for ($($ty,)+)
+        where
+            $($ty: Serialize,)+
+        {
+            const SPECIFIED: bool = true;
+
+            fn assign(&self, out: &mut String) {
+                let ($($ty,)+) = self;
+                let mut separator = '?';
+                $(
+                    if write_query($ty, separator, out) {
+                        separator = '&';
+                    }
+                )+
+            }
+        }
+    };
+}
+
+impl_href_queries_tuples!(Q1);
+impl_href_queries_tuples!(Q1, Q2);
+impl_href_queries_tuples!(Q1, Q2, Q3);
+impl_href_queries_tuples!(Q1, Q2, Q3, Q4);
+impl_href_queries_tuples!(Q1, Q2, Q3, Q4, Q5);
+impl_href_queries_tuples!(Q1, Q2, Q3, Q4, Q5, Q6);
+impl_href_queries_tuples!(Q1, Q2, Q3, Q4, Q5, Q6, Q7);
+impl_href_queries_tuples!(Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8);
+
+/// Serializes one query item behind `separator` into `out`, returning whether
+/// the item produced any query string at all.
+///
+/// # Panics
+///
+/// Panics if the item does not serialize to a URL query string.
+fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bool {
+    let query = serde_urlencoded::to_string(query)
+        .unwrap_or_else(|error| panic!("query item does not serialize to a query string: {error}"));
+    if query.is_empty() {
+        return false;
+    }
+    out.push(separator);
+    out.push_str(&query);
+    true
+}
+
+/// A URL being built by `href!`.
 ///
 /// [`query`](Self::query) adds query items, [`fragment`](Self::fragment) sets
 /// the fragment, and [`relative`](Self::relative), [`absolute`](Self::absolute),
@@ -590,7 +666,7 @@ where
 }
 
 /// An href used in attribute value position renders as the URL it resolves
-/// to, e.g. `href=(href(...))`.
+/// to, e.g. `href=(href!(...))`.
 impl<T, P, Q, F> AttributeValueViewParts for Href<T, P, Q, F>
 where
     T: HrefTarget,

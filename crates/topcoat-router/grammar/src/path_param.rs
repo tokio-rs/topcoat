@@ -72,6 +72,58 @@ impl PathParam {
         .to_tokens(tokens);
     }
 
+    /// Emits the marker type named after the parameter, through which `href!`
+    /// fills the parameter with a value.
+    ///
+    /// The marker is an enum without variants, so it lives only in the type
+    /// namespace and leaves the parameter's name free for the reader.
+    fn emit_marker(&self, tokens: &mut TokenStream) {
+        let visibility = &self.visibility;
+        let ident = &self.name;
+        let name = self.name_string();
+        let (bound, body) = match (self.is_catch_all(), self.param_type()) {
+            (false, Some(ty)) => (
+                quote! { ::core::borrow::Borrow<#ty> },
+                quote! { segments.push(::core::borrow::Borrow::<#ty>::borrow(value)); },
+            ),
+            (true, Some(ty)) => (
+                quote! { ::core::convert::AsRef<[#ty]> },
+                quote! {
+                    for segment in ::core::convert::AsRef::<[#ty]>::as_ref(value) {
+                        segments.push(segment);
+                    }
+                },
+            ),
+            (false, None) => (
+                quote! { ::core::convert::AsRef<str> },
+                quote! { segments.push(::core::convert::AsRef::<str>::as_ref(value)); },
+            ),
+            (true, None) => (
+                quote! { #topcoat_router::SegmentList },
+                quote! {
+                    #topcoat_router::SegmentList::for_each_segment(value, |segment| {
+                        segments.push(segment);
+                    });
+                },
+            ),
+        };
+
+        quote! {
+            #[doc(hidden)]
+            #[allow(dead_code, non_camel_case_types)]
+            #visibility enum #ident {}
+
+            impl<V: #bound> #topcoat_router::HrefParam<V> for #ident {
+                const NAME: &'static str = #name;
+
+                fn segments(value: &V, segments: &mut #topcoat_router::HrefSegments<'_>) {
+                    #body
+                }
+            }
+        }
+        .to_tokens(tokens);
+    }
+
     /// The result of a parsed parameter: the borrowed `value`, or the declared
     /// error response, or the borrowed parse error without one.
     fn parsed_output(&self, value: &TokenStream, ty: &Type) -> TokenStream {
@@ -188,6 +240,7 @@ impl Parse for PathParam {
 impl ToTokens for PathParam {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         self.emit_reader(tokens);
+        self.emit_marker(tokens);
     }
 }
 
