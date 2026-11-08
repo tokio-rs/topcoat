@@ -8,7 +8,7 @@ pub use topcoat_runtime_macro::*;
 /// # Panics
 ///
 /// Panics if the request did not pass through a
-/// [`RuntimeLayer`](crate::runtime::RuntimeLayer).
+/// [`RuntimeLayer`].
 #[cfg(feature = "view")]
 #[topcoat::view::component]
 pub async fn script(cx: &topcoat::context::Cx) -> topcoat::Result<impl topcoat::view::View> {
