@@ -57,11 +57,10 @@ async fn shadowed(cx: &Cx) -> Result<impl View> {
 }
 
 // A page linking to itself: the marker stays reachable from the page's own
-// body, next to a binding of the same name shadowing it.
+// body, where the page's function shadows it.
 #[page("/self-linked")]
 async fn self_linked(cx: &Cx) -> Result<impl View> {
-    let self_linked = "self-linked";
-    Ok(view! { <a href=(href!(self_linked))>(self_linked)</a> })
+    Ok(view! { <a href=(href!(self_linked))>"self-linked"</a> })
 }
 
 // Pages used as components: called like any component inside `view!`, with a
