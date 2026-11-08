@@ -36,7 +36,9 @@ const SKELETON_ROWS: usize = 5;
 
 #[memoize(as_ref)]
 async fn customer(cx: &Cx) -> Result<Customer> {
-    Ok(Customer::find(cx, *customer_id(cx)?).await?.ok_or_not_found()?)
+    Ok(Customer::find(cx, *customer_id(cx)?)
+        .await?
+        .ok_or_not_found()?)
 }
 
 #[page(with(Crumb::new(async |cx| Ok(customer(cx).await?.name.clone()))))]

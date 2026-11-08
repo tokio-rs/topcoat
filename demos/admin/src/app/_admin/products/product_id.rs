@@ -36,7 +36,9 @@ struct Rejected {
 
 #[memoize(as_ref)]
 async fn product(cx: &Cx) -> Result<Product> {
-    Ok(Product::find(cx, *product_id(cx)?).await?.ok_or_not_found()?)
+    Ok(Product::find(cx, *product_id(cx)?)
+        .await?
+        .ok_or_not_found()?)
 }
 
 #[page(with(Crumb::new(async |cx| Ok(product(cx).await?.name.clone()))))]
