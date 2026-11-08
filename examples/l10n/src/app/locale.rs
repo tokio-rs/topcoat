@@ -5,8 +5,7 @@ use topcoat::{
     context::Cx,
     l10n::{Locale, locale},
     router::{
-        Body, Next, Slot, error::not_found, href, layer, layout, module_param,
-        response::Response,
+        Body, Next, Slot, error::not_found, href, layer, layout, module_param, response::Response,
     },
     view::{View, component, view},
 };

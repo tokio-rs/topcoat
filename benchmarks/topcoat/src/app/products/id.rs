@@ -15,9 +15,7 @@ module_param!(product_id: u32 else not_found);
 #[page]
 async fn product_detail(cx: &Cx) -> Result<impl View> {
     let catalog = context::<Catalog>(cx);
-    let product = catalog
-        .get(*product_id(cx)?)
-        .ok_or_not_found()?;
+    let product = catalog.get(*product_id(cx)?).ok_or_not_found()?;
     let related: Vec<&Product> = product
         .related_ids
         .iter()

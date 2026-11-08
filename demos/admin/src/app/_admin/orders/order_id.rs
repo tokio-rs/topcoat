@@ -15,10 +15,7 @@ use topcoat::{
 use super::{status_badge, t};
 use crate::{
     app::{
-        _admin::{
-            Crumb,
-            customers::customer_id,
-        },
+        _admin::{Crumb, customers::customer_id},
         _common::money,
     },
     components::{

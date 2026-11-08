@@ -104,8 +104,7 @@ path_param!(*raw_numbers: u32);
 
 #[page("/raw-numbers/{*raw_numbers}")]
 async fn raw_number_list(cx: &Cx) -> Result<impl View> {
-    let number_values =
-        raw_numbers(cx).ok_or_bad_request("every segment must be a number")?;
+    let number_values = raw_numbers(cx).ok_or_bad_request("every segment must be a number")?;
     Ok(view! { (format!("{number_values:?}")) })
 }
 

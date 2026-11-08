@@ -45,12 +45,7 @@ async fn home(cx: &Cx) -> Result<impl View> {
                 </a>
             </li>
             <li>
-                <a
-                    href=(href!(
-                        crate::posts::post_id::post,
-                        crate::posts::post_id: 42,
-                    ))
-                >
+                <a href=(href!(crate::posts::post_id::post, crate::posts::post_id: 42))>
                     "path param: /posts/42"
                 </a>
             </li>

@@ -783,10 +783,7 @@ mod tests {
 
     #[test]
     fn skips_group_segments() {
-        assert_eq!(
-            assign("/(auth)/users/{id}", &(Id::arg("42"),)),
-            "/users/42"
-        );
+        assert_eq!(assign("/(auth)/users/{id}", &(Id::arg("42"),)), "/users/42");
     }
 
     #[test]

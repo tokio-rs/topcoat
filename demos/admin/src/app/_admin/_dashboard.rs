@@ -16,10 +16,7 @@ use topcoat::{
 
 use super::{
     Section,
-    orders::{
-        order_id,
-        status_badge, time_ago,
-    },
+    orders::{order_id, status_badge, time_ago},
 };
 use crate::{
     app::_common::{money, timestamp},
