@@ -11,7 +11,10 @@ This example serves a sitemap at `/sitemap.xml`. The relative path `./sitemap.xm
 use topcoat::{
     Result,
     context::Cx,
-    router::{ content::sitemap::{ChangeFrequency, Sitemap, SitemapUrl}, route, },
+    router::{
+        content::sitemap::{ChangeFrequency, Sitemap, SitemapUrl},
+        route,
+    },
 };
 
 #[route(GET "./sitemap.xml")]

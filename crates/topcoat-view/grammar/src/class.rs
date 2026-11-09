@@ -10,8 +10,8 @@ use topcoat_core_grammar::common::{ParseOption, lenient, paths::topcoat_view};
 /// The parsed body of a `class!` invocation. Lowers to a
 /// [`runtime::Class`](topcoat_view::Class).
 ///
-/// Unlike `view!` and `attributes!`, the body takes no leading `cx =>`
-/// argument: constructing a class list does not touch the request context.
+/// Unlike `view!` and `attributes!`, the body does not capture `cx`:
+/// constructing a class list does not touch the request context.
 /// The entries receive it later, when the surrounding attribute machinery
 /// converts the class list into view parts.
 pub struct Class {

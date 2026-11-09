@@ -11,7 +11,11 @@ Accept a [`WebSocketUpgrade`] parameter and return the response from [`on_upgrad
 use topcoat::{
     Result,
     context::Cx,
-    router::{ content::websocket::{Message, WebSocketUpgrade}, response::Response, route, },
+    router::{
+        content::websocket::{Message, WebSocketUpgrade},
+        response::Response,
+        route,
+    },
 };
 
 #[route(GET)]

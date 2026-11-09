@@ -12,7 +12,10 @@ use futures_core::Stream;
 use topcoat::{
     Result,
     context::Cx,
-    router::{ content::sse::{Event, KeepAlive, Sse}, route, },
+    router::{
+        content::sse::{Event, KeepAlive, Sse},
+        route,
+    },
 };
 
 #[route(GET)]

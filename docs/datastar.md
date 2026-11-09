@@ -113,7 +113,10 @@ use topcoat::{
     Result,
     context::Cx,
     datastar::PatchSignals,
-    router::{ content::sse::{Event, KeepAlive, Sse}, route, },
+    router::{
+        content::sse::{Event, KeepAlive, Sse},
+        route,
+    },
 };
 
 #[derive(Serialize)]
