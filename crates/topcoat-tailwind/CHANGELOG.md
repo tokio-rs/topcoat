@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0](https://github.com/tokio-rs/topcoat/compare/topcoat-tailwind-v0.11.0...topcoat-tailwind-v0.12.0) - 2026-11-09
+
+### Added
+
+- [**breaking**] add formatting with `topcoat fmt` for all topcoat macros ([#579](https://github.com/tokio-rs/topcoat/pull/579))
+
+### Fixed
+
+- *(tailwind)* verify the default CLI download against a shipped checksum ([#575](https://github.com/tokio-rs/topcoat/pull/575))
+
 ## [0.9.0](https://github.com/tokio-rs/topcoat/compare/topcoat-tailwind-v0.8.1...topcoat-tailwind-v0.9.0) - 2026-09-24
 
 ### Other

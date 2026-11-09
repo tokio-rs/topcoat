@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0](https://github.com/tokio-rs/topcoat/compare/topcoat-icon-v0.11.0...topcoat-icon-v0.12.0) - 2026-11-09
+
+### Added
+
+- [**breaking**] require leading `cx: &Cx` and capture context in view macros ([#581](https://github.com/tokio-rs/topcoat/pull/581))
+- [**breaking**] lenient macros ([#580](https://github.com/tokio-rs/topcoat/pull/580))
+- [**breaking**] add formatting with `topcoat fmt` for all topcoat macros ([#579](https://github.com/tokio-rs/topcoat/pull/579))
+
 ## [0.10.0](https://github.com/tokio-rs/topcoat/compare/topcoat-icon-v0.9.0...topcoat-icon-v0.10.0) - 2026-10-03
 
 ### Fixed

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cookie-v0.11.0...topcoat-cookie-v0.12.0) - 2026-11-09
+
+### Added
+
+- [**breaking**] remove `mail!` and `cookie!` macros ([#585](https://github.com/tokio-rs/topcoat/pull/585))
+- [**breaking**] lenient macros ([#580](https://github.com/tokio-rs/topcoat/pull/580))
+- [**breaking**] add formatting with `topcoat fmt` for all topcoat macros ([#579](https://github.com/tokio-rs/topcoat/pull/579))
+- [**breaking**] unify macro syntax ([#571](https://github.com/tokio-rs/topcoat/pull/571))
+- *(router)* route context with `#[route(with(...))]` ([#566](https://github.com/tokio-rs/topcoat/pull/566))
+- *(core)* [**breaking**] unify `app_context` and `request_context` into one `context` ([#562](https://github.com/tokio-rs/topcoat/pull/562))
+
+### Other
+
+- [**breaking**] move more things into request context ([#593](https://github.com/tokio-rs/topcoat/pull/593))
+
 ## [0.11.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cookie-v0.10.0...topcoat-cookie-v0.11.0) - 2026-10-24
 
 ### Fixed

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0](https://github.com/tokio-rs/topcoat/compare/topcoat-l10n-macro-v0.11.0...topcoat-l10n-macro-v0.12.0) - 2026-11-09
+
+### Added
+
+- [**breaking**] require leading `cx: &Cx` and capture context in view macros ([#581](https://github.com/tokio-rs/topcoat/pull/581))
+- [**breaking**] unify macro syntax ([#571](https://github.com/tokio-rs/topcoat/pull/571))
+- *(router)* route context with `#[route(with(...))]` ([#566](https://github.com/tokio-rs/topcoat/pull/566))
+
 ## [0.11.0](https://github.com/tokio-rs/topcoat/compare/topcoat-l10n-macro-v0.0.0...topcoat-l10n-macro-v0.11.0) - 2026-10-24
 
 ### Added
