@@ -238,6 +238,59 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "asset")]
+    #[tokio::test]
+    async fn renders_asset_urls_in_the_absolute_form() {
+        use topcoat_asset::{
+            Asset, AssetConfig, AssetId, AssetOptions, MANIFEST_VERSION, Manifest, ManifestEntry,
+            RawAsset,
+        };
+
+        const ID: AssetId = AssetId::new("app", "preview.png", &AssetOptions::NONE);
+        static ENCODED: [u8; RawAsset::encoded_len("/app/preview.png", &AssetOptions::NONE)] =
+            RawAsset::encode(ID, "/app/preview.png", &AssetOptions::NONE);
+        let preview = Asset::new(&ENCODED);
+        let manifest = Manifest {
+            version: MANIFEST_VERSION,
+            assets: vec![ManifestEntry {
+                id: ID,
+                file: "preview.png".to_owned(),
+                hash: "0".to_owned(),
+                content_type: "image/png".to_owned(),
+            }],
+        };
+
+        let cx = &Cx::new()
+            .with(BaseUrl::new("https://example.com").unwrap())
+            .with(AssetConfig::hosted_at("/static", manifest))
+            .with(
+                Metadata::new()
+                    .canonical(preview)
+                    .open_graph(OpenGraph::new().image(preview)),
+            );
+        let page = metadata(cx).await.unwrap();
+
+        let html = view! {
+            canonical(metadata: page)
+            open_graph(metadata: page)
+        }
+        .single()
+        .await
+        .unwrap()
+        .render(cx);
+
+        let url = "https://example.com/static/preview.png";
+        assert!(html.contains(&format!(r#"href="{url}""#)), "{html}");
+        assert!(
+            html.contains(&format!(r#"property="og:url" content="{url}""#)),
+            "{html}"
+        );
+        assert!(
+            html.contains(&format!(r#"property="og:image" content="{url}""#)),
+            "{html}"
+        );
+    }
+
     #[tokio::test]
     async fn renders_robots_only_when_a_directive_is_denied() {
         let cx = &Cx::new();
