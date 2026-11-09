@@ -1,17 +1,7 @@
-use topcoat_core::context::{Cx, try_context};
-use topcoat_view::{AttributeValueViewParts, DynViewPart, HtmlWriter, PartsWriter};
+use topcoat_core::context::Cx;
+use topcoat_view::{AttributeValueViewParts, PartsWriter};
 
-use crate::{Asset, AssetConfig};
-
-impl DynViewPart for Asset {
-    #[track_caller]
-    fn render(&self, cx: &Cx, w: &mut HtmlWriter<'_, '_>) {
-        let asset_config = try_context::<AssetConfig>(cx).unwrap_or_else(|| {
-            panic!("no asset config registered in this router context; load the asset bundle with `.assets(AssetBundle::load().unwrap())`");
-        });
-        let _ = asset_config.fmt_url(cx, *self, w);
-    }
-}
+use crate::{Asset, asset_config};
 
 impl AttributeValueViewParts for Asset {
     #[inline]
@@ -19,8 +9,11 @@ impl AttributeValueViewParts for Asset {
         true
     }
 
-    #[inline]
-    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_dyn(Box::new(self));
+    /// Resolves the asset's URL with the context the view was built with, so
+    /// a [`UrlForm`](topcoat_core::url_form::UrlForm) set for the view
+    /// applies.
+    #[track_caller]
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
+        parts.push_string(asset_config(cx).resolve(cx, self));
     }
 }
