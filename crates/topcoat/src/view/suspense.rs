@@ -1,6 +1,3 @@
-// Links to the router extension become plain text without the router.
-#![cfg_attr(not(feature = "router"), allow(rustdoc::broken_intra_doc_links))]
-
 use crate::{
     Result,
     context::{Cx, identity, try_context},
@@ -107,9 +104,11 @@ pub async fn suspense(
 /// }
 /// ```
 ///
-/// Set the router's default with [`RouterSuspenseExt::suspense`]. To use a
-/// different mode for a request, add a `SuspenseMode` to its context. See
-/// [`suspense_mode`] for how the default is chosen.
+/// Set the default for the whole app with `.with(SuspenseMode::Wait)` on the
+/// router builder, or for part of it with `with(...)` on a route, page,
+/// layout, or layer. To use a different mode for a request, add a
+/// `SuspenseMode` to its context. See [`suspense_mode`] for how the default
+/// is chosen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SuspenseMode {
     /// Shows the fallback if the child's initial content is not ready, then
@@ -127,33 +126,6 @@ pub enum SuspenseMode {
 #[must_use]
 pub fn suspense_mode(cx: &Cx) -> SuspenseMode {
     try_context::<SuspenseMode>(cx).copied().unwrap_or_default()
-}
-
-/// Configures the default suspense mode on a [`RouterBuilder`](crate::router::RouterBuilder).
-#[cfg(feature = "router")]
-pub trait RouterSuspenseExt {
-    /// Chooses the default mode for [`suspense`] boundaries on this router.
-    ///
-    /// Adds `mode` to the router's context. Override it with [`Cx::with`]
-    /// for a child context or with the `mode` argument on one boundary.
-    ///
-    /// ```rust
-    /// use topcoat::{
-    ///     router::Router,
-    ///     view::{RouterSuspenseExt, SuspenseMode},
-    /// };
-    ///
-    /// let router = Router::builder().suspense(SuspenseMode::Wait).build();
-    /// ```
-    #[must_use]
-    fn suspense(self, mode: SuspenseMode) -> Self;
-}
-
-#[cfg(feature = "router")]
-impl RouterSuspenseExt for crate::router::RouterBuilder {
-    fn suspense(self, mode: SuspenseMode) -> Self {
-        self.with(mode)
-    }
 }
 
 #[cfg(all(test, feature = "router"))]
@@ -194,7 +166,7 @@ mod tests {
     #[tokio::test]
     async fn a_waiting_router_sends_suspense_content_settled() {
         let router = RouterBuilder::new()
-            .suspense(SuspenseMode::Wait)
+            .with(SuspenseMode::Wait)
             .page(home)
             .build();
         let html = fetch(router).await;
