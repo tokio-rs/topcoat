@@ -20,7 +20,7 @@ async fn post(cx: &Cx) -> Result<impl View> {
 
 # Linking
 
-Pass `post_id: value` to [`href!`](macro.href.html). This works both inside the module and in its parent, the module that contains the file:
+Pass `post_id: value` to [`href!`](macro.href.html):
 
 ```rust
 // src/app/posts.rs
@@ -43,7 +43,7 @@ async fn posts(cx: &Cx) -> Result<impl View> {
 # fn main() {}
 ```
 
-From anywhere else, use the full path, such as `crate::app::posts::post_id: 42`.
+For this to work, either the `post_id` module or the accessor function `post_id::post_id` has to be in scope.
 
 # Catch-all parameters
 
