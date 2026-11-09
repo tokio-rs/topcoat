@@ -1,6 +1,3 @@
-// Links to the router extension become plain text without the router.
-#![cfg_attr(not(feature = "router"), allow(rustdoc::broken_intra_doc_links))]
-
 use crate::{
     Result,
     context::{Cx, identity, try_context},
