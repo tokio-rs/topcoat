@@ -400,7 +400,8 @@ mod tests {
     fn a_layer_configuration_applies_to_the_routes_under_it() {
         let router = Router::builder()
             .layer(
-                LayerFn::new(Some(Path::new("/quiet")), passthrough_layer).with(Compression::disable()),
+                LayerFn::new(Some(Path::new("/quiet")), passthrough_layer)
+                    .with(Compression::disable()),
             )
             .route(get("/quiet/x", long_route))
             .route(get("/x", long_route))
