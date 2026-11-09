@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0](https://github.com/tokio-rs/topcoat/compare/topcoat-core-grammar-v0.11.0...topcoat-core-grammar-v0.12.0) - 2026-11-09
+
+### Added
+
+- [**breaking**] unify macro field parsing and use explicit mail views ([#583](https://github.com/tokio-rs/topcoat/pull/583))
+- [**breaking**] require leading `cx: &Cx` and capture context in view macros ([#581](https://github.com/tokio-rs/topcoat/pull/581))
+- [**breaking**] lenient macros ([#580](https://github.com/tokio-rs/topcoat/pull/580))
+- [**breaking**] add formatting with `topcoat fmt` for all topcoat macros ([#579](https://github.com/tokio-rs/topcoat/pull/579))
+
 ## [0.11.0](https://github.com/tokio-rs/topcoat/compare/topcoat-core-grammar-v0.10.0...topcoat-core-grammar-v0.11.0) - 2026-10-24
 
 ### Added

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0](https://github.com/tokio-rs/topcoat/compare/topcoat-asset-v0.11.0...topcoat-asset-v0.12.0) - 2026-11-09
+
+### Added
+
+- [**breaking**] unify macro field parsing and use explicit mail views ([#583](https://github.com/tokio-rs/topcoat/pull/583))
+- [**breaking**] require leading `cx: &Cx` and capture context in view macros ([#581](https://github.com/tokio-rs/topcoat/pull/581))
+- [**breaking**] lenient macros ([#580](https://github.com/tokio-rs/topcoat/pull/580))
+- [**breaking**] add formatting with `topcoat fmt` for all topcoat macros ([#579](https://github.com/tokio-rs/topcoat/pull/579))
+- *(metadata)* built-in page metadata support ([#570](https://github.com/tokio-rs/topcoat/pull/570))
+- *(core)* [**breaking**] unify `app_context` and `request_context` into one `context` ([#562](https://github.com/tokio-rs/topcoat/pull/562))
+
+### Fixed
+
+- *(asset)* resolve asset URLs with the view's context ([#596](https://github.com/tokio-rs/topcoat/pull/596))
+
 ## [0.11.0](https://github.com/tokio-rs/topcoat/compare/topcoat-asset-v0.10.0...topcoat-asset-v0.11.0) - 2026-10-24
 
 ### Fixed
