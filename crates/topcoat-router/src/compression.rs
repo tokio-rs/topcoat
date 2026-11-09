@@ -36,7 +36,7 @@ use crate::{Body, response::Response};
 /// };
 ///
 /// // Serves an archive that is compressed already.
-/// #[route(GET "/export.zip", with(Compression::off()))]
+/// #[route(GET "/export.zip", with(Compression::disable()))]
 /// async fn export(cx: &Cx) -> Result<Vec<u8>> {
 ///     Ok(Vec::new())
 /// }
@@ -70,7 +70,7 @@ impl Compression {
     /// Use this when something in front of the application compresses
     /// already, like a reverse proxy or CDN.
     #[must_use]
-    pub fn off() -> Self {
+    pub fn disable() -> Self {
         Self {
             gzip: false,
             brotli: false,
@@ -338,7 +338,7 @@ mod tests {
 
     #[test]
     fn off_disables_compression() {
-        let router = router_with(long_route, Compression::off());
+        let router = router_with(long_route, Compression::disable());
         let (headers, body) = send(&router, Some("gzip, br"));
         assert!(!headers.contains_key(CONTENT_ENCODING));
         assert_eq!(body, long_body());
@@ -385,7 +385,7 @@ mod tests {
     #[test]
     fn a_route_configuration_replaces_the_router_configuration() {
         let router = Router::builder()
-            .with(Compression::off())
+            .with(Compression::disable())
             .route(get("/x", long_route).with(Compression::default()))
             .route(get("/y", long_route))
             .build();
@@ -400,7 +400,7 @@ mod tests {
     fn a_layer_configuration_applies_to_the_routes_under_it() {
         let router = Router::builder()
             .layer(
-                LayerFn::new(Some(Path::new("/quiet")), passthrough_layer).with(Compression::off()),
+                LayerFn::new(Some(Path::new("/quiet")), passthrough_layer).with(Compression::disable()),
             )
             .route(get("/quiet/x", long_route))
             .route(get("/x", long_route))
