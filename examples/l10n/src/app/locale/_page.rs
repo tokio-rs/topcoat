@@ -22,7 +22,7 @@ pub async fn page(cx: &Cx) -> Result<impl View> {
         // number for the locale, like 1,234 or 1.234.
         <ul>
             for count in [1, 5, 1234] {
-                // Short for `count = count`.
+                // Short for `count: count`.
                 <li>(t!(items, count))</li>
             }
         </ul>
