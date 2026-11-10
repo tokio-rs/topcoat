@@ -55,6 +55,7 @@ changelog_include = [
     "topcoat-l10n-macro",
     "topcoat-mail",
     "topcoat-metadata",
+    "topcoat-openapi",
     "topcoat-router",
     "topcoat-router-grammar",
     "topcoat-router-macro",
@@ -177,6 +178,11 @@ version_group = "topcoat"
 
 [[package]]
 name = "topcoat-metadata"
+release = true
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-openapi"
 release = true
 version_group = "topcoat"
 

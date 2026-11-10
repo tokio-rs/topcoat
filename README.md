@@ -247,6 +247,7 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 - [Metadata](https://docs.rs/topcoat/latest/topcoat/metadata/index.html): titles, descriptions, and link previews for search engines and social networks, set per layout and page.
 - [Localization](https://docs.rs/topcoat/latest/topcoat/l10n/index.html): choose the language for each request and display translations from Fluent files.
 - [Mail](https://docs.rs/topcoat/latest/topcoat/mail/index.html): build mail with `Mail::builder`, deliver through SMTP, file, or in-memory transports.
+- [OpenAPI](https://docs.rs/topcoat/latest/topcoat/openapi/index.html): describe API routes where they are declared and generate an OpenAPI document from the router.
 
 **Third-party integrations**
 - [Tailwind](https://docs.rs/topcoat/latest/topcoat/tailwind/index.html): Tailwind CSS without Node, wired into the asset pipeline.
@@ -263,7 +264,6 @@ Planned features we'd like to bring to Topcoat. Have an idea? [Open an issue](ht
 - [ ] More Topcoat UI components, full "blocks" e.g. sign-in form
 - [ ] Better [Toasty](https://github.com/tokio-rs/toasty) integration (safely create/update records from forms without listing out all the fields)
 - [ ] Validations
-- [ ] `OpenAPI` endpoints
 - [ ] Docs for how to deploy Topcoat
 - [ ] Pre-rendering for static pages
 - [ ] `WebTransport`

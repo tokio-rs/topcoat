@@ -9,7 +9,7 @@ use std::{
     ops::Index,
     pin::Pin,
     sync::{
-        Arc,
+        Arc, LazyLock,
         atomic::{AtomicUsize, Ordering},
     },
 };
@@ -22,8 +22,8 @@ use topcoat_core::{
 };
 
 use crate::{
-    Body, EndpointIndex, HrefTarget, IntoPath, Layer, Methods, Next, OwnedMethods, Path, Terminal,
-    response::Response, route, route_endpoint,
+    Body, Endpoint, EndpointIndex, HrefTarget, IntoPath, Layer, Methods, Next, OwnedMethods, Path,
+    Terminal, response::Response, route, route_endpoint,
 };
 
 /// The future returned by [`Route::handle`]: a boxed, `Send` future borrowing
@@ -251,9 +251,16 @@ pub(crate) struct RouteWithLayers {
     /// The route's context, built once when the router is built, or `None`
     /// when it holds no values.
     context: Option<Arc<ContextMap>>,
+    /// The endpoint serving this route.
+    endpoint: EndpointIndex,
 }
 
 impl RouteWithLayers {
+    /// Returns the endpoint serving this route.
+    pub(crate) fn endpoint(&self) -> EndpointIndex {
+        self.endpoint
+    }
+
     /// Returns the route's context, or `None` when it holds no values.
     pub(crate) fn shared_context(&self) -> Option<&Arc<ContextMap>> {
         self.context.as_ref()
@@ -279,6 +286,59 @@ impl Route for RouteWithLayers {
 
     fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
         Next::new(&self.layers, Terminal::Route(&*self.route)).run(cx, body)
+    }
+}
+
+/// A route registered on a [`Router`](crate::Router), as visited by
+/// [`Router::routes`](crate::Router::routes).
+///
+/// It describes the route without a request: the path and methods it is
+/// served at and the values attached to it.
+#[derive(Clone, Copy)]
+pub struct RegisteredRoute<'router> {
+    route: &'router RouteWithLayers,
+    endpoint: &'router Endpoint,
+}
+
+impl<'router> RegisteredRoute<'router> {
+    /// Pairs `route` with the endpoint serving it.
+    pub(crate) fn new(route: &'router RouteWithLayers, endpoint: &'router Endpoint) -> Self {
+        Self { route, endpoint }
+    }
+
+    /// The identity of the route's handler.
+    #[must_use]
+    pub fn id(&self) -> RouteId {
+        self.route.id()
+    }
+
+    /// The URL path the route is served at.
+    ///
+    /// Parameters keep their `{name}` form. Group segments are not part of
+    /// it, because they never reach the URL.
+    #[must_use]
+    pub fn path(&self) -> &'router Path {
+        self.endpoint.path()
+    }
+
+    /// The HTTP methods the route responds to.
+    #[must_use]
+    pub fn methods(&self) -> Methods<'router> {
+        self.route.methods()
+    }
+
+    /// The route's context: the values of the layers and layouts that wrap
+    /// it, followed by its own.
+    ///
+    /// Values registered on the router builder are not part of it. Read them
+    /// with [`Router::context`](crate::Router::context).
+    #[must_use]
+    pub fn context(&self) -> &'router ContextMap {
+        static EMPTY: LazyLock<ContextMap> = LazyLock::new(ContextMap::new);
+        match self.route.shared_context() {
+            Some(context) => context,
+            None => &EMPTY,
+        }
     }
 }
 
@@ -313,6 +373,7 @@ impl Routes {
             route,
             layers,
             context,
+            endpoint,
         });
         index
     }
@@ -321,6 +382,16 @@ impl Routes {
     /// this router holds no route with that identity.
     pub(crate) fn endpoint(&self, id: RouteId) -> Option<EndpointIndex> {
         self.endpoint_lookup.get(&id).copied()
+    }
+
+    /// Returns the number of routes registered so far.
+    pub(crate) fn len(&self) -> usize {
+        self.routes.len()
+    }
+
+    /// Iterates over the routes in registration order.
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &RouteWithLayers> {
+        self.routes.iter()
     }
 }
 

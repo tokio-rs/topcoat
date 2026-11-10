@@ -12,8 +12,8 @@ use topcoat_core::{
 };
 
 use crate::{
-    Body, Endpoint, EndpointIndex, Endpoints, Layer, Next, RawPathParams, Route, RouteId,
-    RouteIndex, RouterBuilder, Routes, Terminal, TrustedProxies,
+    Body, Endpoint, EndpointIndex, Endpoints, Layer, Next, RawPathParams, RegisteredRoute, Route,
+    RouteId, RouteIndex, RouterBuilder, Routes, Terminal, TrustedProxies,
     error::{RewriteChain, RewriteError, internal_server_response, respond},
     origin_policy,
     proxy::ClientIp,
@@ -107,6 +107,48 @@ impl Router {
             }
         })
         .await
+    }
+
+    /// Iterates over the routes registered on this router, pages included.
+    ///
+    /// Each item describes a route without a request, so the routing table
+    /// can be inspected once the router is built. The order is unspecified.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use topcoat::{
+    ///     Result,
+    ///     context::Cx,
+    ///     router::{Router, route},
+    /// };
+    ///
+    /// #[route(GET "/health")]
+    /// async fn health(cx: &Cx) -> Result<&'static str> {
+    ///     Ok("ok")
+    /// }
+    ///
+    /// let router = Router::builder().route(health).build();
+    /// let paths: Vec<_> = router.routes().map(|route| route.path().as_str()).collect();
+    ///
+    /// assert_eq!(paths, ["/health"]);
+    /// ```
+    pub fn routes(&self) -> impl Iterator<Item = RegisteredRoute<'_>> {
+        let inner = &*self.inner;
+        inner
+            .routes
+            .iter()
+            .take(inner.declared_routes)
+            .map(|route| RegisteredRoute::new(route, &inner.endpoints[route.endpoint()]))
+    }
+
+    /// Returns the values registered on the router builder.
+    ///
+    /// Every request sees these values. A route's own values, read with
+    /// [`RegisteredRoute::context`], shadow them.
+    #[must_use]
+    pub fn context(&self) -> &ContextMap {
+        &self.inner.context
     }
 
     /// Handles a request using the context values in `chain`.
@@ -223,6 +265,9 @@ impl Router {
 pub(crate) struct RouterInner {
     /// The registered routes, indexed by the endpoints' method tables.
     pub(crate) routes: Routes,
+    /// The number of routes the application registered. They come first in
+    /// `routes`, followed by the routes the router adds itself.
+    pub(crate) declared_routes: usize,
     /// The registered endpoints and the matcher resolving a request URL to
     /// one of them.
     pub(crate) endpoints: Endpoints,
@@ -367,6 +412,7 @@ pub(crate) fn test_matched_cx(path: &crate::Path) -> Cx {
     let endpoint = endpoints.push(Cow::Owned(path.as_str().to_owned()), Endpoint::new(path));
     let inner = RouterInner {
         routes: Routes::default(),
+        declared_routes: 0,
         endpoints,
         always_layers: Box::new([]),
         context: Arc::new(ContextMap::new()),
@@ -2309,5 +2355,93 @@ mod tests {
             assert_eq!(&send(&router, Method::GET, "/x").2[..], b"route");
         }
         assert_eq!(BUILDS.load(Ordering::Relaxed), 1);
+    }
+
+    // -- Router::routes --
+
+    /// Lists every registered route as `METHODS path`, sorted, with `*` for
+    /// an any-method route.
+    fn listed(router: &Router) -> Vec<String> {
+        let mut listed: Vec<String> = router
+            .routes()
+            .map(|route| {
+                let methods = match route.methods() {
+                    Methods::Any => "*".to_owned(),
+                    Methods::Only(methods) => methods
+                        .iter()
+                        .map(Method::as_str)
+                        .collect::<Vec<_>>()
+                        .join("+"),
+                };
+                format!("{methods} {}", route.path())
+            })
+            .collect();
+        listed.sort();
+        listed
+    }
+
+    #[test]
+    fn routes_lists_every_registered_route_and_page() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::POST, path("/users"), say_posted))
+            .route(RouteFn::new(Methods::Any, path("/hook"), say_route))
+            .page(PageFn::new(Method::GET, path("/about"), render_page))
+            .build();
+
+        assert_eq!(listed(&router), ["* /hook", "GET /about", "POST /users"]);
+    }
+
+    #[test]
+    fn routes_reports_the_served_path_without_group_segments() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(
+                Method::GET,
+                path("/(auth)/users/{id}"),
+                say_route,
+            ))
+            .build();
+
+        assert_eq!(listed(&router), ["GET /users/{id}"]);
+    }
+
+    #[test]
+    fn routes_skips_the_trailing_slash_forms_the_router_adds() {
+        for policy in [
+            TrailingSlash::Redirect,
+            TrailingSlash::Serve,
+            TrailingSlash::Strict,
+        ] {
+            let router = RouterBuilder::new()
+                .trailing_slash(policy)
+                .route(RouteFn::new(Method::GET, path("/users"), say_route))
+                .build();
+
+            assert_eq!(listed(&router), ["GET /users"], "{policy:?}");
+        }
+    }
+
+    #[test]
+    fn a_registered_route_holds_the_values_of_its_layers_and_itself() {
+        let router = RouterBuilder::new()
+            .with(Tag("app"))
+            .layer(LayerFn::new(Some(path("/")), pass_through).with(Tag("root")))
+            .layer(LayerFn::new(Some(path("/admin")), pass_through).with(Tag("admin")))
+            .route(RouteFn::new(Method::GET, path("/admin/users"), say_route).with(Tag("route")))
+            .route(RouteFn::new(Method::GET, path("/about"), say_route))
+            .build();
+
+        let tags_at = |served: &str| -> Vec<&str> {
+            let route = router
+                .routes()
+                .find(|route| route.path().as_str() == served)
+                .unwrap();
+            route.context().iter::<Tag>().map(|tag| tag.0).collect()
+        };
+
+        // Closest first, and without the router's own values.
+        assert_eq!(tags_at("/admin/users"), ["route", "admin", "root"]);
+        assert_eq!(tags_at("/about"), ["root"]);
+        let app: Vec<_> = router.context().iter::<Tag>().map(|tag| tag.0).collect();
+        assert_eq!(app, ["app"]);
     }
 }

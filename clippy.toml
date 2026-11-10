@@ -1,1 +1,1 @@
-doc-valid-idents = ["WebSocket", "WebSockets", ".."]
+doc-valid-idents = ["OpenAPI", "WebSocket", "WebSockets", ".."]
