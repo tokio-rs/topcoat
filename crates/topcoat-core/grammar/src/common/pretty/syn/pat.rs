@@ -118,10 +118,14 @@ impl PrettyPrint for syn::PatRest {
 impl PrettyPrint for syn::PatSlice {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
         self.attrs.pretty_print(printer);
-        self.bracket_token
-            .pretty_print(printer, Some(BreakMode::Consistent), |printer| {
+        self.bracket_token.pretty_print_unless_empty(
+            printer,
+            Some(BreakMode::Consistent),
+            self.elems.is_empty(),
+            |printer| {
                 self.elems.pretty_print(printer);
-            });
+            },
+        );
     }
 }
 
@@ -163,8 +167,11 @@ impl PrettyPrint for syn::FieldPat {
 impl PrettyPrint for syn::PatTuple {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
         self.attrs.pretty_print(printer);
-        self.paren_token
-            .pretty_print(printer, Some(BreakMode::Consistent), |printer| {
+        self.paren_token.pretty_print_unless_empty(
+            printer,
+            Some(BreakMode::Consistent),
+            self.elems.is_empty(),
+            |printer| {
                 if self.elems.len() == 1 && !matches!(self.elems[0], syn::Pat::Rest(_)) {
                     self.elems[0].pretty_print(printer);
                     printer.scan_text(",".into(), TextMode::Always);
@@ -172,7 +179,8 @@ impl PrettyPrint for syn::PatTuple {
                 } else {
                     self.elems.pretty_print(printer);
                 }
-            });
+            },
+        );
     }
 }
 
@@ -180,10 +188,14 @@ impl PrettyPrint for syn::PatTupleStruct {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
         self.attrs.pretty_print(printer);
         qpath(printer, self.qself.as_ref(), &self.path);
-        self.paren_token
-            .pretty_print(printer, Some(BreakMode::Consistent), |printer| {
+        self.paren_token.pretty_print_unless_empty(
+            printer,
+            Some(BreakMode::Consistent),
+            self.elems.is_empty(),
+            |printer| {
                 self.elems.pretty_print(printer);
-            });
+            },
+        );
     }
 }
 
