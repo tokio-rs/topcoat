@@ -1,6 +1,6 @@
-An [OpenAPI](https://www.openapis.org) document describes an HTTP API in a format that documentation tools and client generators understand. Attach an [`Operation`] to the routes that belong to your API, then create a [`Document`] that lists them with [`OpenApi`].
+Use [OpenAPI](https://www.openapis.org) to describe your HTTP API. Documentation tools can display this description, and client generators can use it to create code that calls your API. In Topcoat, you describe routes with [`Operation`] and use [`OpenApi`] to collect those descriptions into a [`Document`].
 
-Enable the `openapi` feature to use this module. Request and response schemas come from [schemars](https://docs.rs/schemars), so add it to your dependencies as well:
+Enable Topcoat's `openapi` feature. Also add [schemars](https://docs.rs/schemars), which describes the data in your request and response bodies:
 
 ```sh
 cargo add schemars
@@ -8,7 +8,7 @@ cargo add schemars
 
 # Documenting a route
 
-Add an `Operation` to a route with `with(...)`. Name the request body with [`request`](Operation::request) and each response with [`response_with`](Operation::response_with), and derive `JsonSchema` on the types they carry:
+Add an `Operation` to a route using `with(...)`. Use [`request`](Operation::request) to describe the request body and [`response_with`](Operation::response_with) to describe a response that has a body. Derive `JsonSchema` on the data types used in these bodies:
 
 ```rust
 use schemars::JsonSchema;
@@ -45,13 +45,13 @@ async fn create_user(cx: &Cx, Json(input): Json<CreateUser>) -> Result<(StatusCo
 }
 ```
 
-The document takes the route's path, methods, and path parameters from the router. Everything else comes from the operation. An operation is not checked against the handler, so update it when the handler's body or return type changes.
+Topcoat gets the path, HTTP methods, and path parameters from the router. You provide the other details in the operation. Topcoat does not check that these details match the handler, so keep them up to date when you change what the handler accepts or returns.
 
-Use [`response`](Operation::response) for a response without a body. Doc comments on a type and its fields become descriptions in its schema.
+For a response with no body, use [`response`](Operation::response). Doc comments on your data types and their fields become descriptions in the generated schema.
 
 # Serving the document
 
-[`OpenApi`] holds the settings of the document, such as the API's title and version. Call [`generate`](OpenApi::generate) with a router to create the [`Document`]. A route can return it to serve it as JSON:
+Set the API's title, version, and other document settings with [`OpenApi`]. Pass your router to [`generate`](OpenApi::generate) to create a [`Document`]. Return the document from a route to serve it as JSON:
 
 ```rust
 use topcoat::{
@@ -70,9 +70,9 @@ async fn spec(cx: &Cx) -> Result<Document> {
 }
 ```
 
-[`router(cx)`](crate::router::router) returns the router that handles the request. This route has no operation, so the document does not list it.
+[`router(cx)`](crate::router::router) gives you the router handling the current request. In this example, the document route has no operation of its own. It stays out of the document unless it inherits an operation, as described below.
 
-`generate` only needs a router, not a request. A test or a command of your application can build the router and write the document to a file with [`to_json_pretty`](Document::to_json_pretty):
+You can also generate the document outside a request. For example, a test or an application command can build the router, call `generate`, and save the result with [`to_json_pretty`](Document::to_json_pretty):
 
 ```rust
 use topcoat::{openapi::OpenApi, router::Router};
@@ -85,7 +85,7 @@ fn export(router: &Router) -> std::io::Result<()> {
 
 # Documenting a group of routes
 
-A route is documented when an `Operation` is attached to it or to something that wraps it. Add one to a [layer](macro@crate::router::layer) to document every route under its path:
+Several routes can share an operation. Add an `Operation` to a [layer](macro@crate::router::layer) to include every route under that layer's path in the document. Each route inherits the layer's settings. Use `.hidden(true)` to leave a route out:
 
 ```rust
 use topcoat::{
@@ -117,13 +117,15 @@ async fn debug(cx: &Cx) -> Result<&'static str> {
 }
 ```
 
-A route combines its own operation with those of its layers. For a setting such as the summary, the closest value takes priority, so a route overrides its layers. Tags, parameters, and responses add up instead. A route keeps the ones its layers declare and replaces only a parameter or response status that it declares itself.
+A route can add its own operation to change or extend the settings it inherits. For settings such as the summary, the value closest to the route wins. A summary on the route therefore overrides a summary on a layer.
 
-Operations follow the rules of [route context](crate::context#route-context). An operation on a layout documents the pages it wraps, and one added to the router builder with `.with(...)` documents every route.
+Tags, parameters, and responses are combined. The route keeps the entries from its layers. If it defines the same parameter or a response with the same status code, its definition replaces the inherited one.
+
+You can also put an operation on a layout to document the pages it wraps, or on the router builder with `.with(...)` to document every route. These settings follow the rules of [route context](crate::context#route-context).
 
 # Parameters
 
-Path parameters are part of a route's path, so the document lists them without an entry. They are documented as strings. Add a [`Parameter`] to give one a type or a description:
+Topcoat automatically includes path parameters in the document and describes them as strings. Add a [`Parameter`] when you want to specify a different type or add a description:
 
 ```rust
 use topcoat::openapi::{Operation, Parameter};
@@ -135,9 +137,9 @@ let operation = Operation::new().parameter(
 );
 ```
 
-`Parameter` also describes single query keys, headers, and cookies. These are optional unless marked with [`required`](Parameter::required).
+Use `Parameter` to describe individual query parameters, headers, or cookies too. These are optional by default. Call [`required(true)`](Parameter::required) to mark one as required.
 
-For a struct read with [`query_params`](macro@crate::router::query_params), derive `JsonSchema` and pass it to [`query`](Operation::query). Each field becomes a query parameter. Fields of type `Option` are optional, and doc comments become descriptions:
+To document a struct used with [`query_params`](macro@crate::router::query_params), derive `JsonSchema` and pass the struct's type to [`query`](Operation::query). Topcoat adds a query parameter for each field. An `Option` field is optional, and each field's doc comment becomes its description:
 
 ```rust
 use schemars::JsonSchema;
@@ -157,11 +159,11 @@ let operation = Operation::new().query::<PostsQuery>();
 
 # Request and response bodies
 
-A type that implements [`Content`] can describe a body. It names a media type and a schema. The JSON and form extractors implement it for payloads that implement `JsonSchema`, and strings are documented as plain text.
+The [`Content`] trait describes a body's format, called its media type, and the shape of its data, called its schema. JSON and form extractors implement `Content` when their data type implements `JsonSchema`. String bodies are described as plain text.
 
-Wrap a request type in `Option` for a body that requests may leave out, such as `.request::<Option<Json<CreateUser>>>()`.
+To document an optional request body, wrap the body type in `Option`. For example, `.request::<Option<Json<CreateUser>>>()` says that the client may leave out the JSON body.
 
-Implement `Content` for your own extractors and response types:
+For a custom extractor or response type, implement `Content` to describe its body:
 
 ```rust
 use topcoat::openapi::{
@@ -180,11 +182,11 @@ impl Content for Csv {
 }
 ```
 
-Schemas describe a type as it is read from a request. Serde attributes are respected. A type that is written differently than it is read, for example because of `#[serde(skip_serializing)]`, is still documented in its read form when used in a response.
+Schemas follow Serde's rules for reading data into a type, even when the type is used in a response. If a type uses different rules for reading and writing, the response schema may differ from the data sent to the client. For example, `#[serde(skip_serializing)]` leaves a field out when writing a response, but that field can still appear in the schema.
 
 # Authentication
 
-Register each way to authenticate as a [`SecurityScheme`] under a name, then require it by that name with [`security`](Operation::security). A layer is a good place for the requirement, because it also covers every route below it:
+Give each authentication method a name and register it as a [`SecurityScheme`]. Use that name in [`security`](Operation::security) to document which method a route requires. Put this setting on a layer to apply it to every route below the layer. A route can use `.no_security()` to document that it does not require authentication:
 
 ```rust
 use topcoat::openapi::{OpenApi, Operation, SecurityScheme};
@@ -198,10 +200,16 @@ let protected = Operation::new().security("token");
 let public = Operation::new().no_security();
 ```
 
-Calling `security` several times on one operation lists alternatives, so clients may use any of the schemes. The requirements of an operation replace those of its layers as a whole.
+Call `security` more than once on an operation to list alternative authentication methods. Clients can use any one of them. When an operation sets its own security requirements, they replace all the requirements inherited from its layers.
 
-The security settings only document the API. Checking credentials is still up to your layers and handlers.
+These settings describe authentication in the document. Your layers and handlers must still check credentials and enforce access rules.
 
 # Mistakes found while generating
 
-`generate` panics when the routes are documented inconsistently. This happens when an operation describes a path parameter that its route's path does not have, requires a security scheme that is not registered, or shares its operation ID with another operation. Generate the document in a test to catch these mistakes before a request does.
+`generate` panics if it finds any of these problems:
+
+- An operation describes a path parameter that does not exist in the route's path.
+- An operation requires a security scheme that has not been registered.
+- Two operations have the same operation ID.
+
+Generate the document in a test to catch these mistakes before someone requests it.

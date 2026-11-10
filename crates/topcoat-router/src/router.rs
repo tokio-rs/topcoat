@@ -139,13 +139,7 @@ impl Router {
             .routes
             .iter()
             .take(inner.declared_routes)
-            .map(|route| {
-                let endpoint = inner
-                    .routes
-                    .endpoint(route.id())
-                    .expect("a registered route has an endpoint");
-                RegisteredRoute::new(route, &inner.endpoints[endpoint])
-            })
+            .map(|route| RegisteredRoute::new(route, &inner.endpoints[route.endpoint()]))
     }
 
     /// Returns the values registered on the router builder.

@@ -251,9 +251,16 @@ pub(crate) struct RouteWithLayers {
     /// The route's context, built once when the router is built, or `None`
     /// when it holds no values.
     context: Option<Arc<ContextMap>>,
+    /// The endpoint serving this route.
+    endpoint: EndpointIndex,
 }
 
 impl RouteWithLayers {
+    /// Returns the endpoint serving this route.
+    pub(crate) fn endpoint(&self) -> EndpointIndex {
+        self.endpoint
+    }
+
     /// Returns the route's context, or `None` when it holds no values.
     pub(crate) fn shared_context(&self) -> Option<&Arc<ContextMap>> {
         self.context.as_ref()
@@ -366,6 +373,7 @@ impl Routes {
             route,
             layers,
             context,
+            endpoint,
         });
         index
     }
