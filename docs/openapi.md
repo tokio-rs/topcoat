@@ -83,9 +83,9 @@ fn export(router: &Router) -> std::io::Result<()> {
 }
 ```
 
-# Documenting a group of routes
+# Inherited settings
 
-Several routes can share an operation. Add an `Operation` to a [layer](macro@crate::router::layer) to include every route under that layer's path in the document. Each route inherits the layer's settings. Use `.hidden(true)` to leave a route out:
+Add an `Operation` to a [layer](macro@crate::router::layer) to set documentation defaults for every route under its path. Each route inherits these defaults and is included in the document. Use `.hidden(true)` to leave a route out:
 
 ```rust
 use topcoat::{
@@ -117,7 +117,7 @@ async fn debug(cx: &Cx) -> Result<&'static str> {
 }
 ```
 
-A route can add its own operation to change or extend the settings it inherits. For settings such as the summary, the value closest to the route wins. A summary on the route therefore overrides a summary on a layer.
+A route can add its own operation to override or extend these defaults. For example, a summary on the route overrides the summary from its layer.
 
 Tags, parameters, and responses are combined. The route keeps the entries from its layers. If it defines the same parameter or a response with the same status code, its definition replaces the inherited one.
 
