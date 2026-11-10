@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use schemars::JsonSchema;
+use schemars::{JsonSchema, SchemaGenerator};
 use serde::Serialize;
 
 use crate::content::SchemaFn;
@@ -91,7 +91,8 @@ impl Parameter {
     /// `.schema::<u64>()` for a numeric ID.
     #[must_use]
     pub fn schema<T: JsonSchema>(mut self) -> Self {
-        self.schema = Some(|generator| generator.subschema_for::<T>());
+        let schema: SchemaFn = SchemaGenerator::subschema_for::<T>;
+        self.schema = Some(schema);
         self
     }
 

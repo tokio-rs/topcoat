@@ -102,7 +102,7 @@ impl<'api> Generation<'api> {
                 continue;
             }
 
-            if let Some(id) = &operation.operation_id {
+            if let Some(id) = &operation.id {
                 let used_by = format!("{method} {path}");
                 if let Some(first) = self.operation_ids.insert(id.clone(), used_by) {
                     panic!(
@@ -163,7 +163,7 @@ impl<'api> Generation<'api> {
             tags: operation.tags.clone(),
             summary: operation.summary.clone(),
             description: operation.description.clone(),
-            operation_id: operation.operation_id.clone(),
+            operation_id: operation.id.clone(),
             parameters: self.parameters(path, route, operation),
             request_body: operation.request.map(|content| RequestBodyObject {
                 required: content.required,
@@ -325,7 +325,7 @@ impl<'api> Generation<'api> {
                     "the operation at `{path}` requires the security scheme `{scheme}`, which \
                      is not registered",
                 );
-                BTreeMap::from([(scheme.clone(), [])])
+                BTreeMap::from([(scheme.clone(), Vec::new())])
             })
             .collect()
     }

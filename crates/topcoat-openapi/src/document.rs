@@ -175,7 +175,7 @@ pub(crate) struct OperationObject {
 
 /// One accepted way to authenticate: the name of a security scheme, mapped
 /// to the scopes it needs.
-pub(crate) type SecurityRequirement = BTreeMap<Cow<'static, str>, [&'static str; 0]>;
+pub(crate) type SecurityRequirement = BTreeMap<Cow<'static, str>, Vec<Cow<'static, str>>>;
 
 /// A parameter of an operation.
 #[derive(Debug, Clone, Serialize)]

@@ -67,7 +67,7 @@ use crate::{
 pub struct Operation {
     pub(crate) summary: Option<Cow<'static, str>>,
     pub(crate) description: Option<Cow<'static, str>>,
-    pub(crate) operation_id: Option<Cow<'static, str>>,
+    pub(crate) id: Option<Cow<'static, str>>,
     pub(crate) deprecated: Option<bool>,
     pub(crate) hidden: Option<bool>,
     pub(crate) tags: Vec<Cow<'static, str>>,
@@ -106,7 +106,7 @@ impl Operation {
     /// serves a single method rather than on a layer.
     #[must_use]
     pub fn operation_id(mut self, operation_id: impl Into<Cow<'static, str>>) -> Self {
-        self.operation_id = Some(operation_id.into());
+        self.id = Some(operation_id.into());
         self
     }
 
@@ -265,19 +265,19 @@ impl Operation {
     /// Fills the settings this operation leaves unset from `outer`, and
     /// places the tags, parameters, and responses of `outer` before its own.
     fn inherit(&mut self, outer: &Operation) {
-        fn fill<T: Clone>(field: &mut Option<T>, outer: &Option<T>) {
+        fn fill<T: Clone>(field: &mut Option<T>, outer: Option<&T>) {
             if field.is_none() {
-                field.clone_from(outer);
+                *field = outer.cloned();
             }
         }
 
-        fill(&mut self.summary, &outer.summary);
-        fill(&mut self.description, &outer.description);
-        fill(&mut self.operation_id, &outer.operation_id);
-        fill(&mut self.deprecated, &outer.deprecated);
-        fill(&mut self.hidden, &outer.hidden);
-        fill(&mut self.request, &outer.request);
-        fill(&mut self.security, &outer.security);
+        fill(&mut self.summary, outer.summary.as_ref());
+        fill(&mut self.description, outer.description.as_ref());
+        fill(&mut self.id, outer.id.as_ref());
+        fill(&mut self.deprecated, outer.deprecated.as_ref());
+        fill(&mut self.hidden, outer.hidden.as_ref());
+        fill(&mut self.request, outer.request.as_ref());
+        fill(&mut self.security, outer.security.as_ref());
 
         let mut tags = outer.tags.clone();
         for tag in self.tags.drain(..) {
