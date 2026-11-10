@@ -13,9 +13,36 @@ pub trait Delim {
         break_mode: Option<BreakMode>,
         f: impl FnOnce(&mut Printer<'_>),
     ) {
+        self.pretty_print_unless_empty(printer, break_mode, false, f);
+    }
+
+    /// [`pretty_print`](Self::pretty_print) for a body that may hold nothing.
+    ///
+    /// The break points inside a delimiter pair are what put the body on lines
+    /// of its own. Without a body they have nothing to put there, so a pair
+    /// that breaks emits `(` and `)` on lines of their own with nothing
+    /// between them. Passing `no_body` closes the pair on one line instead, the
+    /// way an empty brace pair collapses to `{}`.
+    ///
+    /// A comment inside the pair counts as a body: the pair breaks so the
+    /// comment keeps its own line.
+    fn pretty_print_unless_empty(
+        &self,
+        printer: &mut Printer<'_>,
+        break_mode: Option<BreakMode>,
+        no_body: bool,
+        f: impl FnOnce(&mut Printer<'_>),
+    ) {
         printer.move_cursor(self.span().open().start());
         self.open_text().pretty_print(printer);
         printer.move_cursor(self.span().open().end());
+
+        if no_body && !printer.has_comment_before(self.span().close().start()) {
+            self.close_text().pretty_print(printer);
+            printer.move_cursor(self.span().close().end());
+            printer.skip_trivia();
+            return;
+        }
 
         if let Some(break_mode) = break_mode {
             printer.scan_begin(break_mode);

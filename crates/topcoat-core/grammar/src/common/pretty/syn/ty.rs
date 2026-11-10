@@ -66,8 +66,11 @@ impl PrettyPrint for syn::TypeParen {
 
 impl PrettyPrint for syn::TypeTuple {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
-        self.paren_token
-            .pretty_print(printer, Some(BreakMode::Consistent), |printer| {
+        self.paren_token.pretty_print_unless_empty(
+            printer,
+            Some(BreakMode::Consistent),
+            self.elems.is_empty(),
+            |printer| {
                 if self.elems.len() == 1 {
                     self.elems[0].pretty_print(printer);
                     printer.scan_text(",".into(), TextMode::Always);
@@ -75,7 +78,8 @@ impl PrettyPrint for syn::TypeTuple {
                 } else {
                     self.elems.pretty_print(printer);
                 }
-            });
+            },
+        );
     }
 }
 

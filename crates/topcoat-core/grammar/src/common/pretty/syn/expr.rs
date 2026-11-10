@@ -136,11 +136,14 @@ fn chain(printer: &mut Printer<'_>, expr: &syn::Expr) {
                 inner.dot_token.pretty_print(printer);
                 inner.method.pretty_print(printer);
                 inner.turbofish.pretty_print(printer);
-                inner
-                    .paren_token
-                    .pretty_print(printer, Some(BreakMode::Consistent), |printer| {
+                inner.paren_token.pretty_print_unless_empty(
+                    printer,
+                    Some(BreakMode::Consistent),
+                    inner.args.is_empty(),
+                    |printer| {
                         inner.args.pretty_print(printer);
-                    });
+                    },
+                );
             }
             Link::Field(inner) => {
                 if breakable {
@@ -301,10 +304,14 @@ impl PrettyPrint for syn::ExprCall {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
         self.attrs.pretty_print(printer);
         self.func.pretty_print(printer);
-        self.paren_token
-            .pretty_print(printer, Some(BreakMode::Consistent), |printer| {
+        self.paren_token.pretty_print_unless_empty(
+            printer,
+            Some(BreakMode::Consistent),
+            self.args.is_empty(),
+            |printer| {
                 self.args.pretty_print(printer);
-            });
+            },
+        );
     }
 }
 
@@ -322,10 +329,14 @@ impl PrettyPrint for syn::ExprIndex {
 impl PrettyPrint for syn::ExprArray {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
         self.attrs.pretty_print(printer);
-        self.bracket_token
-            .pretty_print(printer, Some(BreakMode::Consistent), |printer| {
+        self.bracket_token.pretty_print_unless_empty(
+            printer,
+            Some(BreakMode::Consistent),
+            self.elems.is_empty(),
+            |printer| {
                 self.elems.pretty_print(printer);
-            });
+            },
+        );
     }
 }
 
@@ -345,8 +356,11 @@ impl PrettyPrint for syn::ExprRepeat {
 impl PrettyPrint for syn::ExprTuple {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
         self.attrs.pretty_print(printer);
-        self.paren_token
-            .pretty_print(printer, Some(BreakMode::Consistent), |printer| {
+        self.paren_token.pretty_print_unless_empty(
+            printer,
+            Some(BreakMode::Consistent),
+            self.elems.is_empty(),
+            |printer| {
                 if self.elems.len() == 1 {
                     self.elems[0].pretty_print(printer);
                     printer.scan_text(",".into(), TextMode::Always);
@@ -354,7 +368,8 @@ impl PrettyPrint for syn::ExprTuple {
                 } else {
                     self.elems.pretty_print(printer);
                 }
-            });
+            },
+        );
     }
 }
 
@@ -767,6 +782,25 @@ mod tests {
     #[test]
     fn call_normalizes_spacing() {
         assert_eq!(expr("foo ( a , b )"), "foo(a, b)");
+    }
+
+    #[test]
+    fn long_line_keeps_an_empty_argument_list_closed() {
+        // The break points inside a pair are what put its body on lines of its
+        // own. With no body there is nothing to put there, so the pair closes
+        // rather than splitting into `(` and `)` lines with nothing between.
+        assert_eq!(
+            expr(
+                "\"a string long enough to push this whole expression past the eighty-nine column margin\".to_owned()"
+            ),
+            "\"a string long enough to push this whole expression past the eighty-nine column margin\".to_owned()",
+        );
+        assert_eq!(
+            expr(
+                "a_really_long_module_path_that_keeps_going::and::another_segment::and_another::function_name()"
+            ),
+            "a_really_long_module_path_that_keeps_going::and::another_segment::and_another::function_name()",
+        );
     }
 
     #[test]

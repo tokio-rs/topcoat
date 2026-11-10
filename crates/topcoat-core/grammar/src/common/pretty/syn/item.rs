@@ -470,10 +470,14 @@ impl PrettyPrint for syn::FieldsNamed {
 
 impl PrettyPrint for syn::FieldsUnnamed {
     fn pretty_print(&self, printer: &mut Printer<'_>) {
-        self.paren_token
-            .pretty_print(printer, Some(BreakMode::Consistent), |printer| {
+        self.paren_token.pretty_print_unless_empty(
+            printer,
+            Some(BreakMode::Consistent),
+            self.unnamed.is_empty(),
+            |printer| {
                 self.unnamed.pretty_print(printer);
-            });
+            },
+        );
     }
 }
 
