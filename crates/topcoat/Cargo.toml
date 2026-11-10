@@ -49,6 +49,7 @@ full = [
 	"mail-smtp",
 	"metadata",
 	"multipart",
+	"openapi",
 	"router",
 	"runtime",
 	"serve",
@@ -159,6 +160,10 @@ multipart = [
 	"router",
 	"topcoat-router/multipart",
 ]
+openapi = [
+	"dep:topcoat-openapi",
+	"router",
+]
 router = [
 	"dep:topcoat-router",
 	"dep:topcoat-router-macro",
@@ -233,6 +238,7 @@ topcoat-l10n = { workspace = true, optional = true }
 topcoat-l10n-macro = { workspace = true, optional = true }
 topcoat-mail = { workspace = true, optional = true }
 topcoat-metadata = { workspace = true, optional = true }
+topcoat-openapi = { workspace = true, optional = true }
 topcoat-router = { workspace = true, optional = true }
 topcoat-router-macro = { workspace = true, optional = true }
 topcoat-runtime = { workspace = true, optional = true }
@@ -252,6 +258,7 @@ tokio-tungstenite = { workspace = true, optional = true, features = ["connect"] 
 [dev-dependencies]
 futures-core.workspace = true
 futures-util.workspace = true
+schemars.workspace = true
 serde_json.workspace = true
 uuid = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
@@ -265,5 +272,5 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [package.metadata.cargo-udeps.ignore]
 normal = ["topcoat-ui-registry"]
-# Used by a doctest in the context guide, which cargo-udeps cannot see.
-development = ["uuid"]
+# Used by doctests in the context and OpenAPI guides, which cargo-udeps cannot see.
+development = ["schemars", "uuid"]

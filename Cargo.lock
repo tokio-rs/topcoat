@@ -1327,6 +1327,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
+name = "dyn-clone"
+version = "1.0.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
+
+[[package]]
 name = "either"
 version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3183,6 +3189,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
+name = "openapi"
+version = "0.12.0"
+dependencies = [
+ "schemars",
+ "serde",
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
 name = "openssl-probe"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4036,6 +4052,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "schemars"
+version = "1.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab508826f74a77ca9d5aba6ff19b522583ee3eaf28a19384ff3d0e5835fadf6e"
+dependencies = [
+ "dyn-clone",
+ "ref-cast",
+ "schemars_derive",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "schemars_derive"
+version = "1.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1c3a92094fa7d61aa124645844facb6b554dfc797136d0f5fd1f890e2bffc69"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde_derive_internals",
+ "syn 3.0.6",
+]
+
+[[package]]
 name = "scoped-tls"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4121,6 +4162,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "serde_derive_internals"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f852137cce035d6a4df67ccce505ff6b3e9fd3a10e3e52b24dc71e650bb1a9bd"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.6",
 ]
 
 [[package]]
@@ -5208,6 +5260,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "inventory",
+ "schemars",
  "serde",
  "serde_json",
  "tokio",
@@ -5228,6 +5281,7 @@ dependencies = [
  "topcoat-l10n-macro",
  "topcoat-mail",
  "topcoat-metadata",
+ "topcoat-openapi",
  "topcoat-router",
  "topcoat-router-macro",
  "topcoat-runtime",
@@ -5567,6 +5621,19 @@ dependencies = [
  "topcoat-router",
  "topcoat-view",
  "topcoat-view-macro",
+]
+
+[[package]]
+name = "topcoat-openapi"
+version = "0.12.0"
+dependencies = [
+ "schemars",
+ "serde",
+ "serde_json",
+ "tokio",
+ "topcoat",
+ "topcoat-core",
+ "topcoat-router",
 ]
 
 [[package]]

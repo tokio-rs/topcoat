@@ -47,6 +47,9 @@ pub mod mail;
 #[cfg(feature = "metadata")]
 pub mod metadata;
 
+#[cfg(feature = "openapi")]
+pub mod openapi;
+
 #[cfg(feature = "router")]
 pub mod router;
 

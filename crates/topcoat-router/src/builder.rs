@@ -481,11 +481,14 @@ impl RouterBuilder {
             .map(|(layer, _)| Arc::clone(layer))
             .collect();
 
+        // The routes registered from here on are the router's own.
+        let declared_routes = routes.len();
         self.trailing_slash
             .register_twins(&mut endpoints, &mut routes, &always_layers);
 
         Router::new(RouterInner {
             routes,
+            declared_routes,
             endpoints,
             always_layers,
             context: Arc::new(self.context),
