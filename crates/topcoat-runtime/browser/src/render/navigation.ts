@@ -1,12 +1,25 @@
 import type { Runtime } from "../runtime";
 import { newRender, type RenderToken } from "./frames";
 import { PageRequest, type PageResponseHead, PrefetchCache } from "./prefetch";
+import {
+	startTypedTransition,
+	VT_SHARED_ATTRIBUTE,
+	VT_SHARED_CLASS,
+	vtTypesOf,
+} from "./view-transition";
 
 /**
  * Enables runtime navigation on a link. The value sets when to prefetch:
  * `never`, `intent`, or `viewport`.
  */
 export const LINK_ATTRIBUTE = "data-topcoat-link";
+
+/**
+ * Event name dispatched on the document once a runtime navigation has
+ * replaced the page. A page update does not run the scripts it brings, so
+ * scripts outside the runtime have no other signal that the swap happened.
+ */
+export const NAVIGATE_EVENT = "topcoat:navigate";
 
 /** The hover delay before loading a linked page, in milliseconds. */
 const INTENT_DELAY = 80;
@@ -21,6 +34,14 @@ const STATE_KEY = "topcoat";
  */
 type HistoryMode = "push" | "replace" | "traverse";
 
+/** What a `NAVIGATE_EVENT` listener learns about the new page. */
+export type NavigateDetail = {
+	/** The URL the document now shows. */
+	url: string;
+	/** How the document reached the new URL. */
+	mode: HistoryMode;
+};
+
 type ScrollPosition = { x: number; y: number };
 
 /** Script types to check when deciding whether a page needs new scripts. */
@@ -30,6 +51,17 @@ const SCRIPT_TYPES = new Set([
 	"text/javascript",
 	"application/javascript",
 ]);
+
+/** One shared-element name the runtime marked, and what to restore. */
+type MarkedVTName = {
+	el: HTMLElement;
+	/** The style attribute the mark wrote, to tell it from the destination's. */
+	styleAttribute: string | null;
+	/** The inline name the element had before it was marked. */
+	inlineName: string;
+	/** The inline class the element had before it was marked. */
+	inlineClass: string;
+};
 
 /**
  * Opens pages by updating the current document.
@@ -56,6 +88,12 @@ export class NavigationController {
 	private streaming: Promise<void> | null = null;
 	/** The current page's URL with the # fragment removed. */
 	private documentUrl = "";
+	/** The shared-element names the current navigation marked. */
+	private markedVTNames: {
+		names: MarkedVTName[];
+		/** The navigation that marked them, so only it may release them. */
+		generation: number;
+	} | null = null;
 	/** Scripts already loaded in this document. */
 	private readonly scripts = new Set<string>();
 	/** Whether this controller is responsible for restoring scroll positions. */
@@ -185,6 +223,7 @@ export class NavigationController {
 		url: URL,
 		mode: HistoryMode,
 		scroll: ScrollPosition | null = null,
+		vtTypes: string[] | null = null,
 	): Promise<void> {
 		this.generation += 1;
 		const generation = this.generation;
@@ -204,10 +243,21 @@ export class NavigationController {
 		const isCurrent = () =>
 			generation === this.generation && !this.controller.signal.aborted;
 		try {
-			await this.follow(request, url, mode, scroll, isCurrent);
+			await this.follow(
+				request,
+				url,
+				mode,
+				scroll,
+				isCurrent,
+				vtTypes,
+				generation,
+			);
 		} finally {
 			if (this.uncommitted === request) this.uncommitted = null;
 			if (this.streaming === streaming) this.streaming = null;
+			// The previous navigation settles after this one replaced it, so it
+			// releases only the names it marked.
+			this.clearVTNames(generation);
 			finish();
 		}
 	}
@@ -219,6 +269,8 @@ export class NavigationController {
 		mode: HistoryMode,
 		scroll: ScrollPosition | null,
 		isCurrent: () => boolean,
+		vtTypes: string[] | null,
+		generation: number,
 	): Promise<void> {
 		let head: PageResponseHead;
 		try {
@@ -257,9 +309,29 @@ export class NavigationController {
 							load(destination, mode);
 							return;
 						}
-						this.commit(next, destination, mode, scroll, render);
-						if (this.uncommitted === request) this.uncommitted = null;
-						committed = true;
+						const apply = () => {
+							this.commit(next, destination, mode, scroll, render);
+							if (this.uncommitted === request) this.uncommitted = null;
+							committed = true;
+						};
+						if (vtTypes === null) {
+							apply();
+							break;
+						}
+						// Awaiting the transition's own update keeps `committed`
+						// true before the loop consumes the next frame, so
+						// streamed frames never race the swap; frames that
+						// follow apply after the transition captured, outside
+						// its groups. A superseded navigation resolves without
+						// swapping: the loop's next check returns.
+						await startTypedTransition(vtTypes, () => {
+							if (isCurrent()) apply();
+						});
+						// The new page is captured by now, so the origin's name
+						// has done its job. Holding it would leave the two
+						// shared elements colliding for the animation's
+						// duration.
+						this.clearVTNames(generation);
 						break;
 					}
 					case "swap":
@@ -283,14 +355,32 @@ export class NavigationController {
 			// A response without a snapshot leaves nothing to show, so the
 			// browser loads the destination instead.
 			if (!committed && isCurrent()) load(destination, mode);
+			// A streamed response keeps swapping regions in after the
+			// snapshot commit; announcing there hands listeners a document
+			// whose suspense regions have not arrived yet. The event fires
+			// once the stream is fully consumed.
+			if (committed && isCurrent()) this.announce(destination, mode);
 		} catch (error) {
 			if (!isCurrent()) return;
 			if (!committed) {
 				load(destination, mode);
 				return;
 			}
+			// The stream failed after the snapshot: regions past the
+			// failure point are missing. The event fires for every
+			// committed document, including this partial one.
+			this.announce(destination, mode);
 			this.runtime.reportError(error);
 		}
+	}
+
+	/** Dispatches NAVIGATE_EVENT for a committed document. */
+	private announce(url: URL, mode: HistoryMode): void {
+		document.dispatchEvent(
+			new CustomEvent<NavigateDetail>(NAVIGATE_EVENT, {
+				detail: { url: url.href, mode },
+			}),
+		);
 	}
 
 	/**
@@ -368,8 +458,97 @@ export class NavigationController {
 		const url = this.destination(link);
 		if (url === null) return;
 		event.preventDefault();
+		const vtTypes = vtTypesOf(link);
+		// Name the shared element before anything is fetched: the origin is what the
+		// transition snapshots, so the mark has to be in place by the time
+		// the response commits, and only a click can say which one.
+		this.markVTNames(link, vtTypes);
 		// Reuse the history entry when opening the current URL again.
-		void this.navigate(url, url.href === location.href ? "replace" : "push");
+		void this.navigate(
+			url,
+			url.href === location.href ? "replace" : "push",
+			null,
+			vtTypes,
+		);
+	}
+
+	/**
+	 * Names the elements `link` marks with `VT_SHARED_ATTRIBUTE`. Only a link
+	 * that declares transition types gets one: without a transition the names
+	 * would sit on the page until the next click.
+	 *
+	 * The previous names are released first, because two rendered elements
+	 * sharing a `view-transition-name` makes the transition skip itself. The
+	 * mark records the generation of the navigation about to open, so a
+	 * superseded navigation settling later cannot release a newer one.
+	 */
+	private markVTNames(link: HTMLAnchorElement, types: string[] | null): void {
+		this.clearVTNames();
+		if (types === null) return;
+		const selector = `[${VT_SHARED_ATTRIBUTE}]`;
+		const marked: HTMLElement[] = [
+			...(link.matches(selector) ? [link] : []),
+			...link.querySelectorAll<HTMLElement>(selector),
+		];
+		const names: MarkedVTName[] = [];
+		const seen = new Set<string>();
+		for (const el of marked) {
+			const name = el.getAttribute(VT_SHARED_ATTRIBUTE);
+			if (name === null || name === "") continue;
+			// A name may be marked once per transition. A second element
+			// carrying it would make the browser reject the whole
+			// transition, so it keeps the first and leaves the rest out.
+			if (seen.has(name)) continue;
+			seen.add(name);
+			// Keep the inline values to put back, so an element the server
+			// already names keeps its own name once the transition is done.
+			const inlineName = el.style.getPropertyValue("view-transition-name");
+			const inlineClass = el.style.getPropertyValue("view-transition-class");
+			el.style.setProperty("view-transition-name", name);
+			el.style.setProperty("view-transition-class", VT_SHARED_CLASS);
+			// Record the attribute the mark wrote: a swap replaces it with
+			// the destination's own, even when that names the element the
+			// same way.
+			names.push({
+				el,
+				styleAttribute: el.getAttribute("style"),
+				inlineName,
+				inlineClass,
+			});
+		}
+		if (names.length > 0)
+			this.markedVTNames = { names, generation: this.generation + 1 };
+	}
+
+	/** Takes back the names this controller marked, leaving styles as found. */
+	private clearVTNames(owner?: number): void {
+		const marked = this.markedVTNames;
+		if (marked === null) return;
+		if (owner !== undefined && marked.generation !== owner) return;
+		this.markedVTNames = null;
+		for (const {
+			el,
+			styleAttribute,
+			inlineName,
+			inlineClass,
+		} of marked.names) {
+			// The swap may have morphed this node into the destination's
+			// element, whose markup owns the attribute from then on. Restoring
+			// the origin's values would remove the destination's transition
+			// styles, even when it names the element the same way the mark
+			// did.
+			if (el.getAttribute("style") !== styleAttribute) continue;
+			if (inlineName === "") {
+				el.style.removeProperty("view-transition-name");
+			} else {
+				el.style.setProperty("view-transition-name", inlineName);
+			}
+			if (inlineClass === "") {
+				el.style.removeProperty("view-transition-class");
+			} else {
+				el.style.setProperty("view-transition-class", inlineClass);
+			}
+		}
 	}
 
 	private onPopState(): void {
