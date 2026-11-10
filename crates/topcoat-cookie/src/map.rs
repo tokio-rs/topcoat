@@ -42,4 +42,8 @@ where
         (self.f)(&mut cookie);
         self.inner.remove(cookie);
     }
+
+    fn normalize_name(&self, cookie: &mut Cookie<'static>) {
+        self.inner.normalize_name(cookie);
+    }
 }
