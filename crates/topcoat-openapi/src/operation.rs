@@ -456,6 +456,6 @@ mod tests {
         assert_eq!(replaced.security.unwrap(), ["session"]);
 
         let public = combine(&[Operation::new().no_security(), layer]);
-        assert!(public.security.unwrap().is_empty());
+        assert_eq!(public.security, Some(Vec::new()));
     }
 }

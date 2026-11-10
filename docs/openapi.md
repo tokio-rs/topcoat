@@ -203,13 +203,3 @@ let public = Operation::new().no_security();
 Call `security` more than once on an operation to list alternative authentication methods. Clients can use any one of them. When an operation sets its own security requirements, they replace all the requirements inherited from its layers.
 
 These settings describe authentication in the document. Your layers and handlers must still check credentials and enforce access rules.
-
-# Mistakes found while generating
-
-`generate` panics if it finds any of these problems:
-
-- An operation describes a path parameter that does not exist in the route's path.
-- An operation requires a security scheme that has not been registered.
-- Two operations have the same operation ID.
-
-Generate the document in a test to catch these mistakes before someone requests it.
