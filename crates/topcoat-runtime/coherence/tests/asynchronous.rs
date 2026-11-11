@@ -133,21 +133,41 @@ fn panics_before_during_and_after_await() {
 }
 
 #[test]
-fn known_control_flow_mismatches_after_await() {
-    let condition = Awaitable::ready(true).after_yield();
-    coherent!(async known "return_inside_if" => {
-        if condition.await { return 1.0; }
+fn control_flow_after_await() {
+    for value in [false, true] {
+        let condition = Awaitable::ready(value).after_yield();
+        let awaited = Awaitable::ready(()).after_yield();
+        coherent!(async => {
+            if condition.await {
+                awaited.await;
+                return 1.0;
+            }
+            2.0
+        });
+        let condition = Awaitable::ready(value).after_yield();
+        coherent!(async => {
+            loop {
+                if condition.await { break; }
+                break;
+            }
+            3.0
+        });
+    }
+    let awaited = Awaitable::ready(()).after_yield();
+    coherent!(async => {
+        if true {
+            awaited.await
+        }
         2.0
     });
-    coherent!(async known "break_inside_if" => {
-        loop {
-            if condition.await { break; }
-            break;
-        }
-        3.0
+    let failure = Awaitable::<f64>::panicking("must not be polled");
+    let other = Awaitable::ready(1.0);
+    coherent!(async => {
+        if true { failure } else { other };
+        2.0
     });
     let condition = Awaitable::ready(false).after_yield();
-    coherent!(async known "continue_inside_if" => {
+    coherent!(async => {
         let condition = condition.await;
         loop {
             if condition { continue; }
