@@ -372,7 +372,7 @@ The key expression is evaluated once per iteration and can use the loop's bindin
 
 The attribute is optional. An unkeyed loop still renders, but its iteration identity is ambiguous. Consuming that identity through a component's context errors with the location of the loop missing its key. Nested keyed loops inherit ambiguity from an unkeyed outer loop.
 
-Ordinary Rust expressions use the context explicitly passed to them. The macro does not rebind context variables inside loops. If a helper needs a distinct identity for each call, pass a context derived with [`Cx::keyed`](../context/struct.Cx.html#method.keyed), such as `helper(&cx.keyed(item.id))`.
+Inside a loop body, `cx` refers to the current iteration's context. In a keyed loop, each iteration has its own identity, so helpers called with `cx` in the body, such as `signal(cx, ...)` or `element_id(cx)`, also get one per iteration. In an unkeyed loop, `cx` is ambiguous. Contexts derived from it with [`Cx::keyed`](../context/struct.Cx.html#method.keyed) stay ambiguous too, so add `#[key(...)]` to the loop instead. Outside loops, use `cx.keyed(...)` to give separate helper calls distinct identities, such as `helper(&cx.keyed(item.id))` in a plain Rust loop.
 
 ## Element IDs
 
@@ -390,7 +390,22 @@ Ok(view! {
 # }
 ```
 
-When rendering the component in a `view!` loop, add `#[key(...)]` to the loop so each instance has its own identity. To create one ID per item inside a loop body, pass a keyed context, such as `element_id(&cx.keyed(item.id))`.
+When rendering the component in a `view!` loop, add `#[key(...)]` to the loop so each instance has its own identity. To create one ID per item inside a loop body, key the loop and call `element_id(cx)` in the body:
+
+```rust
+# use topcoat::{Result, context::Cx, view::*};
+# #[component]
+# async fn example(cx: &Cx) -> Result<impl View> {
+Ok(view! {
+    #[key(name)]
+    for name in ["email", "phone"] {
+        let id = element_id(cx);
+        <label for=(&id)>(name)</label>
+        <input id=(&id) name=(name)>
+    }
+})
+# }
+```
 
 # Views Are Lazy
 

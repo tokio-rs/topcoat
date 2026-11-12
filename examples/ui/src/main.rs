@@ -811,8 +811,9 @@ async fn checks_card(cx: &Cx) -> Result<impl View> {
             card_content(
                 field_group(
                     attrs: attributes! { class="gap-3" },
+                    #[key(key)]
                     for (key, text, checked, disabled) in checks {
-                        let id = element_id(&cx.keyed(key));
+                        let id = element_id(cx);
 
                         field(
                             orientation: FieldOrientation::Horizontal,
@@ -859,8 +860,9 @@ async fn switches_card(cx: &Cx) -> Result<impl View> {
             card_content(
                 field_group(
                     attrs: attributes! { class="gap-3" },
+                    #[key(key)]
                     for (key, text, checked, disabled) in switches {
-                        let id = element_id(&cx.keyed(key));
+                        let id = element_id(cx);
 
                         field(
                             orientation: FieldOrientation::Horizontal,
@@ -893,12 +895,13 @@ async fn radios_card(cx: &Cx) -> Result<impl View> {
             card_content(
                 radio_group(
                     attrs: attributes! { aria-label="Example options" },
+                    #[key(value)]
                     for (value, text, checked, disabled) in [
                         ("one", "Option one", true, false),
                         ("two", "Option two", false, false),
                         ("three", "Option three (disabled)", false, true),
                     ] {
-                        let id = element_id(&cx.keyed(value));
+                        let id = element_id(cx);
 
                         field(
                             orientation: FieldOrientation::Horizontal,
