@@ -42,9 +42,10 @@ The runtime and CLI embed their prebuilt `dist/index.js`; the runtime's coherenc
 
 ## Documentation site
 
-For changes to `docs/SUMMARY.md` or `book.toml`, or when adding, moving, or removing a guide, build the site and check that it reports no warnings or errors (needs mdbook):
+For changes to `docs/SUMMARY.md` or `book.toml`, or when adding, moving, or removing a guide, build the site and check that it reports no warnings or errors (needs mdbook and Python 3). Build the API docs first, since the site resolves rustdoc links from them:
 
 ```
+cargo doc -p topcoat --all-features --no-deps
 mdbook build
 ```
 

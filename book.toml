@@ -18,3 +18,7 @@ edit-url-template = "https://github.com/tokio-rs/topcoat/edit/main/{path}"
 # The examples need the `topcoat` crate, which the Rust playground lacks.
 [output.html.playground]
 runnable = false
+
+# Resolves rustdoc links in the guides from the API docs in `target/doc`.
+[preprocessor.rustdoc-links]
+command = "python3 .github/scripts/rustdoc_links.py"

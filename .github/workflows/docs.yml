@@ -6,6 +6,7 @@ on:
     paths:
       - docs/**
       - book.toml
+      - .github/scripts/rustdoc_links.py
       - .github/workflows/docs.yml
   # Manual re-deploy of main, for when a deploy failed or the Pages settings
   # changed.
@@ -29,9 +30,14 @@ jobs:
     if: github.repository == 'tokio-rs/topcoat'
     steps:
       - uses: actions/checkout@v7
+      - run: rustup update stable && rustup default stable
+      - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         with:
           tool: mdbook@0.5.4
+      # The guides link to API items the way rustdoc expects. The
+      # `rustdoc-links` preprocessor reads the resolved links from these docs.
+      - run: cargo doc -p topcoat --all-features --no-deps --locked
       # Reads `book.toml` and writes the site to `book/`.
       - run: mdbook build
       - uses: actions/upload-pages-artifact@v5

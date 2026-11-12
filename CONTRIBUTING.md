@@ -94,12 +94,15 @@ Match the surrounding code and follow the [`style`](.agents/skills/style/SKILL.m
 
 The guides in `docs/` are published at <https://tokio-rs.github.io/topcoat/>. The site is built with [mdBook](https://rust-lang.github.io/mdBook/), configured in `book.toml`. Many of these files are also the crates' API documentation, so keep them valid for rustdoc too.
 
-Preview the site locally:
+Preview the site locally (needs Python 3):
 
 ```sh
 cargo install mdbook
+cargo doc -p topcoat --all-features --no-deps
 mdbook serve --open
 ```
+
+Write links to API items as rustdoc expects them, such as ``[`Router`]`` or `[text](crate::asset)`. The build looks up where rustdoc resolved each link and points it to the matching guide or to docs.rs. This is why `cargo doc` runs first. Without the API docs the site still builds, but these links stay unresolved.
 
 The sidebar comes from `docs/SUMMARY.md`. Add every new page to it. mdBook skips pages that are not listed, so they would not appear on the site.
 
