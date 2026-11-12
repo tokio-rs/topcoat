@@ -31,7 +31,7 @@ Reading a parameter that the matched route did not capture panics.
 
 # Reading one segment
 
-Call the generated function, such as `post_id(cx)`, to read the parameter from the matched route. A declaration with `: Type` parses the segment with [`FromStr`](core::str::FromStr) and memoizes the result for the request.
+Call the generated function, such as `post_id(cx)`, to read the parameter from the matched route. A declaration with `: Type` parses the segment with [`FromStr`](https://doc.rust-lang.org/core/str/trait.FromStr.html) and memoizes the result for the request.
 
 ```rust
 // src/app/posts.rs
@@ -190,13 +190,13 @@ Values are borrowed when the URL is written, so the same `href!` can render more
 
 A link that leaves out a parameter of the target's path, or fills a parameter the path does not declare, panics.
 
-Each segment is written with [`Display`](core::fmt::Display) and percent-encoded, so a value stays inside the segment it fills: `slug: "a/b"` fills its one segment as `a%2Fb`. A catch-all contributes one segment per element, so the separators between them are the only `/` it adds.
+Each segment is written with [`Display`](https://doc.rust-lang.org/core/fmt/trait.Display.html) and percent-encoded, so a value stays inside the segment it fills: `slug: "a/b"` fills its one segment as `a%2Fb`. A catch-all contributes one segment per element, so the separators between them are the only `/` it adds.
 
 Empty values, `.`, and `..` panic because browsers treat them as path structure rather than segment content.
 
 # Requirements
 
-- Parsed segment types must implement [`FromStr`](core::str::FromStr) to be read.
-- Parsed segment types must implement [`Display`](core::fmt::Display) to be written into a URL.
+- Parsed segment types must implement [`FromStr`](https://doc.rust-lang.org/core/str/trait.FromStr.html) to be read.
+- Parsed segment types must implement [`Display`](https://doc.rust-lang.org/core/fmt/trait.Display.html) to be written into a URL.
 - The parsed segment type and its `<T as FromStr>::Err` must be `Send + Sync + 'static` so the result can be [memoized](../context/attr.memoize.html).
 - The parameter name in the route path must match the declaration.

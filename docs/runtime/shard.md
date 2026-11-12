@@ -159,7 +159,7 @@ async fn search_results(cx: &Cx, query: String) -> Result<impl View> {
 
 The browser re-renders this shard with a `POST` request to `/search/results`. Arguments and signal values are sent in the request body, so the path cannot contain dynamic or catch-all parameters.
 
-The path follows the router's [path syntax](../router/index.html#paths). Groups affect layer matching but are omitted from the URL. For example, `#[shard("/(api)/search/results")]` serves re-render requests at `/search/results`.
+The path follows the router's [path syntax](../router/index.html#path-syntax). Groups affect layer matching but are omitted from the URL. For example, `#[shard("/(api)/search/results")]` serves re-render requests at `/search/results`.
 
 [`context`]: ../context/index.html
 [`Cx`]: ../context/struct.Cx.html
