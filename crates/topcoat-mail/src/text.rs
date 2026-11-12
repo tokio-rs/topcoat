@@ -17,6 +17,8 @@ pub(crate) struct PlainText {
     breaks: u8,
     /// Whether a space is owed before the next content.
     space: bool,
+    /// Whether a list marker was written and its item content has not started.
+    marker: bool,
     /// Depth of open elements whose content is dropped entirely.
     hidden: usize,
     /// Open links: where each label starts in `out`, and the target.
@@ -80,6 +82,7 @@ impl PlainText {
                 self.flush();
                 self.out.push_str(&marker);
                 self.space = false;
+                self.marker = true;
             }
             "a" => {
                 let target = tag.attribute("href").map(decode).unwrap_or_default();
@@ -112,8 +115,11 @@ impl PlainText {
     }
 
     /// Applies an element's separation: blocks stand apart, lines break,
-    /// and inline elements flow.
+    /// and inline elements flow. Item content stays on its list marker's line.
     fn separate(&mut self, name: &str) {
+        if self.marker {
+            return;
+        }
         match name {
             "p" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "blockquote" | "pre" | "table"
             | "figure" | "address" | "hr" => self.break_line(2),
@@ -155,6 +161,7 @@ impl PlainText {
         }
         self.breaks = 0;
         self.space = false;
+        self.marker = false;
     }
 
     /// Returns the converted text without trailing whitespace.
@@ -393,6 +400,21 @@ mod tests {
 
         let numbered = "<ol><li>First</li><li>Second</li></ol>";
         assert_eq!(PlainText::from_html(numbered), "1. First\n2. Second");
+    }
+
+    #[test]
+    fn list_markers_stay_next_to_block_content() {
+        let paragraphs = "<ul><li><p>One</p></li><li><p>Two</p></li></ul>";
+        assert_eq!(PlainText::from_html(paragraphs), "- One\n\n- Two");
+
+        let divs = "<ol><li><div>First</div></li><li><div>Second</div></li></ol>";
+        assert_eq!(PlainText::from_html(divs), "1. First\n2. Second");
+    }
+
+    #[test]
+    fn nested_lists_start_on_their_own_line() {
+        let html = "<ul><li>Parent<ul><li>Child</li></ul></li></ul>";
+        assert_eq!(PlainText::from_html(html), "- Parent\n\n- Child");
     }
 
     #[test]
