@@ -1,0 +1,20 @@
+[book]
+title = "Topcoat"
+description = "Guides for Topcoat, a Rust server-rendered web framework."
+language = "en"
+src = "docs"
+
+[build]
+build-dir = "book"
+# Fail on a `docs/SUMMARY.md` entry that points to a missing file instead of
+# creating an empty page for it.
+create-missing = false
+
+[output.html]
+site-url = "/topcoat/"
+git-repository-url = "https://github.com/tokio-rs/topcoat"
+edit-url-template = "https://github.com/tokio-rs/topcoat/edit/main/{path}"
+
+# The examples need the `topcoat` crate, which the Rust playground lacks.
+[output.html.playground]
+runnable = false
