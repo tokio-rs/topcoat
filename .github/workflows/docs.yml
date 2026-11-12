@@ -1,0 +1,51 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/**
+      - book.toml
+      - .github/workflows/docs.yml
+  # Manual re-deploy of main, for when a deploy failed or the Pages settings
+  # changed.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Deploy one build at a time. Let a running deploy finish instead of cancelling
+# it halfway through; a newer push waits and then replaces it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    if: github.repository == 'tokio-rs/topcoat'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: mdbook@0.5.4
+      # Reads `book.toml` and writes the site to `book/`.
+      - run: mdbook build
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: book
+
+  # Needs Settings -> Pages -> Source set to "GitHub Actions".
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
