@@ -42,7 +42,7 @@
         in
         {
           default = pkgs.mkShell {
-            packages = [ rustToolchain ];
+            packages = [ rustToolchain pkgs.mdbook ];
             hardeningDisable = [ "fortify" ];
             RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
           };
