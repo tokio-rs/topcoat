@@ -29,6 +29,20 @@ impl Expr {
         Ok(())
     }
 
+    /// Lowers a statement-position `if` without an IIFE, so `return`, `break`,
+    /// and `continue` apply to the enclosing function or loop. Awaits stay in
+    /// the enclosing async function instead of a nested one.
+    pub(super) fn expr_if_as_statement(
+        if_expr: &ExprIf,
+        rust: &mut TokenStream,
+        js: &mut Js,
+        names: &mut NameResolver,
+    ) -> syn::Result<()> {
+        let rust_if = Self::expr_if_inner(if_expr, js, names)?;
+        rust_if.to_tokens(rust);
+        Ok(())
+    }
+
     fn expr_if_inner(
         if_expr: &ExprIf,
         js: &mut Js,

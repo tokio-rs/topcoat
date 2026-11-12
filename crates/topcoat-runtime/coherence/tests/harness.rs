@@ -109,7 +109,7 @@ fn exception_baselines_require_exact_outcomes() {
             "changed break failure",
             Expr::evaluate(|| value, Js::source(source)),
         );
-        let report = format!("{:#}", case.check_known("break_inside_if").unwrap_err());
+        let report = format!("{:#}", case.check_known("illegal_break_statement").unwrap_err());
         assert!(report.contains(expected));
     }
 }

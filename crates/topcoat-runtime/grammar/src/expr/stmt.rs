@@ -45,15 +45,21 @@ impl Expr {
                 let returns = is_last && semi.is_none();
                 if returns {
                     js.push_str("return ");
-                }
-
-                let mut value = TokenStream::new();
-                Self::dispatch(expr, &mut value, js, names)?;
-
-                if returns {
+                    let mut value = TokenStream::new();
+                    Self::dispatch(expr, &mut value, js, names)?;
                     js.push(';');
                     value.to_tokens(rust);
+                } else if let syn::Expr::If(if_expr) = expr {
+                    // Keep statement-position if out of an IIFE so return,
+                    // break, and continue apply to the enclosing function or
+                    // loop (see tokio-rs/topcoat#603).
+                    let mut value = TokenStream::new();
+                    Self::expr_if_as_statement(if_expr, &mut value, js, names)?;
+                    js.push_str("; ");
+                    quote! { #value; }.to_tokens(rust);
                 } else {
+                    let mut value = TokenStream::new();
+                    Self::dispatch(expr, &mut value, js, names)?;
                     js.push_str("; ");
                     quote! { #value; }.to_tokens(rust);
                 }
