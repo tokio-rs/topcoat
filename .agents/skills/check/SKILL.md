@@ -40,6 +40,14 @@ yarn test
 
 The runtime and CLI embed their prebuilt `dist/index.js`; the runtime's coherence crate also embeds `dist/coherence.js`. CI rebuilds these files and rejects drift. Include regenerated bundles alongside source changes.
 
+## Documentation site
+
+For changes to `docs/SUMMARY.md` or `book.toml`, or when adding, moving, or removing a guide, build the site and check that it reports no warnings or errors (needs mdbook):
+
+```
+mdbook build
+```
+
 ## New crates
 
 A new crate must be referenced in the toplevel `Cargo.toml` as well as `release-plz.toml`.
