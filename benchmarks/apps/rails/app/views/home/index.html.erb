@@ -1,0 +1,62 @@
+<section class="relative overflow-hidden bg-teal-900 text-white">
+  <div class="mx-auto grid max-w-7xl items-center gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2 lg:px-8 lg:py-28">
+    <div>
+      <p class="text-sm font-semibold uppercase tracking-widest text-teal-200">New season, same harbor</p>
+      <h1 class="mt-4 text-4xl font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl">Well-made gear for every harbor day.</h1>
+      <p class="mt-6 max-w-xl text-lg leading-8 text-teal-100">
+        Tents, knives, boots and blankets from small workshops we know by name. Built to last, easy to repair and shipped free over $75.
+      </p>
+      <div class="mt-10 flex flex-wrap gap-4">
+        <%= link_to "Shop all products", products_path, class: "rounded-full bg-white px-6 py-3 text-sm font-semibold text-teal-900 shadow-sm hover:bg-teal-50" %>
+        <%= link_to "Browse outdoor gear", products_path(category: "outdoor"), class: "rounded-full px-6 py-3 text-sm font-semibold text-white ring-1 ring-inset ring-white/40 hover:bg-white/10" %>
+      </div>
+    </div>
+    <div aria-hidden="true" class="relative hidden aspect-[4/3] lg:block">
+      <div class="absolute left-[8%] top-[10%] aspect-square w-[46%] -rotate-6 rounded-[28%] bg-amber-200 shadow-2xl shadow-black/30"></div>
+      <div class="absolute right-[6%] top-[4%] aspect-square w-[34%] rotate-12 rounded-full bg-sky-400 shadow-2xl shadow-black/30"></div>
+      <div class="absolute bottom-[2%] right-[18%] aspect-square w-[40%] rotate-6 rounded-[28%] bg-orange-700 shadow-2xl shadow-black/30"></div>
+    </div>
+  </div>
+</section>
+<section aria-label="Why Harbor Market" class="border-b border-stone-200 bg-white">
+  <ul class="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:grid-cols-3 sm:px-6 lg:px-8">
+    <% [
+      [ "M3 6h11v10H3zM14 10h4l3 3v3h-7M7 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z", "Free shipping over $75", "Orders ship within one business day from Portland." ],
+      [ "M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5", "30-day returns", "Changed your mind? Send it back, on us." ],
+      [ "M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Zm-3 9 2 2 4-4", "Repair, don't replace", "Spare parts and repairs for as long as we sell it." ]
+    ].each do |icon_path, title, text| %>
+      <li class="flex gap-4">
+        <span class="flex size-11 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-700"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="size-6"><path d="<%= icon_path %>"></path></svg></span>
+        <div>
+          <p class="font-semibold text-stone-900"><%= title %></p>
+          <p class="mt-1 text-sm text-stone-600"><%= text %></p>
+        </div>
+      </li>
+    <% end %>
+  </ul>
+</section>
+<section aria-labelledby="categories-heading" class="mx-auto max-w-7xl px-4 pt-16 sm:px-6 lg:px-8">
+  <h2 id="categories-heading" class="text-2xl font-semibold tracking-tight">Shop by category</h2>
+  <ul class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <% @categories.each do |category| %>
+      <li>
+        <%= link_to listing_path(category:), class: "group block h-full rounded-2xl border border-stone-200 bg-white p-5 transition hover:border-teal-600 hover:shadow-md" do %>
+          <h3 class="font-semibold text-stone-900 group-hover:text-teal-800"><%= category.name %></h3>
+          <p class="mt-1 line-clamp-2 text-sm text-stone-600"><%= category.description %></p>
+          <p class="mt-4 text-xs font-medium text-stone-500"><%= number_with_delimiter(catalog.product_count(category)) %> products</p>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
+</section>
+<section aria-labelledby="featured-heading" class="mx-auto max-w-7xl px-4 pt-20 sm:px-6 lg:px-8">
+  <div class="flex items-end justify-between gap-4">
+    <h2 id="featured-heading" class="text-2xl font-semibold tracking-tight">Featured products</h2>
+    <%= link_to products_path, class: "flex items-center gap-1.5 text-sm font-semibold text-teal-700 hover:text-teal-900" do %>
+      View all<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="size-4"><path d="M5 12h14m-6-6 6 6-6 6"></path></svg>
+    <% end %>
+  </div>
+  <div class="mt-8 grid grid-cols-2 gap-x-6 gap-y-10 lg:grid-cols-4">
+    <%= render partial: "products/card", collection: @featured, as: :product %>
+  </div>
+</section>

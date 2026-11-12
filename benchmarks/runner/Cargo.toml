@@ -1,0 +1,31 @@
+[package]
+name = "bench-runner"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "Runs the cross-framework web benchmark suite in `benchmarks/`."
+
+[[bin]]
+name = "bench-web"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+brotli.workspace = true
+clap = { workspace = true, features = ["derive"] }
+console.workspace = true
+ctrlc = { workspace = true, features = ["termination"] }
+ego-tree.workspace = true
+flate2.workspace = true
+jiff.workspace = true
+nix = { workspace = true, features = ["signal", "resource"] }
+scraper.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+similar.workspace = true
+sysinfo = { workspace = true, default-features = false, features = ["system"] }
+toml.workspace = true
+ureq.workspace = true
+
+[lints]
+workspace = true

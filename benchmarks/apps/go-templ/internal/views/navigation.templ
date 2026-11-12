@@ -1,0 +1,74 @@
+package views
+
+import "harbor-go-templ/internal/catalog"
+
+// breadcrumbs is a trail of links ending in the current page.
+templ breadcrumbs(trail []link, current string) {
+	<nav aria-label="Breadcrumb" class="text-sm">
+		<ol class="flex flex-wrap items-center gap-1.5 text-stone-500">
+			for _, l := range trail {
+				<li class="flex items-center gap-1.5">
+					<a href={ l.Href } class="hover:text-stone-900">{ l.Label }</a>
+					@iconChevronRight()
+				</li>
+			}
+			<li>
+				<span aria-current="page" class="font-medium text-stone-900">{ current }</span>
+			</li>
+		</ol>
+	</nav>
+}
+
+const (
+	paginationStep         = "flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
+	paginationStepDisabled = "flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-stone-300"
+	paginationPage         = "flex size-10 items-center justify-center rounded-full text-sm font-medium text-stone-600 hover:bg-stone-100"
+	paginationPageCurrent  = "flex size-10 items-center justify-center rounded-full bg-stone-900 text-sm font-semibold text-white"
+)
+
+// pagination is the previous and next links with a link to every page of the listing.
+templ pagination(l *catalog.Listing) {
+	<nav aria-label="Pagination" class="mt-12 flex items-center justify-between gap-4 border-t border-stone-200 pt-6">
+		if l.Page > 1 {
+			<a href={ listingURL(l.CategorySlug(), l.Sort, l.Page-1) } class={ paginationStep }>
+				@iconArrowLeft()
+				Previous
+			</a>
+		} else {
+			<span aria-disabled="true" class={ paginationStepDisabled }>
+				@iconArrowLeft()
+				Previous
+			</span>
+		}
+		<p class="text-sm text-stone-600 sm:hidden">Page { l.Page } of { l.PageCount }</p>
+		<ul class="hidden items-center gap-1 sm:flex">
+			for page := 1; page <= l.PageCount; page++ {
+				<li>
+					if page == l.Page {
+						<a href={ listingURL(l.CategorySlug(), l.Sort, page) } aria-current="page" class={ paginationPageCurrent }>{ page }</a>
+					} else {
+						<a href={ listingURL(l.CategorySlug(), l.Sort, page) } class={ paginationPage }>{ page }</a>
+					}
+				</li>
+			}
+		</ul>
+		if l.Page < l.PageCount {
+			<a href={ listingURL(l.CategorySlug(), l.Sort, l.Page+1) } class={ paginationStep }>
+				Next
+				@iconArrowRight()
+			</a>
+		} else {
+			<span aria-disabled="true" class={ paginationStepDisabled }>
+				Next
+				@iconArrowRight()
+			</span>
+		}
+	</nav>
+}
+
+// statusBadge is a colored pill showing an order's status.
+templ statusBadge(status catalog.OrderStatus) {
+	<span class={ "inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset " + statusColors(status) }>
+		{ status.Label() }
+	</span>
+}

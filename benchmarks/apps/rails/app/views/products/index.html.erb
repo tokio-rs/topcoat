@@ -1,0 +1,77 @@
+<%
+  sidebar_link = "flex items-center justify-between gap-3 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100 hover:text-stone-900"
+  sidebar_link_current = "flex items-center justify-between gap-3 whitespace-nowrap rounded-lg bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-900"
+  sort_link = "block rounded-full bg-white px-3 py-1.5 text-sm font-medium text-stone-600 ring-1 ring-inset ring-stone-200 hover:bg-stone-100"
+  sort_link_current = "block rounded-full bg-stone-900 px-3 py-1.5 text-sm font-medium text-white ring-1 ring-inset ring-stone-900"
+  category = @listing.category
+  title = category ? category.name : "All products"
+  content_for :title, title
+%>
+<div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+  <% if category %>
+    <%= render "shared/breadcrumbs", trail: [ [ "Home", root_path ], [ "Products", products_path ] ], current: title %>
+  <% else %>
+    <%= render "shared/breadcrumbs", trail: [ [ "Home", root_path ] ], current: "Products" %>
+  <% end %>
+  <div class="mt-6 flex flex-col gap-4 border-b border-stone-200 pb-8 md:flex-row md:items-end md:justify-between">
+    <div>
+      <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl"><%= title %></h1>
+      <p class="mt-2 max-w-2xl text-stone-600"><%= category ? category.description : "Everything in the Harbor Market catalog, from tents to turntables." %></p>
+    </div>
+    <p class="shrink-0 text-sm text-stone-500">
+      <% if @listing.empty? %>
+        0 products
+      <% else %>
+        Showing <%= @listing.first_position %> to <%= @listing.last_position %> of <%= number_with_delimiter(@listing.total) %> products
+      <% end %>
+    </p>
+  </div>
+  <div class="mt-8 flex flex-col gap-10 lg:flex-row">
+    <aside class="lg:w-60 lg:shrink-0">
+      <h2 class="px-3 text-sm font-semibold text-stone-900">Categories</h2>
+      <ul class="-mx-1 mt-3 flex gap-1 overflow-x-auto px-1 pb-2 lg:mx-0 lg:block lg:space-y-1 lg:overflow-visible lg:px-0 lg:pb-0">
+        <% [ [ nil, "All products" ], *catalog.categories.map { |c| [ c, c.name ] } ].each do |entry, name| %>
+          <li>
+            <% if entry.equal?(category) %>
+              <%= link_to listing_path(category: entry, sort: @listing.sort), aria: { current: "page" }, class: sidebar_link_current do %>
+                <%= name %>
+                <span class="text-xs text-teal-700"><%= number_with_delimiter(catalog.product_count(entry)) %></span>
+              <% end %>
+            <% else %>
+              <%= link_to listing_path(category: entry, sort: @listing.sort), class: sidebar_link do %>
+                <%= name %>
+                <span class="text-xs text-stone-400"><%= number_with_delimiter(catalog.product_count(entry)) %></span>
+              <% end %>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    </aside>
+    <div class="min-w-0 flex-1">
+      <div class="flex flex-wrap items-center gap-3">
+        <h2 class="text-sm font-medium text-stone-500">Sort by</h2>
+        <ul class="flex flex-wrap gap-2">
+          <% ProductsHelper::SORT_LABELS.each do |sort, label| %>
+            <li>
+              <% if sort == @listing.sort %>
+                <%= link_to label, listing_path(category:, sort:), aria: { current: "true" }, class: sort_link_current %>
+              <% else %>
+                <%= link_to label, listing_path(category:, sort:), class: sort_link %>
+              <% end %>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+      <% if @listing.empty? %>
+        <p class="mt-8 rounded-2xl border border-dashed border-stone-300 p-12 text-center text-stone-500">No products in this category yet.</p>
+      <% else %>
+        <div class="mt-8 grid grid-cols-2 gap-x-6 gap-y-10 md:grid-cols-3 xl:grid-cols-4">
+          <%= render partial: "products/card", collection: @listing.products, as: :product %>
+        </div>
+      <% end %>
+      <% if @listing.page_count > 1 %>
+        <%= render "products/pagination", listing: @listing %>
+      <% end %>
+    </div>
+  </div>
+</div>

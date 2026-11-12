@@ -1,0 +1,69 @@
+package views
+
+import (
+	"harbor-go-templ/internal/catalog"
+	"harbor-go-templ/internal/format"
+)
+
+var orderColumns = []string{"Order", "Placed", "Customer", "Email", "Country", "Items", "Status", "Total"}
+
+// OrdersPage is GET /admin/orders: summary cards and a table of every order, newest first.
+templ OrdersPage(store *catalog.Store, cart int) {
+	{{ summary := store.OrderSummary }}
+	@layout("Orders", cart) {
+		<div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+			<p class="text-sm font-semibold uppercase tracking-widest text-teal-700">Admin</p>
+			<h1 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Orders</h1>
+			<p class="mt-2 text-stone-600">All { format.Count(summary.Count) } orders, newest first.</p>
+			<dl class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+				@orderStat("Orders", format.Count(summary.Count), "All time")
+				@orderStat("Revenue", format.Money(summary.RevenueCents), "Paid, shipped and delivered")
+				@orderStat("Average order", format.Money(summary.AverageCents), "Across revenue orders")
+				@orderStat("Refunded", format.Money(summary.RefundedCents), "Returned to customers")
+			</dl>
+			<div class="mt-8 overflow-x-auto rounded-2xl border border-stone-200 bg-white">
+				<table class="min-w-full whitespace-nowrap text-left text-sm">
+					<thead class="border-b border-stone-200 bg-stone-50 text-xs font-semibold uppercase tracking-wide text-stone-500">
+						<tr>
+							for _, column := range orderColumns {
+								if column == "Items" || column == "Total" {
+									<th scope="col" class="px-4 py-3 text-right">{ column }</th>
+								} else {
+									<th scope="col" class="px-4 py-3">{ column }</th>
+								}
+							}
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-stone-100 text-stone-600">
+						for i := range store.Orders {
+							{{ order := &store.Orders[i] }}
+							<tr class="hover:bg-stone-50">
+								<td class="px-4 py-3 font-medium text-stone-900">{ order.Number }</td>
+								<td class="px-4 py-3">
+									<time datetime={ format.ISODateTime(order.PlacedAt) }>{ format.ShortDateTime(order.PlacedAt) }</time>
+								</td>
+								<td class="px-4 py-3 text-stone-900">{ order.Customer }</td>
+								<td class="px-4 py-3 text-stone-500">{ order.Email }</td>
+								<td class="px-4 py-3">{ order.Country }</td>
+								<td class="px-4 py-3 text-right tabular-nums">{ order.Items }</td>
+								<td class="px-4 py-3">
+									@statusBadge(order.Status)
+								</td>
+								<td class="px-4 py-3 text-right font-medium tabular-nums text-stone-900">{ format.Money(order.TotalCents) }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	}
+}
+
+// orderStat is a summary card with a label, a value and a note.
+templ orderStat(label string, value string, note string) {
+	<div class="rounded-2xl border border-stone-200 bg-white p-5">
+		<dt class="text-sm font-medium text-stone-500">{ label }</dt>
+		<dd class="mt-2 text-2xl font-semibold tracking-tight text-stone-900">{ value }</dd>
+		<dd class="mt-1 text-xs text-stone-500">{ note }</dd>
+	</div>
+}

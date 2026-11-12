@@ -1,0 +1,14 @@
+@page "/error/{code:int}"
+@model ErrorModel
+@{
+    ViewData["Title"] = Model.Title;
+}
+<div class="mx-auto max-w-2xl px-4 py-24 text-center sm:py-32">
+    <p class="text-sm font-semibold text-teal-700">@Model.Code</p>
+    <h1 class="mt-3 text-4xl font-semibold tracking-tight text-stone-900">@Model.Title</h1>
+    <p class="mt-4 text-stone-600">@Model.Message</p>
+    <div class="mt-10 flex flex-wrap justify-center gap-4">
+        <a asp-page="/Index" class="rounded-full bg-teal-700 px-6 py-3 text-sm font-semibold text-white hover:bg-teal-800">Back to home</a>
+        <a asp-page="/Products/Index" class="rounded-full px-6 py-3 text-sm font-semibold text-stone-700 ring-1 ring-inset ring-stone-300 hover:bg-stone-100">Browse products</a>
+    </div>
+</div>

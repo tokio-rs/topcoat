@@ -1,0 +1,24 @@
+id = "leptos-islands"
+name = "Leptos (islands)"
+language = "Rust"
+kind = "rust"
+rendering = "islands"
+description = "Leptos with leptos_axum in islands mode: default SSR mode with components reading the store synchronously (no async data, so each page renders in one pass), two #[island]s hydrated from a small WebAssembly bundle, plain Axum JSON routes."
+requires = ["cargo", "cargo-leptos", "wasm-bindgen", "wasm-opt", "tailwindcss"]
+version_command = "cargo tree --invert leptos --edges normal --depth 0 --prefix none"
+artifacts = ["target/{profile}/harbor-leptos-islands", "target/site"]
+
+[build]
+# cargo-leptos builds the server with the `benchmark` profile (`bin-profile-release`) and the
+# WebAssembly bundle with `wasm-release` (`lib-profile-release`). It runs wasm-bindgen, wasm-opt
+# and tailwindcss from PATH.
+commands = ["cargo leptos build --release --cargo-locked {features}"]
+
+[run]
+command = "target/{profile}/harbor-leptos-islands"
+# The runtime configuration cargo-leptos would set, as the Leptos deployment guide describes.
+env = { LEPTOS_OUTPUT_NAME = "harbor-leptos-islands", LEPTOS_SITE_ROOT = "target/site", LEPTOS_SITE_PKG_DIR = "pkg", LEPTOS_ENV = "PROD" }
+ready_timeout_secs = 60
+
+[client]
+extra_assets = []

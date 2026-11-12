@@ -1,0 +1,2 @@
+/* Scan only `src/` for class names, not the README or build output. */
+@import "tailwindcss" source("..");

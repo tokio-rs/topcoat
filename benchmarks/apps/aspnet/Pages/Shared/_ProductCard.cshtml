@@ -1,0 +1,37 @@
+@* A product in a grid: tile, category, name, tagline, rating, price and color. *@
+@model Product
+@{
+    var rating = Format.Rating(Model.Rating);
+    var palette = Palette.Of(Model.Color);
+}
+<article class="group relative flex flex-col">
+    <partial name="_ProductImage" model="Model" />
+    <div class="mt-4 flex flex-1 flex-col">
+        <p class="text-xs font-medium uppercase tracking-wide text-stone-500">@Model.Category.Name</p>
+        <h3 class="mt-1 text-sm font-semibold text-stone-900 group-hover:text-teal-800">
+            <a asp-page="/Products/Detail" asp-route-id="@Model.Id"><span class="absolute inset-0"></span>@Model.Name</a>
+        </h3>
+        <p class="mt-1 line-clamp-2 text-sm text-stone-600">@Model.Tagline</p>
+        <div class="mt-2 flex items-center gap-1.5">
+            <star-row product="Model" />
+            <span class="text-xs text-stone-500">@rating (@Format.Count(Model.ReviewCount))</span>
+        </div>
+        <div class="mt-auto flex items-end justify-between gap-2 pt-3">
+            <p class="flex items-baseline gap-2">
+                <span class="font-semibold text-stone-900">@Format.Money(Model.PriceCents)</span>
+                @if (Model.CompareAtCents is { } compareAt)
+                {
+                    <s class="text-sm text-stone-400">@Format.Money(compareAt)</s>
+                }
+            </p>
+            <span class="flex items-center gap-1.5 text-xs text-stone-500">
+                <span class="size-3 rounded-full ring-1 ring-black/10 @palette.Accent"></span>
+                @palette.Label
+            </span>
+        </div>
+        @if (Model.Stock is >= 1 and <= 9)
+        {
+            <p class="mt-1 text-xs font-medium text-amber-700">Only @Model.Stock left</p>
+        }
+    </div>
+</article>

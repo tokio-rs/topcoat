@@ -1,0 +1,6 @@
+# uv virtualenv
+/.venv/
+__pycache__/
+# Build output: the compiled stylesheet and `collectstatic`.
+/store/static/store/app.css
+/staticfiles/

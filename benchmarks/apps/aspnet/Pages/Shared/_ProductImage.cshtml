@@ -1,0 +1,22 @@
+@* The square product tile with the sale and sold-out badges. The dataset has no photos, so the tile
+   draws a soft shape in the product's color instead. *@
+@model Product
+@{
+    var palette = Palette.Of(Model.Color);
+}
+<div class="relative aspect-square overflow-hidden rounded-2xl @palette.Tile">
+    <div class="absolute left-1/2 top-1/2 aspect-square w-2/5 -translate-x-1/2 -translate-y-1/2 rotate-6 rounded-[28%] shadow-xl transition group-hover:rotate-12 @palette.Accent"></div>
+    @if (Model.IsSoldOut || Model.IsOnSale)
+    {
+        <div class="absolute left-3 top-3 flex gap-1.5">
+            @if (Model.IsSoldOut)
+            {
+                <span class="rounded-full bg-stone-900 px-2.5 py-1 text-xs font-medium text-white">Sold out</span>
+            }
+            @if (Model.IsOnSale)
+            {
+                <span class="rounded-full bg-rose-600 px-2.5 py-1 text-xs font-medium text-white">Sale</span>
+            }
+        </div>
+    }
+</div>

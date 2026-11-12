@@ -1,0 +1,38 @@
+<% content_for :title, "Orders" %>
+<div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+  <p class="text-sm font-semibold uppercase tracking-widest text-teal-700">Admin</p>
+  <h1 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Orders</h1>
+  <p class="mt-2 text-stone-600">All <%= number_with_delimiter(@summary.count) %> orders, newest first.</p>
+  <dl class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <% [
+      [ "Orders", number_with_delimiter(@summary.count), "All time" ],
+      [ "Revenue", money(@summary.revenue_cents), "Paid, shipped and delivered" ],
+      [ "Average order", money(@summary.average_cents), "Across revenue orders" ],
+      [ "Refunded", money(@summary.refunded_cents), "Returned to customers" ]
+    ].each do |label, value, note| %>
+      <div class="rounded-2xl border border-stone-200 bg-white p-5">
+        <dt class="text-sm font-medium text-stone-500"><%= label %></dt>
+        <dd class="mt-2 text-2xl font-semibold tracking-tight text-stone-900"><%= value %></dd>
+        <dd class="mt-1 text-xs text-stone-500"><%= note %></dd>
+      </div>
+    <% end %>
+  </dl>
+  <div class="mt-8 overflow-x-auto rounded-2xl border border-stone-200 bg-white">
+    <table class="min-w-full whitespace-nowrap text-left text-sm">
+      <thead class="border-b border-stone-200 bg-stone-50 text-xs font-semibold uppercase tracking-wide text-stone-500">
+        <tr>
+          <% %w[Order Placed Customer Email Country Items Status Total].each do |column| %>
+            <% if column == "Items" || column == "Total" %>
+              <th scope="col" class="px-4 py-3 text-right"><%= column %></th>
+            <% else %>
+              <th scope="col" class="px-4 py-3"><%= column %></th>
+            <% end %>
+          <% end %>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100 text-stone-600">
+        <%= render partial: "admin/orders/order", collection: @orders %>
+      </tbody>
+    </table>
+  </div>
+</div>

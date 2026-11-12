@@ -1,0 +1,28 @@
+id = "aspnet"
+name = "ASP.NET Core"
+language = "C#"
+kind = "dotnet"
+rendering = "ssr"
+description = "ASP.NET Core on Kestrel with Razor Pages, Minimal API JSON endpoints with source-generated System.Text.Json, and a small plain JS file for the two interactive pieces."
+requires = ["dotnet", "tailwindcss"]
+version_command = "dotnet --list-runtimes | awk '/^Microsoft.AspNetCore.App / { print \"ASP.NET Core \" $2 }'"
+# Framework-dependent publish output: the app assembly, its config and the static assets.
+artifacts = ["bin/publish"]
+
+[build]
+# The Tailwind stylesheet is compiled by an MSBuild target in `Harbor.csproj`. Build servers are
+# disabled so no compiler or MSBuild processes linger into the measurements.
+commands = ["dotnet publish -c Release -o bin/publish --disable-build-servers -p:RestoreLockedMode=true"]
+# Packages restore into `.nuget/packages` (see `nuget.config`; NUGET_PACKAGES only takes absolute paths).
+env = { DOTNET_CLI_TELEMETRY_OPTOUT = "1", DOTNET_NOLOGO = "1" }
+
+[run]
+# `run.sh` maps BENCH_THREADS to DOTNET_PROCESSOR_COUNT and starts `dotnet Harbor.dll` from the
+# publish directory.
+command = "./run.sh"
+env = { ASPNETCORE_ENVIRONMENT = "Production", DOTNET_CLI_TELEMETRY_OPTOUT = "1", DOTNET_NOLOGO = "1" }
+ready_timeout_secs = 60
+stop_timeout_secs = 10
+
+[client]
+extra_assets = []

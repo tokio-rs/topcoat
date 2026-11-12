@@ -1,0 +1,28 @@
+id = "topcoat"
+name = "Topcoat"
+language = "Rust"
+kind = "rust"
+rendering = "ssr"
+description = "Topcoat on Tokio with view! components, module routing, Tailwind and assets bundled by the Topcoat CLI, and Topcoat's browser runtime for the two interactive pieces."
+requires = ["cargo", "tailwindcss"]
+version_command = "cargo tree --invert topcoat --edges normal --depth 0 --prefix none"
+# The binary and the asset bundle `topcoat asset bundle` writes next to it. The app is a member of
+# the repository's workspace, so both live in the workspace's target directory.
+artifacts = ["../../../target/{profile}/harbor-topcoat", "../../../target/{profile}/assets"]
+
+[build]
+# `topcoat asset bundle` (the repository's `cargo topcoat` alias) builds the app and writes its
+# asset bundle next to the binary. It cannot select cargo features, so the allocator build follows
+# and replaces the binary; the asset ids do not depend on features (see `src/app.rs`).
+commands = [
+    "cargo topcoat asset bundle --profile {profile} --package harbor-topcoat",
+    "cargo build --locked --profile {profile} --package harbor-topcoat {features}",
+]
+
+[run]
+command = "../../../target/{profile}/harbor-topcoat"
+env = {}
+ready_timeout_secs = 60
+
+[client]
+extra_assets = []

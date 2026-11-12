@@ -1,0 +1,47 @@
+<footer class="mt-24 bg-stone-900 text-stone-400">
+  <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+    <div class="grid gap-12 md:grid-cols-5">
+      <div class="md:col-span-2">
+        <%= link_to root_path, class: "flex items-center gap-2.5 text-lg font-semibold tracking-tight text-white" do %>
+          <%= render "shared/logo" %>
+          Harbor Market
+        <% end %>
+        <p class="mt-4 max-w-xs text-sm leading-6">
+          Well-made gear for every harbor day. Shipped from Portland, Oregon since 2016.
+        </p>
+      </div>
+      <% {
+        "Shop" => [
+          [ "All products", products_path ],
+          [ "Outdoor & Camping", products_path(category: "outdoor") ],
+          [ "Kitchen & Dining", products_path(category: "kitchen") ],
+          [ "Audio", products_path(category: "audio") ],
+          [ "Toys & Games", products_path(category: "toys") ]
+        ],
+        "Help" => [
+          [ "Shipping & returns", about_path(anchor: "shipping") ],
+          [ "Warranty & repairs", about_path(anchor: "warranty") ],
+          [ "Contact us", about_path(anchor: "contact") ]
+        ],
+        "Company" => [
+          [ "About us", about_path ],
+          [ "Order admin", admin_orders_path ],
+          [ "Product API", api_products_path ]
+        ]
+      }.each do |title, links| %>
+        <div>
+          <h2 class="text-sm font-semibold text-white"><%= title %></h2>
+          <ul class="mt-4 space-y-3 text-sm">
+            <% links.each do |label, path| %>
+              <li><%= link_to label, path, class: "hover:text-white" %></li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
+    </div>
+    <div class="mt-12 flex flex-col gap-2 border-t border-stone-800 pt-8 text-xs sm:flex-row sm:justify-between">
+      <p>Copyright 2026 Harbor Market. All rights reserved.</p>
+      <p>A demo storefront for comparing web frameworks.</p>
+    </div>
+  </div>
+</footer>

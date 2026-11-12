@@ -1,0 +1,8 @@
+[application]
+
+[web.app]
+title = "Harbor Market"
+
+# Release builds run `wasm-opt` on the client. `z` is the Dioxus default, spelled out here.
+[web.wasm_opt]
+level = "z"

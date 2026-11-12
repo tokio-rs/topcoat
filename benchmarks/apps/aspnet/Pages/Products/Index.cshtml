@@ -1,0 +1,101 @@
+@page "/products"
+@model Harbor.Pages.Products.IndexModel
+@functions {
+    private const string SidebarLink = "flex items-center justify-between gap-3 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100 hover:text-stone-900";
+    private const string SidebarLinkCurrent = "flex items-center justify-between gap-3 whitespace-nowrap rounded-lg bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-900";
+    private const string SortLink = "block rounded-full bg-white px-3 py-1.5 text-sm font-medium text-stone-600 ring-1 ring-inset ring-stone-200 hover:bg-stone-100";
+    private const string SortLinkCurrent = "block rounded-full bg-stone-900 px-3 py-1.5 text-sm font-medium text-white ring-1 ring-inset ring-stone-900";
+}
+@{
+    var listing = Model.Listing;
+    ViewData["Title"] = Model.Heading;
+    var breadcrumbs = listing.Category is null
+        ? new Breadcrumbs([("Home", Url.Page("/Index")!)], "Products")
+        : new Breadcrumbs([("Home", Url.Page("/Index")!), ("Products", Url.Page("/Products/Index")!)], Model.Heading);
+}
+<div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+    <partial name="_Breadcrumbs" model="breadcrumbs" />
+    <div class="mt-6 flex flex-col gap-4 border-b border-stone-200 pb-8 md:flex-row md:items-end md:justify-between">
+        <div>
+            <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">@Model.Heading</h1>
+            <p class="mt-2 max-w-2xl text-stone-600">@Model.Description</p>
+        </div>
+        <p class="shrink-0 text-sm text-stone-500">
+            @if (listing.Total == 0)
+            {
+                @:0 products
+            }
+            else
+            {
+                @:Showing @listing.FirstPosition to @listing.LastPosition of @Format.Count(listing.Total) products
+            }
+        </p>
+    </div>
+    <div class="mt-8 flex flex-col gap-10 lg:flex-row">
+        <aside class="lg:w-60 lg:shrink-0">
+            <h2 class="px-3 text-sm font-semibold text-stone-900">Categories</h2>
+            <ul class="-mx-1 mt-3 flex gap-1 overflow-x-auto px-1 pb-2 lg:mx-0 lg:block lg:space-y-1 lg:overflow-visible lg:px-0 lg:pb-0">
+                <li>
+                    @if (listing.Category is null)
+                    {
+                        <a href="@Url.Listing(null, listing.Sort)" aria-current="page" class="@SidebarLinkCurrent">All products <span class="text-xs text-teal-700">@Format.Count(Model.Store.ProductCount)</span></a>
+                    }
+                    else
+                    {
+                        <a href="@Url.Listing(null, listing.Sort)" class="@SidebarLink">All products <span class="text-xs text-stone-400">@Format.Count(Model.Store.ProductCount)</span></a>
+                    }
+                </li>
+                @foreach (var category in Model.Store.Categories)
+                {
+                    <li>
+                        @if (category == listing.Category)
+                        {
+                            <a href="@Url.Listing(category.Slug, listing.Sort)" aria-current="page" class="@SidebarLinkCurrent">@category.Name <span class="text-xs text-teal-700">@Format.Count(category.ProductCount)</span></a>
+                        }
+                        else
+                        {
+                            <a href="@Url.Listing(category.Slug, listing.Sort)" class="@SidebarLink">@category.Name <span class="text-xs text-stone-400">@Format.Count(category.ProductCount)</span></a>
+                        }
+                    </li>
+                }
+            </ul>
+        </aside>
+        <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-3">
+                <h2 class="text-sm font-medium text-stone-500">Sort by</h2>
+                <ul class="flex flex-wrap gap-2">
+                    @foreach (var sort in Sorts.All)
+                    {
+                        <li>
+                            @if (sort == listing.Sort)
+                            {
+                                <a href="@Url.Listing(listing.CategorySlug, sort)" aria-current="true" class="@SortLinkCurrent">@sort.Label()</a>
+                            }
+                            else
+                            {
+                                <a href="@Url.Listing(listing.CategorySlug, sort)" class="@SortLink">@sort.Label()</a>
+                            }
+                        </li>
+                    }
+                </ul>
+            </div>
+            @if (listing.Total == 0)
+            {
+                <p class="mt-8 rounded-2xl border border-dashed border-stone-300 p-12 text-center text-stone-500">No products in this category yet.</p>
+            }
+            else
+            {
+                <div class="mt-8 grid grid-cols-2 gap-x-6 gap-y-10 md:grid-cols-3 xl:grid-cols-4">
+                    @foreach (var product in listing.Products)
+                    {
+                        <partial name="_ProductCard" model="product" />
+                    }
+                </div>
+            }
+            @if (listing.PageCount > 1)
+            {
+                <partial name="_Pagination" model="listing" />
+            }
+        </div>
+    </div>
+</div>

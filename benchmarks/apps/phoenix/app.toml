@@ -1,0 +1,37 @@
+id = "phoenix"
+name = "Phoenix"
+language = "Elixir"
+kind = "elixir"
+rendering = "ssr"
+description = "Phoenix controllers with HEEx templates and function components on Bandit, run as a mix release, with a small esbuild-bundled JS file for the two interactive pieces."
+requires = ["mix", "elixir", "erl", "rebar3"]
+version_command = """awk -F'"' '/^  "(phoenix|phoenix_live_view|bandit)": /{printf "%s %s ", $2, $4}' mix.lock"""
+# The self-contained release, including ERTS and the digested assets.
+artifacts = ["_build/prod/rel/harbor"]
+
+[build]
+# The tailwind and esbuild hex packages download their pinned CLIs (Tailwind 4.3.3, the
+# shell's version, and esbuild 0.25.4) into `_build` on first use.
+commands = [
+  "mix local.hex --force --if-missing",
+  "mix deps.get --only prod --check-locked",
+  "mix compile",
+  "mix phx.digest.clean --all",
+  "mix assets.deploy",
+  "mix release --overwrite",
+]
+# Mix and Hex homes stay inside the app directory. Rebar3 dependencies are compiled with the
+# shell's `rebar3` instead of one installed into MIX_HOME.
+env = { MIX_ENV = "prod", MIX_HOME = ".mix", HEX_HOME = ".hex", MIX_REBAR3 = "rebar3" }
+
+[run]
+# `rel/env.sh.eex` maps BENCH_THREADS to scheduler flags; runtime.exs reads PORT,
+# BENCH_DATA_DIR and BENCH_COMPRESSION.
+command = "_build/prod/rel/harbor/bin/harbor start"
+# SECRET_KEY_BASE is a fixed dummy value: the app signs nothing a benchmark relies on.
+env = { PHX_SERVER = "true", SECRET_KEY_BASE = "harbor-market-benchmark-dummy-secret-key-base-not-for-production-use-0123456789" }
+ready_timeout_secs = 60
+stop_timeout_secs = 10
+
+[client]
+extra_assets = []

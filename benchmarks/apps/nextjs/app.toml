@@ -1,0 +1,30 @@
+id = "nextjs"
+name = "Next.js"
+language = "TypeScript"
+kind = "node"
+rendering = "rsc+hydration"
+description = "Next.js App Router with React Server Components, standalone output on Node.js with one process per core, client components for the menu toggle and the quantity stepper."
+requires = ["node", "pnpm"]
+version_command = "node -p \"'next ' + require('next/package.json').version + ', react ' + require('react/package.json').version + ', node ' + process.version\""
+# The self-contained server, including the traced `node_modules` and the static assets.
+artifacts = [".next/standalone"]
+
+[build]
+# `next.config.ts` reads `BENCH_COMPRESSION`, which the runner also sets for builds.
+# The standalone server serves `.next/static` once it is copied next to it.
+commands = [
+  "pnpm install --frozen-lockfile",
+  "pnpm build",
+  "cp -R .next/static .next/standalone/.next/",
+]
+env = { NEXT_TELEMETRY_DISABLED = "1" }
+
+[run]
+# Starts `.next/standalone/server.js` in one worker process per `BENCH_THREADS`.
+command = "node server.mjs"
+env = { NEXT_TELEMETRY_DISABLED = "1" }
+ready_timeout_secs = 60
+stop_timeout_secs = 10
+
+[client]
+extra_assets = []

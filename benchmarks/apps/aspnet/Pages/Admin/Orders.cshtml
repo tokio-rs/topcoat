@@ -1,0 +1,81 @@
+@page "/admin/orders"
+@inject Store Store
+@functions {
+    private static readonly string[] Columns = ["Order", "Placed", "Customer", "Email", "Country", "Items", "Status", "Total"];
+
+    // The status badge is a Razor templated method rather than a tag helper: it renders 500 times per
+    // request, and as a tag helper it took about a quarter of this page's rendering time.
+    private void StatusBadge(OrderStatus status)
+    {
+        var (label, colors) = status switch
+        {
+            OrderStatus.Pending => ("Pending", "bg-amber-50 text-amber-800 ring-amber-600/20"),
+            OrderStatus.Paid => ("Paid", "bg-sky-50 text-sky-800 ring-sky-600/20"),
+            OrderStatus.Shipped => ("Shipped", "bg-indigo-50 text-indigo-700 ring-indigo-600/20"),
+            OrderStatus.Delivered => ("Delivered", "bg-emerald-50 text-emerald-800 ring-emerald-600/20"),
+            OrderStatus.Refunded => ("Refunded", "bg-stone-100 text-stone-700 ring-stone-500/20"),
+            _ => ("Cancelled", "bg-rose-50 text-rose-700 ring-rose-600/20"),
+        };
+        <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset @colors">@label</span>
+    }
+}
+@{
+    ViewData["Title"] = "Orders";
+    var summary = Store.OrderSummary;
+    var stats = new (string Label, string Value, string Note)[]
+    {
+        ("Orders", Format.Count(summary.Count), "All time"),
+        ("Revenue", Format.Money(summary.RevenueCents), "Paid, shipped and delivered"),
+        ("Average order", Format.Money(summary.AverageCents), "Across revenue orders"),
+        ("Refunded", Format.Money(summary.RefundedCents), "Returned to customers"),
+    };
+}
+<div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+    <p class="text-sm font-semibold uppercase tracking-widest text-teal-700">Admin</p>
+    <h1 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Orders</h1>
+    <p class="mt-2 text-stone-600">All @Format.Count(summary.Count) orders, newest first.</p>
+    <dl class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        @foreach (var (label, value, note) in stats)
+        {
+            <div class="rounded-2xl border border-stone-200 bg-white p-5">
+                <dt class="text-sm font-medium text-stone-500">@label</dt>
+                <dd class="mt-2 text-2xl font-semibold tracking-tight text-stone-900">@value</dd>
+                <dd class="mt-1 text-xs text-stone-500">@note</dd>
+            </div>
+        }
+    </dl>
+    <div class="mt-8 overflow-x-auto rounded-2xl border border-stone-200 bg-white">
+        <table class="min-w-full whitespace-nowrap text-left text-sm">
+            <thead class="border-b border-stone-200 bg-stone-50 text-xs font-semibold uppercase tracking-wide text-stone-500">
+                <tr>
+                    @foreach (var column in Columns)
+                    {
+                        if (column is "Items" or "Total")
+                        {
+                            <th scope="col" class="px-4 py-3 text-right">@column</th>
+                        }
+                        else
+                        {
+                            <th scope="col" class="px-4 py-3">@column</th>
+                        }
+                    }
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-stone-100 text-stone-600">
+                @foreach (var order in Store.Orders)
+                {
+                    <tr class="hover:bg-stone-50">
+                        <td class="px-4 py-3 font-medium text-stone-900">@order.Number</td>
+                        <td class="px-4 py-3"><time datetime="@Format.IsoDateTime(order.PlacedAt)">@Format.DateTime(order.PlacedAt)</time></td>
+                        <td class="px-4 py-3 text-stone-900">@order.Customer</td>
+                        <td class="px-4 py-3 text-stone-500">@order.Email</td>
+                        <td class="px-4 py-3">@order.Country</td>
+                        <td class="px-4 py-3 text-right tabular-nums">@order.Items</td>
+                        <td class="px-4 py-3">@{ StatusBadge(order.Status); }</td>
+                        <td class="px-4 py-3 text-right font-medium tabular-nums text-stone-900">@Format.Money(order.TotalCents)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

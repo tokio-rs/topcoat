@@ -1,0 +1,64 @@
+{% extends "store/base.html" %}
+{% load storefront %}
+
+{% block title %}Orders | {% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+  <p class="text-sm font-semibold uppercase tracking-widest text-teal-700">Admin</p>
+  <h1 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Orders</h1>
+  <p class="mt-2 text-stone-600">All {{ summary.count|count }} orders, newest first.</p>
+  <dl class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="rounded-2xl border border-stone-200 bg-white p-5">
+      <dt class="text-sm font-medium text-stone-500">Orders</dt>
+      <dd class="mt-2 text-2xl font-semibold tracking-tight text-stone-900">{{ summary.count|count }}</dd>
+      <dd class="mt-1 text-xs text-stone-500">All time</dd>
+    </div>
+    <div class="rounded-2xl border border-stone-200 bg-white p-5">
+      <dt class="text-sm font-medium text-stone-500">Revenue</dt>
+      <dd class="mt-2 text-2xl font-semibold tracking-tight text-stone-900">{{ summary.revenue_cents|money }}</dd>
+      <dd class="mt-1 text-xs text-stone-500">Paid, shipped and delivered</dd>
+    </div>
+    <div class="rounded-2xl border border-stone-200 bg-white p-5">
+      <dt class="text-sm font-medium text-stone-500">Average order</dt>
+      <dd class="mt-2 text-2xl font-semibold tracking-tight text-stone-900">{{ summary.average_cents|money }}</dd>
+      <dd class="mt-1 text-xs text-stone-500">Across revenue orders</dd>
+    </div>
+    <div class="rounded-2xl border border-stone-200 bg-white p-5">
+      <dt class="text-sm font-medium text-stone-500">Refunded</dt>
+      <dd class="mt-2 text-2xl font-semibold tracking-tight text-stone-900">{{ summary.refunded_cents|money }}</dd>
+      <dd class="mt-1 text-xs text-stone-500">Returned to customers</dd>
+    </div>
+  </dl>
+  <div class="mt-8 overflow-x-auto rounded-2xl border border-stone-200 bg-white">
+    <table class="min-w-full whitespace-nowrap text-left text-sm">
+      <thead class="border-b border-stone-200 bg-stone-50 text-xs font-semibold uppercase tracking-wide text-stone-500">
+        <tr>
+          <th scope="col" class="px-4 py-3">Order</th>
+          <th scope="col" class="px-4 py-3">Placed</th>
+          <th scope="col" class="px-4 py-3">Customer</th>
+          <th scope="col" class="px-4 py-3">Email</th>
+          <th scope="col" class="px-4 py-3">Country</th>
+          <th scope="col" class="px-4 py-3 text-right">Items</th>
+          <th scope="col" class="px-4 py-3">Status</th>
+          <th scope="col" class="px-4 py-3 text-right">Total</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100 text-stone-600">
+        {% for order in orders %}
+        <tr class="hover:bg-stone-50">
+          <td class="px-4 py-3 font-medium text-stone-900">{{ order.number }}</td>
+          <td class="px-4 py-3"><time datetime="{{ order.placed_at|date:'Y-m-d\TH:i\Z' }}">{{ order.placed_at|date:"M j, Y H:i" }}</time></td>
+          <td class="px-4 py-3 text-stone-900">{{ order.customer }}</td>
+          <td class="px-4 py-3 text-stone-500">{{ order.email }}</td>
+          <td class="px-4 py-3">{{ order.country }}</td>
+          <td class="px-4 py-3 text-right tabular-nums">{{ order.items }}</td>
+          <td class="px-4 py-3">{% status_badge order.status %}</td>
+          <td class="px-4 py-3 text-right font-medium tabular-nums text-stone-900">{{ order.total_cents|money }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,32 @@
+<%# locals: (listing:) -%>
+<%
+  step = "flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
+  step_disabled = "flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-stone-300"
+  page_link = "flex size-10 items-center justify-center rounded-full text-sm font-medium text-stone-600 hover:bg-stone-100"
+  page_current = "flex size-10 items-center justify-center rounded-full bg-stone-900 text-sm font-semibold text-white"
+  page_path = ->(page) { listing_path(category: listing.category, sort: listing.sort, page:) }
+%>
+<nav aria-label="Pagination" class="mt-12 flex items-center justify-between gap-4 border-t border-stone-200 pt-6">
+  <% if listing.page > 1 %>
+    <%= link_to page_path.(listing.page - 1), class: step do %><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="size-4"><path d="M19 12H5m6-6-6 6 6 6"></path></svg>Previous<% end %>
+  <% else %>
+    <span aria-disabled="true" class="<%= step_disabled %>"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="size-4"><path d="M19 12H5m6-6-6 6 6 6"></path></svg>Previous</span>
+  <% end %>
+  <p class="text-sm text-stone-600 sm:hidden">Page <%= listing.page %> of <%= listing.page_count %></p>
+  <ul class="hidden items-center gap-1 sm:flex">
+    <% 1.upto(listing.page_count) do |page| %>
+      <li>
+        <% if page == listing.page %>
+          <%= link_to page, page_path.(page), aria: { current: "page" }, class: page_current %>
+        <% else %>
+          <%= link_to page, page_path.(page), class: page_link %>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
+  <% if listing.page < listing.page_count %>
+    <%= link_to page_path.(listing.page + 1), class: step do %>Next<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="size-4"><path d="M5 12h14m-6-6 6 6-6 6"></path></svg><% end %>
+  <% else %>
+    <span aria-disabled="true" class="<%= step_disabled %>">Next<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="size-4"><path d="M5 12h14m-6-6 6 6-6 6"></path></svg></span>
+  <% end %>
+</nav>

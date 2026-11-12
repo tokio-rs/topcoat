@@ -1,0 +1,24 @@
+id = "leptos"
+name = "Leptos"
+language = "Rust"
+kind = "rust"
+rendering = "ssr+hydration"
+description = "Leptos with leptos_axum: SSR with SsrMode::Async on the data pages (server functions as resources), whole-app hydration of a WebAssembly bundle with leptos_router, plain Axum JSON routes."
+requires = ["cargo", "cargo-leptos", "wasm-bindgen", "wasm-opt", "tailwindcss"]
+version_command = "cargo tree --invert leptos --edges normal --depth 0 --prefix none"
+artifacts = ["target/{profile}/harbor-leptos", "target/site"]
+
+[build]
+# cargo-leptos builds the server with the `benchmark` profile (`bin-profile-release`) and the
+# WebAssembly bundle with `wasm-release` (`lib-profile-release`). It runs wasm-bindgen, wasm-opt
+# and tailwindcss from PATH.
+commands = ["cargo leptos build --release --cargo-locked {features}"]
+
+[run]
+command = "target/{profile}/harbor-leptos"
+# The runtime configuration cargo-leptos would set, as the Leptos deployment guide describes.
+env = { LEPTOS_OUTPUT_NAME = "harbor-leptos", LEPTOS_SITE_ROOT = "target/site", LEPTOS_SITE_PKG_DIR = "pkg", LEPTOS_ENV = "PROD" }
+ready_timeout_secs = 60
+
+[client]
+extra_assets = []

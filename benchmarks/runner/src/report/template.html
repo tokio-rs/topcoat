@@ -1,0 +1,1068 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Web Framework Benchmark</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-2: #f3f3f0;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
+  --q1: #86b6ef; --q2: #3987e5; --q3: #1c5cab; --q4: #0d366b;
+  --critical: #d03b3b;
+  --critical-ink: #b42f2f;
+  --warning: #fab219;
+  --highlight: rgba(42, 120, 214, 0.07);
+  --heat-0: #f3f3f0;
+  --heat-1: #cde2fb; --heat-2: #9ec5f4; --heat-3: #6da7ec; --heat-4: #3987e5; --heat-5: #256abf; --heat-6: #184f95;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+    --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+    --q1: #184f95; --q2: #2a78d6; --q3: #6da7ec; --q4: #cde2fb;
+    --critical: #d03b3b; --critical-ink: #e66767;
+    --highlight: rgba(57, 135, 229, 0.12);
+    --heat-0: #232321;
+    --heat-1: #104281; --heat-2: #184f95; --heat-3: #1c5cab; --heat-4: #256abf; --heat-5: #2a78d6; --heat-6: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+  --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+  --q1: #184f95; --q2: #2a78d6; --q3: #6da7ec; --q4: #cde2fb;
+  --critical: #d03b3b; --critical-ink: #e66767;
+  --highlight: rgba(57, 135, 229, 0.12);
+  --heat-0: #232321;
+  --heat-1: #104281; --heat-2: #184f95; --heat-3: #1c5cab; --heat-4: #256abf; --heat-5: #2a78d6; --heat-6: #3987e5;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--page); color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+a { color: inherit; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+header.top { padding: 40px 0 16px; }
+header.top h1 { font-size: 28px; line-height: 1.2; margin: 0 0 6px; font-weight: 650; letter-spacing: -0.01em; }
+.sub { color: var(--ink-2); margin: 0; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 18px; color: var(--muted); font-size: 13px; margin-top: 10px; }
+.bar-row-controls, .filters {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+}
+.filters {
+  position: sticky; top: 0; z-index: 5; background: var(--page);
+  border-bottom: 1px solid var(--border); padding: 10px 0; margin-bottom: 8px;
+}
+.filters .spacer { flex: 1; }
+.filters nav { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 13px; }
+.filters nav a { color: var(--ink-2); text-decoration: none; }
+.filters nav a:hover { color: var(--ink); text-decoration: underline; }
+label.ctl { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); }
+select, button.seg, button.theme {
+  font: inherit; font-size: 13px; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px;
+}
+select:focus-visible, button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; }
+.segs { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.segs button.seg { border: 0; border-radius: 0; background: var(--surface); cursor: pointer; padding: 4px 10px; }
+.segs button.seg + button.seg { border-left: 1px solid var(--border); }
+.segs button.seg[aria-pressed="true"] { background: var(--surface-2); font-weight: 600; }
+button.theme { cursor: pointer; }
+section { padding: 28px 0 8px; }
+section > h2 { font-size: 20px; margin: 0 0 4px; font-weight: 650; }
+section > p.lede { color: var(--ink-2); margin: 0 0 16px; max-width: 760px; }
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 16px 16px 12px; margin-bottom: 16px;
+}
+.card h3 { font-size: 15px; margin: 0; font-weight: 600; }
+.card .note { color: var(--muted); font-size: 13px; margin: 2px 0 12px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: 16px; }
+.grid2 > .card { margin-bottom: 0; }
+.banner { border-radius: 10px; padding: 10px 14px; margin: 8px 0; border: 1px solid var(--border); background: var(--surface); }
+.banner strong { margin-right: 6px; }
+.banner.critical { border-left: 4px solid var(--critical); }
+.banner.warning { border-left: 4px solid var(--warning); }
+
+/* Legends */
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); margin: 0 0 10px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.key { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: none; }
+.key.dot { border-radius: 50%; }
+
+/* App labels */
+.app { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.app .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app.topcoat .name { font-weight: 700; }
+.badge {
+  font-size: 11px; line-height: 16px; padding: 0 5px; border-radius: 4px; white-space: nowrap;
+  color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--border);
+}
+
+/* Horizontal bar charts */
+.chart { position: relative; }
+.rows { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr) max-content; column-gap: 0; row-gap: 0; align-items: center; }
+.rows .val { min-width: 68px; padding: 0 2px 0 12px; align-self: stretch; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; }
+.rows .lab { padding-right: 12px; }
+.rows .axis-cell { align-self: start; }
+.rows .lab { padding: 5px 0; min-width: 0; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.rows .lab .badge { flex: none; }
+.rows .val { font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+.rows .val.bad { color: var(--critical-ink); }
+.rows .track { position: relative; height: 26px; }
+.rows .hl { background: var(--highlight); }
+.rows .gridline { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--grid); }
+.rows .bar {
+  position: absolute; left: 0; top: 50%; height: 16px; margin-top: -8px;
+  border-radius: 0 4px 4px 0; min-width: 2px; cursor: default;
+}
+.rows .bar:hover, .rows .bar:focus-visible { filter: brightness(1.12); }
+.rows .range { position: absolute; top: 50%; height: 1px; background: var(--ink-2); }
+.rows .range::before, .rows .range::after { content: ""; position: absolute; top: -4px; width: 1px; height: 9px; background: var(--ink-2); }
+.rows .range::before { left: 0; } .rows .range::after { right: 0; }
+.rows .msg { position: absolute; left: 0; top: 50%; transform: translateY(-50%); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.rows .msg.bad { color: var(--critical-ink); }
+.rows .msg.muted { color: var(--muted); }
+.rows .msg.limit { color: var(--ink-2); }
+.rows .val .sub { font-size: 11px; color: var(--muted); margin-left: 4px; }
+.rows .val.inline { flex-direction: row; align-items: baseline; justify-content: flex-end; }
+td.limit { color: var(--ink-2); font-weight: 600; }
+.axis { position: relative; height: 18px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.axis span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.axis span.first { transform: none; }
+.axis span.last { transform: translateX(-100%); }
+.axis-title { font-size: 11px; color: var(--muted); text-align: right; padding-left: 12px; }
+.seg-bar { position: absolute; top: 50%; height: 16px; margin-top: -8px; }
+.seg-bar:last-child { border-radius: 0 4px 4px 0; }
+.dotline { position: absolute; top: 50%; height: 2px; margin-top: -1px; background: var(--axis); }
+.pdot {
+  position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.rows .hl .pdot { box-shadow: 0 0 0 2px var(--surface); }
+
+/* Overview heat table and data table */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 6px 8px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--grid); }
+th { color: var(--ink-2); font-weight: 600; font-size: 12px; position: sticky; top: 0; background: var(--surface); }
+th:first-child, td:first-child { text-align: left; }
+td { font-variant-numeric: tabular-nums; }
+tr.hl td { background: var(--highlight); }
+td.heat { border: 2px solid var(--surface); border-radius: 6px; }
+td.bad { color: var(--critical-ink); font-weight: 600; }
+td.muted, span.muted { color: var(--muted); }
+table.sortable th { cursor: pointer; user-select: none; }
+table.sortable th[aria-sort="ascending"]::after { content: " \2191"; }
+table.sortable th[aria-sort="descending"]::after { content: " \2193"; }
+.table-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
+.table-tools input { font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--ink); min-width: 220px; }
+.data-scroll { max-height: 560px; overflow: auto; }
+
+dl.kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0; font-size: 13px; }
+dl.kv dt { color: var(--ink-2); }
+dl.kv dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.prose { max-width: 760px; }
+.prose h3 { font-size: 16px; margin: 20px 0 4px; }
+.prose p, .prose li { color: var(--ink); }
+.prose ul { padding-left: 20px; }
+code { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface-2); padding: 1px 4px; border-radius: 4px; }
+details.assets { margin-top: 10px; font-size: 13px; }
+details.assets summary { cursor: pointer; color: var(--ink-2); }
+footer { color: var(--muted); font-size: 12px; padding: 32px 0 48px; }
+
+#tip {
+  position: fixed; z-index: 20; pointer-events: none; max-width: 340px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.45;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14); display: none;
+}
+#tip .tv { font-size: 14px; font-weight: 650; }
+#tip .tl { color: var(--ink-2); }
+#tip .tr { display: flex; justify-content: space-between; gap: 14px; }
+#tip .tr b { font-weight: 600; font-variant-numeric: tabular-nums; }
+#tip .lk { display: inline-block; width: 10px; height: 2px; vertical-align: middle; margin-right: 6px; }
+@media (max-width: 640px) {
+  header.top h1 { font-size: 22px; }
+  .rows .lab .name { max-width: 30vw; }
+  .rows .lab .badge { display: none; }
+  .filters nav { display: none; }
+}
+@media print {
+  .filters { position: static; }
+  #tip { display: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Web framework benchmark</h1>
+    <p class="sub" id="subtitle"></p>
+    <div class="meta" id="meta"></div>
+  </header>
+  <div class="filters" role="toolbar" aria-label="Report filters">
+    <label class="ctl">Scenario <select id="f-scenario"></select></label>
+    <label class="ctl" id="f-conn-wrap">Connections <select id="f-conn"></select></label>
+    <span class="spacer"></span>
+    <nav aria-label="Sections">
+      <a href="#overview">Overview</a><a href="#throughput">Throughput</a><a href="#latency">Latency</a>
+      <a href="#memory">Memory</a><a href="#cpu">CPU</a><a href="#startup">Startup</a>
+      <a href="#payload">Payload</a><a href="#data">Data</a><a href="#setup">Setup</a><a href="#method">Method</a>
+    </nav>
+    <button class="theme" id="theme" type="button" aria-label="Toggle color theme">Theme</button>
+  </div>
+  <div id="banners"></div>
+
+  <section id="overview">
+    <h2>Overview</h2>
+    <p class="lede">Requests per second for every app and scenario at the selected connection count. Shading shows each value relative to the fastest valid app in that scenario. Hydrating frameworks render extra markup and ship a client runtime; the rendering model is shown next to every name, and the payload section shows what that costs the browser.</p>
+    <div class="card"><div class="legend" id="ov-legend"></div><div class="table-wrap" id="ov-table"></div></div>
+  </section>
+
+  <section id="throughput">
+    <h2>Throughput</h2>
+    <p class="lede">Closed-loop load: every connection sends its next request as soon as the previous response arrives. Bars show the median run; whiskers show the range over runs. Measurements with failed requests are not drawn.</p>
+    <div class="card"><h3 id="tp-title"></h3><p class="note" id="tp-note"></p><div class="legend rendering-legend"></div><div id="tp-chart"></div></div>
+    <div class="card" id="tp-conn-card"><h3>Scaling with connections</h3><p class="note">Requests per second of the selected scenario at every measured connection count.</p><div id="tp-conn"></div></div>
+  </section>
+
+  <section id="latency">
+    <h2>Latency</h2>
+    <p class="lede" id="lat-lede"></p>
+    <div class="card"><h3 id="lat-title"></h3><p class="note" id="lat-note"></p>
+      <div class="bar-row-controls" style="margin-bottom:10px"><div class="segs" id="lat-source" role="group" aria-label="Latency source"></div></div>
+      <div class="legend" id="lat-legend"></div><div id="lat-chart"></div></div>
+  </section>
+
+  <section id="memory">
+    <h2>Memory</h2>
+    <p class="lede" id="mem-lede"></p>
+    <div class="grid2">
+      <div class="card"><h3>Idle, after startup</h3><p class="note">Lower is better.</p><div id="mem-idle"></div></div>
+      <div class="card"><h3 id="mem-load-title">Peak under load</h3><p class="note">Lower is better. Mean over the run in the tooltip.</p><div id="mem-load"></div></div>
+    </div>
+  </section>
+
+  <section id="cpu">
+    <h2>CPU efficiency</h2>
+    <p class="lede">Successful requests per CPU-second consumed by the app's whole process tree (user plus system time). This normalizes for how many cores an app used, so multi-process and multi-threaded servers compare fairly.</p>
+    <div class="grid2">
+      <div class="card"><h3 id="cpu-title">Requests per CPU-second</h3><p class="note">Higher is better.</p><div id="cpu-chart"></div></div>
+      <div class="card"><h3 id="cores-title">Cores kept busy</h3><p class="note">Average CPU time per second of wall time during the run. Not better or worse on its own.</p><div id="cores-chart"></div></div>
+    </div>
+  </section>
+
+  <section id="startup">
+    <h2>Startup</h2>
+    <p class="lede">Time from spawning the server process to its first successful <code>GET /health</code>. Every app loads and indexes the dataset before it answers.</p>
+    <div class="card"><h3>Startup time</h3><p class="note">Lower is better.</p><div id="startup-chart"></div></div>
+  </section>
+
+  <section id="payload">
+    <h2>Client payload</h2>
+    <p class="lede">What a browser downloads to show the page: the HTML document plus the scripts, WebAssembly, stylesheets and preloads it references. All responses were fetched uncompressed and compressed by the runner with the same settings (gzip level 9, brotli quality 11), so apps are compared on content, not on server configuration.</p>
+    <div class="card">
+      <div class="bar-row-controls" style="margin-bottom:10px">
+        <div class="segs" id="pl-page" role="group" aria-label="Page"></div>
+        <div class="segs" id="pl-enc" role="group" aria-label="Compression"></div>
+      </div>
+      <div class="legend" id="pl-legend"></div>
+      <div id="pl-chart"></div>
+      <details class="assets"><summary>Every asset</summary><div class="table-wrap" id="pl-assets"></div></details>
+    </div>
+  </section>
+
+  <section id="data">
+    <h2>All measurements</h2>
+    <p class="lede">Every measured point. Click a column to sort. Open-loop latency phases appear as their own rows.</p>
+    <div class="card">
+      <div class="table-tools"><input id="dt-filter" type="search" placeholder="Filter by app or scenario" aria-label="Filter rows"><span class="muted" id="dt-count"></span></div>
+      <div class="table-wrap data-scroll" id="dt"></div>
+    </div>
+  </section>
+
+  <section id="setup">
+    <h2>Setup</h2>
+    <div class="grid2">
+      <div class="card"><h3>Configuration</h3><p class="note">As resolved from <code>bench.toml</code>, the profile and command line flags.</p><dl class="kv" id="cfg"></dl></div>
+      <div class="card"><h3>Environment</h3><p class="note">The load generator ran on the same machine as each app.</p><dl class="kv" id="env"></dl></div>
+    </div>
+    <div class="card" style="margin-top:16px"><h3>Apps</h3><p class="note">Framework versions from each manifest's <code>version_command</code>.</p><div class="table-wrap" id="apps"></div></div>
+  </section>
+
+  <section id="method" class="prose">
+    <h2>Methodology and caveats</h2>
+    <h3>What is measured</h3>
+    <ul>
+      <li>Every app implements the same storefront from <code>benchmarks/SPEC.md</code> and passes <code>verify</code>, which compares visible text, element counts and JSON with the reference app.</li>
+      <li>Apps run one at a time on a free port, in their own process group, with the same environment. Each scenario gets a warmup, then the measured runs. With several runs the median by throughput is shown.</li>
+      <li>Load comes from <code>oha</code> over HTTP/1.1 keep-alive connections. Every request carries a <code>cart_count</code> cookie. The detail scenarios rotate over every product id; the cart scenario rotates over valid request bodies.</li>
+      <li>Any non-2xx/3xx response, connection error or timeout marks the whole measurement invalid. Invalid measurements are listed but never drawn as bars, so an app that answers errors quickly cannot look fast.</li>
+      <li>Memory is sampled from the app's whole process tree, so forked workers count. On Linux it is the proportional set size, which splits shared pages between processes; on macOS it is the resident set size, which counts shared pages once per process and so overstates multi-process servers.</li>
+      <li>CPU time is the user plus system time of the whole process tree during the measured run. Requests per CPU-second divides successful requests by it.</li>
+      <li>With a thread limit (<code>BENCH_THREADS=N</code>), apps are pinned to N CPUs on Linux. On every platform a measurement whose process tree kept materially more than N cores busy is flagged as exceeding the thread limit and is not compared.</li>
+      <li>With compression on, requests send the <code>Accept-Encoding</code> of a current browser, so these runs compare each framework's default compression algorithm and level. The negotiated <code>Content-Encoding</code> is recorded per scenario and shown next to each figure.</li>
+      <li>The latency phase, when enabled, is open-loop: requests are sent at a fixed rate and latency is measured from when each request was scheduled, which corrects for coordinated omission. In relative mode the rate is a fraction of each app's own measured throughput; in fixed mode it is the same for every app.</li>
+    </ul>
+    <h3>What is not measured</h3>
+    <ul>
+      <li>No database: the data layer is in memory by design, so the numbers show the cost of routing, rendering and serialization, not of I/O. Real applications usually spend much of their time elsewhere.</li>
+      <li>No TLS, no HTTP/2, no reverse proxy, no network latency. Compression is only on when the configuration says so.</li>
+      <li>Browser-side cost: hydration time, time to interactive and memory in the browser are not measured. The payload section shows bytes only.</li>
+    </ul>
+    <h3>Caveats</h3>
+    <ul>
+      <li>The frameworks differ in kind. Next.js, Leptos and Dioxus render on the server and then hydrate a client runtime: the server does extra work to serialize state and emit hydration markers, and the browser downloads a JavaScript or WebAssembly bundle. Leptos islands hydrates only the interactive parts and ships less. Topcoat, Axum with Maud, Rails, Django, Phoenix, ASP.NET Core and Go with templ render on the server and ship small or no client runtimes. Server throughput alone does not capture this trade-off; read it together with the client payload.</li>
+      <li>The load generator shares the machine with the server and competes with it for CPU. Very fast servers are partly limited by the load generator, so differences at the top end are compressed.</li>
+      <li>Results depend on the machine, the operating system and its scheduler, thermal state and background load. Compare numbers from the same run only.</li>
+      <li>Short profiles (such as <code>quick</code>) are for smoke testing. JIT-compiled runtimes need longer warmups than they provide.</li>
+    </ul>
+  </section>
+  <footer id="foot"></footer>
+</div>
+<div id="tip" role="tooltip"></div>
+<script>
+"use strict";
+const DATA = /*BENCH_DATA*/null;
+
+(function () {
+  if (!DATA) { document.body.textContent = "No data."; return; }
+
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  function el(tag, attrs, ...children) {
+    const node = document.createElement(tag);
+    if (attrs) for (const [k, v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
+      if (k === "class") node.className = v;
+      else if (k === "style") node.setAttribute("style", v);
+      else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+      else node.setAttribute(k, v === true ? "" : v);
+    }
+    for (const child of children.flat()) {
+      if (child == null || child === false) continue;
+      node.append(child instanceof Node ? child : document.createTextNode(String(child)));
+    }
+    return node;
+  }
+  const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+  const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+  const fmtInt = (v) => v == null ? "-" : nf0.format(v);
+  function fmtCompact(v) {
+    if (v == null || !isFinite(v)) return "-";
+    const a = Math.abs(v);
+    if (a >= 1e6) return nf1.format(v / 1e6) + "M";
+    if (a >= 1e4) return nf1.format(v / 1e3) + "K";
+    if (a >= 100) return nf0.format(v);
+    return nf1.format(v);
+  }
+  function fmtBytes(v) {
+    if (v == null) return "-";
+    const units = ["B", "KiB", "MiB", "GiB"];
+    let i = 0, x = v;
+    while (x >= 1024 && i < units.length - 1) { x /= 1024; i++; }
+    return i === 0 ? x + " B" : (x >= 100 ? nf0.format(x) : nf1.format(x)) + " " + units[i];
+  }
+  function fmtMs(v) {
+    if (v == null || !isFinite(v)) return "-";
+    if (v < 1) return v.toFixed(3) + " ms";
+    if (v < 10) return v.toFixed(2) + " ms";
+    if (v < 1000) return v.toFixed(1) + " ms";
+    return (v / 1000).toFixed(2) + " s";
+  }
+  const pct = (v) => v == null ? "-" : nf0.format(v * 100) + "%";
+
+  const cfg = DATA.config;
+  const apps = DATA.apps;
+  const scenarios = DATA.scenarios;
+  const appById = new Map(apps.map((a) => [a.id, a]));
+  const RENDERING = [
+    { id: "ssr", label: "ssr", color: "var(--s1)", text: "Server-rendered, small or no client runtime" },
+    { id: "ssr+hydration", label: "ssr+hydration", color: "var(--s2)", text: "Server-rendered, then hydrated by a client runtime" },
+    { id: "islands", label: "islands", color: "var(--s3)", text: "Server-rendered, interactive islands hydrate" },
+    { id: "rsc+hydration", label: "rsc+hydration", color: "var(--s4)", text: "React Server Components with client hydration" },
+  ];
+  const renderingColor = (r) => (RENDERING.find((x) => x.id === r) || RENDERING[0]).color;
+  const isTopcoat = (app) => app.id === "topcoat";
+  const measured = apps.filter((a) => a.startup_ms != null || (a.scenarios && a.scenarios.length));
+
+  const state = {
+    scenario: scenarios.length ? scenarios[0].id : null,
+    conn: cfg.connections[0],
+    latSource: "closed",
+    plPage: "home",
+    plEnc: "brotli",
+  };
+
+  function throughputOf(app, scenarioId, conn) {
+    const s = (app.scenarios || []).find((x) => x.id === scenarioId);
+    if (!s) return null;
+    return s.throughput.find((t) => t.connections === conn) || null;
+  }
+  const medianOf = (t) => t && t.median_index != null ? t.runs[t.median_index] : null;
+  function latencyPhaseOf(app, scenarioId) {
+    const s = (app.scenarios || []).find((x) => x.id === scenarioId);
+    return s ? s.latency : null;
+  }
+  function problemsOf(t) {
+    const out = [];
+    for (const r of t.runs) for (const p of r.problems) if (!out.includes(p)) out.push(p);
+    return out;
+  }
+  const scenarioTitle = (id) => (scenarios.find((s) => s.id === id) || { title: id }).title;
+
+  function appLabel(app, opts) {
+    const node = el("span", { class: "app" + (isTopcoat(app) ? " topcoat" : "") },
+      el("span", { class: "key", style: "background:" + renderingColor(app.rendering), "aria-hidden": "true" }),
+      el("span", { class: "name", title: app.name }, app.name));
+    if (!opts || opts.badge !== false) node.append(el("span", { class: "badge" }, app.rendering));
+    return node;
+  }
+
+  // ---------- tooltip ----------
+  const tip = $("tip");
+  const tips = new WeakMap();
+  function attachTip(node, build) {
+    tips.set(node, build);
+    node.setAttribute("tabindex", "0");
+    node.addEventListener("focus", () => showTip(node, null));
+    node.addEventListener("blur", hideTip);
+  }
+  function showTip(node, event) {
+    const build = tips.get(node);
+    if (!build) return;
+    tip.replaceChildren(...build());
+    tip.style.display = "block";
+    const r = tip.getBoundingClientRect();
+    let x, y;
+    if (event) { x = event.clientX + 14; y = event.clientY + 14; }
+    else { const b = node.getBoundingClientRect(); x = b.left; y = b.bottom + 8; }
+    if (x + r.width > window.innerWidth - 8) x = Math.max(8, window.innerWidth - r.width - 8);
+    if (y + r.height > window.innerHeight - 8) y = Math.max(8, y - r.height - 28);
+    tip.style.left = x + "px"; tip.style.top = y + "px";
+  }
+  function hideTip() { tip.style.display = "none"; }
+  document.addEventListener("pointermove", (e) => {
+    let n = e.target;
+    while (n && n !== document.body && !tips.has(n)) n = n.parentNode;
+    if (n && tips.has(n)) showTip(n, e); else hideTip();
+  });
+  function tipRows(title, value, rows) {
+    const out = [];
+    if (value != null) out.push(el("div", { class: "tv" }, value));
+    if (title) out.push(el("div", { class: "tl" }, title));
+    for (const [k, v, color] of rows || []) {
+      out.push(el("div", { class: "tr" },
+        el("span", { class: "tl" }, color ? el("span", { class: "lk", style: "background:" + color }) : null, k),
+        el("b", null, v)));
+    }
+    return out;
+  }
+
+  // ---------- scales ----------
+  function niceTicks(max, count) {
+    if (!(max > 0)) return [0, 1];
+    const raw = max / (count || 4);
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw) || raw;
+    const ticks = [];
+    for (let v = 0; v <= max + step * 0.001; v += step) ticks.push(+v.toPrecision(12));
+    if (ticks[ticks.length - 1] < max) ticks.push(+(ticks[ticks.length - 1] + step).toPrecision(12));
+    return ticks;
+  }
+  function logTicks(min, max) {
+    const lo = Math.floor(Math.log10(min)), hi = Math.ceil(Math.log10(max));
+    const ticks = [];
+    for (let e = lo; e <= hi; e++) ticks.push(Math.pow(10, e));
+    return ticks;
+  }
+
+  // Appends the tick labels as the last row of a `.rows` grid.
+  function axisRow(grid, ticks, x, format, unit) {
+    const axis = el("div", { class: "axis axis-cell" });
+    ticks.forEach((t, i) => axis.append(el("span", { class: i === 0 ? "first" : i === ticks.length - 1 ? "last" : null, style: "left:" + x(t) }, t === 0 ? "0" : format(t))));
+    grid.append(el("div"), axis, el("div", { class: "axis-title axis-cell" }, unit || ""));
+  }
+  // Ticks at round values of the unit the formatter shows (KiB, MiB, ...) for byte axes.
+  function ticksFor(max, count, bytes) {
+    if (!bytes) return niceTicks(max, count);
+    const unit = Math.pow(1024, Math.max(0, Math.floor(Math.log(Math.max(1, max)) / Math.log(1024))));
+    return niceTicks(max / unit, count).map((t) => t * unit);
+  }
+  const ticksCount = (container) => container.closest(".grid2") ? 3 : 5;
+
+  // ---------- bar chart ----------
+  // rows: { app, value, invalid, missing, range: [min,max], tip: () => nodes, segments: [{value,color,label}] }
+  function barChart(container, rows, opts) {
+    const fmt = opts.format;
+    const better = opts.better || "higher";
+    const valid = rows.filter((r) => !r.invalid && !r.missing && !r.limited && r.value != null);
+    const sorted = valid.slice().sort((a, b) => better === "higher" ? b.value - a.value : a.value - b.value)
+      .concat(rows.filter((r) => !valid.includes(r)));
+    const max = Math.max(1e-9, ...valid.map((r) => Math.max(r.value, r.range ? r.range[1] : 0)));
+    const ticks = ticksFor(max, ticksCount(container), fmt === fmtBytes);
+    const top = ticks[ticks.length - 1];
+    const x = (v) => (100 * v / top) + "%";
+    const grid = el("div", { class: "rows" });
+    for (const row of sorted) {
+      const hl = isTopcoat(row.app) ? " hl" : "";
+      grid.append(el("div", { class: "lab" + hl }, appLabel(row.app)));
+      const track = el("div", { class: "track" + hl });
+      for (const t of ticks) track.append(el("div", { class: "gridline", style: "left:" + x(t), "aria-hidden": "true" }));
+      let valueText;
+      if (row.missing) {
+        track.append(el("div", { class: "msg muted" }, row.missing === true ? "not measured" : row.missing));
+        valueText = el("div", { class: "val" }, el("span", { class: "muted" }, "-"));
+      } else if (row.invalid) {
+        track.append(el("div", { class: "msg bad", title: row.invalid }, "\u26a0 invalid: " + row.invalid));
+        valueText = el("div", { class: "val bad" }, "invalid");
+      } else if (row.limited) {
+        track.append(el("div", { class: "msg limit", title: row.limited }, "\u26a0 " + row.limited));
+        valueText = el("div", { class: "val" }, el("span", { class: "muted", title: "not comparable" }, "n/c"));
+      } else {
+        if (row.segments) {
+          let left = 0;
+          const total = row.segments.reduce((s, x) => s + x.value, 0);
+          const holder = el("div", { class: "bar", style: "left:0;width:" + x(total) + ";background:transparent", "aria-label": row.app.name + " " + fmt(row.value) });
+          row.segments.forEach((seg) => {
+            if (!(seg.value > 0)) return;
+            const w = seg.value / total * 100;
+            holder.append(el("div", { class: "seg-bar", style: `left:${left}%;width:calc(${w}% - 2px);background:${seg.color}` }));
+            left += w;
+          });
+          attachTip(holder, row.tip);
+          track.append(holder);
+        } else {
+          const bar = el("div", { class: "bar", style: `width:${x(row.value)};background:${opts.color ? opts.color(row) : renderingColor(row.app.rendering)}`, "aria-label": row.app.name + " " + fmt(row.value) });
+          if (row.tip) attachTip(bar, row.tip);
+          track.append(bar);
+        }
+        if (row.range && row.range[1] > row.range[0]) {
+          track.append(el("div", { class: "range", style: `left:${x(row.range[0])};width:calc(${x(row.range[1])} - ${x(row.range[0])})`, "aria-hidden": "true" }));
+        }
+        valueText = el("div", { class: row.note ? "val inline" : "val", title: row.note ? "Content-Encoding: " + row.note : null }, fmt(row.value), row.note ? el("span", { class: "sub" }, row.note) : null);
+      }
+      if (hl) valueText.classList.add("hl");
+      grid.append(track, valueText);
+    }
+    axisRow(grid, ticks, x, fmt, opts.unit);
+    container.replaceChildren(el("div", { class: "chart" }, grid));
+    if (!rows.length) container.replaceChildren(el("p", { class: "note" }, "No data."));
+  }
+
+  function renderingLegend(node) {
+    const present = new Set(apps.map((a) => a.rendering));
+    node.replaceChildren(...RENDERING.filter((r) => present.has(r.id)).map((r) =>
+      el("span", { title: r.text }, el("span", { class: "key", style: "background:" + r.color }), r.label)));
+  }
+
+  // ---------- header, banners ----------
+  function renderHeader() {
+    const env = DATA.environment;
+    const started = new Date(DATA.started_at);
+    $("subtitle").textContent = `Harbor Market storefront, ${measured.length} of ${apps.length} apps measured, profile "${cfg.profile}".`;
+    const meta = [
+      started.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }),
+      [env.cpu, env.logical_cores ? env.logical_cores + " cores" : null].filter(Boolean).join(", "),
+      [env.os_version || env.os, env.arch].filter(Boolean).join(" "),
+      env.git_commit ? "commit " + env.git_commit.slice(0, 10) + (env.git_dirty ? " (dirty)" : "") : null,
+      `compression ${cfg.compression ? "on" : "off"}`,
+      `threads ${cfg.threads || "default"}`,
+      `Rust allocator ${cfg.allocator}`,
+    ].filter(Boolean);
+    $("meta").replaceChildren(...meta.map((m) => el("span", null, m)));
+    $("foot").textContent = `Generated by bench-web ${DATA.runner_version}, results schema ${DATA.schema_version}.`;
+
+    const banners = [];
+    if (DATA.interrupted) banners.push(["warning", "Interrupted.", "The run was stopped before it finished; some apps or scenarios are missing."]);
+    let invalid = 0;
+    for (const a of apps) for (const s of a.scenarios || []) {
+      for (const t of s.throughput) if (!t.valid) invalid++;
+      if (s.latency && !s.latency.measurement.valid) invalid++;
+    }
+    if (invalid) banners.push(["critical", `${invalid} invalid measurement${invalid > 1 ? "s" : ""}.`, "Some requests failed. These measurements are marked invalid and not drawn; see the data table for the errors."]);
+    let limited = 0;
+    for (const a of apps) for (const s of a.scenarios || []) {
+      for (const t of s.throughput) if (t.valid && t.exceeded_thread_limit) limited++;
+      if (s.latency && s.latency.measurement.valid && s.latency.measurement.exceeded_thread_limit) limited++;
+    }
+    if (limited) banners.push(["warning", `${limited} measurement${limited > 1 ? "s" : ""} exceeded the thread limit.`, `With BENCH_THREADS=${cfg.threads} these apps kept materially more cores busy, so their numbers are not comparable and are not drawn.`]);
+    const mismatches = Object.entries(DATA.environment.tool_version_mismatches || {});
+    if (mismatches.length) banners.push(["warning", "Unexpected tool versions:", mismatches.map(([k, v]) => `${k} (${v})`).join(", ") + "."]);
+    if (cfg.compression) banners.push(["warning", "Compression on.", "Requests send a browser Accept-Encoding and each app answers with its framework's default compression algorithm and level; the negotiated encoding is shown next to each figure. Response sizes are compressed sizes."]);
+    const failed = apps.filter((a) => a.status !== "ok");
+    if (failed.length) banners.push(["warning", `${failed.length} app${failed.length > 1 ? "s" : ""} not fully measured:`, failed.map((a) => `${a.name} (${a.status.replace("_", " ")})`).join(", ") + "."]);
+    if (cfg.profile === "quick") banners.push(["warning", "Quick profile.", "Short warmups and runs: fine for smoke tests, too noisy to publish."]);
+    $("banners").replaceChildren(...banners.map(([kind, strong, text]) =>
+      el("div", { class: "banner " + kind, role: "note" }, el("strong", null, strong), text)));
+  }
+
+  // ---------- filters ----------
+  function renderFilters() {
+    const sel = $("f-scenario");
+    sel.replaceChildren(...scenarios.map((s) => el("option", { value: s.id }, s.title)));
+    sel.value = state.scenario;
+    sel.addEventListener("change", () => { state.scenario = sel.value; renderScenarioSections(); });
+    const conn = $("f-conn");
+    conn.replaceChildren(...cfg.connections.map((c) => el("option", { value: c }, String(c))));
+    conn.value = state.conn;
+    conn.addEventListener("change", () => { state.conn = +conn.value; renderOverview(); renderScenarioSections(); });
+    if (cfg.connections.length < 2) $("f-conn-wrap").style.display = "none";
+    const theme = $("theme");
+    const current = () => document.documentElement.getAttribute("data-theme") ||
+      (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    const label = () => { theme.textContent = current() === "dark" ? "Light theme" : "Dark theme"; };
+    theme.addEventListener("click", () => {
+      const next = current() === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      try { localStorage.setItem("bench-theme", next); } catch (e) { /* storage unavailable */ }
+      label();
+    });
+    try { const saved = localStorage.getItem("bench-theme"); if (saved) document.documentElement.setAttribute("data-theme", saved); } catch (e) { /* storage unavailable */ }
+    label();
+  }
+
+  function segs(node, options, key, onChange) {
+    node.replaceChildren(...options.map(([value, text]) => {
+      const b = el("button", { class: "seg", type: "button", "aria-pressed": String(state[key] === value) }, text);
+      b.addEventListener("click", () => { state[key] = value; segs(node, options, key, onChange); onChange(); });
+      return b;
+    }));
+  }
+
+  // ---------- overview ----------
+  const HEAT = ["--heat-1", "--heat-2", "--heat-3", "--heat-4", "--heat-5", "--heat-6"];
+  function renderOverview() {
+    renderingLegend($("ov-legend"));
+    $("ov-legend").append(el("span", { style: "margin-left:auto" }, "Cell shading: share of the fastest valid app, darker is closer"));
+    const best = {};
+    for (const s of scenarios) {
+      best[s.id] = Math.max(0, ...measured.map((a) => {
+        const t = throughputOf(a, s.id, state.conn);
+        const m = medianOf(t);
+        return t && t.valid && m && !m.exceeded_thread_limit ? m.rps : 0;
+      }));
+    }
+    const rows = measured.map((app) => {
+      const rel = [];
+      const cells = scenarios.map((s) => {
+        const t = throughputOf(app, s.id, state.conn);
+        const m = medianOf(t);
+        if (!t || !m) return { text: "-", cls: "muted" };
+        if (!t.valid) return { text: "\u26a0 ERR", cls: "bad", title: problemsOf(t).join("; ") };
+        if (m.exceeded_thread_limit) return { text: "\u26a0 LIMIT", cls: "limit", title: limitText(m) };
+        const r = best[s.id] ? m.rps / best[s.id] : 0;
+        rel.push(r);
+        const enc = encodingOf(app, s.id);
+        return { text: fmtCompact(m.rps), rel: r, title: `${fmtInt(m.rps)} req/s, ${pct(r)} of the fastest${enc ? ", Content-Encoding: " + enc : ""}` };
+      });
+      const geo = rel.length === scenarios.length && rel.every((r) => r > 0)
+        ? Math.exp(rel.reduce((s, r) => s + Math.log(r), 0) / rel.length) : null;
+      return { app, cells, geo };
+    });
+    rows.sort((a, b) => (b.geo ?? -1) - (a.geo ?? -1));
+    const home = (app) => {
+      const p = (app.payload || []).find((x) => x.page === "home");
+      return p ? (p.totals.js?.brotli || 0) + (p.totals.wasm?.brotli || 0) : null;
+    };
+    const table = el("table", null,
+      el("thead", null, el("tr", null,
+        el("th", null, "App"),
+        ...scenarios.map((s) => el("th", { title: s.description }, s.id)),
+        el("th", { title: "Geometric mean of the share of the fastest app over all scenarios; only for apps with every scenario valid" }, "geo. mean"),
+        el("th", { title: "Idle memory after startup" }, "idle mem"),
+        el("th", { title: "JavaScript plus WebAssembly of the home page, brotli" }, "home JS+WASM"))),
+      el("tbody", null, rows.map(({ app, cells, geo }) => el("tr", { class: isTopcoat(app) ? "hl" : null },
+        el("td", null, appLabel(app)),
+        ...cells.map((c) => {
+          if (c.rel == null) return el("td", { class: c.cls, title: c.title }, c.text);
+          const step = Math.min(HEAT.length - 1, Math.floor(c.rel * HEAT.length - 1e-9));
+          const bg = `var(${HEAT[Math.max(0, step)]})`;
+          const ink = step >= 3 ? "#ffffff" : "var(--ink)";
+          return el("td", { class: "heat", style: `background:${bg};color:${ink}`, title: c.title }, c.text);
+        }),
+        el("td", null, geo == null ? el("span", { class: "muted" }, "-") : pct(geo)),
+        el("td", null, fmtBytes(app.idle_memory_bytes)),
+        el("td", null, home(app) == null ? el("span", { class: "muted" }, "-") : fmtBytes(home(app)))))));
+    $("ov-table").replaceChildren(table);
+  }
+
+  // ---------- per-scenario sections ----------
+  function scenarioRows(valueOf) {
+    return measured.map((app) => {
+      const t = throughputOf(app, state.scenario, state.conn);
+      const m = medianOf(t);
+      if (!t || !m) return { app, missing: true };
+      if (!t.valid) return { app, invalid: problemsOf(t).join("; ") };
+      if (m.exceeded_thread_limit) return { app, limited: limitText(m) };
+      return Object.assign({ app, note: encodingOf(app, state.scenario) }, valueOf(app, t, m));
+    });
+  }
+  // The negotiated Content-Encoding, shown wherever compression-on numbers appear.
+  function encodingOf(app, scenarioId) {
+    if (!cfg.compression) return null;
+    const s = (app.scenarios || []).find((x) => x.id === scenarioId);
+    return s && s.content_encoding ? s.content_encoding : "encoding unknown";
+  }
+  function limitText(m) {
+    return `exceeded thread limit, not comparable (${nf1.format(m.resources.cpu_cores_used)} cores with BENCH_THREADS=${cfg.threads})`;
+  }
+  function measurementTip(app, m, extra) {
+    return () => tipRows(`${app.name} \u00b7 ${app.rendering}`, extra.value, [
+      ["Requests/s", fmtInt(m.rps)],
+      ["Latency p50", fmtMs(m.latency_ms.p50)],
+      ["Latency p99", fmtMs(m.latency_ms.p99)],
+      ["Peak memory", fmtBytes(m.resources.peak_memory_bytes)],
+      ["CPU cores used", nf1.format(m.resources.cpu_cores_used)],
+      ["Requests/CPU-s", fmtInt(m.resources.requests_per_cpu_second)],
+      ["Bytes/response", fmtBytes(Math.round(m.bytes_per_response))],
+      ...(extra.rows || []),
+    ]);
+  }
+
+  function renderScenarioSections() {
+    const sc = scenarios.find((s) => s.id === state.scenario);
+    const title = sc ? sc.title : "";
+    const paths = sc ? `${sc.method} ${sc.sample_paths[0]}${sc.path_count > 1 ? ` (+${sc.path_count - 1} more)` : ""}` : "";
+
+    // throughput
+    $("tp-title").textContent = `${title}: requests per second`;
+    $("tp-note").textContent = `${paths}, ${state.conn} connections. Higher is better.`;
+    document.querySelectorAll(".rendering-legend").forEach(renderingLegend);
+    barChart($("tp-chart"), scenarioRows((app, t, m) => ({
+      value: m.rps,
+      range: t.runs.length > 1 ? [t.rps_min, t.rps_max] : null,
+      tip: measurementTip(app, m, { value: fmtInt(m.rps) + " req/s", rows: t.runs.length > 1 ? [["Runs", t.runs.map((r) => fmtCompact(r.rps)).join(", ")]] : [] }),
+    })), { format: fmtCompact, unit: "req/s" });
+
+    // connection scaling
+    const connCard = $("tp-conn-card");
+    if (cfg.connections.length > 1) {
+      connCard.style.display = "";
+      const conns = cfg.connections.slice().sort((a, b) => a - b);
+      const qs = ["var(--q1)", "var(--q2)", "var(--q3)", "var(--q4)"];
+      const colorOf = (i) => qs[Math.min(qs.length - 1, Math.round(i * (qs.length - 1) / Math.max(1, conns.length - 1)))];
+      const legend = el("div", { class: "legend" }, conns.map((c, i) => el("span", null, el("span", { class: "key dot", style: "background:" + colorOf(i) }), c + " connections")));
+      const rows = measured.map((app) => {
+        const pts = conns.map((c, i) => { const t = throughputOf(app, state.scenario, c); const m = medianOf(t); return { c, i, t, m }; });
+        return { app, pts };
+      });
+      const usable = (p) => p.t && p.t.valid && p.m && !p.m.exceeded_thread_limit;
+      const max = Math.max(1, ...rows.flatMap((r) => r.pts.filter(usable).map((p) => p.m.rps)));
+      const ticks = niceTicks(max, 5), top = ticks[ticks.length - 1];
+      const x = (v) => (100 * v / top) + "%";
+      const best = (r) => Math.max(0, ...r.pts.filter(usable).map((p) => p.m.rps));
+      rows.sort((a, b) => best(b) - best(a));
+      const grid = el("div", { class: "rows" });
+      for (const r of rows) {
+        const hl = isTopcoat(r.app) ? " hl" : "";
+        const track = el("div", { class: "track" + hl });
+        ticks.forEach((t) => track.append(el("div", { class: "gridline", style: "left:" + x(t) })));
+        const ok = r.pts.filter((p) => p.t && p.t.valid && p.m && !p.m.exceeded_thread_limit);
+        if (ok.length > 1) {
+          const lo = Math.min(...ok.map((p) => p.m.rps)), hi = Math.max(...ok.map((p) => p.m.rps));
+          track.append(el("div", { class: "dotline", style: `left:${x(lo)};width:calc(${x(hi)} - ${x(lo)})` }));
+        }
+        for (const p of ok) {
+          const dot = el("div", { class: "pdot", style: `left:${x(p.m.rps)};background:${colorOf(p.i)}` });
+          attachTip(dot, () => tipRows(`${r.app.name} \u00b7 ${p.c} connections`, fmtInt(p.m.rps) + " req/s", [["Latency p99", fmtMs(p.m.latency_ms.p99)], ["Peak memory", fmtBytes(p.m.resources.peak_memory_bytes)]]));
+          track.append(dot);
+        }
+        const bad = r.pts.filter((p) => p.t && !p.t.valid);
+        const limitedPts = r.pts.filter((p) => p.t && p.t.valid && p.m && p.m.exceeded_thread_limit);
+        if (!ok.length) track.append(el("div", { class: bad.length ? "msg bad" : limitedPts.length ? "msg limit" : "msg muted" },
+          bad.length ? "\u26a0 invalid" : limitedPts.length ? "\u26a0 exceeded thread limit, not comparable" : "not measured"));
+        grid.append(el("div", { class: "lab" + hl }, appLabel(r.app)), track,
+          el("div", { class: (bad.length ? "val bad" : "val") + hl }, bad.length ? `${bad.length} invalid` : (ok.length ? fmtCompact(best(r)) : "-")));
+      }
+      axisRow(grid, ticks, x, fmtCompact, "req/s");
+      $("tp-conn").replaceChildren(legend, grid);
+    } else {
+      connCard.style.display = "none";
+    }
+
+    renderLatency(title);
+
+    // memory
+    const metric = DATA.environment.memory_metric === "pss" ? "proportional set size (PSS)" : "resident set size (RSS)";
+    $("mem-lede").textContent = `Memory of each app's whole process tree, as the sum of each process's ${metric}.` +
+      (DATA.environment.memory_metric === "pss" ? "" : " RSS counts shared pages once per process, which overstates servers that fork worker processes.");
+    barChart($("mem-idle"), measured.map((app) => app.idle_memory_bytes == null ? { app, missing: true } : {
+      app, value: app.idle_memory_bytes,
+      tip: () => tipRows(`${app.name} \u00b7 ${app.rendering}`, fmtBytes(app.idle_memory_bytes), [["Startup", fmtMs(app.startup_ms)]]),
+    }), { format: fmtBytes, better: "lower" });
+    $("mem-load-title").textContent = `Peak under load: ${title}`;
+    barChart($("mem-load"), scenarioRows((app, t, m) => ({
+      value: m.resources.peak_memory_bytes,
+      tip: () => tipRows(`${app.name} \u00b7 ${app.rendering}`, fmtBytes(m.resources.peak_memory_bytes), [
+        ["Mean during run", fmtBytes(m.resources.mean_memory_bytes)], ["Idle", fmtBytes(app.idle_memory_bytes)], ["Samples", fmtInt(m.resources.samples)]]),
+    })), { format: fmtBytes, better: "lower" });
+
+    // cpu
+    $("cpu-title").textContent = `Requests per CPU-second: ${title}`;
+    barChart($("cpu-chart"), scenarioRows((app, t, m) => m.resources.requests_per_cpu_second == null ? { missing: "no CPU samples" } : ({
+      value: m.resources.requests_per_cpu_second,
+      tip: measurementTip(app, m, { value: fmtInt(m.resources.requests_per_cpu_second) + " req/CPU-s", rows: [["CPU seconds", nf1.format(m.resources.cpu_seconds)]] }),
+    })), { format: fmtCompact, unit: "req/CPU-s" });
+    $("cores-title").textContent = `Cores kept busy: ${title}`;
+    barChart($("cores-chart"), scenarioRows((app, t, m) => ({
+      value: m.resources.cpu_cores_used,
+      tip: measurementTip(app, m, { value: nf1.format(m.resources.cpu_cores_used) + " cores" }),
+    })), { format: (v) => nf1.format(v), unit: "cores", color: () => "var(--muted)", better: "higher" });
+  }
+
+  function renderLatency(title) {
+    const hasPhase = measured.some((a) => (a.scenarios || []).some((s) => s.latency));
+    const options = [["closed", "Closed-loop runs"]];
+    if (hasPhase) options.push(["open", "Open-loop latency phase"]);
+    if (!hasPhase) state.latSource = "closed";
+    segs($("lat-source"), options, "latSource", () => renderLatency(title));
+    const lat = cfg.latency;
+    $("lat-lede").textContent = hasPhase
+      ? (lat.mode === "relative"
+        ? `The open-loop phase sends requests at ${pct(lat.fraction)} of each app's own measured throughput, so every app runs with the same headroom; the offered rate is shown per app. Closed-loop latency mostly reflects queueing at full load.`
+        : `The open-loop phase sends the same fixed rate to every app. Apps that could not reach it are flagged as saturated; their latency mostly measures queue growth.`)
+      : "Latency during the closed-loop throughput runs. At full load it mostly reflects queueing, so read it alongside throughput. Enable the latency phase (profile full, or --latency on) for open-loop measurements.";
+    const PCTS = [["p50", "p50", "var(--q1)"], ["p90", "p90", "var(--q2)"], ["p99", "p99", "var(--q3)"], ["p999", "p99.9", "var(--q4)"]];
+    $("lat-legend").replaceChildren(...PCTS.map(([, label, color]) => el("span", null, el("span", { class: "key dot", style: "background:" + color }), label)));
+    const open = state.latSource === "open";
+    $("lat-title").textContent = `${title}: latency percentiles`;
+    $("lat-note").textContent = open
+      ? `Open-loop at a fixed rate with coordinated omission correction, ${lat.connections} connections, ${lat.duration}. Log scale; lower is better.`
+      : `From the median closed-loop run at ${state.conn} connections. Log scale; lower is better.`;
+
+    const rows = measured.map((app) => {
+      if (open) {
+        const p = latencyPhaseOf(app, state.scenario);
+        if (!p) return { app, missing: true };
+        if (!p.measurement.valid) return { app, invalid: p.measurement.problems.join("; ") };
+        if (p.measurement.exceeded_thread_limit) return { app, limited: limitText(p.measurement) };
+        return { app, m: p.measurement, phase: p };
+      }
+      const t = throughputOf(app, state.scenario, state.conn);
+      const m = medianOf(t);
+      if (!t || !m) return { app, missing: true };
+      if (!t.valid) return { app, invalid: problemsOf(t).join("; ") };
+      if (m.exceeded_thread_limit) return { app, limited: limitText(m) };
+      return { app, m };
+    });
+    const values = rows.filter((r) => r.m).flatMap((r) => PCTS.map(([k]) => r.m.latency_ms[k]).filter((v) => v > 0));
+    const container = $("lat-chart");
+    if (!values.length) { container.replaceChildren(el("p", { class: "note" }, "No valid latency data for this scenario.")); return; }
+    const ticks = logTicks(Math.min(...values), Math.max(...values));
+    const lo = Math.log10(ticks[0]), hi = Math.log10(ticks[ticks.length - 1]);
+    const x = (v) => (100 * (Math.log10(v) - lo) / Math.max(1e-9, hi - lo)) + "%";
+    rows.sort((a, b) => (a.m ? a.m.latency_ms.p99 : Infinity) - (b.m ? b.m.latency_ms.p99 : Infinity));
+    const grid = el("div", { class: "rows" });
+    for (const r of rows) {
+      const hl = isTopcoat(r.app) ? " hl" : "";
+      const track = el("div", { class: "track" + hl });
+      ticks.forEach((t) => track.append(el("div", { class: "gridline", style: "left:" + x(t) })));
+      let val;
+      if (r.m) {
+        const L = r.m.latency_ms;
+        if (L.p50 > 0 && L.p999 > 0) track.append(el("div", { class: "dotline", style: `left:${x(L.p50)};width:calc(${x(L.p999)} - ${x(L.p50)})` }));
+        const hit = el("div", { class: "bar", style: `left:0;width:100%;background:transparent;height:24px;margin-top:-12px` });
+        for (const [k, , color] of PCTS) if (L[k] > 0) track.append(el("div", { class: "pdot", style: `left:${x(L[k])};background:${color}` }));
+        attachTip(hit, () => tipRows(`${r.app.name} \u00b7 ${r.app.rendering}`, "p99 " + fmtMs(L.p99), [
+          ...PCTS.map(([k, label, color]) => [label, fmtMs(L[k]), color]),
+          ["max", fmtMs(L.max)], ["mean", fmtMs(L.mean)],
+          ...(r.phase ? [["Offered rate", fmtInt(r.phase.target_rps) + " req/s"], ["Achieved", fmtInt(r.m.rps) + " req/s"]] : [["Requests/s", fmtInt(r.m.rps)]]),
+        ]));
+        track.append(hit);
+        const sat = r.phase && r.phase.saturated;
+        val = el("div", { class: sat ? "val bad" : "val", title: sat ? "Did not reach the offered rate" : null },
+          fmtMs(L.p99), r.phase ? el("div", { class: "muted", style: "font-size:11px" }, (sat ? "\u26a0 saturated @" : "@") + fmtCompact(r.phase.target_rps) + "/s") : null);
+      } else if (r.invalid) {
+        track.append(el("div", { class: "msg bad", title: r.invalid }, "\u26a0 invalid: " + r.invalid));
+        val = el("div", { class: "val bad" }, "invalid");
+      } else if (r.limited) {
+        track.append(el("div", { class: "msg limit", title: r.limited }, "\u26a0 " + r.limited));
+        val = el("div", { class: "val" }, el("span", { class: "muted" }, "n/c"));
+      } else {
+        track.append(el("div", { class: "msg muted" }, "not measured"));
+        val = el("div", { class: "val" }, el("span", { class: "muted" }, "-"));
+      }
+      if (hl) val.classList.add("hl");
+      grid.append(el("div", { class: "lab" + hl }, appLabel(r.app)), track, val);
+    }
+    axisRow(grid, ticks, x, (t) => t >= 1000 ? t / 1000 + " s" : t >= 1 ? t + " ms" : t * 1000 + " \u00b5s", "p99");
+    container.replaceChildren(grid);
+  }
+
+  // ---------- startup ----------
+  function renderStartup() {
+    barChart($("startup-chart"), measured.map((app) => app.startup_ms == null ? { app, missing: true } : {
+      app, value: app.startup_ms,
+      tip: () => tipRows(`${app.name} \u00b7 ${app.rendering}`, fmtMs(app.startup_ms), [["Build time", app.build_secs == null ? "-" : nf1.format(app.build_secs) + " s"]]),
+    }), { format: fmtMs, better: "lower" });
+  }
+
+  // ---------- payload ----------
+  const CATS = [["html", "HTML", "var(--s1)"], ["js", "JavaScript", "var(--s2)"], ["wasm", "WebAssembly", "var(--s3)"], ["css", "CSS", "var(--s4)"], ["other", "Other", "var(--s5)"]];
+  function renderPayload() {
+    const pages = [...new Set(apps.flatMap((a) => (a.payload || []).map((p) => p.page)))];
+    if (!pages.length) {
+      $("pl-chart").replaceChildren(el("p", { class: "note" }, cfg.payload ? "No payload was measured." : "Payload measurement was disabled for this run."));
+      return;
+    }
+    if (!pages.includes(state.plPage)) state.plPage = pages[0];
+    segs($("pl-page"), pages.map((p) => [p, p === "home" ? "Home page" : p === "detail" ? "Detail page" : p]), "plPage", renderPayload);
+    segs($("pl-enc"), [["raw", "Uncompressed"], ["gzip", "gzip"], ["brotli", "brotli"]], "plEnc", renderPayload);
+    const used = CATS.filter(([k]) => apps.some((a) => (a.payload || []).some((p) => p.totals[k] && p.totals[k].raw > 0)));
+    $("pl-legend").replaceChildren(...used.map(([, label, color]) => el("span", null, el("span", { class: "key", style: "background:" + color }), label)));
+    const enc = state.plEnc;
+    barChart($("pl-chart"), measured.map((app) => {
+      const p = (app.payload || []).find((x) => x.page === state.plPage);
+      if (!p) return { app, missing: true };
+      const segments = used.map(([k, label, color]) => ({ value: (p.totals[k] || {})[enc] || 0, color, label }));
+      return {
+        app, value: p.total[enc], segments,
+        tip: () => tipRows(`${app.name} \u00b7 ${app.rendering}`, fmtBytes(p.total[enc]) + " total",
+          [...used.map(([k, label, color]) => [label, fmtBytes((p.totals[k] || {})[enc] || 0), color]),
+            ["Requests", fmtInt(p.assets.length)],
+            ["Inline script in HTML", fmtBytes(p.inline_script_bytes)],
+            ...(p.missing.length ? [["Failed to load", p.missing.length]] : [])]),
+      };
+    }), { format: fmtBytes, better: "lower" });
+
+    const rows = [];
+    for (const app of measured) {
+      const p = (app.payload || []).find((x) => x.page === state.plPage);
+      if (!p) continue;
+      for (const a of p.assets) rows.push([app, a]);
+    }
+    $("pl-assets").replaceChildren(el("table", null,
+      el("thead", null, el("tr", null, ["App", "Asset", "Type", "Found via", "Raw", "gzip", "brotli"].map((h) => el("th", null, h)))),
+      el("tbody", null, rows.map(([app, a]) => el("tr", { class: isTopcoat(app) ? "hl" : null },
+        el("td", null, app.name), el("td", { style: "text-align:left;max-width:360px;overflow:hidden;text-overflow:ellipsis", title: a.path }, a.path),
+        el("td", null, a.category), el("td", null, a.source),
+        el("td", null, fmtBytes(a.sizes.raw)), el("td", null, fmtBytes(a.sizes.gzip)), el("td", null, fmtBytes(a.sizes.brotli)))))));
+  }
+
+  // ---------- data table ----------
+  function renderDataTable() {
+    const cols = [
+      ["App", (r) => r.app.name, "text"], ["Rendering", (r) => r.app.rendering, "text"], ["Scenario", (r) => r.scenario, "text"],
+      ["Mode", (r) => r.mode, "text"], ["Conns", (r) => r.conns],
+      ["Valid", (r) => !r.m.valid ? "NO" : r.m.exceeded_thread_limit ? "limit" : "yes", "text"],
+      ["req/s", (r) => r.m.rps, fmtInt], ["p50", (r) => r.m.latency_ms.p50, fmtMs], ["p90", (r) => r.m.latency_ms.p90, fmtMs],
+      ["p99", (r) => r.m.latency_ms.p99, fmtMs], ["p99.9", (r) => r.m.latency_ms.p999, fmtMs], ["max", (r) => r.m.latency_ms.max, fmtMs],
+      ["peak mem", (r) => r.m.resources.peak_memory_bytes, fmtBytes], ["mean mem", (r) => r.m.resources.mean_memory_bytes, fmtBytes],
+      ["CPU s", (r) => r.m.resources.cpu_seconds, (v) => nf1.format(v)], ["cores", (r) => r.m.resources.cpu_cores_used, (v) => nf1.format(v)],
+      ["req/CPU-s", (r) => r.m.resources.requests_per_cpu_second, fmtInt], ["bytes/resp", (r) => r.m.bytes_per_response, (v) => fmtBytes(Math.round(v))],
+      ["requests", (r) => r.m.requests, fmtInt], ["errors", (r) => r.m.requests - r.m.successful_requests, fmtInt],
+      ["encoding", (r) => r.encoding || "", "text"],
+      ["artifact*", (r) => r.app.artifact_bytes, fmtBytes],
+      ["problems", (r) => r.m.problems.join("; "), "text"],
+    ];
+    const problemsCol = cols.length - 1, errorsCol = cols.findIndex(([h]) => h === "errors"), validCol = cols.findIndex(([h]) => h === "Valid");
+    const data = [];
+    for (const app of measured) for (const s of app.scenarios || []) {
+      for (const t of s.throughput) {
+        const m = medianOf(t) || t.runs[0];
+        if (m) data.push({ app, scenario: s.id, mode: t.runs.length > 1 ? `closed, median of ${t.runs.length}` : "closed", conns: t.connections, m, encoding: s.content_encoding });
+      }
+      if (s.latency) data.push({ app, scenario: s.id, mode: `open @${fmtInt(s.latency.target_rps)}/s${s.latency.saturated ? " (saturated)" : ""}`, conns: s.latency.connections, m: s.latency.measurement, encoding: s.content_encoding });
+    }
+    let sortCol = 6, dir = -1, filter = "";
+    const table = el("table", { class: "sortable" });
+    function draw() {
+      const q = filter.toLowerCase();
+      const rows = data.filter((r) => !q || (r.app.name + " " + r.app.id + " " + r.scenario + " " + r.app.rendering).toLowerCase().includes(q));
+      const [, get, kind] = cols[sortCol];
+      rows.sort((a, b) => {
+        const x = get(a), y = get(b);
+        if (kind === "text") return dir * String(x).localeCompare(String(y));
+        return dir * ((x ?? -Infinity) - (y ?? -Infinity));
+      });
+      table.replaceChildren(
+        el("thead", null, el("tr", null, cols.map(([h], i) => {
+          const th = el("th", { scope: "col", tabindex: "0", "aria-sort": i === sortCol ? (dir > 0 ? "ascending" : "descending") : null }, h);
+          const act = () => { if (sortCol === i) dir = -dir; else { sortCol = i; dir = cols[i][2] === "text" ? 1 : -1; } draw(); };
+          th.addEventListener("click", act);
+          th.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); act(); } });
+          return th;
+        }))),
+        el("tbody", null, rows.map((r) => el("tr", { class: isTopcoat(r.app) ? "hl" : null }, cols.map(([, get, kind], i) => {
+          const v = get(r);
+          const text = kind === "text" ? v : (v == null ? "-" : (typeof kind === "function" ? kind(v) : v));
+          const bad = (i === validCol && !r.m.valid) || (i === errorsCol && v > 0);
+          const lim = i === validCol && r.m.valid && r.m.exceeded_thread_limit;
+          return el("td", { class: bad ? "bad" : lim ? "limit" : null, style: i === problemsCol ? "text-align:left;white-space:normal;min-width:200px" : null }, text);
+        })))));
+      $("dt-count").textContent = `${rows.length} of ${data.length} rows. artifact*: size of the build output each manifest lists; manifests count different things, so it is not comparable across runtimes.`;
+    }
+    $("dt-filter").addEventListener("input", (e) => { filter = e.target.value; draw(); });
+    $("dt").replaceChildren(table);
+    draw();
+  }
+
+  // ---------- setup ----------
+  function affinity() {
+    const found = apps.find((a) => a.cpu_affinity);
+    return found ? found.cpu_affinity : null;
+  }
+  function renderSetup() {
+    const kv = (node, pairs) => node.replaceChildren(...pairs.flatMap(([k, v]) => [el("dt", null, k), el("dd", null, v == null || v === "" ? "-" : String(v))]));
+    const list = (xs) => xs && xs.length ? xs.join(", ") : "all";
+    kv($("cfg"), [
+      ["Profile", cfg.profile], ["Apps", list(cfg.apps)], ["Skipped apps", cfg.skip.join(", ") || "none"],
+      ["Scenarios", list(cfg.scenarios)], ["Skipped scenarios", cfg.skip_scenarios.join(", ") || "none"],
+      ["Warmup", cfg.warmup], ["Duration", cfg.duration], ["Runs", cfg.runs], ["Connections", cfg.connections.join(", ")],
+      ["Threads", cfg.threads ? cfg.threads + (affinity() ? `, pinned to CPUs ${affinity()}` : ", not pinned (flagged above " + (cfg.threads * (1 + (cfg.thread_limit_margin ?? 0.5)) + 0.25).toFixed(2) + " cores)") : "framework default"], ["Compression", cfg.compression ? "on" : "off"], ["Rust allocator", cfg.allocator],
+      ["Cooldown", cfg.cooldown], ["Request timeout", cfg.request_timeout], ["Sample interval", cfg.sample_interval],
+      ["Idle settle", cfg.idle_settle], ["Cart cookie", "cart_count=" + cfg.cart_count],
+      ["Latency phase", cfg.latency.enabled
+        ? `${cfg.latency.mode === "relative" ? pct(cfg.latency.fraction) + " of measured throughput" : cfg.latency.rate + " req/s"}, ${cfg.latency.duration}, ${cfg.latency.connections} connections`
+        : "off"],
+    ]);
+    const env = DATA.environment;
+    kv($("env"), [
+      ...Object.entries(env.tool_version_mismatches || {}).map(([k, v]) => ["\u26a0 " + k, v]),
+      ["CPU", env.cpu], ["Cores", `${env.physical_cores ?? "?"} physical, ${env.logical_cores} logical`], ["Memory", fmtBytes(env.memory_bytes)],
+      ["OS", env.os_version || env.os], ["Kernel", env.kernel], ["Arch", env.arch], ["Memory metric", env.memory_metric.toUpperCase()],
+      ["Git commit", env.git_commit ? env.git_commit + (env.git_dirty ? " (uncommitted changes)" : "") : null],
+      ["Load generator", env.oha], ["Nix shell", env.nix_shell ? "yes" : "no"],
+      ["Started", DATA.started_at], ["Finished", DATA.finished_at],
+      ...Object.entries(env.toolchains || {}).map(([k, v]) => [k, v]),
+    ]);
+    $("apps").replaceChildren(el("table", null,
+      el("thead", null, el("tr", null, ["App", "Rendering", "Language", "Version", "Status", "Description"].map((h) => el("th", null, h)))),
+      el("tbody", null, apps.map((a) => el("tr", { class: isTopcoat(a) ? "hl" : null },
+        el("td", null, appLabel(a, { badge: false })), el("td", null, a.rendering), el("td", null, a.language),
+        el("td", { style: "white-space:normal" }, a.framework_version || "-"),
+        el("td", { class: a.status === "ok" ? null : "bad", title: a.error || null }, a.status.replace("_", " ")),
+        el("td", { style: "text-align:left;white-space:normal;min-width:260px" }, a.description, a.error ? el("div", { class: "muted" }, a.error.split("\n")[0]) : null))))));
+  }
+
+  renderHeader();
+  renderFilters();
+  renderOverview();
+  renderScenarioSections();
+  renderStartup();
+  renderPayload();
+  renderDataTable();
+  renderSetup();
+})();
+</script>
+</body>
+</html>

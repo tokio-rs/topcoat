@@ -1,0 +1,32 @@
+id = "rails"
+name = "Rails"
+language = "Ruby"
+kind = "ruby"
+rendering = "ssr"
+description = "Rails 8.1 in production mode on Puma (one worker per core) with YJIT, ERB layouts and partials, Propshaft, tailwindcss-rails, and Hotwire (Turbo + Stimulus) through importmap."
+requires = ["ruby", "bundle"]
+version_command = 'grep -E "^    (rails|puma) [(]" Gemfile.lock && ruby -v'
+# The deployable app: the code and the precompiled assets. The vendored gems are not counted.
+artifacts = ["app", "config", "public"]
+
+[build]
+# The same steps as the Dockerfile that `rails new` generates: install the locked gems without the
+# development and test groups, precompile bootsnap's cache, then precompile the assets, which also
+# runs the Tailwind CSS build.
+commands = [
+  "bundle install",
+  "bundle exec bootsnap precompile --gemfile app/ lib/",
+  "bin/rails assets:precompile",
+]
+env = { BUNDLE_DEPLOYMENT = "1", BUNDLE_WITHOUT = "development:test", RAILS_ENV = "production", SECRET_KEY_BASE_DUMMY = "1" }
+
+[run]
+# `config/puma.rb` maps BENCH_THREADS to Puma workers and binds 127.0.0.1:$PORT.
+command = "bundle exec puma -C config/puma.rb"
+# SECRET_KEY_BASE is a fixed dummy value: the app signs or encrypts nothing, but Rails requires
+# one in production. RAILS_LOG_LEVEL=warn turns off per-request logs; errors are still logged.
+env = { BUNDLE_DEPLOYMENT = "1", BUNDLE_WITHOUT = "development:test", RAILS_ENV = "production", RAILS_LOG_LEVEL = "warn", SECRET_KEY_BASE = "harbor-market-benchmark-dummy-secret-key-base" }
+ready_timeout_secs = 60
+
+[client]
+extra_assets = []

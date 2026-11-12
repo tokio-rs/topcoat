@@ -1,0 +1,61 @@
+[package]
+name = "harbor-dioxus"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# `dx` builds the client with `--features web` for wasm32 and the server with `--features server`.
+[features]
+default = []
+web = ["dioxus/web", "dep:wasm-bindgen", "dep:web-sys"]
+server = [
+    "dioxus/server",
+    "dep:axum",
+    "dep:axum-extra",
+    "dep:serde_json",
+    "dep:tokio",
+    "dep:tower-http",
+]
+jemalloc = ["dep:tikv-jemallocator"]
+mimalloc = ["dep:mimalloc"]
+
+[dependencies]
+dioxus = { version = "=0.7.10", features = ["fullstack", "router"] }
+serde = { version = "1.0.228", features = ["derive"] }
+time = { version = "0.3.55", features = ["formatting", "macros", "parsing", "serde"] }
+
+# Server only.
+axum = { version = "0.8.9", optional = true }
+axum-extra = { version = "0.10.3", features = ["cookie"], optional = true }
+mimalloc = { version = "0.1.52", optional = true }
+serde_json = { version = "1.0.145", optional = true }
+tikv-jemallocator = { version = "0.7.0", optional = true }
+tokio = { version = "1.48.0", features = ["rt-multi-thread"], optional = true }
+tower-http = { version = "0.6.8", features = ["compression-full"], optional = true }
+
+# Client only. `wasm-bindgen` is pinned to the `wasm-bindgen` CLI that `dx` runs.
+wasm-bindgen = { version = "=0.2.129", optional = true }
+web-sys = { version = "0.3.83", features = ["Document", "HtmlDocument", "Window"], optional = true }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+# The server binary. Same as the `benchmark` profile of the Topcoat workspace, so every Rust app is
+# built the same way.
+[profile.benchmark]
+inherits = "release"
+codegen-units = 1
+lto = "fat"
+
+# The WebAssembly client, with the size settings from the Dioxus optimization guide.
+[profile.wasm-release]
+inherits = "release"
+opt-level = "z"
+debug = false
+lto = true
+codegen-units = 1
+panic = "abort"
+incremental = false
+
+# Standalone on purpose: this app has its own dependency tree and lockfile.
+[workspace]

@@ -1,0 +1,23 @@
+id = "axum-maud"
+name = "Axum + Maud"
+language = "Rust"
+kind = "rust"
+rendering = "ssr"
+description = "Axum on Tokio with Maud compile-time templates, tower-http compression and a small plain JS file for the two interactive pieces."
+requires = ["cargo", "tailwindcss"]
+version_command = "cargo tree --invert axum --edges normal --depth 0 --prefix none"
+# Assets are embedded in the binary.
+artifacts = ["target/{profile}/harbor-axum-maud"]
+
+[build]
+# `build.rs` runs the `tailwindcss` on PATH and warns unless it is 4.3.3, the benchmark shell's
+# version.
+commands = ["cargo build --locked --profile {profile} {features}"]
+
+[run]
+command = "target/{profile}/harbor-axum-maud"
+env = {}
+ready_timeout_secs = 60
+
+[client]
+extra_assets = []
