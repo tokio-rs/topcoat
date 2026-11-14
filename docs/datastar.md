@@ -7,7 +7,7 @@ Everything below is re-exported from `topcoat::datastar` and gated behind the `d
 ```toml
 # Cargo.toml
 [dependencies]
-topcoat = { version = "0.12.1", features = ["datastar"] }
+topcoat = { version = "0.12.2", features = ["datastar"] }
 ```
 
 # Loading the Datastar script

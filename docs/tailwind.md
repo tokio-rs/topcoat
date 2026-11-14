@@ -8,10 +8,10 @@ Enable the `tailwind` feature for both your runtime dependency and your build de
 
 ```toml
 [dependencies]
-topcoat = { version = "0.12.1", features = ["tailwind"] }
+topcoat = { version = "0.12.2", features = ["tailwind"] }
 
 [build-dependencies]
-topcoat = { version = "0.12.1", default-features = false, features = ["tailwind"] }
+topcoat = { version = "0.12.2", default-features = false, features = ["tailwind"] }
 ```
 
 Add a `build.rs` next to `Cargo.toml`:
