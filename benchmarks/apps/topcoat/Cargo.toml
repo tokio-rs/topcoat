@@ -23,5 +23,9 @@ tikv-jemallocator = { version = "0.7.0", optional = true }
 # We cannot use `workspace = true` with `default-features = false`.
 topcoat = { path = "../../../crates/topcoat", default-features = false, features = ["tailwind"] }
 
+[package.metadata.cargo-udeps.ignore]
+# Unused when `--all-features` also enables `jemalloc`, which takes precedence.
+normal = ["mimalloc"]
+
 [lints]
 workspace = true
