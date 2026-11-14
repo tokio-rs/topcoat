@@ -13,7 +13,8 @@ impl Expr {
     ///
     /// The Rust output constructs the original struct from the fields' real
     /// values. This lets the compiler enforce its field names, types, and
-    /// visibility rules.
+    /// visibility rules. A base given with `..base` supplies the fields that
+    /// the literal omits.
     pub(super) fn expr_struct(
         expr: &ExprStruct,
         rust: &mut TokenStream,
@@ -32,14 +33,20 @@ impl Expr {
                 "qualified struct paths are not supported",
             ));
         }
-        if let Some(dot2_token) = &expr.dot2_token {
+        if let (Some(dot2_token), None) = (&expr.dot2_token, &expr.rest) {
             return Err(syn::Error::new_spanned(
                 quote! { #dot2_token },
-                "struct update syntax is not supported",
+                "struct update syntax requires a base expression",
             ));
         }
 
-        js.push_str("cx.record({");
+        // With a base, the fields are passed first so that, as in Rust, they
+        // are evaluated before it.
+        js.push_str(if expr.rest.is_some() {
+            "cx.recordWith({"
+        } else {
+            "cx.record({"
+        });
         let mut fields = Vec::with_capacity(expr.fields.len());
         for (index, field) in expr.fields.iter().enumerate() {
             if let Some(attr) = field.attrs.first() {
@@ -65,11 +72,24 @@ impl Expr {
                 #name: #topcoat_runtime::Surrogate::into_real(#value)
             });
         }
-        js.push_str("})");
+        js.push_str("}");
+
+        // The compiler checks that the base has the record's type, so a
+        // borrowed record is rejected and must be cloned first.
+        let base = match &expr.rest {
+            Some(base) => {
+                js.push_str(", ");
+                let mut value = TokenStream::new();
+                Self::dispatch(base, &mut value, js, names)?;
+                quote_spanned! {base.span()=> ..#topcoat_runtime::Surrogate::into_real(#value) }
+            }
+            None => TokenStream::new(),
+        };
+        js.push(')');
 
         let path = &expr.path;
         quote! {
-            #topcoat_runtime::Surrogated::into_surrogate(#path { #(#fields),* })
+            #topcoat_runtime::Surrogated::into_surrogate(#path { #(#fields,)* #base })
         }
         .to_tokens(rust);
         Ok(())
