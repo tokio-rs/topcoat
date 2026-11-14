@@ -62,10 +62,10 @@ Iconify support lives behind the `icon-iconify` feature, for both your runtime d
 
 ```toml
 [dependencies]
-topcoat = { version = "0.12.1", features = ["icon-iconify"] }
+topcoat = { version = "0.12.2", features = ["icon-iconify"] }
 
 [build-dependencies]
-topcoat = { version = "0.12.1", default-features = false, features = ["icon-iconify"] }
+topcoat = { version = "0.12.2", default-features = false, features = ["icon-iconify"] }
 ```
 
 Add a `build.rs` next to `Cargo.toml` to stage the sets you use. Each set is downloaded when it is missing from the cache:

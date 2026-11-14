@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.2](https://github.com/tokio-rs/topcoat/compare/topcoat-cookie-v0.12.1...topcoat-cookie-v0.12.2) - 2026-11-14
+
+### Added
+
+- *(cookie)* make `CookieStore.remove()` return the value ([#606](https://github.com/tokio-rs/topcoat/pull/606))
+
 ## [0.12.0](https://github.com/tokio-rs/topcoat/compare/topcoat-cookie-v0.11.0...topcoat-cookie-v0.12.0) - 2026-11-09
 
 ### Added

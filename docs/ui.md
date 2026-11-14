@@ -8,10 +8,10 @@ Set up the [`topcoat` CLI](https://github.com/tokio-rs/topcoat/blob/main/docs/ge
 
 ```toml
 [dependencies]
-topcoat = { version = "0.12.1", features = ["font-fontsource", "tailwind", "ui"] }
+topcoat = { version = "0.12.2", features = ["font-fontsource", "tailwind", "ui"] }
 
 [build-dependencies]
-topcoat = { version = "0.12.1", default-features = false, features = ["tailwind"] }
+topcoat = { version = "0.12.2", default-features = false, features = ["tailwind"] }
 ```
 
 ## Initialize the package
