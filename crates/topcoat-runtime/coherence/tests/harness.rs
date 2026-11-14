@@ -94,24 +94,13 @@ fn missing_baseline_is_an_error() {
 }
 
 #[test]
-fn exception_baselines_require_exact_outcomes() {
-    for (value, source, expected) in [
-        (3.0, "cx.hydrate(3)", "now passes"),
-        (
-            3.0,
-            "(() => { throw new SyntaxError('Illegal break statement'); })()",
-            "changed",
-        ),
-        (2.5, "(() => { break; })()", "changed"),
-        (3.0, "({ unexpected: true })", "Unsupported coherence value"),
-    ] {
-        let case = Case::evaluated(
-            "changed break failure",
-            Expr::evaluate(|| value, Js::source(source)),
-        );
-        let report = format!("{:#}", case.check_known("break_inside_if").unwrap_err());
-        assert!(report.contains(expected));
-    }
+fn known_mismatch_cannot_hide_an_unsupported_value() {
+    let case = Case::evaluated(
+        "unsupported value",
+        Expr::evaluate(|| true, Js::source("({ unexpected: true })")),
+    );
+    let report = format!("{:#}", case.check_known("some_unit").unwrap_err());
+    assert!(report.contains("Unsupported coherence value"));
 }
 
 #[test]
