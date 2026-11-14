@@ -23,7 +23,7 @@ scraper.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 similar.workspace = true
-sysinfo = { workspace = true, default-features = false, features = ["system"] }
+sysinfo = { workspace = true, features = ["system"] }
 toml.workspace = true
 ureq.workspace = true
 

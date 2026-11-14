@@ -177,8 +177,7 @@ impl<'api> Generation<'api> {
                         description: response.description.clone(),
                         content: response
                             .content
-                            .map(|content| self.content(content))
-                            .unwrap_or_default(),
+                            .map_or_default(|content| self.content(content)),
                     };
                     (*status, response)
                 })
@@ -280,8 +279,7 @@ impl<'api> Generation<'api> {
         let required: Vec<&str> = schema
             .get("required")
             .and_then(Value::as_array)
-            .map(|names| names.iter().filter_map(Value::as_str).collect())
-            .unwrap_or_default();
+            .map_or_default(|names| names.iter().filter_map(Value::as_str).collect());
 
         properties
             .into_iter()
@@ -420,7 +418,7 @@ mod tests {
     fn parameters(operation: &Value) -> Vec<(&str, &str, bool)> {
         operation["parameters"]
             .as_array()
-            .map(|parameters| {
+            .map_or_default(|parameters| {
                 parameters
                     .iter()
                     .map(|parameter| {
@@ -432,7 +430,6 @@ mod tests {
                     })
                     .collect()
             })
-            .unwrap_or_default()
     }
 
     /// Follows a `$ref` into the document, so tests do not depend on where a

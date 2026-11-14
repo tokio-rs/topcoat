@@ -3,6 +3,8 @@ mod app;
 #[allow(dead_code)]
 mod components;
 mod db;
+// Toasty's derive macros generate code that uses underscore-prefixed items.
+#[allow(clippy::used_underscore_items)]
 mod features;
 mod seed;
 

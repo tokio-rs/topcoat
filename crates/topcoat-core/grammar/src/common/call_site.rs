@@ -57,9 +57,7 @@ impl CallSite {
     ///
     /// Returns an error if it needs the current directory but cannot read it.
     pub fn current() -> io::Result<Self> {
-        let manifest_dir = env::var_os("CARGO_MANIFEST_DIR")
-            .map(PathBuf::from)
-            .unwrap_or_default();
+        let manifest_dir = env::var_os("CARGO_MANIFEST_DIR").map_or_default(PathBuf::from);
         let out_dir = env::var_os("OUT_DIR").map(PathBuf::from);
         Self::new(
             &manifest_dir,

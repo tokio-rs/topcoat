@@ -13,14 +13,12 @@ use tokio::runtime;
 
 use crate::{config::Config, data::Store};
 
-#[cfg(all(feature = "jemalloc", feature = "mimalloc"))]
-compile_error!("the `jemalloc` and `mimalloc` features are mutually exclusive");
-
+// `jemalloc` takes precedence so that `--all-features` builds still compile.
 #[cfg(feature = "jemalloc")]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-#[cfg(feature = "mimalloc")]
+#[cfg(all(feature = "mimalloc", not(feature = "jemalloc")))]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 

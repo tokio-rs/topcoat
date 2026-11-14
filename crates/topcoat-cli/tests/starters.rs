@@ -142,9 +142,14 @@ fn check(name: &str, args: &[&str], tailwind: bool) {
 }
 
 /// The Tailwind output of the most recent build of `package`.
+///
+/// Cargo places build script output in `build/<package>-<hash>` or, with the newer build
+/// directory layout, in `build/<package>/<hash>`.
 fn stylesheet(target: &Path, package: &str) -> PathBuf {
+    let build = target.join("debug/build");
+    let is_hash = |name: &str| name.chars().all(|char| char.is_ascii_hexdigit());
     let prefix = format!("{package}-");
-    fs::read_dir(target.join("debug/build"))
+    let flat = fs::read_dir(&build)
         .unwrap()
         .map(|entry| entry.unwrap().path())
         .filter(|dir| {
@@ -152,8 +157,18 @@ fn stylesheet(target: &Path, package: &str) -> PathBuf {
                 .and_then(|name| name.to_str())
                 .and_then(|name| name.strip_prefix(&prefix))
                 // Match `foo-<hash>` but not another package's `foo-bar-<hash>`.
-                .is_some_and(|hash| hash.chars().all(|char| char.is_ascii_hexdigit()))
-        })
+                .is_some_and(is_hash)
+        });
+    let nested = fs::read_dir(build.join(package))
+        .into_iter()
+        .flatten()
+        .map(|entry| entry.unwrap().path())
+        .filter(|dir| {
+            dir.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(is_hash)
+        });
+    flat.chain(nested)
         .map(|dir| dir.join("out/tailwind.css"))
         .filter_map(|css| {
             let modified = css.metadata().ok()?.modified().ok()?;

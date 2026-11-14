@@ -7,6 +7,7 @@ mod health;
 mod not_found;
 pub mod products;
 
+use products::ListingLink;
 use topcoat::{
     Result,
     asset::{Asset, AssetBundle, RouterBuilderAssetExt, asset},
@@ -30,7 +31,6 @@ use crate::{
     data::{Store, store},
     format::Count,
 };
-use products::ListingLink;
 
 /// The Tailwind stylesheet compiled by `build.rs`.
 ///

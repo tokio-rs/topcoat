@@ -82,7 +82,7 @@ impl PlainText {
                 self.space = false;
             }
             "a" => {
-                let target = tag.attribute("href").map(decode).unwrap_or_default();
+                let target = tag.attribute("href").map_or_default(decode);
                 self.links.push((self.out.len(), target.into_owned()));
             }
             "img" => {

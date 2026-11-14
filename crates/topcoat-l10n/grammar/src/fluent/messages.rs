@@ -110,8 +110,7 @@ impl Messages {
         let id = name.to_string();
         let source_file = call_site
             .source_file()
-            .map(Path::to_string_lossy)
-            .unwrap_or_default();
+            .map_or_default(Path::to_string_lossy);
         let start = Span::call_site().start();
         let line = u32::try_from(start.line).unwrap_or(0);
         let column = u32::try_from(start.column + 1).unwrap_or(0);

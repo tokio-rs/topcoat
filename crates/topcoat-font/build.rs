@@ -251,6 +251,8 @@ fn catalog(families: &[FamilyMetadata], ranges: &[String]) -> String {
     }
 
     out.push_str("/// Every family in the vendored catalog, sorted by [`id`](Family::id).\n");
+    // Families whose name starts with a digit get an underscore-prefixed identifier.
+    out.push_str("#[allow(clippy::used_underscore_items)]\n");
     write!(out, "pub static ALL: &[&Family] = &[\n{all}];\n").unwrap();
     out
 }
