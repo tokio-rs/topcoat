@@ -1,2 +1,3 @@
 [alias]
 topcoat = "run -p topcoat-cli --bin topcoat --"
+bench-web = "run --release -p bench-runner --bin bench-web --"

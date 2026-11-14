@@ -1,0 +1,14 @@
+<%# locals: (trail:, current:) -%>
+<nav aria-label="Breadcrumb" class="text-sm">
+  <ol class="flex flex-wrap items-center gap-1.5 text-stone-500">
+    <% trail.each do |label, path| %>
+      <li class="flex items-center gap-1.5">
+        <%= link_to label, path, class: "hover:text-stone-900" %>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="size-4 text-stone-300"><path d="m9 6 6 6-6 6"></path></svg>
+      </li>
+    <% end %>
+    <li>
+      <span aria-current="page" class="font-medium text-stone-900"><%= current %></span>
+    </li>
+  </ol>
+</nav>

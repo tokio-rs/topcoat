@@ -1,7 +1,2 @@
+# Output of `cargo bench-web run` and `verify`.
 results/
-topcoat/assets/
-nextjs/node_modules/
-nextjs/.next/
-nextjs/next-env.d.ts
-leptos/target/
-axum-maud/target/

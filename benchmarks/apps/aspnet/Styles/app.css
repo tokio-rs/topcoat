@@ -1,0 +1,4 @@
+@import "tailwindcss" source(none);
+@source "../Pages";
+@source "../TagHelpers";
+@source "../Infrastructure";

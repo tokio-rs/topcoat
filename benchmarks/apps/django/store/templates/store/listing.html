@@ -1,0 +1,57 @@
+{% extends "store/base.html" %}
+{% load storefront %}
+
+{% block title %}{{ title }} | {% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+  {% breadcrumbs trail current %}
+  <div class="mt-6 flex flex-col gap-4 border-b border-stone-200 pb-8 md:flex-row md:items-end md:justify-between">
+    <div>
+      <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">{{ title }}</h1>
+      <p class="mt-2 max-w-2xl text-stone-600">{{ description }}</p>
+    </div>
+    <p class="shrink-0 text-sm text-stone-500">{% if listing.total %}Showing {{ listing.first_position }} to {{ listing.last_position }} of {{ listing.total|count }} products{% else %}0 products{% endif %}</p>
+  </div>
+  <div class="mt-8 flex flex-col gap-10 lg:flex-row">
+    <aside class="lg:w-60 lg:shrink-0">
+      <h2 class="px-3 text-sm font-semibold text-stone-900">Categories</h2>
+      <ul class="-mx-1 mt-3 flex gap-1 overflow-x-auto px-1 pb-2 lg:mx-0 lg:block lg:space-y-1 lg:overflow-visible lg:px-0 lg:pb-0">
+        {% for entry in sidebar %}
+        <li>
+          {% if entry.current %}
+          <a href="{{ entry.url }}" aria-current="page" class="flex items-center justify-between gap-3 whitespace-nowrap rounded-lg bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-900">{{ entry.name }}<span class="text-xs text-teal-700">{{ entry.count|count }}</span></a>
+          {% else %}
+          <a href="{{ entry.url }}" class="flex items-center justify-between gap-3 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100 hover:text-stone-900">{{ entry.name }}<span class="text-xs text-stone-400">{{ entry.count|count }}</span></a>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </aside>
+    <div class="min-w-0 flex-1">
+      <div class="flex flex-wrap items-center gap-3">
+        <h2 class="text-sm font-medium text-stone-500">Sort by</h2>
+        <ul class="flex flex-wrap gap-2">
+          {% for sort in sorts %}
+          <li>
+            {% if sort.current %}
+            <a href="{{ sort.url }}" aria-current="true" class="block rounded-full bg-stone-900 px-3 py-1.5 text-sm font-medium text-white ring-1 ring-inset ring-stone-900">{{ sort.label }}</a>
+            {% else %}
+            <a href="{{ sort.url }}" class="block rounded-full bg-white px-3 py-1.5 text-sm font-medium text-stone-600 ring-1 ring-inset ring-stone-200 hover:bg-stone-100">{{ sort.label }}</a>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% if listing.products %}
+      <div class="mt-8 grid grid-cols-2 gap-x-6 gap-y-10 md:grid-cols-3 xl:grid-cols-4">
+        {% for product in listing.products %}{% product_card product %}{% endfor %}
+      </div>
+      {% else %}
+      <p class="mt-8 rounded-2xl border border-dashed border-stone-300 p-12 text-center text-stone-500">No products in this category yet.</p>
+      {% endif %}
+      {% if listing.page_count > 1 %}{% pagination listing %}{% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

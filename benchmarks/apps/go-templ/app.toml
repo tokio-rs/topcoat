@@ -1,0 +1,26 @@
+id = "go-templ"
+name = "Go + templ"
+language = "Go"
+kind = "go"
+rendering = "ssr"
+description = "Go net/http with the pattern-matching ServeMux, templ components, encoding/json, klauspost gzhttp compression and a small plain JS file for the two interactive pieces."
+requires = ["go", "templ", "tailwindcss"]
+version_command = "awk '$1 == \"github.com/a-h/templ\" { print \"templ\", $2 }' go.mod && go env GOVERSION"
+# The stylesheet and script are embedded in the binary.
+artifacts = ["bin/harbor-go-templ"]
+
+[build]
+# `go generate` runs `templ generate` and the Tailwind CSS CLI (see main.go).
+commands = [
+  "go generate ./...",
+  "go build -trimpath -ldflags '-s -w' -o bin/harbor-go-templ .",
+]
+env = { GOTOOLCHAIN = "local", CGO_ENABLED = "0" }
+
+[run]
+command = "bin/harbor-go-templ"
+env = {}
+ready_timeout_secs = 60
+
+[client]
+extra_assets = []

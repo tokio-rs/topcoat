@@ -1,0 +1,13 @@
+[project]
+name = "harbor-django"
+version = "0.1.0"
+description = "Harbor Market storefront built with Django."
+requires-python = ">=3.13"
+dependencies = [
+    "django>=6.1.3",
+    "gunicorn>=27.0.0",
+    "whitenoise>=6.12.0",
+]
+
+[tool.uv]
+package = false

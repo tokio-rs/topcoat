@@ -1,0 +1,8 @@
+@import "tailwindcss" source(none);
+@source "../src";
+
+/* The `<leptos-island>` wrapper of an island takes no part in layout, so the page lays out like
+   the markup without islands. */
+leptos-island {
+  display: contents;
+}

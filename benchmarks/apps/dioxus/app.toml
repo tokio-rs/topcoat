@@ -1,0 +1,29 @@
+id = "dioxus"
+name = "Dioxus"
+language = "Rust"
+kind = "rust"
+rendering = "ssr+hydration"
+description = "Dioxus 0.7 fullstack: Axum server-side rendering with server functions, the Dioxus router and rsx! components hydrated in the browser as WebAssembly."
+requires = ["cargo", "dx", "tailwindcss", "wasm-bindgen", "wasm-opt"]
+version_command = "cargo tree --locked --invert dioxus --edges normal --depth 0 --prefix none --features server"
+# The server binary and the `public/` directory with the client bundle and the stylesheet.
+artifacts = ["dist"]
+
+[build]
+# `dx bundle` builds the WebAssembly client with the `wasm-release` profile and the server with the
+# `benchmark` profile, then writes both to `dist/`. `NO_DOWNLOADS=1` makes `dx` use the
+# `tailwindcss`, `wasm-bindgen`, `wasm-opt` and `esbuild` binaries on `PATH`. `target/dx` is
+# where `dx` stages the bundle; it keeps the hashed assets of earlier builds, so it is cleared too.
+commands = [
+    "rm -rf dist target/dx",
+    "dx bundle --release --out-dir dist --cargo-args=--locked @client --web --profile wasm-release --debug-symbols false @server --server --profile benchmark {features}",
+]
+env = { NO_DOWNLOADS = "1" }
+
+[run]
+command = "dist/server"
+env = {}
+ready_timeout_secs = 60
+
+[client]
+extra_assets = []

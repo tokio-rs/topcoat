@@ -1,0 +1,5 @@
+/* The default Tailwind theme with no customization, like every app in the benchmark. Classes
+   are picked up from the templates and components. */
+@import "tailwindcss" source(none);
+@source "../js";
+@source "../../lib/harbor_web";

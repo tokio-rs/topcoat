@@ -1,0 +1,156 @@
+# Configuration for `cargo bench-web run`.
+#
+# Values are resolved in this order, later ones winning:
+#   1. the built-in defaults (identical to the top-level values below),
+#   2. the top-level values in this file,
+#   3. the selected profile (`--profile <name>`, or `profile` below),
+#   4. command line flags (`cargo bench-web run --help` lists them).
+#
+# Durations are strings such as "500ms", "10s" or "2m". `cargo bench-web run --dry-run`
+# prints the resolved configuration without running anything.
+
+# Profile used when `--profile` is not given.
+profile = "standard"
+
+# Apps to run, by id (directory name under `apps/`). Empty means every app. `--only`, `--skip`.
+apps = []
+skip = []
+
+# Scenarios to run (see SPEC.md or `cargo bench-web list`). Empty means all. `--scenarios`,
+# `--skip-scenarios`.
+scenarios = []
+skip_scenarios = []
+
+# Closed-loop load before the measured runs of every scenario and connection count. JIT
+# runtimes (Node, .NET, Ruby YJIT, the BEAM) need a few seconds to reach steady state, and
+# connection pools and caches fill up. Nothing is recorded during warmup except errors.
+warmup = "5s"
+
+# Length of each measured, closed-loop run.
+duration = "10s"
+
+# Measured runs per scenario and connection count. With more than one run the report uses the
+# run with the median throughput and shows the spread.
+runs = 1
+
+# Concurrent connections of the load generator. Each value is a separate measurement; the
+# first value is the "primary" one used by the overview charts and the terminal summary.
+# 64 is enough to keep every core busy on common 8 to 16 core machines for all servers here,
+# while staying well within what process-per-request servers (gunicorn, Puma) queue gracefully.
+connections = [64]
+
+# Worker threads or processes per app, passed as `BENCH_THREADS`. 0 lets each framework use its
+# default, which for every app in this suite means "all cores". Lower it to leave cores to the
+# load generator, which shares the machine.
+threads = 0
+
+# Response compression (`BENCH_COMPRESSION`). Off by default so the numbers measure the
+# frameworks rather than their compression libraries; in production compression is often done
+# by a reverse proxy anyway. When on, the load generator sends `Accept-Encoding` and the
+# response sizes in the results are compressed sizes.
+compression = false
+
+# Global allocator for Rust apps: "system", "jemalloc" or "mimalloc". Selected through the
+# app's cargo features (`{features}` in its build command). jemalloc is what most production
+# Rust web services use; the platform allocator on macOS is notably slow under contention.
+allocator = "jemalloc"
+
+# Pause after each scenario and after each app, so sockets in TIME_WAIT, background GC and
+# thermal effects of one measurement disturb the next one less.
+cooldown = "2s"
+
+# Build the apps before running them. `--skip-build` reuses existing build output.
+build = true
+
+# Measure the client payload (what a browser downloads for the home and detail pages).
+payload = true
+
+# Where result directories go, relative to `benchmarks/`. Each run creates
+# `<output_dir>/<timestamp>-<profile>/` and points `<output_dir>/latest` at it.
+output_dir = "results"
+
+# Open the HTML report in the browser when the run is done. `--open`.
+open = false
+
+# How often the memory and CPU time of the app's process tree are sampled during load.
+# Sampling costs a little CPU; 250ms catches memory peaks without measurable overhead.
+sample_interval = "250ms"
+
+# Per-request timeout. A request that takes longer counts as an error and invalidates the
+# measurement.
+request_timeout = "10s"
+
+# Wait after the app answers its first health check before reading its idle memory, so lazy
+# initialization right after startup is included.
+idle_settle = "2s"
+
+# The `cart_count` cookie every request sends. Every HTML page renders it in the header.
+cart_count = 3
+
+# With `threads` set, a measurement is flagged as "exceeded thread limit, not comparable" when
+# the app's process tree kept more than `threads * (1 + thread_limit_margin) + 0.25` cores busy
+# on average. The margin allows for runtime helper threads: Node.js with one worker shows about
+# 1.4 cores from garbage collection and I/O threads.
+thread_limit_margin = 0.5
+
+[latency]
+# Open-loop phase: requests are sent at a fixed rate whether or not earlier ones finished, and
+# latencies are corrected for coordinated omission (measured from when each request was
+# scheduled, not from when it was sent). This is the latency a user sees at a given load,
+# unlike the latency of the closed-loop runs, which mostly reflects queueing at full load.
+enabled = false
+
+# How the rate is chosen:
+#   "relative": `fraction` times the app's own median throughput from the closed-loop runs of
+#               the same scenario (the best value over all connection counts). Every app runs
+#               at the same relative utilization, so the comparison is about latency behavior
+#               (tail latency, GC pauses, scheduling) with equal headroom. The offered rate
+#               differs per app and is shown next to every latency figure.
+#   "fixed":    `rate` (or a per-scenario value from `rates`) for every app. This answers
+#               "what does a user see at N requests per second", but with throughput differing
+#               by up to 100x between apps a single rate either barely loads the fast apps or
+#               overloads the slow ones, whose latency then only measures queue growth. Apps
+#               that cannot reach the rate are flagged as saturated.
+# The default is "relative" at 50%, a load at which every server should be comfortable.
+mode = "relative"
+fraction = 0.5
+rate = 1000
+# Per-scenario rates for "fixed" mode, e.g. { plaintext = 20000, orders = 500 }.
+rates = {}
+duration = "10s"
+# Connections available to the open-loop generator. It must be large enough that the
+# generator never waits for a free connection at the target rate.
+connections = 64
+
+# Named profiles. Each sets any of the keys above (and `[profiles.<name>.latency]`).
+
+[profiles.quick]
+# Smoke test: every app and scenario in a few minutes. The numbers are noisy and JIT runtimes
+# are not warmed up properly, so do not publish them.
+warmup = "500ms"
+duration = "1s"
+cooldown = "0s"
+idle_settle = "500ms"
+connections = [32]
+
+[profiles.standard]
+# The defaults above: one 10s run per scenario after a 5s warmup. Roughly 3 minutes per app.
+
+[profiles.full]
+# For published numbers: three runs per point (median reported), three connection counts and
+# the latency phase. Roughly 30 minutes per app.
+warmup = "10s"
+duration = "15s"
+runs = 3
+connections = [64, 16, 256]
+cooldown = "5s"
+
+[profiles.full.latency]
+enabled = true
+duration = "30s"
+
+# Tool versions every app is expected to be built with. `run` and `doctor` warn when the tool on
+# PATH reports another version, and the actual versions are recorded in `results.json`. The
+# values match the benchmark Nix shell.
+[expected_tools]
+tailwindcss = "4.3.3"

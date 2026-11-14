@@ -1,0 +1,97 @@
+package views
+
+import (
+	"harbor-go-templ/internal/catalog"
+	"harbor-go-templ/internal/format"
+)
+
+// productImage is the square product tile with the sale and sold-out badges.
+//
+// The dataset has no photos, so the tile draws a soft shape in the product's color instead.
+templ productImage(p *catalog.Product) {
+	<div class={ "relative aspect-square overflow-hidden rounded-2xl " + tile(p.Color) }>
+		<div class={ "absolute left-1/2 top-1/2 aspect-square w-2/5 -translate-x-1/2 -translate-y-1/2 rotate-6 rounded-[28%] shadow-xl transition group-hover:rotate-12 " + accent(p.Color) }></div>
+		if p.SoldOut() || p.CompareAtCents != nil {
+			<div class="absolute left-3 top-3 flex gap-1.5">
+				if p.SoldOut() {
+					<span class="rounded-full bg-stone-900 px-2.5 py-1 text-xs font-medium text-white">Sold out</span>
+				}
+				if p.CompareAtCents != nil {
+					<span class="rounded-full bg-rose-600 px-2.5 py-1 text-xs font-medium text-white">Sale</span>
+				}
+			</div>
+		}
+	</div>
+}
+
+// productCard is a product in a grid: tile, category, name, tagline, rating, price and color.
+templ productCard(p *catalog.Product) {
+	<article class="group relative flex flex-col">
+		@productImage(p)
+		<div class="mt-4 flex flex-1 flex-col">
+			<p class="text-xs font-medium uppercase tracking-wide text-stone-500">{ p.Category.Name }</p>
+			<h3 class="mt-1 text-sm font-semibold text-stone-900 group-hover:text-teal-800">
+				<a href={ productURL(p.ID) }>
+					<span class="absolute inset-0"></span>
+					{ p.Name }
+				</a>
+			</h3>
+			<p class="mt-1 line-clamp-2 text-sm text-stone-600">{ p.Tagline }</p>
+			<div class="mt-2 flex items-center gap-1.5">
+				@stars(filledStars(p.RatingTenths()), format.Rating(p.Rating), smallStars)
+				<span class="text-xs text-stone-500">
+					{ format.Rating(p.Rating) } ({ format.Count(p.ReviewCount) })
+				</span>
+			</div>
+			<div class="mt-auto flex items-end justify-between gap-2 pt-3">
+				<p class="flex items-baseline gap-2">
+					<span class="font-semibold text-stone-900">{ format.Money(p.PriceCents) }</span>
+					if p.CompareAtCents != nil {
+						<s class="text-sm text-stone-400">{ format.Money(*p.CompareAtCents) }</s>
+					}
+				</p>
+				<span class="flex items-center gap-1.5 text-xs text-stone-500">
+					<span class={ "size-3 rounded-full ring-1 ring-black/10 " + accent(p.Color) }></span>
+					{ p.Color.Label() }
+				</span>
+			</div>
+			if p.Stock >= 1 && p.Stock <= 9 {
+				<p class="mt-1 text-xs font-medium text-amber-700">Only { p.Stock } left</p>
+			}
+		</div>
+	</article>
+}
+
+// starSize is the size of a star row.
+type starSize int
+
+const (
+	smallStars starSize = iota
+	largeStars
+)
+
+func starClass(size starSize, filled bool) string {
+	switch {
+	case size == smallStars && filled:
+		return "size-4 fill-amber-400"
+	case size == smallStars:
+		return "size-4 fill-stone-300"
+	case filled:
+		return "size-5 fill-amber-400"
+	default:
+		return "size-5 fill-stone-300"
+	}
+}
+
+// stars is a row of five stars with filled of them highlighted.
+//
+// The row is a single image to assistive technology, labelled with rating.
+templ stars(filled int, rating string, size starSize) {
+	<span class="flex items-center gap-0.5" role="img" aria-label={ "Rated " + rating + " out of 5" }>
+		for star := range 5 {
+			<svg viewBox="0 0 20 20" class={ starClass(size, star < filled) }>
+				<path d="M10 1l3 6 6 1-4 4 1 6-6-3-6 3 1-6-4-4 6-1z"></path>
+			</svg>
+		}
+	</span>
+}

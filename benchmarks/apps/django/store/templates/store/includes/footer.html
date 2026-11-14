@@ -1,0 +1,40 @@
+<footer class="mt-24 bg-stone-900 text-stone-400">
+  <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+    <div class="grid gap-12 md:grid-cols-5">
+      <div class="md:col-span-2">
+        <a href="{% url 'store:home' %}" class="flex items-center gap-2.5 text-lg font-semibold tracking-tight text-white">{% include "store/icons/logo.svg" %}Harbor Market</a>
+        <p class="mt-4 max-w-xs text-sm leading-6">Well-made gear for every harbor day. Shipped from Portland, Oregon since 2016.</p>
+      </div>
+      <div>
+        <h2 class="text-sm font-semibold text-white">Shop</h2>
+        <ul class="mt-4 space-y-3 text-sm">
+          <li><a href="{% url 'store:listing' %}" class="hover:text-white">All products</a></li>
+          <li><a href="{% url 'store:listing' %}?category=outdoor" class="hover:text-white">Outdoor &amp; Camping</a></li>
+          <li><a href="{% url 'store:listing' %}?category=kitchen" class="hover:text-white">Kitchen &amp; Dining</a></li>
+          <li><a href="{% url 'store:listing' %}?category=audio" class="hover:text-white">Audio</a></li>
+          <li><a href="{% url 'store:listing' %}?category=toys" class="hover:text-white">Toys &amp; Games</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="text-sm font-semibold text-white">Help</h2>
+        <ul class="mt-4 space-y-3 text-sm">
+          <li><a href="{% url 'store:about' %}#shipping" class="hover:text-white">Shipping &amp; returns</a></li>
+          <li><a href="{% url 'store:about' %}#warranty" class="hover:text-white">Warranty &amp; repairs</a></li>
+          <li><a href="{% url 'store:about' %}#contact" class="hover:text-white">Contact us</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="text-sm font-semibold text-white">Company</h2>
+        <ul class="mt-4 space-y-3 text-sm">
+          <li><a href="{% url 'store:about' %}" class="hover:text-white">About us</a></li>
+          <li><a href="{% url 'store:orders' %}" class="hover:text-white">Order admin</a></li>
+          <li><a href="{% url 'store:api-products' %}" class="hover:text-white">Product API</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="mt-12 flex flex-col gap-2 border-t border-stone-800 pt-8 text-xs sm:flex-row sm:justify-between">
+      <p>Copyright 2026 Harbor Market. All rights reserved.</p>
+      <p>A demo storefront for comparing web frameworks.</p>
+    </div>
+  </div>
+</footer>

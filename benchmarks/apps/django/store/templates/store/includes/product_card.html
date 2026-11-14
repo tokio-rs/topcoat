@@ -1,0 +1,27 @@
+{% load storefront %}
+<article class="group relative flex flex-col">
+  {% product_image product %}
+  <div class="mt-4 flex flex-1 flex-col">
+    <p class="text-xs font-medium uppercase tracking-wide text-stone-500">{{ product.category.name }}</p>
+    <h3 class="mt-1 text-sm font-semibold text-stone-900 group-hover:text-teal-800">
+      <a href="{% url 'store:product' product.id %}"><span class="absolute inset-0"></span>{{ product.name }}</a>
+    </h3>
+    <p class="mt-1 line-clamp-2 text-sm text-stone-600">{{ product.tagline }}</p>
+    {% with rating=product.rating|floatformat:1 %}
+    <div class="mt-2 flex items-center gap-1.5">
+      {% stars product.rating_tenths rating "small" %}
+      <span class="text-xs text-stone-500">{{ rating }} ({{ product.review_count|count }})</span>
+    </div>
+    {% endwith %}
+    <div class="mt-auto flex items-end justify-between gap-2 pt-3">
+      <p class="flex items-baseline gap-2">
+        <span class="font-semibold text-stone-900">{{ product.price_cents|money }}</span>
+        {% if product.on_sale %}<s class="text-sm text-stone-400">{{ product.compare_at_cents|money }}</s>{% endif %}
+      </p>
+      {% with palette=product.palette %}
+      <span class="flex items-center gap-1.5 text-xs text-stone-500"><span class="size-3 rounded-full ring-1 ring-black/10 {{ palette.accent }}"></span>{{ palette.label }}</span>
+      {% endwith %}
+    </div>
+    {% if product.is_low_stock %}<p class="mt-1 text-xs font-medium text-amber-700">Only {{ product.stock }} left</p>{% endif %}
+  </div>
+</article>

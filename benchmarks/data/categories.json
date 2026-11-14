@@ -1,0 +1,62 @@
+[
+  {
+    "slug": "outdoor",
+    "name": "Outdoor & Camping",
+    "description": "Tents, packs, stoves and the small things that make a night under the stars feel easy."
+  },
+  {
+    "slug": "kitchen",
+    "name": "Kitchen & Dining",
+    "description": "Knives, cookware and tableware for people who cook every day, not just on Sundays."
+  },
+  {
+    "slug": "home",
+    "name": "Home & Living",
+    "description": "Soft textiles, warm light and quiet storage for rooms you want to spend time in."
+  },
+  {
+    "slug": "electronics",
+    "name": "Electronics",
+    "description": "Chargers, cameras and gadgets that quietly do their job and get out of the way."
+  },
+  {
+    "slug": "apparel",
+    "name": "Apparel",
+    "description": "Layers that work as well on a ferry deck as they do in the office."
+  },
+  {
+    "slug": "footwear",
+    "name": "Footwear",
+    "description": "Boots, runners and slippers built on comfortable lasts and real rubber."
+  },
+  {
+    "slug": "bags",
+    "name": "Bags & Travel",
+    "description": "Carry-ons, packs and organizers that make getting out the door the easy part."
+  },
+  {
+    "slug": "office",
+    "name": "Office & Desk",
+    "description": "Tools for writing, thinking and working comfortably, at home or anywhere else."
+  },
+  {
+    "slug": "garden",
+    "name": "Garden",
+    "description": "Hard-wearing tools and simple kits for balconies, allotments and back gardens."
+  },
+  {
+    "slug": "audio",
+    "name": "Audio",
+    "description": "Speakers, headphones and turntables tuned for listening, not just for spec sheets."
+  },
+  {
+    "slug": "fitness",
+    "name": "Fitness",
+    "description": "Gear for home workouts, long runs and everything in between."
+  },
+  {
+    "slug": "toys",
+    "name": "Toys & Games",
+    "description": "Wooden toys, puzzles and games for curious kids and competitive grown-ups."
+  }
+]

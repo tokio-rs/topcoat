@@ -1,0 +1,18 @@
+<nav aria-label="Pagination" class="mt-12 flex items-center justify-between gap-4 border-t border-stone-200 pt-6">
+  {% if previous_url %}
+  <a href="{{ previous_url }}" class="flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100">{% include "store/icons/arrow-left.svg" %}Previous</a>
+  {% else %}
+  <span aria-disabled="true" class="flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-stone-300">{% include "store/icons/arrow-left.svg" %}Previous</span>
+  {% endif %}
+  <p class="text-sm text-stone-600 sm:hidden">Page {{ page }} of {{ page_count }}</p>
+  <ul class="hidden items-center gap-1 sm:flex">
+    {% for number, url, current in pages %}
+    <li>{% if current %}<a href="{{ url }}" aria-current="page" class="flex size-10 items-center justify-center rounded-full bg-stone-900 text-sm font-semibold text-white">{{ number }}</a>{% else %}<a href="{{ url }}" class="flex size-10 items-center justify-center rounded-full text-sm font-medium text-stone-600 hover:bg-stone-100">{{ number }}</a>{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% if next_url %}
+  <a href="{{ next_url }}" class="flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100">Next{% include "store/icons/arrow-right.svg" %}</a>
+  {% else %}
+  <span aria-disabled="true" class="flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-stone-300">Next{% include "store/icons/arrow-right.svg" %}</span>
+  {% endif %}
+</nav>

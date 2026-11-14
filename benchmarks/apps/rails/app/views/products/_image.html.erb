@@ -1,0 +1,15 @@
+<%# locals: (product:) -%>
+<% swatch = swatch(product) %>
+<div class="relative aspect-square overflow-hidden rounded-2xl <%= swatch.tile %>">
+  <div class="absolute left-1/2 top-1/2 aspect-square w-2/5 -translate-x-1/2 -translate-y-1/2 rotate-6 rounded-[28%] shadow-xl transition group-hover:rotate-12 <%= swatch.accent %>"></div>
+  <% if product.sold_out? || product.on_sale? %>
+    <div class="absolute left-3 top-3 flex gap-1.5">
+      <% if product.sold_out? %>
+        <span class="rounded-full bg-stone-900 px-2.5 py-1 text-xs font-medium text-white">Sold out</span>
+      <% end %>
+      <% if product.on_sale? %>
+        <span class="rounded-full bg-rose-600 px-2.5 py-1 text-xs font-medium text-white">Sale</span>
+      <% end %>
+    </div>
+  <% end %>
+</div>

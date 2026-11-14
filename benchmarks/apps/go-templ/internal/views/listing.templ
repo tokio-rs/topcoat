@@ -1,0 +1,109 @@
+package views
+
+import (
+	"harbor-go-templ/internal/catalog"
+	"harbor-go-templ/internal/format"
+)
+
+const (
+	sidebarLink        = "flex items-center justify-between gap-3 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100 hover:text-stone-900"
+	sidebarLinkCurrent = "flex items-center justify-between gap-3 whitespace-nowrap rounded-lg bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-900"
+	sortLink           = "block rounded-full bg-white px-3 py-1.5 text-sm font-medium text-stone-600 ring-1 ring-inset ring-stone-200 hover:bg-stone-100"
+	sortLinkCurrent    = "block rounded-full bg-stone-900 px-3 py-1.5 text-sm font-medium text-white ring-1 ring-inset ring-stone-900"
+)
+
+// listingTitle is the title and description of a listing.
+func listingTitle(l *catalog.Listing) (title, description string) {
+	if l.Category == nil {
+		return "All products", "Everything in the Harbor Market catalog, from tents to turntables."
+	}
+	return l.Category.Name, l.Category.Description
+}
+
+// ListingPage is GET /products: one page of products with category sidebar, sort links and
+// pagination.
+templ ListingPage(store *catalog.Store, l *catalog.Listing, cart int) {
+	{{ title, description := listingTitle(l) }}
+	@layout(title, cart) {
+		<div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+			if l.Category != nil {
+				@breadcrumbs([]link{{"/", "Home"}, {"/products", "Products"}}, title)
+			} else {
+				@breadcrumbs([]link{{"/", "Home"}}, "Products")
+			}
+			<div class="mt-6 flex flex-col gap-4 border-b border-stone-200 pb-8 md:flex-row md:items-end md:justify-between">
+				<div>
+					<h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">{ title }</h1>
+					<p class="mt-2 max-w-2xl text-stone-600">{ description }</p>
+				</div>
+				<p class="shrink-0 text-sm text-stone-500">
+					if l.Total == 0 {
+						0 products
+					} else {
+						Showing { l.FirstPosition() } to { l.LastPosition() } of { format.Count(l.Total) } products
+					}
+				</p>
+			</div>
+			<div class="mt-8 flex flex-col gap-10 lg:flex-row">
+				<aside class="lg:w-60 lg:shrink-0">
+					<h2 class="px-3 text-sm font-semibold text-stone-900">Categories</h2>
+					<ul class="-mx-1 mt-3 flex gap-1 overflow-x-auto px-1 pb-2 lg:mx-0 lg:block lg:space-y-1 lg:overflow-visible lg:px-0 lg:pb-0">
+						<li>
+							@sidebarEntry(listingURL("", l.Sort, 1), "All products", store.ProductCount(), l.Category == nil)
+						</li>
+						for _, category := range store.Categories {
+							<li>
+								@sidebarEntry(listingURL(category.Slug, l.Sort, 1), category.Name, category.ProductCount, l.Category == category)
+							</li>
+						}
+					</ul>
+				</aside>
+				<div class="min-w-0 flex-1">
+					<div class="flex flex-wrap items-center gap-3">
+						<h2 class="text-sm font-medium text-stone-500">Sort by</h2>
+						<ul class="flex flex-wrap gap-2">
+							for _, sort := range catalog.Sorts {
+								<li>
+									if sort == l.Sort {
+										<a href={ listingURL(l.CategorySlug(), sort, 1) } aria-current="true" class={ sortLinkCurrent }>{ sort.Label() }</a>
+									} else {
+										<a href={ listingURL(l.CategorySlug(), sort, 1) } class={ sortLink }>{ sort.Label() }</a>
+									}
+								</li>
+							}
+						</ul>
+					</div>
+					if l.Total == 0 {
+						<p class="mt-8 rounded-2xl border border-dashed border-stone-300 p-12 text-center text-stone-500">
+							No products in this category yet.
+						</p>
+					} else {
+						<div class="mt-8 grid grid-cols-2 gap-x-6 gap-y-10 md:grid-cols-3 xl:grid-cols-4">
+							for _, product := range l.Products {
+								@productCard(product)
+							}
+						</div>
+					}
+					if l.PageCount > 1 {
+						@pagination(l)
+					}
+				</div>
+			</div>
+		</div>
+	}
+}
+
+// sidebarEntry is a category link in the listing sidebar with its product count.
+templ sidebarEntry(href string, label string, count int, current bool) {
+	if current {
+		<a href={ href } aria-current="page" class={ sidebarLinkCurrent }>
+			{ label }
+			<span class="text-xs text-teal-700">{ format.Count(count) }</span>
+		</a>
+	} else {
+		<a href={ href } class={ sidebarLink }>
+			{ label }
+			<span class="text-xs text-stone-400">{ format.Count(count) }</span>
+		</a>
+	}
+}

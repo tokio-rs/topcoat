@@ -1,0 +1,11 @@
+<%# locals: (order:) -%>
+<tr class="hover:bg-stone-50">
+  <td class="px-4 py-3 font-medium text-stone-900"><%= order.number %></td>
+  <td class="px-4 py-3"><time datetime="<%= order.placed_at.to_fs(:iso8601_minutes) %>"><%= order.placed_at.to_fs(:storefront) %></time></td>
+  <td class="px-4 py-3 text-stone-900"><%= order.customer %></td>
+  <td class="px-4 py-3 text-stone-500"><%= order.email %></td>
+  <td class="px-4 py-3"><%= order.country %></td>
+  <td class="px-4 py-3 text-right tabular-nums"><%= order.items %></td>
+  <td class="px-4 py-3"><%= order_status_badge(order) %></td>
+  <td class="px-4 py-3 text-right font-medium tabular-nums text-stone-900"><%= money(order.total_cents) %></td>
+</tr>

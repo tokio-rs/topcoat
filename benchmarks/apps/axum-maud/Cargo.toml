@@ -1,0 +1,33 @@
+[package]
+name = "harbor-axum-maud"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[features]
+jemalloc = ["dep:tikv-jemallocator"]
+mimalloc = ["dep:mimalloc"]
+
+[dependencies]
+axum = "0.8.9"
+axum-extra = { version = "0.12.6", features = ["cookie"] }
+maud = { version = "0.27.0", features = ["axum"] }
+mimalloc = { version = "0.1.52", optional = true }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+tikv-jemallocator = { version = "0.7.0", optional = true }
+time = { version = "0.3.55", features = ["macros", "parsing", "formatting", "serde"] }
+tokio = { version = "1.54.1", features = ["macros", "net", "rt-multi-thread"] }
+tower-http = { version = "0.7.1", features = ["compression-full"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+# Same as the `benchmark` profile of the Topcoat workspace, so every Rust app is built the same way.
+[profile.benchmark]
+inherits = "release"
+codegen-units = 1
+lto = "fat"
+
+# Standalone on purpose: this app has its own dependency tree and lockfile.
+[workspace]

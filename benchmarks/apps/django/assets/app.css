@@ -1,0 +1,3 @@
+@import "tailwindcss" source(none);
+@source "../store/templates";
+@source "../store/**/*.py";

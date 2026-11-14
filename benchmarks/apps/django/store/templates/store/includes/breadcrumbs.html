@@ -1,0 +1,8 @@
+<nav aria-label="Breadcrumb" class="text-sm">
+  <ol class="flex flex-wrap items-center gap-1.5 text-stone-500">
+    {% for label, url in trail %}
+    <li class="flex items-center gap-1.5"><a href="{{ url }}" class="hover:text-stone-900">{{ label }}</a>{% include "store/icons/chevron-right.svg" %}</li>
+    {% endfor %}
+    <li><span aria-current="page" class="font-medium text-stone-900">{{ current }}</span></li>
+  </ol>
+</nav>

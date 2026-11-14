@@ -1,0 +1,14 @@
+@* A breadcrumb trail of links ending in the current page. *@
+@model Breadcrumbs
+<nav aria-label="Breadcrumb" class="text-sm">
+    <ol class="flex flex-wrap items-center gap-1.5 text-stone-500">
+        @foreach (var (label, href) in Model.Trail)
+        {
+            <li class="flex items-center gap-1.5">
+                <a href="@href" class="hover:text-stone-900">@label</a>
+                @Icons.ChevronRight
+            </li>
+        }
+        <li><span aria-current="page" class="font-medium text-stone-900">@Model.Current</span></li>
+    </ol>
+</nav>

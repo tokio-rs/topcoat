@@ -1,0 +1,77 @@
+<Layouts.app cart_count={@cart_count}>
+  <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+    <%= if @listing.category do %>
+      <.breadcrumbs trail={[{"Home", ~p"/"}, {"Products", ~p"/products"}]} current={@page_title} />
+    <% else %>
+      <.breadcrumbs trail={[{"Home", ~p"/"}]} current="Products" />
+    <% end %>
+    <div class="mt-6 flex flex-col gap-4 border-b border-stone-200 pb-8 md:flex-row md:items-end md:justify-between">
+      <div>
+        <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">{@page_title}</h1>
+        <p class="mt-2 max-w-2xl text-stone-600">
+          <%= if @listing.category do %>
+            {@listing.category.description}
+          <% else %>
+            Everything in the Harbor Market catalog, from tents to turntables.
+          <% end %>
+        </p>
+      </div>
+      <p class="shrink-0 text-sm text-stone-500">
+        <%= if @listing.total == 0 do %>
+          0 products
+        <% else %>
+          Showing {@listing.first_position} to {@listing.last_position} of {count(@listing.total)} products
+        <% end %>
+      </p>
+    </div>
+    <div class="mt-8 flex flex-col gap-10 lg:flex-row">
+      <aside class="lg:w-60 lg:shrink-0">
+        <h2 class="px-3 text-sm font-semibold text-stone-900">Categories</h2>
+        <ul class="-mx-1 mt-3 flex gap-1 overflow-x-auto px-1 pb-2 lg:mx-0 lg:block lg:space-y-1 lg:overflow-visible lg:px-0 lg:pb-0">
+          <li>
+            <.sidebar_link
+              href={listing_path(nil, @listing.sort)}
+              current={is_nil(@listing.category)}
+              count={@product_count}
+            >
+              All products
+            </.sidebar_link>
+          </li>
+          <li :for={category <- @categories}>
+            <.sidebar_link
+              href={listing_path(category.slug, @listing.sort)}
+              current={category.slug == category_slug(@listing)}
+              count={category.product_count}
+            >
+              {category.name}
+            </.sidebar_link>
+          </li>
+        </ul>
+      </aside>
+      <div class="min-w-0 flex-1">
+        <div class="flex flex-wrap items-center gap-3">
+          <h2 class="text-sm font-medium text-stone-500">Sort by</h2>
+          <ul class="flex flex-wrap gap-2">
+            <li :for={sort <- Catalog.sorts()}>
+              <.sort_link
+                href={listing_path(category_slug(@listing), sort)}
+                current={sort == @listing.sort}
+                sort={sort}
+              />
+            </li>
+          </ul>
+        </div>
+        <%= if @listing.total == 0 do %>
+          <p class="mt-8 rounded-2xl border border-dashed border-stone-300 p-12 text-center text-stone-500">
+            No products in this category yet.
+          </p>
+        <% else %>
+          <div class="mt-8 grid grid-cols-2 gap-x-6 gap-y-10 md:grid-cols-3 xl:grid-cols-4">
+            <.product_card :for={product <- @listing.products} product={product} />
+          </div>
+        <% end %>
+        <.pagination :if={@listing.page_count > 1} listing={@listing} />
+      </div>
+    </div>
+  </div>
+</Layouts.app>

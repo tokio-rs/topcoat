@@ -1,0 +1,69 @@
+use maud::{Markup, html};
+
+use super::icons;
+
+const COLUMNS: [(&str, &[(&str, &str)]); 3] = [
+    (
+        "Shop",
+        &[
+            ("/products", "All products"),
+            ("/products?category=outdoor", "Outdoor & Camping"),
+            ("/products?category=kitchen", "Kitchen & Dining"),
+            ("/products?category=audio", "Audio"),
+            ("/products?category=toys", "Toys & Games"),
+        ],
+    ),
+    (
+        "Help",
+        &[
+            ("/about#shipping", "Shipping & returns"),
+            ("/about#warranty", "Warranty & repairs"),
+            ("/about#contact", "Contact us"),
+        ],
+    ),
+    (
+        "Company",
+        &[
+            ("/about", "About us"),
+            ("/admin/orders", "Order admin"),
+            ("/api/products", "Product API"),
+        ],
+    ),
+];
+
+/// The site footer with link columns.
+pub fn footer() -> Markup {
+    html! {
+        footer class="mt-24 bg-stone-900 text-stone-400" {
+            div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8" {
+                div class="grid gap-12 md:grid-cols-5" {
+                    div class="md:col-span-2" {
+                        a href="/" class="flex items-center gap-2.5 text-lg font-semibold tracking-tight text-white" {
+                            (icons::logo())
+                            "Harbor Market"
+                        }
+                        p class="mt-4 max-w-xs text-sm leading-6" {
+                            "Well-made gear for every harbor day. Shipped from Portland, Oregon since 2016."
+                        }
+                    }
+                    @for (title, links) in COLUMNS {
+                        div {
+                            h2 class="text-sm font-semibold text-white" { (title) }
+                            ul class="mt-4 space-y-3 text-sm" {
+                                @for (href, label) in links {
+                                    li {
+                                        a href=(href) class="hover:text-white" { (label) }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                div class="mt-12 flex flex-col gap-2 border-t border-stone-800 pt-8 text-xs sm:flex-row sm:justify-between" {
+                    p { "Copyright 2026 Harbor Market. All rights reserved." }
+                    p { "A demo storefront for comparing web frameworks." }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,44 @@
+@* Previous and next links with a link to every page of the listing. *@
+@model Listing
+@functions {
+    private const string Step = "flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100";
+    private const string StepDisabled = "flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-stone-300";
+    private const string PageLink = "flex size-10 items-center justify-center rounded-full text-sm font-medium text-stone-600 hover:bg-stone-100";
+    private const string PageCurrent = "flex size-10 items-center justify-center rounded-full bg-stone-900 text-sm font-semibold text-white";
+
+    private string PageUrl(int page) => Url.Listing(Model.CategorySlug, Model.Sort, page);
+}
+<nav aria-label="Pagination" class="mt-12 flex items-center justify-between gap-4 border-t border-stone-200 pt-6">
+    @if (Model.Page > 1)
+    {
+        <a href="@PageUrl(Model.Page - 1)" class="@Step">@Icons.ArrowLeft Previous</a>
+    }
+    else
+    {
+        <span aria-disabled="true" class="@StepDisabled">@Icons.ArrowLeft Previous</span>
+    }
+    <p class="text-sm text-stone-600 sm:hidden">Page @Model.Page of @Model.PageCount</p>
+    <ul class="hidden items-center gap-1 sm:flex">
+        @for (var number = 1; number <= Model.PageCount; number++)
+        {
+            <li>
+                @if (number == Model.Page)
+                {
+                    <a href="@PageUrl(number)" aria-current="page" class="@PageCurrent">@number</a>
+                }
+                else
+                {
+                    <a href="@PageUrl(number)" class="@PageLink">@number</a>
+                }
+            </li>
+        }
+    </ul>
+    @if (Model.Page < Model.PageCount)
+    {
+        <a href="@PageUrl(Model.Page + 1)" class="@Step">Next @Icons.ArrowRight</a>
+    }
+    else
+    {
+        <span aria-disabled="true" class="@StepDisabled">Next @Icons.ArrowRight</span>
+    }
+</nav>

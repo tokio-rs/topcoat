@@ -1,0 +1,27 @@
+id = "django"
+name = "Django"
+language = "Python"
+kind = "python"
+rendering = "ssr"
+description = "Django with the Django template language on Gunicorn (one gthread worker process per core, keep-alive), WhiteNoise for static files and a small plain JS file for the two interactive pieces."
+requires = ["uv", "python3", "tailwindcss"]
+version_command = ".venv/bin/python -c \"import sys, django, gunicorn; print(f'Django {django.get_version()}, Gunicorn {gunicorn.__version__}, Python {sys.version.split()[0]}')\""
+# The deployable app: the code and the `collectstatic` output. The virtualenv is not counted.
+artifacts = ["harbor", "store", "staticfiles"]
+
+[build]
+commands = [
+    "uv sync --locked --no-dev --compile-bytecode",
+    "tailwindcss --input assets/app.css --output store/static/store/app.css --minify",
+    ".venv/bin/python manage.py collectstatic --noinput --clear",
+]
+# Use the Python on `PATH` (the Nix shell's), never a downloaded one.
+env = { UV_PYTHON_DOWNLOADS = "never", UV_PYTHON_PREFERENCE = "only-system" }
+
+[run]
+command = ".venv/bin/gunicorn --config gunicorn.conf.py harbor.wsgi"
+env = {}
+ready_timeout_secs = 60
+
+[client]
+extra_assets = []

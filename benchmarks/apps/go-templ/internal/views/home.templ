@@ -1,0 +1,91 @@
+package views
+
+import (
+	"harbor-go-templ/internal/catalog"
+	"harbor-go-templ/internal/format"
+)
+
+var perks = []struct {
+	Icon  templ.Component
+	Title string
+	Text  string
+}{
+	{iconTruck(), "Free shipping over $75", "Orders ship within one business day from Portland."},
+	{iconRefresh(), "30-day returns", "Changed your mind? Send it back, on us."},
+	{iconShield(), "Repair, don't replace", "Spare parts and repairs for as long as we sell it."},
+}
+
+// HomePage is GET /: hero, store perks, category links and featured products.
+templ HomePage(store *catalog.Store, cart int) {
+	@layout("", cart) {
+		<section class="relative overflow-hidden bg-teal-900 text-white">
+			<div class="mx-auto grid max-w-7xl items-center gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2 lg:px-8 lg:py-28">
+				<div>
+					<p class="text-sm font-semibold uppercase tracking-widest text-teal-200">New season, same harbor</p>
+					<h1 class="mt-4 text-4xl font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl">
+						Well-made gear for every harbor day.
+					</h1>
+					<p class="mt-6 max-w-xl text-lg leading-8 text-teal-100">
+						Tents, knives, boots and blankets from small workshops we know by name. Built to last, easy to repair and shipped free over $75.
+					</p>
+					<div class="mt-10 flex flex-wrap gap-4">
+						<a href="/products" class="rounded-full bg-white px-6 py-3 text-sm font-semibold text-teal-900 shadow-sm hover:bg-teal-50">
+							Shop all products
+						</a>
+						<a href={ categoryURL("outdoor") } class="rounded-full px-6 py-3 text-sm font-semibold text-white ring-1 ring-inset ring-white/40 hover:bg-white/10">
+							Browse outdoor gear
+						</a>
+					</div>
+				</div>
+				<div aria-hidden="true" class="relative hidden aspect-[4/3] lg:block">
+					<div class="absolute left-[8%] top-[10%] aspect-square w-[46%] -rotate-6 rounded-[28%] bg-amber-200 shadow-2xl shadow-black/30"></div>
+					<div class="absolute right-[6%] top-[4%] aspect-square w-[34%] rotate-12 rounded-full bg-sky-400 shadow-2xl shadow-black/30"></div>
+					<div class="absolute bottom-[2%] right-[18%] aspect-square w-[40%] rotate-6 rounded-[28%] bg-orange-700 shadow-2xl shadow-black/30"></div>
+				</div>
+			</div>
+		</section>
+		<section aria-label="Why Harbor Market" class="border-b border-stone-200 bg-white">
+			<ul class="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:grid-cols-3 sm:px-6 lg:px-8">
+				for _, perk := range perks {
+					<li class="flex gap-4">
+						<span class="flex size-11 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-700">
+							@perk.Icon
+						</span>
+						<div>
+							<p class="font-semibold text-stone-900">{ perk.Title }</p>
+							<p class="mt-1 text-sm text-stone-600">{ perk.Text }</p>
+						</div>
+					</li>
+				}
+			</ul>
+		</section>
+		<section aria-labelledby="categories-heading" class="mx-auto max-w-7xl px-4 pt-16 sm:px-6 lg:px-8">
+			<h2 id="categories-heading" class="text-2xl font-semibold tracking-tight">Shop by category</h2>
+			<ul class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+				for _, category := range store.Categories {
+					<li>
+						<a href={ categoryURL(category.Slug) } class="group block h-full rounded-2xl border border-stone-200 bg-white p-5 transition hover:border-teal-600 hover:shadow-md">
+							<h3 class="font-semibold text-stone-900 group-hover:text-teal-800">{ category.Name }</h3>
+							<p class="mt-1 line-clamp-2 text-sm text-stone-600">{ category.Description }</p>
+							<p class="mt-4 text-xs font-medium text-stone-500">{ format.Count(category.ProductCount) } products</p>
+						</a>
+					</li>
+				}
+			</ul>
+		</section>
+		<section aria-labelledby="featured-heading" class="mx-auto max-w-7xl px-4 pt-20 sm:px-6 lg:px-8">
+			<div class="flex items-end justify-between gap-4">
+				<h2 id="featured-heading" class="text-2xl font-semibold tracking-tight">Featured products</h2>
+				<a href="/products" class="flex items-center gap-1.5 text-sm font-semibold text-teal-700 hover:text-teal-900">
+					View all
+					@iconArrowRight()
+				</a>
+			</div>
+			<div class="mt-8 grid grid-cols-2 gap-x-6 gap-y-10 lg:grid-cols-4">
+				for _, product := range store.Featured {
+					@productCard(product)
+				}
+			</div>
+		</section>
+	}
+}
