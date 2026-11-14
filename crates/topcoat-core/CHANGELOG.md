@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.2](https://github.com/tokio-rs/topcoat/compare/topcoat-core-v0.12.1...topcoat-core-v0.12.2) - 2026-11-14
+
+### Other
+
+- rewrite benchmarks with new frameworks and visualization ([#613](https://github.com/tokio-rs/topcoat/pull/613))
+
 ## [0.12.0](https://github.com/tokio-rs/topcoat/compare/topcoat-core-v0.11.0...topcoat-core-v0.12.0) - 2026-11-09
 
 ### Added
