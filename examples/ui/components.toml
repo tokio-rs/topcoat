@@ -93,7 +93,7 @@ hash = "sha256:4ca216a40620bdb7df1e882bd57c061f1f7e08e65a2a737d8dbafbc38d91069f"
 file = "src/components/progress.rs"
 
 [registries.topcoat.components.radio_group]
-hash = "sha256:475b5a0dfda650e9998673d317302221c2904c1e0b6878612abb059c86a6fdeb"
+hash = "sha256:9f0fe2d48433945b2e79e0cecfc5e192b97771be919fdf1b641eb19e28cdc31f"
 file = "src/components/radio_group.rs"
 
 [registries.topcoat.components.select]
