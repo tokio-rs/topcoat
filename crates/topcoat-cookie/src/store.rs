@@ -140,13 +140,14 @@ where
     /// it exists to make that intent explicit at the call site.
     pub fn rollback(self) {}
 
-    /// Queues a removal of the backing cookie, expiring it on the client.
+    /// Queues a removal of the backing cookie and returns the in-memory value.
     ///
-    /// Drops the in-memory value and removes the cookie through the backing
-    /// jar. Use the same jar configuration as when writing so the browser can
-    /// match the cookie's name, path, and domain.
-    pub fn remove(self) {
+    /// Expires the cookie on the client through the backing jar. Use the same
+    /// jar configuration as when writing so the browser can match the cookie's
+    /// name, path, and domain.
+    pub fn remove(self) -> T {
         self.jar.remove(Cookie::new(self.key, ""));
+        self.value
     }
 }
 
