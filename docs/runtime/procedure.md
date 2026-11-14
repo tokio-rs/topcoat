@@ -90,7 +90,7 @@ async fn double(cx: &Cx, value: usize) -> Result<usize> {
 
 The browser calls this procedure with a `POST` request to `/api/double`. Arguments are sent in the request body, so the path cannot contain dynamic or catch-all parameters.
 
-The path follows the router's [path syntax](../router/index.html#paths). Groups affect layer matching but are omitted from the URL. For example, `#[procedure("/(api)/double")]` serves calls at `/double`.
+The path follows the router's [path syntax](../router/index.html#path-syntax). Groups affect layer matching but are omitted from the URL. For example, `#[procedure("/(api)/double")]` serves calls at `/double`.
 
 [`Cx`]: ../context/struct.Cx.html
 [`Result`]: ../type.Result.html

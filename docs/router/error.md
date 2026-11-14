@@ -84,7 +84,7 @@ async fn root_layout(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
 
 The [`StatusCode`](crate::StatusCode) keeps the response at 403. Without it, the fallback view would produce a 200 response. Return an error from the fallback to let an outer boundary or the router handle it.
 
-You may also use [`live!`](../view/macro.live.html) regions to handle errors instead of using the simpler `error_boundary` component.
+You may also use [`live!`](../../view/macro.live.html) regions to handle errors instead of using the simpler `error_boundary` component.
 
 # Not-found pages
 

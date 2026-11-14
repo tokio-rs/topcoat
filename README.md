@@ -205,6 +205,8 @@ view! { <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())> }
 
 ## Learn Topcoat
 
+Read the guides on the [documentation site](https://tokio-rs.github.io/topcoat/), or pick a topic below.
+
 **Start here**
 
 - [Getting started](https://github.com/tokio-rs/topcoat/blob/main/docs/getting_started.md): create an app with `topcoat new` and run the dev server.

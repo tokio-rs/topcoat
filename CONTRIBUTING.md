@@ -90,6 +90,24 @@ Follow these rules throughout the project:
 
 Match the surrounding code and follow the [`style`](.agents/skills/style/SKILL.md) skill. For guides, also read the [`prose`](.agents/skills/prose/SKILL.md) skill. For macros, read the [`macro`](.agents/skills/macro/SKILL.md) skill.
 
+## Documentation
+
+The guides in `docs/` are published at <https://tokio-rs.github.io/topcoat/>. The site is built with [mdBook](https://rust-lang.github.io/mdBook/), configured in `book.toml`. Many of these files are also the crates' API documentation, so keep them valid for rustdoc too.
+
+Preview the site locally (needs Python 3):
+
+```sh
+cargo install mdbook
+cargo doc -p topcoat --all-features --no-deps
+mdbook serve --open
+```
+
+Write links to API items as rustdoc expects them, such as ``[`Router`]`` or `[text](crate::asset)`. The build looks up where rustdoc resolved each link and points it to the matching guide or to docs.rs. This is why `cargo doc` runs first. Without the API docs the site still builds, but these links stay unresolved.
+
+The sidebar comes from `docs/SUMMARY.md`. Add every new page to it. mdBook skips pages that are not listed, so they would not appear on the site.
+
+The [`Docs`](.github/workflows/docs.yml) workflow builds and deploys the site on every push to `main` that changes `docs/` or `book.toml`.
+
 ## Commits and pull requests
 
 Commit messages and pull request titles follow [Conventional Commits](https://www.conventionalcommits.org/):
@@ -113,6 +131,7 @@ More detail is in the [`commit`](.agents/skills/commit/SKILL.md) and [`pr`](.age
 ## Where to find things
 
 - [README](README.md): an introduction to Topcoat and an index of guides.
+- [Documentation site](https://tokio-rs.github.io/topcoat/): the guides from `docs/`, ordered for reading.
 - [`docs/getting_started.md`](docs/getting_started.md): building an app with Topcoat, which is worth doing before changing the framework.
 - [Tokio Discord](https://discord.gg/tokio): questions, feature discussions, and everything else.
 
