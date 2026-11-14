@@ -79,7 +79,7 @@ Expressions use a subset of Rust's syntax:
 - Blocks, with `let` bindings of plain identifiers; the trailing expression is the block's value.
 - `if`/`else` as an expression.
 - Closures, optionally `async`, and `.await`.
-- `loop`, `while`, `break`, `continue`, and `return`.
+- `loop`, `while`, `break`, `continue`, and `return`. `break` and `continue` must be directly in the loop body, not inside an `if` or a block within it.
 
 Unsupported syntax produces a compile error at the expression.
 

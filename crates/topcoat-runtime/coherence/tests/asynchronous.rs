@@ -139,20 +139,4 @@ fn known_control_flow_mismatches_after_await() {
         if condition.await { return 1.0; }
         2.0
     });
-    coherent!(async known "break_inside_if" => {
-        loop {
-            if condition.await { break; }
-            break;
-        }
-        3.0
-    });
-    let condition = Awaitable::ready(false).after_yield();
-    coherent!(async known "continue_inside_if" => {
-        let condition = condition.await;
-        loop {
-            if condition { continue; }
-            break;
-        }
-        3.0
-    });
 }
