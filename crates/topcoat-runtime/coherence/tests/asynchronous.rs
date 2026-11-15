@@ -133,24 +133,30 @@ fn panics_before_during_and_after_await() {
 }
 
 #[test]
-fn known_control_flow_mismatches_after_await() {
+fn control_flow_inside_if_after_await() {
     let condition = Awaitable::ready(true).after_yield();
-    coherent!(async known "return_inside_if" => {
-        if condition.await { return 1.0; }
+    coherent!(async => {
+        if condition.await {
+            return 1.0;
+        }
         2.0
     });
-    coherent!(async known "break_inside_if" => {
+    coherent!(async => {
         loop {
-            if condition.await { break; }
+            if condition.await {
+                break;
+            }
             break;
         }
         3.0
     });
     let condition = Awaitable::ready(false).after_yield();
-    coherent!(async known "continue_inside_if" => {
+    coherent!(async => {
         let condition = condition.await;
         loop {
-            if condition { continue; }
+            if condition {
+                continue;
+            }
             break;
         }
         3.0

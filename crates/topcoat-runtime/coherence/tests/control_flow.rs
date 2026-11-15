@@ -54,3 +54,65 @@ fn bounded_loops() {
         3.0
     });
 }
+
+#[test]
+fn return_inside_if() {
+    coherent!({
+        if true {
+            return 1.0;
+        }
+        2.0
+    });
+}
+
+#[test]
+fn break_inside_if_inside_loop() {
+    coherent!({
+        loop {
+            if true {
+                break;
+            }
+            break;
+        }
+        3.0
+    });
+}
+
+#[test]
+fn break_inside_if_inside_while() {
+    coherent!({
+        while true {
+            if true {
+                break;
+            }
+            break;
+        }
+        3.0
+    });
+}
+
+#[test]
+fn continue_inside_if_inside_loop() {
+    coherent!({
+        loop {
+            if false {
+                continue;
+            }
+            break;
+        }
+        3.0
+    });
+}
+
+#[test]
+fn continue_inside_if_inside_while() {
+    coherent!({
+        while true {
+            if false {
+                continue;
+            }
+            break;
+        }
+        3.0
+    });
+}
