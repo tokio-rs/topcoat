@@ -33,7 +33,8 @@ getrandom = { workspace = true, features = ["wasm_js"] }
 
 [dev-dependencies]
 http.workspace = true
-topcoat = { workspace = true, features = ["session"] }
+# Without default features, so `cargo test -p topcoat-session --lib` runs without `cookie`.
+topcoat = { workspace = true, default-features = false, features = ["router", "session"] }
 tokio = { workspace = true, features = ["macros", "rt"] }
 
 [lints]

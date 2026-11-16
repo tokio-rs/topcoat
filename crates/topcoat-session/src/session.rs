@@ -419,6 +419,13 @@ mod tests {
         assert_send::<Pending<'static>>();
     }
 
+    #[cfg(not(feature = "cookie"))]
+    #[test]
+    #[should_panic(expected = "no session token store")]
+    fn prepare_start_without_a_token_store_panics() {
+        let _ = prepare_start(&Cx::new());
+    }
+
     #[cfg(feature = "cookie")]
     #[test]
     #[should_panic(expected = "cookie layer")]

@@ -47,6 +47,8 @@ pub trait TokenStore: Send + Sync {
 /// no `SessionTokenStore`, and the default store is unavailable.
 ///
 /// ```rust
+/// # #[cfg(feature = "cookie")]
+/// # fn main() {
 /// use topcoat::{
 ///     router::Router,
 ///     session::{SessionTokenStore, cookie::CookieTokenStore},
@@ -55,6 +57,9 @@ pub trait TokenStore: Send + Sync {
 /// let router = Router::builder()
 ///     .with(SessionTokenStore::new(CookieTokenStore::new().name("id")))
 ///     .build();
+/// # }
+/// # #[cfg(not(feature = "cookie"))]
+/// # fn main() {}
 /// ```
 pub struct SessionTokenStore(Box<dyn TokenStore>);
 

@@ -78,6 +78,9 @@ jobs:
       # fingerprint so the script downloads it again.
       - run: test -e target/debug/gn_out/obj/librusty_v8.a || rm -rf target/debug/build/v8-* target/debug/.fingerprint/v8-*
       - run: cargo test --workspace --all-features
+      # The workspace run enables every feature; this runs the session tests
+      # without the default cookie token store.
+      - run: cargo test -p topcoat-session
 
   # Compiles a few starter applications created by `topcoat new` against this
   # checkout. Every combination compiles the framework with different features, so
