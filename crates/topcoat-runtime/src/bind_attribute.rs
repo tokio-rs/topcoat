@@ -30,6 +30,7 @@ where
             evaluated,
             js,
             is_static,
+            synced: _,
         } = self.value;
 
         if is_static {
