@@ -168,6 +168,7 @@ pub struct PendingRotation<'a> {
 /// [`SessionLifetime`](crate::SessionLifetime) is too large to add to the
 /// current time, or when the context has no token store; see
 /// [`SessionTokenStore`](crate::SessionTokenStore).
+#[track_caller]
 pub fn prepare_start(cx: &Cx) -> Pending<'_> {
     let store = token_store(cx);
     let token = Token::random();
@@ -417,6 +418,13 @@ mod tests {
     fn pending_is_send() {
         assert_send::<Pending<'static>>();
     }
+
+    #[cfg(feature = "cookie")]
+    #[test]
+    #[should_panic(expected = "cookie layer")]
+    fn prepare_start_without_a_cookie_layer_panics() {
+        let _ = prepare_start(&Cx::new());
+    }
 }
 
 #[cfg(all(test, feature = "cookie"))]
@@ -597,6 +605,14 @@ mod cookie_tests {
             .await;
         assert!(result.is_err());
         assert_eq!(set_cookies(&cx), Vec::<String>::new());
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "cookie layer")]
+    async fn a_cookie_store_write_without_a_cookie_layer_panics_for_any_lifetime() {
+        let _ = CookieTokenStore::new()
+            .write(&Cx::new(), Token::random(), Duration::MAX)
+            .await;
     }
 
     #[tokio::test]
