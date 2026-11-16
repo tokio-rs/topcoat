@@ -32,10 +32,20 @@ impl PrettyPrint for syn::Macro {
             let print_args = |printer: &mut Printer<'_>| args.pretty_print(printer);
             match &self.delimiter {
                 syn::MacroDelimiter::Paren(paren) => {
-                    paren.pretty_print(printer, Some(BreakMode::Consistent), print_args);
+                    paren.pretty_print_unless_empty(
+                        printer,
+                        Some(BreakMode::Consistent),
+                        args.is_empty(),
+                        print_args,
+                    );
                 }
                 syn::MacroDelimiter::Bracket(bracket) => {
-                    bracket.pretty_print(printer, Some(BreakMode::Consistent), print_args);
+                    bracket.pretty_print_unless_empty(
+                        printer,
+                        Some(BreakMode::Consistent),
+                        args.is_empty(),
+                        print_args,
+                    );
                 }
                 syn::MacroDelimiter::Brace(_) => unreachable!("brace bodies are copied verbatim"),
             }
