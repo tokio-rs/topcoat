@@ -164,9 +164,9 @@ mod tests {
             &'a self,
             _cx: &'a Cx,
             _token: Token,
-            max_age: Duration,
+            time_to_live: Duration,
         ) -> TokenStoreFuture<'a, ()> {
-            self.writes.lock().unwrap().push(max_age);
+            self.writes.lock().unwrap().push(time_to_live);
             Box::pin(async { Ok(()) })
         }
 

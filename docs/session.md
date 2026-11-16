@@ -234,7 +234,7 @@ impl TokenStore for BearerTokenStore {
         &'a self,
         _cx: &'a Cx,
         _token: Token,
-        _max_age: Duration,
+        _time_to_live: Duration,
     ) -> TokenStoreFuture<'a, ()> {
         // API clients receive their token out of band; there is nothing to
         // send with the response.
