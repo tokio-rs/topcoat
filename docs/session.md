@@ -199,7 +199,7 @@ let router = Router::builder()
     .build();
 ```
 
-Sessions last 30 days when the context has no [`SessionLifetime`]. The lifetime becomes both the `Max-Age` of the issued cookie and the `expires_at` handed to you by [`start`], [`refresh`], and [`rotate`], so the client's cookie and your record expire together.
+Sessions last 30 days when the context has no [`SessionLifetime`]. The lifetime, rounded up to whole seconds, is both the issued token's time to live and the `expires_at` on every [`Session`] the module hands you, so a token store that keeps that time to live does not expire the token before your record. Browsers limit how long a cookie may live, so with a very long lifetime the client can drop the cookie before the record expires.
 
 # Custom token stores
 
@@ -248,6 +248,8 @@ impl TokenStore for BearerTokenStore {
 ```
 
 Add it to the router with `.with(SessionTokenStore::new(BearerTokenStore))`. Serialize the raw token with [`Token::encode`] and parse it back with [`Token::decode`]; both use URL-safe base64.
+
+A store that sends the token with an expiry must keep it valid for at least the time to live passed to `write`, which is a whole number of seconds. A shorter one lets your record outlive the token.
 
 # Security notes
 
