@@ -15,6 +15,7 @@ Session functions take `cx: &Cx`:
 - [`stop`] instructs the client to discard its token and returns the hash so you can delete the record. Call it on logout.
 - [`refresh`] re-issues the current token with a full lifetime ahead of it, for sliding expiration.
 - [`rotate`] replaces the current token with a fresh one, for privilege changes.
+- [`prepare_start`] and [`prepare_rotate`] do the same as [`start`] and [`rotate`] but hold the token back until you [`commit`](Pending::commit) it, after your record is stored. [`prepare_start`] returns a [`Pending`] token; [`prepare_rotate`] returns a [`PendingRotation`] with the hash to revoke and the pending replacement.
 
 Topcoat reads the token once per request. Session changes update that cached value, so later code in the same request sees the new session.
 
@@ -178,6 +179,40 @@ async fn escalate(cx: &Cx) -> Result<()> {
     Ok(())
 }
 ```
+
+## Issuing the token after the record moves
+
+[`rotate`] issues the new token before you have stored its record. If your write then fails, or loses a race against another request carrying the same token, the client already holds a token with no record. To avoid that, prepare the rotation, move the record, and commit the token only once the record is in place:
+
+```rust
+use topcoat::{Result, context::Cx, session};
+# /// Moves the record from `revoked` to the new session; `false` when no record was under `revoked`.
+# async fn rekey_session(_cx: &Cx, _revoked: &session::TokenHash, _session: &session::Session) -> Result<bool> { Ok(true) }
+# async fn delete_session(_cx: &Cx, _hash: &session::TokenHash) -> Result<()> { Ok(()) }
+
+async fn escalate(cx: &Cx) -> Result<()> {
+    let Some(rotation) = session::prepare_rotate(cx).await? else {
+        return Ok(());
+    };
+    if !rekey_session(cx, &rotation.revoked, rotation.pending.session()).await? {
+        // Another request already moved the record. Issue nothing.
+        return Ok(());
+    }
+    if let Err(error) = rotation.pending.commit().await {
+        // The record moved but the client did not get the token.
+        let (session, source) = error.into_parts();
+        delete_session(cx, &session.token_hash).await?;
+        return Err(source);
+    }
+    Ok(())
+}
+```
+
+[`prepare_rotate`] returns a [`PendingRotation`]: the hash to revoke and a [`Pending`] replacement. Nothing is sent to the client until [`Pending::commit`] runs. Commit only when your write actually moved the record. If it failed, or found no record because a concurrent request already moved it, return without committing: the pending token is dropped, the response carries no session change, and the client keeps the token it arrived with. [`prepare_start`] has the same shape for signing in.
+
+[`Pending::commit`] fails when the token store cannot issue the token. At that point the record has already moved, and the client may hold either token if the store failed after sending the new one. The [`CommitError`] carries the session you prepared; delete its record so neither token stays signed in. The example takes the session and the store's error out with [`CommitError::into_parts`] and returns the store's error itself, because `?` on the `CommitError` would wrap it and hide its type from your error handling.
+
+Commit before the response starts streaming. The default cookie store panics once the response headers have been sent. Unlike an error, a panic leaves the record you moved in place with no token issued and no [`CommitError`] to name it.
 
 # Configuration
 
