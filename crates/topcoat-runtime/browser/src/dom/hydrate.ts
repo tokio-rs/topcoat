@@ -3,7 +3,12 @@ import { ShardUnit } from "../render/shard";
 import { type Region, Scope } from "../scope";
 import type { SignalId } from "../signal-registry";
 import { setupBinding } from "./binding";
-import { setupEventHandler } from "./event";
+import {
+	hasMountHandler,
+	type PendingMount,
+	scheduleMounts,
+	setupEventHandler,
+} from "./event";
 import { type CommentMarker, parseComment } from "./markers";
 import { setupTextExpression } from "./text";
 
@@ -34,6 +39,9 @@ type Frame = {
  *   scope, and removes the ID from this set. Remaining IDs were not reused.
  * - `syncText`: reconciles replacement text with current signal values.
  *   Initial hydration preserves the server's text until a signal changes.
+ *
+ * Elements with an `@mount` handler receive the mount event once the scan
+ * completes without an error and the caller's synchronous work finishes.
  */
 export function hydrate(
 	root: Node,
@@ -51,6 +59,7 @@ export function hydrate(
 
 	const stack: Frame[] = [{ scope: initialScope, shard: null, region: null }];
 	const textExpressions: PendingTextExpression[] = [];
+	const mounts: PendingMount[] = [];
 
 	for (let node = walker.nextNode(); node; node = walker.nextNode()) {
 		if (to && node === to) break;
@@ -59,7 +68,7 @@ export function hydrate(
 		if (current === undefined) throw new Error("Stack was empty");
 
 		if (node.nodeType === Node.ELEMENT_NODE) {
-			processElement(node as Element, current);
+			processElement(node as Element, current, mounts);
 			continue;
 		}
 
@@ -76,13 +85,19 @@ export function hydrate(
 			syncText,
 		);
 	}
+	scheduleMounts(mounts);
 }
 
-function processElement(el: Element, scope: Scope): void {
+function processElement(
+	el: Element,
+	scope: Scope,
+	mounts: PendingMount[],
+): void {
 	for (const attr of Array.from(el.attributes)) {
 		setupBinding(el, attr, scope);
 		setupEventHandler(el, attr, scope);
 	}
+	if (hasMountHandler(el)) mounts.push({ el, scope });
 	if (
 		el instanceof HTMLAnchorElement &&
 		el.getAttribute(LINK_ATTRIBUTE) === "viewport"

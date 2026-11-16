@@ -124,6 +124,34 @@ For operations outside the expression vocabulary, use a JavaScript string litera
 
 Signals also have methods for common updates. For example, `$(|_e| count.increment())` adds one to a numeric signal.
 
+# Running code when content loads
+
+The `@mount` handler runs in the browser after the runtime attaches to its element. Use it for work that needs the browser, such as reading `sessionStorage` or formatting a time in the viewer's time zone:
+
+```rust
+# use topcoat::{Result, context::Cx, runtime::signal, view::*};
+# #[component]
+# async fn example(cx: &Cx) -> Result<impl View> {
+let flash = signal(cx, String::new);
+
+Ok(view! {
+    <p
+        :hidden=$(flash.get().is_empty())
+        @mount=$(|_e| flash.set(raw!(
+            "cx.hydrate(sessionStorage.getItem('flash') ?? '')",
+            String::new()
+        )))
+    >
+        $(flash.get())
+    </p>
+})
+# }
+```
+
+The handler runs each time the server renders the element and the runtime attaches to it: on page load, after a [`link`](struct.link.html) navigation, and after a page, shard, or live region render that includes the element. It does not run for prefetched pages until they are displayed. Handlers run in document order, after every signal on the page is available, so they can read and set any of them. The handler receives an [`Event`] whose `target` is the element.
+
+A render can run the handler again while an earlier async handler is still running. Keep handlers safe to repeat, for example by removing a stored value once it has been read.
+
 # Bind attributes
 
 An attribute starting with `:` is a **bind attribute**. The server renders its expression's initial value. The browser updates the attribute whenever a signal read by the expression changes:
