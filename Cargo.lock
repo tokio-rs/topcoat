@@ -6193,6 +6193,7 @@ version = "0.12.1"
 dependencies = [
  "base64",
  "getrandom 0.4.2",
+ "http",
  "sha2 0.11.0",
  "thiserror",
  "tokio",

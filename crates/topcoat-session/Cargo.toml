@@ -32,6 +32,7 @@ web-time.workspace = true
 getrandom = { workspace = true, features = ["wasm_js"] }
 
 [dev-dependencies]
+http.workspace = true
 topcoat = { workspace = true, features = ["session"] }
 tokio = { workspace = true, features = ["macros", "rt"] }
 
