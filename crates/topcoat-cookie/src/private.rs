@@ -36,16 +36,26 @@ impl<J: Cookies> Cookies for PrivateJar<'_, J> {
     }
 
     fn add<C: Into<Cookie<'static>>>(&self, cookie: C) {
-        let cookie = cookie.into();
+        let mut cookie = cookie.into();
         let name = cookie.name().to_owned();
+        // Authenticate the name that the inner jar returns on read, which
+        // may differ from the supplied name when a prefix adapter strips it.
+        self.inner.normalize_name(&mut cookie);
         let mut jar = RawCookieJar::new();
         jar.private_mut(self.key).add(cookie);
-        if let Some(sealed) = jar.get(&name).cloned() {
+        if let Some(mut sealed) = jar.iter().next().cloned() {
+            // Keep the original name for storage so inner adapters apply
+            // their prefixes exactly as they would for a plaintext cookie.
+            sealed.set_name(name);
             self.inner.add(sealed);
         }
     }
 
     fn remove<C: Into<Cookie<'static>>>(&self, cookie: C) {
         self.inner.remove(cookie);
+    }
+
+    fn normalize_name(&self, cookie: &mut Cookie<'static>) {
+        self.inner.normalize_name(cookie);
     }
 }
