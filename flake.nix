@@ -1,9 +1,10 @@
 {
-  description = "Topcoat development shell";
+  description = "Topcoat CLI and development shells";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
+    crane.url = "github:ipetkov/crane";
     fenix = {
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -11,7 +12,12 @@
   };
 
   outputs =
-    inputs@{ flake-parts, fenix, ... }:
+    inputs@{
+      flake-parts,
+      crane,
+      fenix,
+      ...
+    }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = [
         "aarch64-darwin"
@@ -21,14 +27,17 @@
       ];
 
       perSystem =
-        { pkgs, system, ... }:
+        {
+          pkgs,
+          system,
+          lib,
+          ...
+        }:
         let
-          rustVersion = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.rust-version;
+          workspacePackage = (lib.importTOML ./Cargo.toml).workspace.package;
+          rustVersion = workspacePackage.rust-version;
           msrv =
-            if builtins.length (pkgs.lib.splitString "." rustVersion) == 2 then
-              "${rustVersion}.0"
-            else
-              rustVersion;
+            if builtins.length (lib.splitString "." rustVersion) == 2 then "${rustVersion}.0" else rustVersion;
           # Hash of the channel manifest, shared by host and cross targets.
           toolchainSpec = {
             channel = msrv;
@@ -49,8 +58,36 @@
             rustToolchain
             (fenix.packages.${system}.targets.wasm32-unknown-unknown.toolchainOf toolchainSpec).rust-std
           ];
+
+          craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
+          # Keep the browser bundle, templates, and other files embedded by the CLI.
+          src = lib.cleanSource ./.;
+
+          commonArgs = {
+            inherit src;
+            pname = "topcoat-cli";
+            version = workspacePackage.version;
+            cargoExtraArgs = "--locked --package topcoat-cli";
+            strictDeps = true;
+          };
+
+          cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+
+          topcoat-cli = craneLib.buildPackage (
+            commonArgs
+            // {
+              inherit cargoArtifacts;
+              nativeCheckInputs = [ pkgs.gitMinimal ];
+              meta.mainProgram = "topcoat";
+            }
+          );
         in
         {
+          packages = {
+            inherit topcoat-cli;
+            default = topcoat-cli;
+          };
+
           devShells = {
             default = pkgs.mkShell {
               packages = [ rustToolchain ];
