@@ -9,6 +9,8 @@
 mod add;
 mod init;
 mod list;
+#[cfg_attr(not(test), expect(dead_code, reason = "no command merges yet"))]
+mod merge;
 mod module;
 mod package;
 mod remove;
