@@ -112,7 +112,8 @@ struct PlannedRemoval {
 ///
 /// Returns an entry for every file written and for every selected component that
 /// was skipped because its file already exists. Dependencies whose files already
-/// exist are left untouched and not reported.
+/// exist are left untouched and not reported. A component whose file is left
+/// untouched keeps the hash recorded for it, so a pending update stays visible.
 ///
 /// # Errors
 ///
@@ -273,7 +274,8 @@ pub fn add(
         // Write the source unless it is already present. Dependencies never
         // clobber existing files; only a root being overwritten (or a
         // replacement) rewrites.
-        if !exists || (pending.origin.overwritable() && options.overwrite) || replacing {
+        let written = !exists || (pending.origin.overwritable() && options.overwrite) || replacing;
+        if written {
             writes.push(PlannedWrite {
                 name: component.name().to_string(),
                 dir: dir.clone(),
@@ -289,18 +291,25 @@ pub fn add(
         // Collect dependencies before recording the component, so the borrow on
         // the registry cache is released before the state is mutated.
         let dependencies = component.dependencies().to_vec();
-        let version = workspace
-            .registry_version(&pending.registry)
-            .map(str::to_string);
+        let name = component.name().to_string();
 
-        state.registry_mut(&pending.registry).components.insert(
-            component.name().to_string(),
-            InstalledComponent {
-                hash,
-                version,
-                file: relative_file,
-            },
-        );
+        // A file that is left alone keeps its record, so the recorded hash still
+        // describes the file on disk. A file that was not tracked yet is recorded
+        // at the registry's current source.
+        let components = &mut state.registry_mut(&pending.registry).components;
+        if written || !components.contains_key(&name) {
+            let version = workspace
+                .registry_version(&pending.registry)
+                .map(str::to_string);
+            components.insert(
+                name,
+                InstalledComponent {
+                    hash,
+                    version,
+                    file: relative_file,
+                },
+            );
+        }
 
         for dependency in dependencies {
             // A dependency names a registry crate directly: `Same` for the
