@@ -1,13 +1,14 @@
 use std::{
     collections::{HashMap, HashSet},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Command,
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use serde::Deserialize;
 
 use super::package::Package;
-use crate::{DEFAULT_REGISTRY, DEFAULT_REGISTRY_CRATE};
+use crate::{DEFAULT_REGISTRY, DEFAULT_REGISTRY_CRATE, Registry};
 
 /// The Cargo dependency graph used to resolve component registries.
 ///
@@ -44,6 +45,18 @@ struct MetadataPackage {
     metadata: serde_json::Value,
 }
 
+impl MetadataPackage {
+    /// The index of the package registry the package was published to, in the form
+    /// Cargo accepts as a dependency's `registry-index`. Path and git dependencies
+    /// have none.
+    fn registry_index(&self) -> Option<&str> {
+        let source = self.source.as_deref()?;
+        source
+            .strip_prefix("registry+")
+            .or_else(|| source.starts_with("sparse+").then_some(source))
+    }
+}
+
 #[derive(Deserialize)]
 struct Dependency {
     name: String,
@@ -53,20 +66,7 @@ impl Workspace {
     /// Resolves the package's dependency graph by running `cargo metadata` at the
     /// package root.
     pub(super) fn load(package: &Package) -> Result<Self, String> {
-        let output = Command::new("cargo")
-            .args(["metadata", "--format-version=1"])
-            .current_dir(package.root())
-            .output()
-            .map_err(|error| format!("failed to run `cargo metadata`: {error}"))?;
-        if !output.status.success() {
-            return Err(format!(
-                "`cargo metadata` failed: {}",
-                String::from_utf8_lossy(&output.stderr).trim()
-            ));
-        }
-        let metadata: Metadata = serde_json::from_slice(&output.stdout)
-            .map_err(|error| format!("failed to parse `cargo metadata` output: {error}"))?;
-        Ok(Self::from_metadata(metadata))
+        Ok(Self::from_metadata(cargo_metadata(package, None)?))
     }
 
     /// Indexes the packages and direct dependencies of a resolved dependency graph.
@@ -98,15 +98,65 @@ impl Workspace {
     /// registry. Path and git dependencies have none, because their version does not
     /// identify their sources.
     pub(super) fn registry_version(&self, name: &str) -> Option<&str> {
-        let crate_name = if name == DEFAULT_REGISTRY {
-            DEFAULT_REGISTRY_CRATE
-        } else {
-            name
+        let package = self.packages.get(registry_crate(name))?;
+        package.registry_index()?;
+        Some(&package.version)
+    }
+
+    /// Loads a registry as it was published in `version` of its crate. Cargo downloads
+    /// that version if it is not cached.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the registry's crate does not come from a package registry,
+    /// Cargo cannot provide the version, or the version does not hold a loadable
+    /// registry.
+    #[expect(dead_code, reason = "no command reads published versions yet")]
+    pub(super) fn published_registry(
+        &self,
+        package: &Package,
+        name: &str,
+        version: &str,
+    ) -> Result<Registry, String> {
+        let crate_name = registry_crate(name);
+        let index = self
+            .packages
+            .get(crate_name)
+            .and_then(MetadataPackage::registry_index)
+            .ok_or_else(|| {
+                format!("registry crate `{crate_name}` does not come from a package registry")
+            })?;
+
+        // Resolve a throwaway package that depends on exactly that version. It is its
+        // own workspace, so Cargo does not look for one in the directories above it.
+        let dir = ScratchDir::create()?;
+        let manifest = dir.0.join("Cargo.toml");
+        let write = |path: &Path, contents: &str| {
+            std::fs::write(path, contents)
+                .map_err(|error| format!("failed to write {}: {error}", path.display()))
         };
-        let package = self.packages.get(crate_name)?;
-        let source = package.source.as_deref()?;
-        (source.starts_with("registry+") || source.starts_with("sparse+"))
-            .then_some(package.version.as_str())
+        write(
+            &manifest,
+            &format!(
+                "[package]\nname = \"topcoat-ui-base\"\nversion = \"0.0.0\"\nedition = \"2021\"\n\n\
+                 [lib]\npath = \"lib.rs\"\n\n\
+                 [workspace]\n\n\
+                 [dependencies.{crate_name}]\nversion = {}\nregistry-index = {}\n",
+                toml::Value::from(format!("={version}")),
+                toml::Value::from(index),
+            ),
+        )?;
+        write(&dir.0.join("lib.rs"), "")?;
+
+        let metadata = cargo_metadata(package, Some(&manifest))?;
+        let published = metadata
+            .packages
+            .iter()
+            .find(|package| package.name == crate_name && package.version == version)
+            .ok_or_else(|| format!("Cargo did not resolve `{crate_name}` {version}"))?;
+        Registry::load(registry_path(published, crate_name)?).map_err(|error| {
+            format!("failed to load registry `{name}` from `{crate_name}` {version}: {error}")
+        })
     }
 
     /// Finds a registry's manifest directory and checks that it is an allowed
@@ -159,6 +209,63 @@ impl Workspace {
         names.dedup();
         names
     }
+}
+
+/// A new directory in the system's temporary directory. It is removed when dropped.
+struct ScratchDir(PathBuf);
+
+impl ScratchDir {
+    fn create() -> Result<Self, String> {
+        // The process ID and the time make the name unique. Creating fails rather
+        // than reusing a directory that already exists.
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |elapsed| elapsed.as_nanos());
+        let name = format!("topcoat-ui-{}-{nanos}", std::process::id());
+        let path = std::env::temp_dir().join(name);
+        std::fs::create_dir(&path)
+            .map_err(|error| format!("failed to create {}: {error}", path.display()))?;
+        Ok(Self(path))
+    }
+}
+
+impl Drop for ScratchDir {
+    fn drop(&mut self) {
+        // Best effort: a leftover directory is harmless.
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+/// The crate that provides the registry `name`.
+fn registry_crate(name: &str) -> &str {
+    if name == DEFAULT_REGISTRY {
+        DEFAULT_REGISTRY_CRATE
+    } else {
+        name
+    }
+}
+
+/// Runs `cargo metadata` from the package root, so the package's Cargo configuration
+/// applies. Resolves `manifest` if given, and the package itself otherwise.
+fn cargo_metadata(package: &Package, manifest: Option<&Path>) -> Result<Metadata, String> {
+    let mut command = Command::new("cargo");
+    command
+        .args(["metadata", "--format-version=1"])
+        .current_dir(package.root());
+    if let Some(manifest) = manifest {
+        command.arg("--manifest-path").arg(manifest);
+    }
+    let output = command
+        .output()
+        .map_err(|error| format!("failed to run `cargo metadata`: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "`cargo metadata` failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    serde_json::from_slice(&output.stdout)
+        .map_err(|error| format!("failed to parse `cargo metadata` output: {error}"))
 }
 
 /// The registry directory `package` declares (the directory holding
