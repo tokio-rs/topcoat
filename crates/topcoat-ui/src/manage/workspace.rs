@@ -111,7 +111,6 @@ impl Workspace {
     /// Returns an error if the registry's crate does not come from a package registry,
     /// Cargo cannot provide the version, or the version does not hold a loadable
     /// registry.
-    #[expect(dead_code, reason = "no command reads published versions yet")]
     pub(super) fn published_registry(
         &self,
         package: &Package,

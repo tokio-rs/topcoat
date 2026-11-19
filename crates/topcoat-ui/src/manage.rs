@@ -9,13 +9,13 @@
 mod add;
 mod init;
 mod list;
-#[cfg_attr(not(test), expect(dead_code, reason = "no command merges yet"))]
 mod merge;
 mod module;
 mod package;
 mod remove;
 mod scaffold;
 mod state;
+mod update;
 mod workspace;
 
 pub use add::*;
@@ -24,6 +24,7 @@ pub use list::*;
 pub use package::*;
 pub use remove::*;
 pub use scaffold::*;
+pub use update::*;
 
 /// Answers a confirmation prompt. Return `true` to accept, `false` to decline,
 /// or `Err` to abort the operation with an error.
