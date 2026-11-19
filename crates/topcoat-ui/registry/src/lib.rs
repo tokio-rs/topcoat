@@ -16,3 +16,8 @@ pub mod components;
 /// use `/` as the separator.
 #[cfg(feature = "embedded")]
 pub static FILES: &[(&str, &str)] = include!(concat!(env!("OUT_DIR"), "/embedded.rs"));
+
+/// The version of this crate, which is the version the sources in [`FILES`] were
+/// published as.
+#[cfg(feature = "embedded")]
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");

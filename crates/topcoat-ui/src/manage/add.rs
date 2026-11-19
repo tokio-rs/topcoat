@@ -289,11 +289,15 @@ pub fn add(
         // Collect dependencies before recording the component, so the borrow on
         // the registry cache is released before the state is mutated.
         let dependencies = component.dependencies().to_vec();
+        let version = workspace
+            .registry_version(&pending.registry)
+            .map(str::to_string);
 
         state.registry_mut(&pending.registry).components.insert(
             component.name().to_string(),
             InstalledComponent {
                 hash,
+                version,
                 file: relative_file,
             },
         );

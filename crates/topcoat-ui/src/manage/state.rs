@@ -32,6 +32,9 @@ pub(super) struct InstalledTheme {
     pub name: String,
     pub registry: String,
     pub hash: String,
+    /// The published version of the registry crate the theme was installed from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
     pub file: PathBuf,
 }
 
@@ -42,9 +45,13 @@ pub(super) struct RegistryState {
     pub components: BTreeMap<String, InstalledComponent>,
 }
 
+/// An installed component's source hash and destination path.
 #[derive(Serialize, Deserialize)]
 pub(super) struct InstalledComponent {
     pub hash: String,
+    /// The published version of the registry crate the component was installed from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
     pub file: PathBuf,
 }
 
@@ -136,4 +143,35 @@ fn default_state_version() -> u32 {
 /// The default base directory for component install output.
 fn default_components_dir() -> PathBuf {
     PathBuf::from("src/components")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn loads_state_written_without_versions() {
+        let state: InstallState = toml::from_str(
+            r#"
+            version = 1
+
+            [theme]
+            name = "plain"
+            registry = "topcoat"
+            hash = "sha256:aa"
+            file = "styles.css"
+
+            [registries.topcoat.components.button]
+            hash = "sha256:bb"
+            file = "src/components/button.rs"
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(state.theme.unwrap().version, None);
+        assert_eq!(
+            state.registries["topcoat"].components["button"].version,
+            None
+        );
+    }
 }

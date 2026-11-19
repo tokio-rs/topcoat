@@ -32,6 +32,10 @@ struct Metadata {
 struct MetadataPackage {
     name: String,
     id: String,
+    version: String,
+    /// Where Cargo got the package from. Path dependencies have no source.
+    #[serde(default)]
+    source: Option<String>,
     manifest_path: PathBuf,
     dependencies: Vec<Dependency>,
     /// The crate's `[package.metadata]` table, holding the
@@ -62,7 +66,11 @@ impl Workspace {
         }
         let metadata: Metadata = serde_json::from_slice(&output.stdout)
             .map_err(|error| format!("failed to parse `cargo metadata` output: {error}"))?;
+        Ok(Self::from_metadata(metadata))
+    }
 
+    /// Indexes the packages and direct dependencies of a resolved dependency graph.
+    fn from_metadata(metadata: Metadata) -> Self {
         let members: HashSet<&str> = metadata
             .workspace_default_members
             .iter()
@@ -80,10 +88,25 @@ impl Workspace {
             .map(|package| (package.name.clone(), package))
             .collect();
 
-        Ok(Self {
+        Self {
             packages,
             direct_deps,
-        })
+        }
+    }
+
+    /// Returns the version of a registry's crate if it was published to a package
+    /// registry. Path and git dependencies have none, because their version does not
+    /// identify their sources.
+    pub(super) fn registry_version(&self, name: &str) -> Option<&str> {
+        let crate_name = if name == DEFAULT_REGISTRY {
+            DEFAULT_REGISTRY_CRATE
+        } else {
+            name
+        };
+        let package = self.packages.get(crate_name)?;
+        let source = package.source.as_deref()?;
+        (source.starts_with("registry+") || source.starts_with("sparse+"))
+            .then_some(package.version.as_str())
     }
 
     /// Finds a registry's manifest directory and checks that it is an allowed
@@ -162,4 +185,44 @@ fn registry_subdir(package: &MetadataPackage) -> Option<&str> {
         .get("topcoat-ui")?
         .get("registry")?
         .as_str()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A dependency graph holding one registry crate that Cargo got from `source`.
+    fn workspace(name: &str, source: Option<&str>) -> Workspace {
+        let metadata = serde_json::json!({
+            "workspace_default_members": [],
+            "packages": [{
+                "name": name,
+                "id": name,
+                "version": "1.2.3",
+                "source": source,
+                "manifest_path": "/registry/Cargo.toml",
+                "dependencies": [],
+            }],
+        });
+        Workspace::from_metadata(serde_json::from_value(metadata).unwrap())
+    }
+
+    #[test]
+    fn published_registries_have_a_version() {
+        let crates_io = Some("registry+https://github.com/rust-lang/crates.io-index");
+        let builtin = workspace(DEFAULT_REGISTRY_CRATE, crates_io);
+        assert_eq!(builtin.registry_version(DEFAULT_REGISTRY), Some("1.2.3"));
+
+        let sparse = workspace("custom", Some("sparse+https://example.com/index/"));
+        assert_eq!(sparse.registry_version("custom"), Some("1.2.3"));
+    }
+
+    #[test]
+    fn path_and_git_registries_have_no_version() {
+        let path = workspace("custom", None);
+        assert_eq!(path.registry_version("custom"), None);
+
+        let git = workspace("custom", Some("git+https://example.com/custom.git#0123abc"));
+        assert_eq!(git.registry_version("custom"), None);
+    }
 }

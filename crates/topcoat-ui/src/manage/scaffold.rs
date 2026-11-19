@@ -12,6 +12,9 @@ pub struct ScaffoldOptions<'a> {
     pub theme: Option<&'a str>,
     /// The components to install. Their dependencies are installed too.
     pub components: &'a [&'a str],
+    /// The published version of the registry crate that `registry` was loaded from,
+    /// if it has one. It is recorded in the install state.
+    pub registry_version: Option<&'a str>,
 }
 
 /// A file planned by [`scaffold`].
@@ -44,7 +47,12 @@ pub fn scaffold(
             names.join(", ")
         ))
     };
-    let theme = ThemePlan::select(registry, options.theme, &mut choose)?;
+    let theme = ThemePlan::select(
+        registry,
+        options.registry_version,
+        options.theme,
+        &mut choose,
+    )?;
 
     let mut state = InstallState::default();
     let mut files = Vec::new();
@@ -89,6 +97,7 @@ pub fn scaffold(
             name,
             InstalledComponent {
                 hash: content_hash(&contents),
+                version: options.registry_version.map(str::to_string),
                 file: file.clone(),
             },
         );
@@ -118,6 +127,7 @@ pub fn scaffold(
         name: theme.name,
         registry: theme.registry,
         hash: theme.hash,
+        version: theme.version,
         file: theme.file.clone(),
     });
     files.push(ScaffoldFile {
@@ -185,6 +195,7 @@ mod tests {
         let options = ScaffoldOptions {
             theme: None,
             components: &["alert_dialog"],
+            registry_version: None,
         };
         let files = scaffold(&registry(), &options).unwrap();
 
@@ -209,6 +220,7 @@ mod tests {
         let options = ScaffoldOptions {
             theme: Some("plain"),
             components: &["alert_dialog"],
+            registry_version: None,
         };
         let files = scaffold(&registry(), &options).unwrap();
         let state: InstallState = toml::from_str(file(&files, STATE_FILE).unwrap()).unwrap();
@@ -228,10 +240,29 @@ mod tests {
     }
 
     #[test]
+    fn install_state_records_the_registry_version() {
+        let options = ScaffoldOptions {
+            theme: None,
+            components: &["alert_dialog"],
+            registry_version: Some("1.2.3"),
+        };
+        let files = scaffold(&registry(), &options).unwrap();
+        let state: InstallState = toml::from_str(file(&files, STATE_FILE).unwrap()).unwrap();
+
+        assert_eq!(state.theme.unwrap().version.as_deref(), Some("1.2.3"));
+        let components = &state.registries[DEFAULT_REGISTRY].components;
+        assert_eq!(components.len(), 2);
+        for installed in components.values() {
+            assert_eq!(installed.version.as_deref(), Some("1.2.3"));
+        }
+    }
+
+    #[test]
     fn rejects_unknown_components() {
         let options = ScaffoldOptions {
             theme: None,
             components: &["carousel"],
+            registry_version: None,
         };
         assert!(scaffold(&registry(), &options).is_err());
     }

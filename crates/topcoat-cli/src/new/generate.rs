@@ -485,6 +485,7 @@ pub fn generate(name: &PackageName, options: &ProjectOptions) -> Result<ProjectP
             &ScaffoldOptions {
                 theme: None,
                 components: &components,
+                registry_version: Some(topcoat_ui_registry::VERSION),
             },
         )?;
         for file in scaffold {

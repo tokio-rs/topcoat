@@ -9,7 +9,9 @@
 //! pointing to a directory containing `registry.toml` and component sources.
 //!
 //! Components are versioned by a hash of their source. The install state saves
-//! that hash so later comparisons with the registry can identify updates.
+//! that hash so later comparisons with the registry can identify updates. When
+//! the registry crate was published, the install state also saves its version,
+//! which identifies the release the source came from.
 
 pub mod manage;
 mod registry;
