@@ -58,6 +58,9 @@ impl UpdateKind {
 pub enum UpdateAction {
     /// The registry's source has not changed since the file was installed.
     UpToDate,
+    /// The registry's source has not changed since the file was installed, and the
+    /// install state gained the registry version it lacked.
+    VersionRecorded,
     /// The file had no local changes and was replaced with the registry's new source.
     FastForwarded,
     /// The file already matched the registry's new source, so only the install state
@@ -81,6 +84,10 @@ pub enum UpdateAction {
 /// the registry's changes, and overlapping changes are left in the file as conflict
 /// markers. The install state then records the new source, also for files with
 /// conflicts.
+///
+/// A file recorded without a registry version gains the current one if the
+/// registry's source has not changed since the file was installed. A later update can
+/// then read that source to merge.
 ///
 /// Every file is planned before the first one is written. A later I/O failure can
 /// leave some files updated and others not.
@@ -109,11 +116,19 @@ pub fn update(package: &Package, options: &UpdateOptions) -> Result<Vec<UpdateEn
 
     for target in targets {
         let plan = sources.plan(&target)?;
+        let mut action = plan.action;
+        let version = workspace
+            .registry_version(&target.registry)
+            .map(str::to_string);
         if let Some(hash) = plan.hash {
-            let version = workspace
-                .registry_version(&target.registry)
-                .map(str::to_string);
             target.record(&mut state, hash, version);
+            changed = true;
+        } else if action == UpdateAction::UpToDate && target.version.is_none() && version.is_some()
+        {
+            // The recorded hash is that of the current source, so the current version
+            // of the registry holds the source the file was installed from.
+            target.record(&mut state, target.hash.clone(), version);
+            action = UpdateAction::VersionRecorded;
             changed = true;
         }
         if let Some(contents) = plan.contents {
@@ -124,7 +139,7 @@ pub fn update(package: &Package, options: &UpdateOptions) -> Result<Vec<UpdateEn
             kind: target.kind,
             file: target.file,
             registry: target.registry,
-            action: plan.action,
+            action,
         });
     }
 

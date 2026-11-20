@@ -46,6 +46,7 @@ impl UpdateCommand {
         let would = if self.dry_run { "would be " } else { "" };
         let mut changed = false;
         let mut conflicts = 0;
+        let mut versions = 0;
         for entry in entries {
             let name = match entry.kind {
                 UpdateKind::Theme => format!("theme {}", style(entry.name).bold()),
@@ -54,6 +55,10 @@ impl UpdateCommand {
             let file = style(format!("({})", entry.file.display())).dim();
             match entry.action {
                 UpdateAction::UpToDate => continue,
+                UpdateAction::VersionRecorded => {
+                    versions += 1;
+                    continue;
+                }
                 UpdateAction::FastForwarded | UpdateAction::Matched => println!(
                     "{} {name} {file} {would}updated from {}",
                     style("~").yellow(),
@@ -92,6 +97,21 @@ impl UpdateCommand {
 
         if !changed {
             println!("{} already up to date", style("✓").green());
+        }
+        if versions > 0 {
+            println!(
+                "{}",
+                style(format!(
+                    "{} the registry version of {versions} {} in components.toml",
+                    if self.dry_run {
+                        "would record"
+                    } else {
+                        "recorded"
+                    },
+                    if versions == 1 { "file" } else { "files" }
+                ))
+                .dim()
+            );
         }
         if conflicts > 0 && !self.dry_run {
             println!();
