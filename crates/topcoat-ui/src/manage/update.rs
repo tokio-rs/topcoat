@@ -4,11 +4,16 @@ use super::{
     merge::{LineEnding, merge, normalize},
     package::Package,
     state::InstallState,
+    vcs::Vcs,
     workspace::Workspace,
 };
 use crate::{Registry, content_hash};
 
 /// Options for updating installed files.
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "each bool is an independent switch"
+)]
 pub struct UpdateOptions {
     /// Names of the components to update. If none are named and `theme` is `false`,
     /// the theme and every installed component are updated.
@@ -17,6 +22,10 @@ pub struct UpdateOptions {
     pub theme: bool,
     /// Plan the update and report it without writing any file.
     pub dry_run: bool,
+    /// Merge even if the package's git repository has uncommitted changes.
+    pub allow_dirty: bool,
+    /// Merge even if the package is not in a git repository.
+    pub allow_no_vcs: bool,
 }
 
 /// What [`update`] did with one installed file.
@@ -89,6 +98,11 @@ pub enum UpdateAction {
 /// registry's source has not changed since the file was installed. A later update can
 /// then read that source to merge.
 ///
+/// A merge rewrites a file that holds local changes. To keep that undoable, no file
+/// is written if any file needs merging while the package's git repository has
+/// uncommitted changes or the package is in none. `allow_dirty` and `allow_no_vcs` in
+/// `options` lift this.
+///
 /// Every file is planned before the first one is written. A later I/O failure can
 /// leave some files updated and others not.
 ///
@@ -97,9 +111,13 @@ pub enum UpdateAction {
 /// # Errors
 ///
 /// Returns an error if the install state or workspace cannot be loaded, a named
-/// component is not installed, the theme is requested but none is installed, or
-/// reading or writing a file or saving the install state fails.
+/// component is not installed, the theme is requested but none is installed, a merge
+/// is refused as described above, or reading or writing a file or saving the install
+/// state fails.
 pub fn update(package: &Package, options: &UpdateOptions) -> Result<Vec<UpdateEntry>, String> {
+    // Read before the workspace is loaded, because resolving it can rewrite
+    // `Cargo.lock`, which must not count as an uncommitted change.
+    let vcs = Vcs::inspect(package.root());
     let mut state = InstallState::load(package)?;
     let workspace = Workspace::load(package)?;
     let targets = Target::select(&state, options)?;
@@ -144,6 +162,15 @@ pub fn update(package: &Package, options: &UpdateOptions) -> Result<Vec<UpdateEn
     }
 
     if !options.dry_run {
+        let merges = entries.iter().any(|entry| {
+            matches!(
+                entry.action,
+                UpdateAction::Merged | UpdateAction::Conflicted { .. }
+            )
+        });
+        if merges {
+            vcs.ensure_undoable(options.allow_dirty, options.allow_no_vcs)?;
+        }
         for (file, contents) in &writes {
             std::fs::write(file, contents)
                 .map_err(|error| format!("failed to write {}: {error}", file.display()))?;

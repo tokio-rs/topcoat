@@ -5,6 +5,10 @@ use topcoat_ui::manage::{self, Package, UpdateAction, UpdateKind, UpdateOptions}
 use super::PackageArg;
 
 #[derive(Args)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "each bool is a command-line switch"
+)]
 pub(super) struct UpdateCommand {
     /// Names of the components to update (defaults to the theme and every
     /// installed component)
@@ -15,6 +19,12 @@ pub(super) struct UpdateCommand {
     /// Show what would happen without writing any file
     #[arg(long)]
     dry_run: bool,
+    /// Merge even if the git repository has uncommitted changes
+    #[arg(long)]
+    allow_dirty: bool,
+    /// Merge even if the package is not in a git repository
+    #[arg(long)]
+    allow_no_vcs: bool,
     #[command(flatten)]
     package: PackageArg,
 }
@@ -39,6 +49,8 @@ impl UpdateCommand {
             components: self.components,
             theme: self.theme,
             dry_run: self.dry_run,
+            allow_dirty: self.allow_dirty,
+            allow_no_vcs: self.allow_no_vcs,
         };
         let entries = manage::update(&package, &options)?;
 

@@ -16,6 +16,7 @@ mod remove;
 mod scaffold;
 mod state;
 mod update;
+mod vcs;
 mod workspace;
 
 pub use add::*;
