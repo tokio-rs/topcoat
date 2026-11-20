@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use diffy::{DiffOptions, Hunk, IncompleteHunkStyle, Line, MergeOptions};
+use diffy::{ConflictStyle, DiffOptions, Hunk, IncompleteHunkStyle, Line, MergeOptions};
 
 /// The marker that opens a conflict, followed by the local lines.
 const OURS_MARKER: &str = "<<<<<<< ours\n";
@@ -77,6 +77,8 @@ pub(super) fn merge(base: Option<&str>, ours: &str, theirs: &str) -> Merged {
 /// Merges two texts that share the ancestor `base`.
 fn three_way(base: &str, ours: &str, theirs: &str) -> (String, bool) {
     let mut options = MergeOptions::new();
+    // A conflict shows the two sides, as git does by default, and leaves out `base`.
+    options.set_conflict_style(ConflictStyle::Merge);
     // Keeps every marker on its own line when a side lacks a final newline.
     options.set_incomplete_hunk_style(IncompleteHunkStyle::Git);
     match options.merge(base, ours, theirs) {
@@ -186,7 +188,10 @@ mod tests {
         let merged = merge(Some(BASE), &ours, &theirs);
 
         assert!(merged.conflicted);
-        assert!(merged.text.contains("OURS\n") && merged.text.contains("THEIRS\n"));
+        assert_eq!(
+            merged.text,
+            "one\n<<<<<<< ours\nOURS\n=======\nTHEIRS\n>>>>>>> theirs\nthree\nfour\nfive\n"
+        );
     }
 
     #[test]
