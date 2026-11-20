@@ -29,8 +29,9 @@ impl ListCommand {
         let listings = manage::list(&package, self.registry.as_deref())?;
 
         for listing in &listings {
-            // Skip registries that have no components installed from them.
+            // Skip registries that have nothing installed from them.
             if self.installed
+                && listing.theme.is_none()
                 && listing.outcome.as_ref().is_ok_and(|components| {
                     components.iter().all(|component| {
                         matches!(component.status, InstallStatus::Available { .. })
@@ -44,6 +45,10 @@ impl ListCommand {
             println!();
             println!("{}", style(&listing.name).bold());
 
+            if let Some(theme) = &listing.theme {
+                print_installed("theme ", &theme.name, &theme.status);
+            }
+
             let components = match &listing.outcome {
                 Ok(components) => components,
                 Err(error) => {
@@ -56,40 +61,47 @@ impl ListCommand {
             };
 
             for component in components {
-                match &component.status {
-                    InstallStatus::Available { .. } => {
-                        if !self.installed {
-                            println!("    {}", component.name);
-                        }
+                if matches!(component.status, InstallStatus::Available { .. }) {
+                    if !self.installed {
+                        println!("    {}", component.name);
                     }
-                    InstallStatus::UpToDate { .. } => {
-                        println!(
-                            "  {} {} {}",
-                            style("✓").green(),
-                            style(&component.name).bold(),
-                            style("(installed)").dim()
-                        );
-                    }
-                    InstallStatus::Update { .. } => {
-                        println!(
-                            "  {} {} {}",
-                            style("↑").yellow(),
-                            style(&component.name).bold(),
-                            style("(update available)").yellow(),
-                        );
-                    }
-                    InstallStatus::Orphaned { .. } => {
-                        println!(
-                            "  {} {} {}",
-                            style("?").red(),
-                            component.name,
-                            style("(orphaned)").red(),
-                        );
-                    }
+                } else {
+                    print_installed("", &component.name, &component.status);
                 }
             }
         }
 
         Ok(())
+    }
+}
+
+/// Prints the line for an installed component or theme. `kind` goes before the name,
+/// to tell a theme from a component.
+fn print_installed(kind: &str, name: &str, status: &InstallStatus) {
+    match status {
+        InstallStatus::Available { .. } => {}
+        InstallStatus::UpToDate { .. } => {
+            println!(
+                "  {} {kind}{} {}",
+                style("✓").green(),
+                style(name).bold(),
+                style("(installed)").dim()
+            );
+        }
+        InstallStatus::Update { .. } => {
+            println!(
+                "  {} {kind}{} {}",
+                style("↑").yellow(),
+                style(name).bold(),
+                style("(update available)").yellow(),
+            );
+        }
+        InstallStatus::Orphaned { .. } => {
+            println!(
+                "  {} {kind}{name} {}",
+                style("?").red(),
+                style("(orphaned)").red(),
+            );
+        }
     }
 }
