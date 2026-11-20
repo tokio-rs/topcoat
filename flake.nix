@@ -43,10 +43,6 @@
             channel = msrv;
             sha256 = "sha256-zm3dyIY2T414ZRR3EhLOvptzG6gta4WZUcawzMUWtqI=";
           };
-          nightlyToolChainSpec = {
-            channel = "nightly";
-            sha256 = "sha256-axBIOyanKDHAdB/h6wkf3l1+DCa6/WAv4+vVKvZH684=";
-          };
 
           rustToolchain = (fenix.packages.${system}.toolchainOf toolchainSpec).withComponents [
             "cargo"
@@ -56,7 +52,12 @@
             "rustc"
             "rustfmt"
           ];
-          nightlyRustToolchain = (fenix.packages.${system}.toolchainOf nightlyToolChainSpec).withComponents [
+          # Fetch the same dated manifest on the evaluating host for every system.
+          nightlyManifest = builtins.fetchurl {
+            url = "https://static.rust-lang.org/dist/2026-11-20/channel-rust-nightly.toml";
+            sha256 = "sha256-axBIOyanKDHAdB/h6wkf3l1+DCa6/WAv4+vVKvZH684=";
+          };
+          nightlyRustToolchain = (fenix.packages.${system}.fromManifestFile nightlyManifest).withComponents [
             "cargo"
             "rustc"
             "rustfmt"
@@ -114,6 +115,8 @@
                 rustToolchain
                 cargo-hack
                 cargo-udeps
+                # The v8 build script needs a downloader for the prebuilt archive.
+                curl
                 gitMinimal
                 nodejs_22
                 (yarn.override { nodejs = nodejs_22; })
