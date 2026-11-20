@@ -100,7 +100,7 @@ To see what is on offer, run:
 topcoat ui list
 ```
 
-The list shows available components and their install status. Use `--installed` to show only installed components.
+The list shows available components and their install status, and the installed theme. Use `--installed` to show only what is installed.
 
 # Using components
 
@@ -194,21 +194,40 @@ Add the `dark` class to `<html>` to enable dark mode for the page, or to another
 
 The theme has no shadows by default. To enable them, replace `--shadow-xs` and `--shadow-sm` in both `:root` and `.dark` with the commented values beside them in `styles.css`.
 
-The UI commands preserve `styles.css` after initialization, so you can customize it freely.
+You can customize `styles.css` freely. When the registry's theme changes, `topcoat ui update` merges the changes into your file instead of replacing it. See [Updating components](#updating-components).
 
 # Updating components
 
-`topcoat ui list` reports an update when a component's registry source has changed since installation. It compares the current registry hash with the hash saved in `components.toml`. Edits to your local copy do not affect this comparison.
-
-To pull the newer source, re-add the component:
+To pull updates, first update the registry crate. For the built-in registry, that is `topcoat` itself. Then run `topcoat ui list` to see which components have an update available. To apply the updates, run:
 
 ```sh
-topcoat ui add button --overwrite
+topcoat ui update
 ```
 
-This replaces your file with the registry's source. Save any local changes first, then review the diff and reapply the changes you want to keep.
+The command updates the theme and every installed component. A file you have not edited is replaced with the new source. A file you have edited is merged, so your changes are kept.
 
-To refresh every component at once, run `topcoat ui add --all --overwrite`. This also installs any component you do not have yet.
+Name components to update only those, or pass `--theme` to update the theme. Add `--dry-run` to see what would happen without writing any file:
+
+```sh
+topcoat ui update button card
+topcoat ui update --theme
+```
+
+If you and the registry changed the same lines, the command leaves both versions in the file between conflict markers and exits with a non-zero status:
+
+```text
+<<<<<<< ours
+class="h-9 rounded-full px-4"
+=======
+class="h-9 rounded-md px-6"
+>>>>>>> theirs
+```
+
+`ours` is your version and `theirs` is the registry's. Edit the file to keep what you want, then delete the markers.
+
+So that a merge can always be undone, the command refuses to merge when the git repository has uncommitted changes, or when the package is not in one. Commit your work first, or pass `--allow-dirty` or `--allow-no-vcs`.
+
+To drop your changes to a component and take the registry's source instead, run `topcoat ui add button --overwrite`.
 
 # Removing components
 
