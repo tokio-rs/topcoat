@@ -76,6 +76,11 @@ impl UpdateCommand {
                     style("~").yellow(),
                     entry.registry
                 ),
+                UpdateAction::Installed => println!(
+                    "{} {name} {file} {would}added from {}",
+                    style("+").green(),
+                    entry.registry
+                ),
                 UpdateAction::Merged => println!(
                     "{} {name} {file} {would}merged with your changes from {}",
                     style("~").yellow(),

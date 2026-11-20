@@ -1,13 +1,19 @@
-use std::{collections::HashMap, io::ErrorKind, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    io::ErrorKind,
+    path::PathBuf,
+};
 
 use super::{
+    add::find_file_conflict,
     merge::{LineEnding, merge, normalize},
+    module,
     package::Package,
-    state::InstallState,
+    state::{InstallState, InstalledComponent},
     vcs::Vcs,
     workspace::Workspace,
 };
-use crate::{Registry, content_hash};
+use crate::{Component, Dependency, Registry, content_hash};
 
 /// Options for updating installed files.
 #[expect(
@@ -83,8 +89,21 @@ pub enum UpdateAction {
         /// every difference between the file and the registry's source is a conflict.
         missing_base: Option<String>,
     },
+    /// The component was not installed and its file was written, because an updated
+    /// component depends on it.
+    Installed,
     /// The file was left alone, for the given reason.
     Skipped { reason: String },
+}
+
+impl UpdateAction {
+    /// Whether the file now derives from a newer registry source than before.
+    fn changes_source(&self) -> bool {
+        matches!(
+            self,
+            Self::FastForwarded | Self::Matched | Self::Merged | Self::Conflicted { .. }
+        )
+    }
 }
 
 /// Updates installed components and the theme to the registry's current sources.
@@ -93,6 +112,10 @@ pub enum UpdateAction {
 /// the registry's changes, and overlapping changes are left in the file as conflict
 /// markers. The install state then records the new source, also for files with
 /// conflicts.
+///
+/// A component that an updated component depends on is installed if it is missing.
+/// No other component is installed, and a file that already exists in its place is
+/// left alone.
 ///
 /// A file recorded without a registry version gains the current one if the
 /// registry's source has not changed since the file was installed. A later update can
@@ -106,12 +129,13 @@ pub enum UpdateAction {
 /// Every file is planned before the first one is written. A later I/O failure can
 /// leave some files updated and others not.
 ///
-/// Returns an entry for every selected file.
+/// Returns an entry for every selected file and every installed dependency.
 ///
 /// # Errors
 ///
 /// Returns an error if the install state or workspace cannot be loaded, a named
-/// component is not installed, the theme is requested but none is installed, a merge
+/// component is not installed, the theme is requested but none is installed, a new
+/// dependency or its registry cannot be resolved, a merge
 /// is refused as described above, or reading or writing a file or saving the install
 /// state fails.
 pub fn update(package: &Package, options: &UpdateOptions) -> Result<Vec<UpdateEntry>, String> {
@@ -161,19 +185,50 @@ pub fn update(package: &Package, options: &UpdateOptions) -> Result<Vec<UpdateEn
         });
     }
 
+    let merges = entries.iter().any(|entry| {
+        matches!(
+            entry.action,
+            UpdateAction::Merged | UpdateAction::Conflicted { .. }
+        )
+    });
+
+    // The new sources of updated components may depend on components that are not
+    // installed.
+    let updated: Vec<(String, String)> = entries
+        .iter()
+        .filter(|entry| entry.kind == UpdateKind::Component && entry.action.changes_source())
+        .map(|entry| (entry.registry.clone(), entry.name.clone()))
+        .collect();
+    let installs = sources.new_dependencies(&mut state, &updated)?;
+    changed |= !installs.is_empty();
+    entries.extend(installs.iter().map(|install| UpdateEntry {
+        name: install.name.clone(),
+        kind: UpdateKind::Component,
+        file: install.file.clone(),
+        registry: install.registry.clone(),
+        action: UpdateAction::Installed,
+    }));
+
     if !options.dry_run {
-        let merges = entries.iter().any(|entry| {
-            matches!(
-                entry.action,
-                UpdateAction::Merged | UpdateAction::Conflicted { .. }
-            )
-        });
         if merges {
             vcs.ensure_undoable(options.allow_dirty, options.allow_no_vcs)?;
+        }
+        let components_dir = package.resolve(&state.components_dir);
+        if !installs.is_empty() {
+            module::check(&components_dir)?;
         }
         for (file, contents) in &writes {
             std::fs::write(file, contents)
                 .map_err(|error| format!("failed to write {}: {error}", file.display()))?;
+        }
+        for install in &installs {
+            let file = package.resolve(&install.file);
+            std::fs::create_dir_all(&components_dir).map_err(|error| {
+                format!("failed to create {}: {error}", components_dir.display())
+            })?;
+            std::fs::write(&file, &install.contents)
+                .map_err(|error| format!("failed to write {}: {error}", file.display()))?;
+            module::declare(&components_dir, &install.file_name)?;
         }
         if changed {
             state.save(package)?;
@@ -267,6 +322,16 @@ impl Target {
     }
 }
 
+/// A component to install because an updated component depends on it.
+struct Install {
+    registry: String,
+    name: String,
+    /// The package-relative path of the file to write.
+    file: PathBuf,
+    file_name: String,
+    contents: String,
+}
+
 /// Reads registry sources, loading each registry once.
 struct Sources<'a> {
     package: &'a Package,
@@ -278,19 +343,23 @@ struct Sources<'a> {
 }
 
 impl Sources<'_> {
+    /// The registry `name` as the package currently resolves it.
+    fn current(&mut self, name: &str) -> Result<&Registry, String> {
+        let workspace = self.workspace;
+        self.current
+            .entry(name.to_string())
+            .or_insert_with(|| {
+                let dir = workspace.registry_dir(name)?;
+                Registry::load(dir)
+                    .map_err(|error| format!("failed to load registry `{name}`: {error}"))
+            })
+            .as_ref()
+            .map_err(Clone::clone)
+    }
+
     /// Plans the update of one installed file.
     fn plan(&mut self, target: &Target) -> Result<Plan, String> {
-        let workspace = self.workspace;
-        let current = self
-            .current
-            .entry(target.registry.clone())
-            .or_insert_with(|| {
-                let dir = workspace.registry_dir(&target.registry)?;
-                Registry::load(dir).map_err(|error| {
-                    format!("failed to load registry `{}`: {error}", target.registry)
-                })
-            });
-        let theirs = match current {
+        let theirs = match self.current(&target.registry) {
             Ok(registry) => match target.kind.read(registry, &target.name)? {
                 Some(theirs) => theirs,
                 None => {
@@ -300,7 +369,7 @@ impl Sources<'_> {
                     )));
                 }
             },
-            Err(error) => return Ok(Plan::skip(error.clone())),
+            Err(error) => return Ok(Plan::skip(error)),
         };
 
         let path = self.package.resolve(&target.file);
@@ -315,6 +384,72 @@ impl Sources<'_> {
         Ok(Plan::new(&target.hash, &ours, &theirs, || {
             self.base(target)
         }))
+    }
+
+    /// Plans the installation of every component that the `updated` components depend
+    /// on, directly or through another new dependency, and that is not installed.
+    /// Records each in `state`.
+    ///
+    /// A dependency whose file already exists is left alone and not recorded.
+    fn new_dependencies(
+        &mut self,
+        state: &mut InstallState,
+        updated: &[(String, String)],
+    ) -> Result<Vec<Install>, String> {
+        let (package, workspace) = (self.package, self.workspace);
+        let mut queue = VecDeque::new();
+        for (registry, name) in updated {
+            if let Some(component) = self.current(registry)?.get(name) {
+                queue.extend(dependencies(registry, &component));
+            }
+        }
+
+        let mut visited = HashSet::new();
+        let mut installs = Vec::new();
+        while let Some((registry, name)) = queue.pop_front() {
+            if !visited.insert((registry.clone(), name.clone())) {
+                continue;
+            }
+            let installed = state
+                .registries
+                .get(&registry)
+                .is_some_and(|tracked| tracked.components.contains_key(&name));
+            if installed {
+                continue;
+            }
+
+            let component = self
+                .current(&registry)?
+                .get(&name)
+                .ok_or_else(|| format!("unknown component `{name}` in registry `{registry}`"))?;
+            let file = state.components_dir.join(component.file_name());
+            if package.resolve(&file).exists()
+                || find_file_conflict(state, &registry, &name, &file).is_some()
+            {
+                continue;
+            }
+
+            let contents = component
+                .read_source()
+                .map_err(|error| format!("failed to read component `{name}`: {error}"))?;
+            queue.extend(dependencies(&registry, &component));
+            state.registry_mut(&registry).components.insert(
+                name.clone(),
+                InstalledComponent {
+                    hash: content_hash(&contents),
+                    version: workspace.registry_version(&registry).map(str::to_string),
+                    file: file.clone(),
+                },
+            );
+            installs.push(Install {
+                file_name: component.file_name().to_string(),
+                registry,
+                name,
+                file,
+                contents,
+            });
+        }
+        Ok(installs)
     }
 
     /// Reads the source `target` was installed from, out of the registry version the
@@ -343,6 +478,19 @@ impl Sources<'_> {
         }
         Ok(base)
     }
+}
+
+/// The registry and name of every component that `component` of `registry` depends
+/// on.
+fn dependencies(registry: &str, component: &Component<'_>) -> Vec<(String, String)> {
+    component
+        .dependencies()
+        .iter()
+        .map(|dependency| match dependency {
+            Dependency::Same(name) => (registry.to_string(), name.clone()),
+            Dependency::Other { registry, name } => (registry.clone(), name.clone()),
+        })
+        .collect()
 }
 
 /// What to do with one installed file.

@@ -450,7 +450,7 @@ fn resolve_root_registry(
 
 /// Finds another installed component using the same destination path. Components with
 /// the same name but different paths do not conflict.
-fn find_file_conflict(
+pub(super) fn find_file_conflict(
     state: &InstallState,
     registry: &str,
     component: &str,
