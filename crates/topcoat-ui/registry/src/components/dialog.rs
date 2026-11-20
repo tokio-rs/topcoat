@@ -20,7 +20,7 @@ const OVERLAY: StaticClass = class!(
 /// supplies the entry transition's initial opacity.
 const FADE: StaticClass = class!(
     "opacity-0 open:opacity-100 starting:open:opacity-0",
-    "[transition:opacity_200ms_ease-out,display_200ms_allow-discrete]",
+    "[transition:opacity_200ms_ease-out,display_200ms_allow-discrete,overlay_200ms_allow-discrete]",
 );
 
 /// A panel displayed over the page.
