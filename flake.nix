@@ -43,6 +43,10 @@
             channel = msrv;
             sha256 = "sha256-zm3dyIY2T414ZRR3EhLOvptzG6gta4WZUcawzMUWtqI=";
           };
+          nightlyToolChainSpec = {
+            channel = "nightly";
+            sha256 = "sha256-axBIOyanKDHAdB/h6wkf3l1+DCa6/WAv4+vVKvZH684=";
+          };
 
           rustToolchain = (fenix.packages.${system}.toolchainOf toolchainSpec).withComponents [
             "cargo"
@@ -52,6 +56,21 @@
             "rustc"
             "rustfmt"
           ];
+          nightlyRustToolchain = (fenix.packages.${system}.toolchainOf nightlyToolChainSpec).withComponents [
+            "cargo"
+            "rustc"
+            "rustfmt"
+          ];
+          # Fenix supplies Cargo directly, so the dev shell dispatches +nightly itself.
+          devCargo = pkgs.writeShellScriptBin "cargo" ''
+            if [[ "''${1-}" == "+nightly" ]]; then
+              shift
+              export PATH="${nightlyRustToolchain}/bin:$PATH"
+              exec ${nightlyRustToolchain}/bin/cargo "$@"
+            fi
+            exec ${rustToolchain}/bin/cargo "$@"
+          '';
+
           # The MSRV toolchain plus the wasm32 standard library for hydrated
           # benchmark apps (Leptos, Dioxus).
           benchmarkRustToolchain = fenix.packages.${system}.combine [
@@ -90,7 +109,15 @@
 
           devShells = {
             default = pkgs.mkShell {
-              packages = [ rustToolchain ];
+              packages = with pkgs; [
+                devCargo
+                rustToolchain
+                cargo-hack
+                cargo-udeps
+                gitMinimal
+                nodejs_22
+                (yarn.override { nodejs = nodejs_22; })
+              ];
               hardeningDisable = [ "fortify" ];
               RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
             };
