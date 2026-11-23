@@ -1,6 +1,6 @@
 mod strip_prefix;
 
-use std::{any::Any, borrow::Cow, pin::Pin, sync::Arc};
+use std::{any::Any, borrow::Cow, pin::Pin};
 
 pub use strip_prefix::*;
 use topcoat_core::{
@@ -9,8 +9,9 @@ use topcoat_core::{
 };
 
 use crate::{
-    Body, Endpoint, IntoPath, Path, Route,
+    Body, Endpoint, Handler, IntoPath, Path, RouteEntry,
     error::{method_not_allowed, not_found},
+    redirect_to_twin,
     response::Response,
 };
 
@@ -194,10 +195,10 @@ pub(crate) fn layers_for_path(layers: &[&dyn Layer], path: &Path) -> Vec<usize> 
 #[derive(Clone, Copy)]
 pub(crate) enum Terminal<'a> {
     /// A matched route handles the request.
-    Route(&'a dyn Route),
+    Route(&'a RouteEntry<'a>),
     /// The path matched but the method did not; the chain resolves to a
     /// method-not-allowed error listing the endpoint's supported methods.
-    MethodNotAllowed(&'a Endpoint),
+    MethodNotAllowed(&'a Endpoint<'a>),
     /// The path matched no endpoint; the chain resolves to a not-found error.
     NotFound,
 }
@@ -210,7 +211,7 @@ pub(crate) enum Terminal<'a> {
 pub struct Next<'a> {
     /// The layers wrapping this request, ordered from least- to most-specific
     /// so the outermost layer runs first.
-    layers: &'a [Arc<dyn Layer>],
+    layers: &'a [&'a dyn Layer],
     /// What runs once the layers are exhausted.
     terminal: Terminal<'a>,
 }
@@ -220,7 +221,7 @@ impl<'a> Next<'a> {
     ///
     /// `layers` must be ordered from least- to most-specific (ascending path
     /// length), so the outermost layer runs first.
-    pub(crate) fn new(layers: &'a [Arc<dyn Layer>], terminal: Terminal<'a>) -> Self {
+    pub(crate) fn new(layers: &'a [&'a dyn Layer], terminal: Terminal<'a>) -> Self {
         Self { layers, terminal }
     }
 
@@ -228,7 +229,7 @@ impl<'a> Next<'a> {
     /// remain.
     pub fn run(self, cx: &'a Cx, body: Body) -> LayerFuture<'a> {
         match self.layers.split_first() {
-            Some((layer, rest)) => layer.handle(
+            Some((&layer, rest)) => layer.handle(
                 cx,
                 body,
                 Next {
@@ -237,7 +238,16 @@ impl<'a> Next<'a> {
                 },
             ),
             None => match self.terminal {
-                Terminal::Route(route) => route.handle(cx, body),
+                Terminal::Route(entry) => match entry.handler {
+                    Handler::Route(route) => route.handle(cx, body),
+                    Handler::Page { .. } => {
+                        todo!("render the page, found through the match in the request context")
+                    }
+                    Handler::Redirect { path, .. } => {
+                        let result = redirect_to_twin(cx, path);
+                        Box::pin(async move { result })
+                    }
+                },
                 Terminal::MethodNotAllowed(endpoint) => {
                     let error = method_not_allowed(endpoint.methods().cloned());
                     Box::pin(async move { Err(error.into()) })
@@ -255,13 +265,14 @@ mod tests {
         sync::{Arc, Mutex},
     };
 
+    use bumpalo::Bump;
     use http::StatusCode;
     use topcoat_core::context::{Cx, context};
 
     use super::*;
     use crate::{
-        Method, RouteFn, RouteFuture, RouteIndex, error::respond, request::Bytes,
-        response::IntoResponse, to_bytes,
+        Method, RouteFn, RouteFuture, error::respond, request::Bytes, response::IntoResponse,
+        to_bytes,
     };
 
     // -- Test helpers --
@@ -351,6 +362,15 @@ mod tests {
         })
     }
 
+    /// A route entry that runs `route` without layers of its own.
+    fn entry(route: &RouteFn) -> RouteEntry<'_> {
+        RouteEntry {
+            handler: Handler::Route(route),
+            layers: &[],
+            context: None,
+        }
+    }
+
     // -- LayerFn --
 
     #[test]
@@ -418,9 +438,10 @@ mod tests {
     #[test]
     fn run_invokes_the_route_terminal_when_no_layers_remain() {
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
+        let entry = entry(&route);
         let cx = Cx::new();
 
-        let next = Next::new(&[], Terminal::Route(&route));
+        let next = Next::new(&[], Terminal::Route(&entry));
         let result = block_on(next.run(&cx, Body::empty()));
         let response = respond(&cx, result);
 
@@ -430,9 +451,12 @@ mod tests {
 
     #[test]
     fn run_resolves_the_method_not_allowed_terminal() {
-        let mut endpoint = Endpoint::new(&path("/x"));
-        endpoint.insert(Method::GET, RouteIndex::new(0));
-        endpoint.insert(Method::POST, RouteIndex::new(1));
+        let arena = Bump::new();
+        let route = RouteFn::new(Method::GET, path("/x"), say_route);
+        let entry = entry(&route);
+        let mut endpoint = Endpoint::new(Path::new("/x"));
+        endpoint.insert(&arena, &Method::GET, &entry);
+        endpoint.insert(&arena, &Method::POST, &entry);
         let cx = Cx::new();
 
         let next = Next::new(&[], Terminal::MethodNotAllowed(&endpoint));
@@ -453,16 +477,16 @@ mod tests {
 
     #[test]
     fn run_walks_layers_in_order_before_the_terminal() {
-        let layers: [Arc<dyn Layer>; 2] = [
-            Arc::new(LayerFn::new(Some(path("/")), record_a)),
-            Arc::new(LayerFn::new(Some(path("/")), record_b)),
-        ];
+        let a = LayerFn::new(Some(path("/")), record_a);
+        let b = LayerFn::new(Some(path("/")), record_b);
+        let layers: [&dyn Layer; 2] = [&a, &b];
         let route = RouteFn::new(Method::GET, path("/x"), record_route);
+        let entry = entry(&route);
 
         let trace: Arc<Trace> = Arc::new(Mutex::new(Vec::new()));
         let cx = Cx::new().with(trace.clone());
 
-        let next = Next::new(&layers, Terminal::Route(&route));
+        let next = Next::new(&layers, Terminal::Route(&entry));
         block_on(next.run(&cx, Body::empty())).unwrap();
 
         // The layers run in slice order, then the terminal route.
@@ -471,12 +495,14 @@ mod tests {
 
     #[test]
     fn run_lets_a_layer_short_circuit_without_calling_next() {
-        let layers: [Arc<dyn Layer>; 1] = [Arc::new(LayerFn::new(Some(path("/")), short_circuit))];
+        let layer = LayerFn::new(Some(path("/")), short_circuit);
+        let layers: [&dyn Layer; 1] = [&layer];
         // The route would answer "route", but the layer never calls `next.run`.
         let route = RouteFn::new(Method::GET, path("/x"), say_route);
+        let entry = entry(&route);
         let cx = Cx::new();
 
-        let next = Next::new(&layers, Terminal::Route(&route));
+        let next = Next::new(&layers, Terminal::Route(&entry));
         let result = block_on(next.run(&cx, Body::empty()));
         let response = respond(&cx, result);
 
