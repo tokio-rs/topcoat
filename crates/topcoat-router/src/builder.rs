@@ -339,15 +339,12 @@ impl RouterBuilder {
     /// set, since it could never be dispatched to.
     #[must_use]
     #[track_caller]
-    pub fn build(mut self) -> Router {
-        // The contexts are created first, because the tables point at them.
-        let plan = self
-            .staged
-            .with_dependent_mut(|_, objects| Plan::new(objects));
-        let cell = RouterCell::build(self.staged, |arena, objects| {
-            plan.into_tables(
+    pub fn build(self) -> Router {
+        let cell = RouterCell::build(self.staged, |arena, objects, contexts| {
+            tables(
                 arena,
                 objects,
+                contexts,
                 self.context,
                 self.trusted_proxies,
                 self.trailing_slash,
@@ -363,227 +360,183 @@ impl Default for RouterBuilder {
     }
 }
 
-/// The layers, layouts and context selected for one route or page, as
-/// positions in the lists of [`Objects`].
-struct Selection {
-    /// The layers wrapping it, outermost first.
-    layers: Vec<usize>,
-    /// The layouts wrapping it, outermost first. Empty for a route.
-    layouts: Vec<usize>,
-    /// Its context, or `None` when it holds no values.
-    context: Option<usize>,
-}
+/// Builds the tables of a router in `arena`, pointing at the values in
+/// `objects`. The context of each route and page is pushed to `contexts`.
+///
+/// # Panics
+///
+/// Panics if two routes are ambiguous, if a route declares no methods, if
+/// two paths conflict, or if a layer wraps no route.
+fn tables<'r>(
+    arena: &'r Bump,
+    objects: &'r Objects<'r>,
+    contexts: &'r mut Vec<Arc<ContextMap>>,
+    context: ContextMap,
+    trusted_proxies: TrustedProxies,
+    trailing_slash: TrailingSlash,
+) -> Tables<'r> {
+    let all_layers: Vec<&'r dyn Layer> = objects.layers.iter().collect();
+    let all_layouts: Vec<&'r dyn Layout> = objects.layouts.iter().collect();
+    // Each layer's and layout's values are built once and shared by
+    // everything it wraps.
+    let layer_contexts: Vec<ContextMap> = all_layers.iter().map(|&layer| layer.context()).collect();
+    let layout_contexts: Vec<ContextMap> = all_layouts
+        .iter()
+        .map(|&layout| layout.context())
+        .collect();
 
-/// What [`RouterBuilder::build`] decides before the tables exist: the
-/// selection of every route and of every page.
-struct Plan {
-    routes: Vec<Selection>,
-    pages: Vec<Selection>,
-}
+    // Each distinct layer stack and layout list is stored once and shared by
+    // the routes that use it.
+    let mut layer_stacks: HashMap<Vec<usize>, &'r [&'r dyn Layer]> = HashMap::new();
+    let mut layout_lists: HashMap<Vec<usize>, &'r [&'r dyn Layout]> = HashMap::new();
+    let mut layers_used = vec![false; all_layers.len()];
 
-impl Plan {
-    /// Selects the layers and layouts of every route and page, and stores the
-    /// context of each in `objects`.
-    fn new(objects: &mut Objects<'_>) -> Self {
-        let all_layers: Vec<&dyn Layer> = objects.layers.iter().collect();
-        let all_layouts: Vec<&dyn Layout> = objects.layouts.iter().collect();
-        // Each layer's and layout's values are built once and shared by
-        // everything it wraps.
-        let layer_contexts: Vec<ContextMap> =
-            all_layers.iter().map(|&layer| layer.context()).collect();
-        let layout_contexts: Vec<ContextMap> =
-            all_layouts.iter().map(|&layout| layout.context()).collect();
-
-        let contexts = &mut objects.contexts;
-        let mut select = |path: &Path, own_context: ContextMap, layouts: Vec<usize>| {
-            // The layers wrapping a route are selected against its own path,
-            // group segments included, so a layer inside a group wraps only
-            // the routes registered through that group.
-            let layers = layers_for_path(&all_layers, path);
-
-            // Outermost layer first and the route last, so each level shadows
-            // the levels around it. Layers run outside layouts, so a route's
-            // layout values shadow its layer values.
-            let mut context = ContextMap::new();
-            for &layer in &layers {
-                layer_contexts[layer].clone().install(&mut context);
-            }
-            for &layout in &layouts {
-                layout_contexts[layout].clone().install(&mut context);
-            }
-            own_context.install(&mut context);
-            let context = (!context.is_empty()).then(|| {
-                contexts.push(Arc::new(context));
-                contexts.len() - 1
+    // Every route and page, with the positions of the layouts wrapping it
+    // and its own values.
+    let routes = objects
+        .routes
+        .iter()
+        .map(|route| (Handler::Route(route), Vec::new(), route.context()));
+    let pages = objects.pages.iter().map(|page| {
+        let positions = layouts_for_path(&all_layouts, page.path());
+        let layouts = *layout_lists
+            .entry(positions.clone())
+            .or_insert_with_key(|positions| {
+                &*arena.alloc_slice_fill_iter(positions.iter().map(|&layout| all_layouts[layout]))
             });
+        (Handler::Page { page, layouts }, positions, page.context())
+    });
 
-            Selection {
-                layers,
-                layouts,
-                context,
-            }
-        };
+    // The route entries point at their contexts, so every context is created
+    // before the first entry.
+    let mut pending = Vec::new();
+    for (handler, layouts, own_context) in routes.chain(pages) {
+        // The layers wrapping a route are selected against its own path,
+        // group segments included, so a layer inside a group wraps only the
+        // routes registered through that group.
+        let layers = layers_for_path(&all_layers, handler.path());
 
-        let routes = objects
-            .routes
-            .iter()
-            .map(|route| select(route.path(), route.context(), Vec::new()))
-            .collect();
-        let pages = objects
-            .pages
-            .iter()
-            .map(|page| {
-                let layouts = layouts_for_path(&all_layouts, page.path());
-                select(page.path(), page.context(), layouts)
-            })
-            .collect();
-        Self { routes, pages }
+        // Outermost layer first and the route last, so each level shadows
+        // the levels around it. Layers run outside layouts, so a route's
+        // layout values shadow its layer values.
+        let mut context = ContextMap::new();
+        for &layer in &layers {
+            layers_used[layer] = true;
+            layer_contexts[layer].clone().install(&mut context);
+        }
+        for &layout in &layouts {
+            layout_contexts[layout].clone().install(&mut context);
+        }
+        own_context.install(&mut context);
+        let context = (!context.is_empty()).then(|| {
+            contexts.push(Arc::new(context));
+            contexts.len() - 1
+        });
+
+        let layers = *layer_stacks.entry(layers).or_insert_with_key(|layers| {
+            &*arena.alloc_slice_fill_iter(layers.iter().map(|&layer| all_layers[layer]))
+        });
+        pending.push((handler, layers, context));
     }
+    let contexts: &'r [Arc<ContextMap>] = contexts;
 
-    /// Builds the tables in `arena`, pointing at the values in `objects`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if two routes are ambiguous, if a route declares no methods, if
-    /// two paths conflict, or if a layer wraps no route.
-    fn into_tables<'r>(
-        self,
-        arena: &'r Bump,
-        objects: &'r Objects<'r>,
-        context: ContextMap,
-        trusted_proxies: TrustedProxies,
-        trailing_slash: TrailingSlash,
-    ) -> Tables<'r> {
-        let all_layers: Vec<&'r dyn Layer> = objects.layers.iter().collect();
-        let all_layouts: Vec<&'r dyn Layout> = objects.layouts.iter().collect();
+    // Group routes that share a path onto a single endpoint. Two routes that
+    // resolve to the same path *and* method are ambiguous, so reject them
+    // here. The grouping map keys endpoints by their matchit path so that
+    // routes differing only in their group segments agree on the one their
+    // endpoint serves.
+    let mut endpoints: Vec<(Cow<'static, str>, Endpoint<'r>)> = Vec::new();
+    let mut grouped: HashMap<Cow<'static, str>, usize> = HashMap::new();
+    let mut declared = Vec::with_capacity(pending.len());
+    for (handler, layers, context) in pending {
+        let entry: &'r RouteEntry<'r> = arena.alloc(RouteEntry {
+            handler,
+            layers,
+            context: context.map(|context| &contexts[context]),
+        });
 
-        // Each distinct layer stack and layout list is stored once and shared
-        // by the routes that use it.
-        let mut layer_stacks: HashMap<Vec<usize>, &'r [&'r dyn Layer]> = HashMap::new();
-        let mut layout_lists: HashMap<Vec<usize>, &'r [&'r dyn Layout]> = HashMap::new();
-        let mut layers_used = vec![false; all_layers.len()];
+        let path = handler.path();
+        let index = *grouped
+            .entry(path.to_matchit_path())
+            .or_insert_with_key(|served| {
+                let served_path = Path::new(arena.alloc_str(served));
+                endpoints.push((served.clone(), Endpoint::new(served_path)));
+                endpoints.len() - 1
+            });
+        let endpoint = &mut endpoints[index].1;
 
-        // Group routes that share a path onto a single endpoint. Two routes
-        // that resolve to the same path *and* method are ambiguous, so reject
-        // them here. The grouping map keys endpoints by their matchit path so
-        // that routes differing only in their group segments agree on the one
-        // their endpoint serves.
-        let mut endpoints: Vec<(Cow<'static, str>, Endpoint<'r>)> = Vec::new();
-        let mut grouped: HashMap<Cow<'static, str>, usize> = HashMap::new();
-        let mut declared = Vec::new();
-
-        let mut add = |handler: Handler<'r>, layers: Vec<usize>, context: Option<usize>| {
-            let path = handler.path();
-            for &layer in &layers {
-                layers_used[layer] = true;
+        // An any-method route shares its path with specific-method routes
+        // (which win at dispatch), so the two kinds are checked for
+        // duplicates independently.
+        match handler.methods() {
+            Methods::Any => {
+                assert!(
+                    endpoint.any().is_none(),
+                    "duplicate any-method route registered for `{}`",
+                    endpoint.path()
+                );
+                endpoint.insert_any(entry);
             }
-            let layers = *layer_stacks.entry(layers).or_insert_with_key(|layers| {
-                &*arena.alloc_slice_fill_iter(layers.iter().map(|&layer| all_layers[layer]))
-            });
-            let entry: &'r RouteEntry<'r> = arena.alloc(RouteEntry {
-                handler,
-                layers,
-                context: context.map(|context| &objects.contexts[context]),
-            });
-
-            let index = *grouped
-                .entry(path.to_matchit_path())
-                .or_insert_with_key(|served| {
-                    let served_path = Path::new(arena.alloc_str(served));
-                    endpoints.push((served.clone(), Endpoint::new(served_path)));
-                    endpoints.len() - 1
-                });
-            let endpoint = &mut endpoints[index].1;
-
-            // An any-method route shares its path with specific-method routes
-            // (which win at dispatch), so the two kinds are checked for
-            // duplicates independently.
-            match handler.methods() {
-                Methods::Any => {
+            Methods::Only(methods) => {
+                assert!(!methods.is_empty(), "route `{path}` registers no methods");
+                for method in methods {
                     assert!(
-                        endpoint.any().is_none(),
-                        "duplicate any-method route registered for `{}`",
+                        endpoint.get(method).is_none(),
+                        "duplicate route registered for `{method} {}`",
                         endpoint.path()
                     );
-                    endpoint.insert_any(entry);
-                }
-                Methods::Only(methods) => {
-                    assert!(!methods.is_empty(), "route `{path}` registers no methods");
-                    for method in methods {
-                        assert!(
-                            endpoint.get(method).is_none(),
-                            "duplicate route registered for `{method} {}`",
-                            endpoint.path()
-                        );
-                        endpoint.insert(arena, method, entry);
-                    }
+                    endpoint.insert(arena, method, entry);
                 }
             }
-            declared.push(RegisteredRoute::new(endpoint.path(), entry));
-        };
-
-        for (route, selection) in objects.routes.iter().zip(self.routes) {
-            add(Handler::Route(route), selection.layers, selection.context);
         }
-        for (page, selection) in objects.pages.iter().zip(self.pages) {
-            let layouts = *layout_lists
-                .entry(selection.layouts)
-                .or_insert_with_key(|layouts| {
-                    &*arena.alloc_slice_fill_iter(layouts.iter().map(|&layout| all_layouts[layout]))
-                });
-            add(
-                Handler::Page { page, layouts },
-                selection.layers,
-                selection.context,
+        declared.push(RegisteredRoute::new(endpoint.path(), entry));
+    }
+
+    // Sanity check for unused layers. Layers without a path always run, and
+    // the root path prefixes every route path, so neither can be a mistyped
+    // path; only narrower paths can go unused.
+    for (&layer, used) in all_layers.iter().zip(layers_used) {
+        if let Some(path) = layer.path() {
+            assert!(
+                used || path == Path::ROOT,
+                "layer with path `{path}` did not match any route, this is likely a mistake"
             );
         }
+    }
 
-        // Sanity check for unused layers. Layers without a path always run,
-        // and the root path prefixes every route path, so neither can be a
-        // mistyped path; only narrower paths can go unused.
-        for (&layer, used) in all_layers.iter().zip(layers_used) {
-            if let Some(path) = layer.path() {
-                assert!(
-                    used || path == Path::ROOT,
-                    "layer with path `{path}` did not match any route, this is likely a mistake"
-                );
+    // Layers without a path wrap every request, so requests that matched no
+    // route still run them. Among them the most recently registered runs
+    // first, like layers sharing a path.
+    let always_layers: Vec<&'r dyn Layer> = all_layers
+        .iter()
+        .copied()
+        .filter(|&layer| layer.path().is_none())
+        .rev()
+        .collect();
+    let always_layers: &'r [&'r dyn Layer] = arena.alloc_slice_copy(&always_layers);
+
+    let mut matcher = matchit::Router::new();
+    let mut served = Vec::with_capacity(endpoints.len());
+    for (path, mut endpoint) in endpoints {
+        endpoint.alias_head_to_get();
+        match matcher.insert(path, endpoint) {
+            Ok(()) => served.push(endpoint),
+            Err(matchit::InsertError::Conflict { with }) => {
+                panic!("failed to register route: conflicts with registered route `{with}`")
             }
+            Err(error) => panic!("failed to register route: {error}"),
         }
+    }
 
-        // Layers without a path wrap every request, so requests that matched
-        // no route still run them. Among them the most recently registered
-        // runs first, like layers sharing a path.
-        let always_layers: Vec<&'r dyn Layer> = all_layers
-            .iter()
-            .copied()
-            .filter(|&layer| layer.path().is_none())
-            .rev()
-            .collect();
-        let always_layers: &'r [&'r dyn Layer] = arena.alloc_slice_copy(&always_layers);
+    // The twins are the router's own routes, so they are not declared.
+    trailing_slash.register_twins(arena, &mut matcher, &served, always_layers);
 
-        let mut matcher = matchit::Router::new();
-        let mut served = Vec::with_capacity(endpoints.len());
-        for (path, mut endpoint) in endpoints {
-            endpoint.alias_head_to_get();
-            match matcher.insert(path, endpoint) {
-                Ok(()) => served.push(endpoint),
-                Err(matchit::InsertError::Conflict { with }) => {
-                    panic!("failed to register route: conflicts with registered route `{with}`")
-                }
-                Err(error) => panic!("failed to register route: {error}"),
-            }
-        }
-
-        // The twins are the router's own routes, so they are not declared.
-        trailing_slash.register_twins(arena, &mut matcher, &served, always_layers);
-
-        Tables {
-            matcher,
-            always_layers,
-            declared: arena.alloc_slice_copy(&declared),
-            context: Arc::new(context),
-            trusted_proxies,
-        }
+    Tables {
+        matcher,
+        always_layers,
+        declared: arena.alloc_slice_copy(&declared),
+        context: Arc::new(context),
+        trusted_proxies,
     }
 }
 

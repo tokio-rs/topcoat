@@ -112,7 +112,6 @@ pub(crate) struct Objects<'r> {
     pub(crate) pages: ArenaSlots<'r, dyn Page>,
     pub(crate) layouts: ArenaSlots<'r, dyn Layout>,
     pub(crate) layers: ArenaSlots<'r, dyn Layer>,
-    pub(crate) contexts: Vec<Arc<ContextMap>>,
 }
 
 self_cell!(
@@ -148,11 +147,17 @@ pub(crate) struct Tables<'r> {
     pub(crate) trusted_proxies: TrustedProxies,
 }
 
+/// Everything the [`Tables`] of a built router point at.
+pub(crate) struct Owner {
+    staged: Staged,
+    contexts: Vec<Arc<ContextMap>>,
+}
+
 self_cell!(
     /// A built router: the arena with its registered values and the
     /// [`Tables`] that point into it.
     pub(crate) struct RouterCell {
-        owner: MutBorrow<Staged>,
+        owner: MutBorrow<Owner>,
         #[not_covariant]
         dependent: Tables,
     }
@@ -161,15 +166,25 @@ self_cell!(
 impl RouterCell {
     /// Finishes `staged` into a router.
     ///
-    /// `tables` receives the arena and the registered values. It can allocate
-    /// in the arena, and the tables it returns can point at anything in it.
+    /// `tables` receives the arena, the registered values and an empty list
+    /// of contexts. It can allocate in the arena and push to the list, and
+    /// the tables it returns can point at anything in either.
     pub(crate) fn build(
         staged: Staged,
-        tables: impl for<'r> FnOnce(&'r Bump, &'r Objects<'r>) -> Tables<'r>,
+        tables: impl for<'r> FnOnce(
+            &'r Bump,
+            &'r Objects<'r>,
+            &'r mut Vec<Arc<ContextMap>>,
+        ) -> Tables<'r>,
     ) -> Self {
-        Self::new(MutBorrow::new(staged), |staged| {
-            let staged: &Staged = staged.borrow_mut();
-            tables(staged.borrow_owner(), staged.borrow_dependent())
+        let owner = Owner {
+            staged,
+            contexts: Vec::new(),
+        };
+        Self::new(MutBorrow::new(owner), |owner| {
+            let Owner { staged, contexts } = owner.borrow_mut();
+            let staged: &Staged = staged;
+            tables(staged.borrow_owner(), staged.borrow_dependent(), contexts)
         })
     }
 
@@ -292,7 +307,7 @@ mod tests {
     }
 
     fn build_with_all_layers(staged: Staged) -> RouterCell {
-        RouterCell::build(staged, |arena, objects| Tables {
+        RouterCell::build(staged, |arena, objects, _| Tables {
             always_layers: arena.alloc_slice_fill_iter(objects.layers.iter()),
             ..empty_tables()
         })
@@ -348,7 +363,7 @@ mod tests {
 
     #[test]
     fn a_path_matches_its_endpoint_and_captures_its_params() {
-        let router = RouterCell::build(Staged::default(), |arena, _| {
+        let router = RouterCell::build(Staged::default(), |arena, _, _| {
             let path = Path::new(arena.alloc_str("/users/{id}"));
             let mut matcher = matchit::Router::new();
             matcher.insert(path.as_str(), Endpoint::new(path)).unwrap();
