@@ -7,13 +7,15 @@ use std::{
 };
 
 use topcoat_core::{
-    context::{ContextMap, ContextValues, Cx, try_context, with_identity},
+    context::{ContextMap, ContextValues, Cx, context, try_context, with_identity},
     error::Result,
 };
+use yoke::{Yoke, Yokeable};
 
 use crate::{
-    Body, Endpoint, EndpointIndex, Endpoints, Layer, Next, RawPathParams, RegisteredRoute, Route,
-    RouteId, RouteIndex, RouterBuilder, Routes, Terminal, TrustedProxies,
+    Body, Endpoint, Next, Path, RawPathParams, RegisteredRoute, RouteEntry, RouteId, RouterBuilder,
+    Terminal,
+    arena::RouterCell,
     error::{RewriteChain, RewriteError, internal_server_response, respond},
     origin_policy,
     proxy::ClientIp,
@@ -43,9 +45,9 @@ use crate::{
 /// Clones share the same routing tables, so cloning is cheap.
 #[derive(Clone)]
 pub struct Router {
-    /// The routing tables, shared with every request context this router
-    /// creates.
-    inner: Arc<RouterInner>,
+    /// The arena and routing tables, shared with every request context this
+    /// router creates.
+    inner: Arc<RouterCell>,
 }
 
 impl Router {
@@ -56,9 +58,9 @@ impl Router {
     }
 
     /// Wraps finalized routing tables into a router.
-    pub(crate) fn new(inner: RouterInner) -> Self {
+    pub(crate) fn new(cell: RouterCell) -> Self {
         Self {
-            inner: Arc::new(inner),
+            inner: Arc::new(cell),
         }
     }
 
@@ -134,12 +136,7 @@ impl Router {
     /// assert_eq!(paths, ["/health"]);
     /// ```
     pub fn routes(&self) -> impl Iterator<Item = RegisteredRoute<'_>> {
-        let inner = &*self.inner;
-        inner
-            .routes
-            .iter()
-            .take(inner.declared_routes)
-            .map(|route| RegisteredRoute::new(route, &inner.endpoints[route.endpoint()]))
+        self.inner.routes().iter()
     }
 
     /// Returns the values registered on the router builder.
@@ -148,16 +145,15 @@ impl Router {
     /// [`RegisteredRoute::context`], shadow them.
     #[must_use]
     pub fn context(&self) -> &ContextMap {
-        &self.inner.context
+        self.inner.context()
     }
 
     /// Handles a request using the context values in `chain`.
     /// The caller catches panics from this future.
     async fn handle_inner(&self, request: Request, mut chain: RewriteChain) -> Response {
-        let inner = &*self.inner;
         // Resolve the client's address once from the original request,
         // before any rewrite can replace its headers.
-        let client_ip = ClientIp(inner.trusted_proxies.resolve(&request));
+        let client_ip = ClientIp(self.inner.trusted_proxies().resolve(&request));
         let (mut parts, mut body) = request.into_parts();
         let original = OriginalParts(Arc::new(parts.clone()));
 
@@ -166,10 +162,9 @@ impl Router {
             // passed by the caller or a rewrite, and discard any other
             // request state. Add the router's values last so they win.
             let cx = Cx::new()
-                .with_shared(Arc::clone(&inner.context))
+                .with_shared(Arc::clone(self.inner.context()))
                 .with_many(chain.context().clone())
                 .with_many((
-                    Arc::clone(&self.inner),
                     ResponseHeaders::new(),
                     RawPathParams::default(),
                     original.clone(),
@@ -215,35 +210,41 @@ impl Router {
 
     /// Matches and runs one dispatch, retaining its context for the response.
     async fn dispatch(&self, cx: Cx, body: Body) -> (Cx, Result<Response>) {
-        let inner = &*self.inner;
+        // The match is made inside the `Yoke`, which ties its references to
+        // the router handle, so the request context can own them.
         let parts = crate::request::parts(&cx);
-        let (cx, next) = match inner.endpoints.at(parts.uri.path()) {
-            Some((endpoint_index, endpoint, params)) => {
-                let path_params = RawPathParams::from_match(
-                    endpoint.path(),
-                    params.iter().map(|(_, value)| value),
-                );
-                let route_index = endpoint.get(&parts.method).or_else(|| endpoint.any());
-                let matched = Matched {
-                    endpoint: endpoint_index,
-                    route: route_index,
+        let mut path_params = RawPathParams::default();
+        let matched: Matched = Yoke::attach_to_cart(Arc::clone(&self.inner), |router| {
+            let Some((endpoint, params)) = router.at(parts.uri.path()) else {
+                return Match {
+                    endpoint: None,
+                    route: None,
                 };
-                let mut matched_cx = cx.with_many((matched, path_params));
-                let next = match route_index {
-                    Some(index) => {
-                        let route = &inner.routes[index];
-                        // The route's values sit between the router's values
-                        // and the request's, so request values shadow them.
-                        if let Some(context) = route.shared_context() {
-                            matched_cx = matched_cx.with_shared(Arc::clone(context));
-                        }
-                        Next::new(&[], Terminal::Route(route))
-                    }
-                    None => Next::new(&inner.always_layers, Terminal::MethodNotAllowed(endpoint)),
-                };
-                (matched_cx, next)
+            };
+            path_params =
+                RawPathParams::from_match(endpoint.path(), params.iter().map(|(_, value)| value));
+            Match {
+                endpoint: Some(endpoint),
+                route: endpoint.get(&parts.method).or_else(|| endpoint.any()),
             }
-            None => (cx, Next::new(&inner.always_layers, Terminal::NotFound)),
+        });
+
+        // The route's values sit between the router's values and the
+        // request's, so request values shadow them.
+        let route_context = matched.get().route.and_then(|route| route.context).cloned();
+        let mut cx = cx.with_many((matched, path_params));
+        if let Some(route_context) = route_context {
+            cx = cx.with_shared(route_context);
+        }
+
+        let found = *context::<Matched>(&cx).get();
+        let always_layers = self.inner.always_layers();
+        let next = match (found.endpoint, found.route) {
+            (_, Some(route)) => Next::new(route.layers, Terminal::Route(route)),
+            (Some(endpoint), None) => {
+                Next::new(always_layers, Terminal::MethodNotAllowed(endpoint))
+            }
+            (None, None) => Next::new(always_layers, Terminal::NotFound),
         };
 
         // The origin check precedes all route and pathless layers. It reads
@@ -257,40 +258,20 @@ impl Router {
     }
 }
 
-/// The routing tables behind a [`Router`].
-///
-/// Every request carries a shared handle to these tables on its context, so
-/// request-time accessors like [`endpoint`] resolve through the router that
-/// dispatched the request.
-pub(crate) struct RouterInner {
-    /// The registered routes, indexed by the endpoints' method tables.
-    pub(crate) routes: Routes,
-    /// The number of routes the application registered. They come first in
-    /// `routes`, followed by the routes the router adds itself.
-    pub(crate) declared_routes: usize,
-    /// The registered endpoints and the matcher resolving a request URL to
-    /// one of them.
-    pub(crate) endpoints: Endpoints,
-    /// The layers registered without a path, wrapping every request. A
-    /// request matched to a route runs them as part of the route's own stack;
-    /// this stack wraps requests that matched no route.
-    pub(crate) always_layers: Box<[Arc<dyn Layer>]>,
-    /// Shared values registered on the router builder and read with
-    /// [`context`](topcoat_core::context::context).
-    pub(crate) context: Arc<ContextMap>,
-    /// The proxies trusted to report the client's address.
-    pub(crate) trusted_proxies: TrustedProxies,
+/// What a request was dispatched to, as references into the router.
+#[derive(Clone, Copy, Yokeable)]
+pub(crate) struct Match<'r> {
+    /// The endpoint the request's path matched, or `None` when it matched
+    /// none (a 404).
+    pub(crate) endpoint: Option<&'r Endpoint<'r>>,
+    /// The route serving the request, or `None` when no route accepts the
+    /// method (a 405) or the path matched no endpoint.
+    pub(crate) route: Option<&'r RouteEntry<'r>>,
 }
 
-/// What a request was dispatched to, stored on its context.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct Matched {
-    /// The endpoint the request's path matched.
-    endpoint: EndpointIndex,
-    /// The route serving the request, or `None` when the path matched but no
-    /// route accepts the method (a 405).
-    route: Option<RouteIndex>,
-}
+/// A [`Match`] together with the router handle that keeps its references
+/// alive. It has no lifetime, so it can be stored on the request context.
+pub(crate) type Matched = Yoke<Match<'static>, Arc<RouterCell>>;
 
 /// Returns the router handling this request.
 ///
@@ -314,17 +295,17 @@ pub fn router(cx: &Cx) -> Router {
 /// not belong to a router request.
 #[must_use]
 pub fn try_router(cx: &Cx) -> Option<Router> {
-    let inner = try_context::<Arc<RouterInner>>(cx)?;
+    let matched = try_context::<Matched>(cx)?;
     Some(Router {
-        inner: Arc::clone(inner),
+        inner: Arc::clone(matched.backing_cart()),
     })
 }
 
-/// Reads the router and dispatch record off a matched request's context.
-fn try_matched(cx: &Cx) -> Option<(&RouterInner, Matched)> {
-    let router = try_context::<Arc<RouterInner>>(cx)?;
+/// Reads what a request was dispatched to off its context, or returns `None`
+/// if no router dispatched it.
+pub(crate) fn try_matched(cx: &Cx) -> Option<Match<'_>> {
     let matched = try_context::<Matched>(cx)?;
-    Some((router, *matched))
+    Some(*matched.get())
 }
 
 /// Returns the endpoint the current request matched.
@@ -350,7 +331,7 @@ fn try_matched(cx: &Cx) -> Option<(&RouterInner, Matched)> {
 /// ```
 #[must_use]
 #[track_caller]
-pub fn endpoint(cx: &Cx) -> &Endpoint {
+pub fn endpoint(cx: &Cx) -> &Endpoint<'_> {
     match try_endpoint(cx) {
         Some(endpoint) => endpoint,
         None => panic!("this request matched no endpoint"),
@@ -362,9 +343,8 @@ pub fn endpoint(cx: &Cx) -> &Endpoint {
 ///
 /// See [`endpoint`] for what the match holds.
 #[must_use]
-pub fn try_endpoint(cx: &Cx) -> Option<&Endpoint> {
-    let (router, matched) = try_matched(cx)?;
-    Some(&router.endpoints[matched.endpoint])
+pub fn try_endpoint(cx: &Cx) -> Option<&Endpoint<'_>> {
+    try_matched(cx)?.endpoint
 }
 
 /// Returns the route handling the current request.
@@ -375,7 +355,7 @@ pub fn try_endpoint(cx: &Cx) -> Option<&Endpoint> {
 /// endpoint, or the endpoint holds no route for the request's method.
 #[must_use]
 #[track_caller]
-pub fn route(cx: &Cx) -> &dyn Route {
+pub fn route(cx: &Cx) -> RegisteredRoute<'_> {
     match try_route(cx) {
         Some(route) => route,
         None => panic!("this request matched no route"),
@@ -386,47 +366,57 @@ pub fn route(cx: &Cx) -> &dyn Route {
 /// the path matched no endpoint (a 404), the endpoint holds no route for the
 /// request's method (a 405), or no router dispatched the request.
 #[must_use]
-pub fn try_route(cx: &Cx) -> Option<&dyn Route> {
-    let (router, matched) = try_matched(cx)?;
-    Some(&router.routes[matched.route?])
+pub fn try_route(cx: &Cx) -> Option<RegisteredRoute<'_>> {
+    let matched = try_matched(cx)?;
+    Some(RegisteredRoute::new(
+        matched.endpoint?.path(),
+        matched.route?,
+    ))
 }
 
-/// Returns the endpoint serving the route registered under `id` on the router
-/// the current request was dispatched through, or `None` if the context
-/// carries no router or the router holds no route with that identity.
+/// Returns the path the route registered under `id` is served at on the
+/// router the current request was dispatched through, or `None` if the
+/// context carries no router or the router holds no route with that identity.
 #[doc(hidden)]
 #[must_use]
-pub fn route_endpoint(cx: &Cx, id: RouteId) -> Option<&Endpoint> {
-    let router = try_context::<Arc<RouterInner>>(cx)?;
-    let index = router.routes.endpoint(id)?;
-    Some(&router.endpoints[index])
+pub fn route_path(cx: &Cx, id: RouteId) -> Option<&Path> {
+    let matched = try_context::<Matched>(cx)?;
+    Some(matched.backing_cart().routes().get(id)?.path())
 }
 
 /// Builds the request context of a request matched to an endpoint at `path`,
 /// as the router assembles one, for tests elsewhere in this crate.
 #[cfg(test)]
-pub(crate) fn test_matched_cx(path: &crate::Path) -> Cx {
-    use std::borrow::Cow;
-
-    let mut endpoints = Endpoints::default();
-    let endpoint = endpoints.push(Cow::Owned(path.as_str().to_owned()), Endpoint::new(path));
-    let inner = RouterInner {
-        routes: Routes::default(),
-        declared_routes: 0,
-        endpoints,
-        always_layers: Box::new([]),
-        context: Arc::new(ContextMap::new()),
-        trusted_proxies: TrustedProxies::new(),
+pub(crate) fn test_matched_cx(path: &Path) -> Cx {
+    use crate::{
+        Routes, TrustedProxies,
+        arena::{Staged, Tables},
     };
+
+    let served = path.to_matchit_path();
+    let cell = RouterCell::build(Staged::default(), |arena, _, _| {
+        let mut matcher = matchit::Router::new();
+        let endpoint = Endpoint::new(Path::new(arena.alloc_str(&served)));
+        matcher.insert(served.clone(), endpoint).unwrap();
+        Ok(Tables {
+            matcher,
+            always_layers: &[],
+            routes: Routes::default(),
+            context: Arc::new(ContextMap::new()),
+            trusted_proxies: TrustedProxies::new(),
+        })
+    })
+    .unwrap();
+    let cell = Arc::new(cell);
+    // The path pattern matches itself, with each parameter capturing its own
+    // name.
+    let matched: Matched = Yoke::attach_to_cart(Arc::clone(&cell), |router| Match {
+        endpoint: router.at(&served).map(|(endpoint, _)| endpoint),
+        route: None,
+    });
     Cx::new()
-        .with_shared(Arc::clone(&inner.context))
-        .with_many((
-            Arc::new(inner),
-            Matched {
-                endpoint,
-                route: None,
-            },
-        ))
+        .with_shared(Arc::clone(cell.context()))
+        .with(matched)
 }
 
 #[cfg(test)]
@@ -441,7 +431,7 @@ mod tests {
     };
 
     use http::{HeaderMap, StatusCode};
-    use topcoat::view::{DynViewPart, HtmlWriter, NodeViewParts, PartsWriter, view};
+    use topcoat::view::{DynViewPart, HtmlWriter, NodeViewParts, PartsWriter, emit, live, view};
     use topcoat_core::{
         base_url::BaseUrl,
         context::{Cx, context, iter_context},
@@ -451,8 +441,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        Body, HrefTarget, LayerFn, LayerFuture, LayoutFn, Method, Methods, PageFn, Path,
-        RemoteAddr, Route, RouteFn, RouteFuture, Slot, TrailingSlash,
+        Body, HrefTarget, Layer, LayerFn, LayerFuture, LayoutFn, Method, Methods, PageFn, Path,
+        RemoteAddr, Route, RouteFn, RouteFuture, Slot, TrailingSlash, TrustedProxies,
         error::rewrite,
         raw_path_params,
         request::{Bytes, client_ip, method, original_method, original_uri, uri},
@@ -530,6 +520,11 @@ mod tests {
         Box::pin(async move { format!("{:?}", route(cx).id()).into_response(cx) })
     }
 
+    /// Echoes the path of the route handling the request.
+    fn echo_route_path(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { route(cx).path().to_string().into_response(cx) })
+    }
+
     /// Returns the router's greeting as the response body.
     struct Greeting(&'static str);
 
@@ -603,6 +598,18 @@ mod tests {
 
     fn render_panicking_page(cx: &Cx, _body: Body) -> BoxView<'_> {
         view! { (Panicking) }.boxed()
+    }
+
+    /// A region that emits twice, so the second emission is rendered by the
+    /// response body after the handler returned.
+    fn render_live_page(cx: &Cx, _body: Body) -> BoxView<'_> {
+        view! {
+            (live! {
+                emit! { "first" }?;
+                emit! { "second" }
+            })
+        }
+        .boxed()
     }
 
     /// Wraps the child content in `R[ ... ]` so layout nesting is observable.
@@ -1405,6 +1412,21 @@ mod tests {
     }
 
     #[test]
+    fn the_matched_route_reports_the_path_it_is_served_at() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(
+                Method::GET,
+                path("/(auth)/users/{id}"),
+                echo_route_path,
+            ))
+            .build();
+
+        // The group is not part of the URL, and the parameter keeps its name.
+        let (_, _, body) = send(&router, Method::GET, "/users/7");
+        assert_eq!(&body[..], b"/users/{id}");
+    }
+
+    #[test]
     #[should_panic(expected = "matched no route")]
     fn route_panics_without_a_matched_route() {
         // The context of a 405: an endpoint matched, but no route did.
@@ -2078,6 +2100,54 @@ mod tests {
         // The `/admin` layout does not apply to a page at `/p`.
         let (_, _, body) = send(&router, Method::GET, "/p");
         assert_eq!(&body[..], b"page");
+    }
+
+    #[test]
+    fn a_page_keeps_rendering_after_its_router_is_dropped() {
+        let router = RouterBuilder::new()
+            .page(PageFn::new(Method::GET, path("/p"), render_live_page))
+            .layout(LayoutFn::new(path("/"), layout_root))
+            .build();
+
+        let response = block_on(router.handle(request(Method::GET, "/p")));
+        // The body still renders the page inside its layout, and both are
+        // owned by the router.
+        drop(router);
+        let body = block_on(to_bytes(response.into_body(), usize::MAX)).unwrap();
+        let body = String::from_utf8_lossy(&body);
+        assert!(body.contains("first"), "{body}");
+        assert!(body.contains("second"), "{body}");
+    }
+
+    // -- Router: dropping --
+
+    /// Counts its drops in the shared counter.
+    struct DropGuard(Arc<AtomicUsize>);
+
+    impl Drop for DropGuard {
+        fn drop(&mut self) {
+            self.0.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    #[test]
+    fn dropping_the_router_drops_the_values_attached_to_its_handlers() {
+        let drops = Arc::new(AtomicUsize::new(0));
+        let guard = || DropGuard(Arc::clone(&drops));
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/x"), say_route).with(guard()))
+            .page(PageFn::new(Method::GET, path("/p"), render_page).with(guard()))
+            .layout(LayoutFn::new(path("/"), layout_root).with(guard()))
+            .layer(LayerFn::new(Some(path("/")), pass_through).with(guard()))
+            .build();
+
+        // A served request holds no value once its response is read.
+        send(&router, Method::GET, "/x");
+        send(&router, Method::GET, "/p");
+        assert_eq!(drops.load(Ordering::Relaxed), 0);
+
+        drop(router);
+        assert_eq!(drops.load(Ordering::Relaxed), 4);
     }
 
     // -- Router::handle: contexts that outlive the handler --

@@ -4,15 +4,23 @@ use std::{
     net::SocketAddr,
     pin::{Pin, pin},
     sync::Arc,
-    time::Duration,
+    task::{Context, Poll},
+    time::{Duration, Instant},
 };
 
-use hyper::{body::Incoming, service::Service};
+use hyper::{
+    body::Incoming,
+    rt::{Sleep, Timer},
+    service::Service,
+};
 use hyper_util::{
     rt::{TokioExecutor, TokioIo, TokioTimer},
     server::conn::auto,
 };
-use tokio::sync::watch;
+use tokio::{
+    sync::watch,
+    time::{Interval, MissedTickBehavior},
+};
 
 use crate::{Body, Listener, RemoteAddr, Router, request::Request, response::Response};
 
@@ -37,6 +45,7 @@ use crate::{Body, Listener, RemoteAddr, Router, request::Request, response::Resp
 pub struct RouterService {
     router: Arc<Router>,
     pub(crate) shutdown_timeout: Duration,
+    header_read_timeout: Option<Duration>,
     /// The peer address of the connection this clone serves, stamped on each
     /// of its requests.
     remote_addr: Option<SocketAddr>,
@@ -48,10 +57,13 @@ impl RouterService {
     pub fn new(router: Router) -> Self {
         /// How long in-flight requests get to finish by default.
         const DEFAULT_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(30);
+        /// How long a client gets to send a request head by default.
+        const DEFAULT_HEADER_READ_TIMEOUT: Duration = Duration::from_secs(30);
 
         Self {
             router: Arc::new(router),
             shutdown_timeout: DEFAULT_SHUTDOWN_TIMEOUT,
+            header_read_timeout: Some(DEFAULT_HEADER_READ_TIMEOUT),
             remote_addr: None,
         }
     }
@@ -62,6 +74,31 @@ impl RouterService {
             remote_addr,
             ..self.clone()
         }
+    }
+
+    /// Sets how long an HTTP/1 client gets to send a complete request head
+    /// before its connection is closed.
+    ///
+    /// The time starts when the server begins waiting for a request, so it
+    /// also limits how long a kept-alive connection may sit idle between
+    /// requests. It does not limit how long a request takes to handle. A
+    /// connection may stay open for up to a third longer than the timeout.
+    ///
+    /// The default is 30 seconds. Pass `None` to wait indefinitely, which
+    /// leaves closing slow or idle connections to a reverse proxy.
+    ///
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// use topcoat::router::{Router, RouterService};
+    ///
+    /// let service =
+    ///     RouterService::new(Router::builder().build()).header_read_timeout(Duration::from_secs(10));
+    /// ```
+    #[must_use]
+    pub fn header_read_timeout(mut self, timeout: impl Into<Option<Duration>>) -> Self {
+        self.header_read_timeout = timeout.into();
+        self
     }
 
     /// Sets how long in-flight requests get to finish during a graceful
@@ -148,21 +185,31 @@ pub async fn internal_serve(
 
             // Serving with upgrade support keeps protocol switches (like
             // WebSockets) working; for ordinary requests it behaves the same.
+            let header_read_timeout = service.header_read_timeout;
             let mut builder = auto::Builder::new(TokioExecutor::new());
-            builder.http1().timer(TokioTimer::new());
+            builder
+                .http1()
+                .timer(DeadlineTimer)
+                .header_read_timeout(header_read_timeout);
             builder.http2().timer(TokioTimer::new());
             let mut connection = pin!(builder.serve_connection_with_upgrades(io, service));
+            let mut deadline_tick = DeadlineTick::new(header_read_timeout);
 
-            let result = tokio::select! {
-                result = connection.as_mut() => result,
-                _ = drain_rx.changed() => {
-                    // Finish the in-flight request, then close: HTTP/1 stops
-                    // keep-alive, HTTP/2 sends GOAWAY.
-                    connection.as_mut().graceful_shutdown();
-                    tokio::select! {
-                        result = connection.as_mut() => result,
-                        // The grace period ended; drop the connection as is.
-                        _ = cutoff_rx.changed() => return,
+            let result = loop {
+                tokio::select! {
+                    result = connection.as_mut() => break result,
+                    // Looping polls the connection again, which is what lets
+                    // it see that its header read deadline has passed.
+                    () = deadline_tick.tick() => {}
+                    _ = drain_rx.changed() => {
+                        // Finish the in-flight request, then close: HTTP/1
+                        // stops keep-alive, HTTP/2 sends GOAWAY.
+                        connection.as_mut().graceful_shutdown();
+                        break tokio::select! {
+                            result = connection.as_mut() => result,
+                            // The grace period ended; drop the connection as is.
+                            _ = cutoff_rx.changed() => return,
+                        };
                     }
                 }
             };
@@ -196,6 +243,81 @@ pub async fn internal_serve(
     done_tx.closed().await;
 
     Ok(())
+}
+
+/// A timer for the header read timeout that stays off the runtime's timer
+/// driver.
+///
+/// Its sleeps only compare the clock against their deadline when polled and
+/// never wake their task. Arming and dropping one per request therefore takes
+/// no shared lock, but something else has to poll the connection for an
+/// expired deadline to be noticed. [`DeadlineTick`] does that.
+struct DeadlineTimer;
+
+impl Timer for DeadlineTimer {
+    fn sleep(&self, duration: Duration) -> Pin<Box<dyn Sleep>> {
+        self.sleep_until(self.now() + duration)
+    }
+
+    fn sleep_until(&self, deadline: Instant) -> Pin<Box<dyn Sleep>> {
+        Box::pin(Deadline(deadline))
+    }
+
+    fn now(&self) -> Instant {
+        tokio::time::Instant::now().into_std()
+    }
+}
+
+/// A sleep handed out by [`DeadlineTimer`].
+struct Deadline(Instant);
+
+impl Future for Deadline {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if tokio::time::Instant::now().into_std() >= self.0 {
+            Poll::Ready(())
+        } else {
+            // No waker is registered. The connection task's `DeadlineTick`
+            // polls again.
+            Poll::Pending
+        }
+    }
+}
+
+impl Sleep for Deadline {}
+
+/// Wakes a connection task at a coarse interval, so its connection is polled
+/// and notices an expired [`Deadline`].
+///
+/// This is the only runtime timer a connection holds for its header read
+/// timeout. It is registered once per tick instead of once per request.
+struct DeadlineTick(Option<Interval>);
+
+impl DeadlineTick {
+    /// Ticks often enough to enforce `timeout`, or never without one.
+    fn new(timeout: Option<Duration>) -> Self {
+        /// Keeps a very short timeout from turning into a busy loop.
+        const MIN_PERIOD: Duration = Duration::from_millis(10);
+
+        Self(timeout.map(|timeout| {
+            let period = (timeout / 3).max(MIN_PERIOD);
+            let mut interval =
+                tokio::time::interval_at(tokio::time::Instant::now() + period, period);
+            interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
+            interval
+        }))
+    }
+
+    /// Completes at the next tick.
+    async fn tick(&mut self) {
+        match &mut self.0 {
+            Some(interval) => {
+                interval.tick().await;
+            }
+            None => std::future::pending().await,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -277,6 +399,29 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(200)).await;
             "slow".into_response(cx)
         })
+    }
+
+    /// A header read timeout short enough to expire within a test.
+    const SHORT_HEADER_READ_TIMEOUT: Duration = Duration::from_millis(100);
+
+    /// A route that takes longer than [`SHORT_HEADER_READ_TIMEOUT`].
+    fn outlast_header_timeout_route(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move {
+            tokio::time::sleep(SHORT_HEADER_READ_TIMEOUT * 3).await;
+            "slow".into_response(cx)
+        })
+    }
+
+    /// Reads until the server closes the connection, bounded so a connection
+    /// that is never closed fails the test instead of hanging it.
+    async fn read_until_closed(stream: &mut TcpStream) -> String {
+        let mut response = Vec::new();
+        // A reset counts as closed too, so the read's own result is ignored.
+        tokio::time::timeout(Duration::from_secs(5), stream.read_to_end(&mut response))
+            .await
+            .expect("server did not close the connection")
+            .ok();
+        String::from_utf8_lossy(&response).into_owned()
     }
 
     /// A route that never resolves, holding its connection open forever.
@@ -501,5 +646,82 @@ mod tests {
         let mut response = String::new();
         let result = stream.read_to_string(&mut response).await;
         assert!(result.is_err() || response.is_empty());
+    }
+
+    #[tokio::test]
+    async fn closes_a_connection_whose_request_head_stalls() {
+        let service = RouterService::new(router_with(say_route))
+            .header_read_timeout(SHORT_HEADER_READ_TIMEOUT);
+        let (addr, shutdown_tx, server) = spawn_server(service).await;
+
+        // The head is never finished.
+        let mut stream = TcpStream::connect(addr).await.unwrap();
+        stream.write_all(b"GET /x HTTP/1.1\r\nhost:").await.unwrap();
+
+        let response = read_until_closed(&mut stream).await;
+        assert!(!response.contains("200 OK"));
+
+        shutdown_tx.send(()).unwrap();
+        shut_down(server).await;
+    }
+
+    #[tokio::test]
+    async fn closes_a_kept_alive_connection_that_sits_idle() {
+        let service = RouterService::new(router_with(say_route))
+            .header_read_timeout(SHORT_HEADER_READ_TIMEOUT);
+        let (addr, shutdown_tx, server) = spawn_server(service).await;
+
+        // Without `connection: close`, only the timeout ends the connection.
+        let mut stream = TcpStream::connect(addr).await.unwrap();
+        stream
+            .write_all(b"GET /x HTTP/1.1\r\nhost: test\r\n\r\n")
+            .await
+            .unwrap();
+
+        let response = read_until_closed(&mut stream).await;
+        assert!(response.contains("200 OK"));
+        assert!(response.ends_with("served"));
+
+        shutdown_tx.send(()).unwrap();
+        shut_down(server).await;
+    }
+
+    #[tokio::test]
+    async fn the_header_read_timeout_does_not_cut_a_slow_request() {
+        let service = RouterService::new(router_with(outlast_header_timeout_route))
+            .header_read_timeout(SHORT_HEADER_READ_TIMEOUT);
+        let (addr, shutdown_tx, server) = spawn_server(service).await;
+
+        let response = get(addr, "/x").await;
+        assert!(response.contains("200 OK"));
+        assert!(response.ends_with("slow"));
+
+        shutdown_tx.send(()).unwrap();
+        shut_down(server).await;
+    }
+
+    #[tokio::test]
+    async fn without_a_header_read_timeout_a_stalled_connection_stays_open() {
+        let service = RouterService::new(router_with(say_route)).header_read_timeout(None);
+        let (addr, shutdown_tx, server) = spawn_server(service).await;
+
+        let mut stream = TcpStream::connect(addr).await.unwrap();
+        stream.write_all(b"GET /x HTTP/1.1\r\nhost:").await.unwrap();
+
+        // Nothing arrives and the connection is not closed.
+        let mut byte = [0];
+        let read = tokio::time::timeout(SHORT_HEADER_READ_TIMEOUT * 3, stream.read(&mut byte));
+        assert!(read.await.is_err());
+
+        // Finishing the head later still gets an answer.
+        stream
+            .write_all(b" test\r\nconnection: close\r\n\r\n")
+            .await
+            .unwrap();
+        let response = read_until_closed(&mut stream).await;
+        assert!(response.contains("200 OK"));
+
+        shutdown_tx.send(()).unwrap();
+        shut_down(server).await;
     }
 }

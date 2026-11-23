@@ -576,7 +576,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        Method, RouteFn, RouteFuture, Router, Terminal,
+        Handler, Method, RouteEntry, RouteFn, RouteFuture, Router, Terminal,
         error::{NotFoundError, not_found},
         request::Bytes,
         response::IntoResponse,
@@ -607,9 +607,19 @@ mod tests {
         Cx::new().with(parts)
     }
 
+    /// A route entry that runs `route` without layers of its own.
+    fn entry(route: &RouteFn) -> RouteEntry<'_> {
+        RouteEntry {
+            handler: Handler::Route(route),
+            layers: &[],
+            context: None,
+        }
+    }
+
     /// Runs a request through `layer` wrapped directly around `route`.
     fn run(layer: &dyn Layer, cx: &Cx, route: &RouteFn) -> Result<Response> {
-        let next = Next::new(&[], Terminal::Route(route));
+        let entry = entry(route);
+        let next = Next::new(&[], Terminal::Route(&entry));
         block_on(layer.handle(cx, Body::empty(), next))
     }
 
@@ -967,9 +977,10 @@ mod tests {
     fn chain_errors_tunnel_through_unchanged() {
         let layer = TowerLayer::new(tower::layer::util::Identity::new());
         let route = RouteFn::new(Method::GET, path("/missing"), not_found_route);
+        let entry = entry(&route);
         let cx = cx_for("/missing");
 
-        let next = Next::new(&[], Terminal::Route(&route));
+        let next = Next::new(&[], Terminal::Route(&entry));
         let result = block_on(layer.handle(&cx, Body::empty(), next));
 
         // The 404 comes back out as the original typed error, not a response.
@@ -987,9 +998,10 @@ mod tests {
         // still be recovered on the way out.
         let layer = TowerLayer::new(tower::timeout::TimeoutLayer::new(Duration::from_mins(1)));
         let route = RouteFn::new(Method::GET, path("/missing"), not_found_route);
+        let entry = entry(&route);
         let cx = cx_for("/missing");
 
-        let next = Next::new(&[], Terminal::Route(&route));
+        let next = Next::new(&[], Terminal::Route(&entry));
         let result = block_on(layer.handle(&cx, Body::empty(), next));
 
         assert!(

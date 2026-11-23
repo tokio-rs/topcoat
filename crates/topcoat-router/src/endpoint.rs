@@ -1,12 +1,9 @@
-use std::{
-    borrow::Cow,
-    collections::HashMap,
-    ops::{Index, IndexMut},
-};
+use std::fmt;
 
+use bumpalo::Bump;
 use http::Method;
 
-use crate::{Path, RouteIndex};
+use crate::{Path, RouteEntry};
 
 /// The standard HTTP methods, in the order their route slots appear in
 /// [`Endpoint::standard`]. Used only to name methods on the cold `Allow`-header
@@ -48,37 +45,37 @@ fn standard_slot(method: &Method) -> Option<usize> {
 /// The router matches a request URL to one endpoint, then picks the route
 /// registered for the request's method. Read the endpoint a request matched
 /// with [`endpoint`](crate::endpoint).
-#[derive(Debug)]
-pub struct Endpoint {
-    standard: [Option<RouteIndex>; STANDARD_METHODS.len()],
-    other: HashMap<Method, RouteIndex>,
-    /// The route handling every method without a registration of its own.
-    /// Routes registered for a specific method take precedence.
-    any: Option<RouteIndex>,
+///
+/// An endpoint borrows from the router it belongs to.
+#[derive(Clone, Copy)]
+pub struct Endpoint<'r> {
     /// The URL path this endpoint serves. Group segments are stripped, since
     /// they are not part of the URL and routes that differ only in them land
     /// on one endpoint.
-    path: Box<str>,
+    path: &'r Path,
+    standard: [Option<&'r RouteEntry<'r>>; STANDARD_METHODS.len()],
+    /// The route handling every method without a registration of its own.
+    /// Routes registered for a specific method take precedence.
+    any: Option<&'r RouteEntry<'r>>,
+    /// The routes registered for extension methods. Almost every endpoint
+    /// has none.
+    other: &'r [(&'r Method, &'r RouteEntry<'r>)],
 }
 
-impl Endpoint {
-    pub(crate) fn new(path: &Path) -> Self {
+impl<'r> Endpoint<'r> {
+    /// Creates an endpoint serving `path` with no routes.
+    pub(crate) fn new(path: &'r Path) -> Self {
         Self {
+            path,
             standard: [None; STANDARD_METHODS.len()],
-            other: HashMap::new(),
             any: None,
-            path: path.as_str().into(),
+            other: &[],
         }
     }
 
     /// Returns a copy of this endpoint's method table serving `path` instead.
-    pub(crate) fn with_path(&self, path: &Path) -> Self {
-        Self {
-            standard: self.standard,
-            other: self.other.clone(),
-            any: self.any,
-            path: path.as_str().into(),
-        }
+    pub(crate) fn with_path(&self, path: &'r Path) -> Self {
+        Self { path, ..*self }
     }
 
     /// Returns the URL path this endpoint serves.
@@ -88,38 +85,55 @@ impl Endpoint {
     /// segments are not part of it: they bind layouts and layers at build
     /// time and never reach the URL.
     #[must_use]
-    pub fn path(&self) -> &Path {
-        Path::new_unchecked(&self.path)
+    pub fn path(&self) -> &'r Path {
+        self.path
     }
 
     /// Returns the route registered specifically for `method`, if any. The
     /// any-method route is not consulted; read it with [`any`](Self::any).
-    pub(crate) fn get(&self, method: &Method) -> Option<RouteIndex> {
+    pub(crate) fn get(&self, method: &Method) -> Option<&'r RouteEntry<'r>> {
         match standard_slot(method) {
             Some(slot) => self.standard[slot],
-            None => self.other.get(method).copied(),
+            None => self
+                .other
+                .iter()
+                .find(|(registered, _)| *registered == method)
+                .map(|&(_, entry)| entry),
         }
     }
 
     /// Returns the route handling every unregistered method, if one is set.
-    pub(crate) fn any(&self) -> Option<RouteIndex> {
+    pub(crate) fn any(&self) -> Option<&'r RouteEntry<'r>> {
         self.any
     }
 
-    /// Registers `index` as the route handling `method`.
-    pub(crate) fn insert(&mut self, method: Method, index: RouteIndex) {
-        match standard_slot(&method) {
-            Some(slot) => self.standard[slot] = Some(index),
-            None => {
-                self.other.insert(method, index);
-            }
+    /// Registers `entry` as the route handling `method`.
+    ///
+    /// The list of extension methods lives in `arena`.
+    pub(crate) fn insert(
+        &mut self,
+        arena: &'r Bump,
+        method: &'r Method,
+        entry: &'r RouteEntry<'r>,
+    ) {
+        if let Some(slot) = standard_slot(method) {
+            self.standard[slot] = Some(entry);
+        } else {
+            let mut other: Vec<_> = self
+                .other
+                .iter()
+                .copied()
+                .filter(|(registered, _)| *registered != method)
+                .collect();
+            other.push((method, entry));
+            self.other = arena.alloc_slice_copy(&other);
         }
     }
 
-    /// Registers `index` as the route handling every method that has no
+    /// Registers `entry` as the route handling every method that has no
     /// registration of its own.
-    pub(crate) fn insert_any(&mut self, index: RouteIndex) {
-        self.any = Some(index);
+    pub(crate) fn insert_any(&mut self, entry: &'r RouteEntry<'r>) {
+        self.any = Some(entry);
     }
 
     /// Points the `HEAD` slot at the `GET` route unless a `HEAD` route was
@@ -138,206 +152,191 @@ impl Endpoint {
             .enumerate()
             .filter(|(slot, _)| self.standard[*slot].is_some())
             .map(|(_, method)| method)
-            .chain(self.other.keys())
+            .chain(self.other.iter().map(|&(method, _)| method))
     }
 }
 
-/// The position of an [`Endpoint`] in a router's [`Endpoints`] table.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct EndpointIndex(usize);
-
-/// The endpoints registered on a router, together with the matcher that
-/// resolves a request URL to one of them.
-///
-/// Endpoints are [`push`](Self::push)ed as the router is built, then only
-/// queried: [`at`](Self::at) matches a request URL, and indexing by
-/// [`EndpointIndex`] resolves a stored index back to its endpoint.
-#[derive(Default)]
-pub(crate) struct Endpoints {
-    endpoints: Vec<Endpoint>,
-    matcher: matchit::Router<EndpointIndex>,
-}
-
-impl Endpoints {
-    /// Registers `endpoint` under the matcher path `path`, returning the
-    /// [`EndpointIndex`] that now identifies it.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `path` conflicts with an already registered one.
-    #[track_caller]
-    pub(crate) fn push(&mut self, path: Cow<'static, str>, endpoint: Endpoint) -> EndpointIndex {
-        match self.try_push(path, endpoint) {
-            Ok(index) => index,
-            Err(with) => {
-                panic!("failed to register route: conflicts with registered route `{with}`")
-            }
-        }
-    }
-
-    /// Registers `endpoint` under the matcher path `path`, returning the
-    /// [`EndpointIndex`] that now identifies it, or the registered path that
-    /// `path` conflicts with.
-    pub(crate) fn try_push(
-        &mut self,
-        path: Cow<'static, str>,
-        endpoint: Endpoint,
-    ) -> Result<EndpointIndex, String> {
-        let index = EndpointIndex(self.endpoints.len());
-        match self.matcher.insert(path, index) {
-            Ok(()) => {
-                self.endpoints.push(endpoint);
-                Ok(index)
-            }
-            Err(matchit::InsertError::Conflict { with }) => Err(with),
-            Err(error) => panic!("failed to register route: {error}"),
-        }
-    }
-
-    /// Iterates over the indices of the endpoints registered so far. The
-    /// iterator borrows nothing, so endpoints can be pushed while it runs.
-    pub(crate) fn indices(&self) -> impl Iterator<Item = EndpointIndex> + use<> {
-        (0..self.endpoints.len()).map(EndpointIndex)
-    }
-
-    /// Matches a request URL against the registered endpoints, returning the
-    /// matched endpoint and the path parameters the URL captured.
-    pub(crate) fn at<'s, 'url>(
-        &'s self,
-        url: &'url str,
-    ) -> Option<(EndpointIndex, &'s Endpoint, matchit::Params<'s, 'url>)> {
-        let matched = self.matcher.at(url).ok()?;
-        let index = *matched.value;
-        Some((index, &self.endpoints[index.0], matched.params))
-    }
-}
-
-impl Index<EndpointIndex> for Endpoints {
-    type Output = Endpoint;
-
-    fn index(&self, EndpointIndex(index): EndpointIndex) -> &Self::Output {
-        &self.endpoints[index]
-    }
-}
-
-impl IndexMut<EndpointIndex> for Endpoints {
-    fn index_mut(&mut self, EndpointIndex(index): EndpointIndex) -> &mut Self::Output {
-        &mut self.endpoints[index]
+impl fmt::Debug for Endpoint<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Endpoint")
+            .field("path", &self.path)
+            .field("methods", &self.methods().collect::<Vec<_>>())
+            .field("any", &self.any.is_some())
+            .finish()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::ptr;
 
-    fn route(index: usize) -> RouteIndex {
-        RouteIndex::new(index)
+    use topcoat_core::context::Cx;
+
+    use super::*;
+    use crate::{Body, Handler, RouteFn, RouteFuture};
+
+    fn unused(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        unreachable!()
+    }
+
+    fn route() -> RouteFn {
+        RouteFn::new(Method::GET, "/x", unused)
+    }
+
+    /// A route entry for `route`. Tests tell entries apart by their address.
+    fn entry(route: &RouteFn) -> RouteEntry<'_> {
+        RouteEntry {
+            handler: Handler::Route(route),
+            layers: &[],
+            context: None,
+        }
+    }
+
+    /// Returns whether `found` is the entry `expected`, not just one equal
+    /// to it.
+    fn is(found: Option<&RouteEntry<'_>>, expected: &RouteEntry<'_>) -> bool {
+        found.is_some_and(|found| ptr::eq(found, expected))
     }
 
     /// An endpoint with no routes registered, at a path no test cares about.
-    fn empty() -> Endpoint {
+    fn empty<'r>() -> Endpoint<'r> {
         Endpoint::new(Path::new("/x"))
     }
 
-    // -- Endpoint: standard methods --
+    // -- Standard methods --
 
     #[test]
     fn empty_endpoint_has_no_routes() {
         let endpoint = empty();
-        assert_eq!(endpoint.get(&Method::GET), None);
-        assert_eq!(endpoint.get(&Method::POST), None);
+        assert!(endpoint.get(&Method::GET).is_none());
+        assert!(endpoint.get(&Method::POST).is_none());
         assert_eq!(endpoint.methods().count(), 0);
     }
 
     #[test]
     fn inserts_and_reads_back_standard_methods() {
+        let arena = Bump::new();
+        let route = route();
+        let (get, post, delete) = (entry(&route), entry(&route), entry(&route));
         let mut endpoint = empty();
-        endpoint.insert(Method::GET, route(0));
-        endpoint.insert(Method::POST, route(1));
-        endpoint.insert(Method::DELETE, route(2));
+        endpoint.insert(&arena, &Method::GET, &get);
+        endpoint.insert(&arena, &Method::POST, &post);
+        endpoint.insert(&arena, &Method::DELETE, &delete);
 
-        assert_eq!(endpoint.get(&Method::GET), Some(route(0)));
-        assert_eq!(endpoint.get(&Method::POST), Some(route(1)));
-        assert_eq!(endpoint.get(&Method::DELETE), Some(route(2)));
+        assert!(is(endpoint.get(&Method::GET), &get));
+        assert!(is(endpoint.get(&Method::POST), &post));
+        assert!(is(endpoint.get(&Method::DELETE), &delete));
         // A method that was never registered is still absent.
-        assert_eq!(endpoint.get(&Method::PUT), None);
+        assert!(endpoint.get(&Method::PUT).is_none());
     }
 
     #[test]
     fn insert_overwrites_the_same_method() {
+        let arena = Bump::new();
+        let route = route();
+        let (first, second) = (entry(&route), entry(&route));
         let mut endpoint = empty();
-        endpoint.insert(Method::GET, route(0));
-        endpoint.insert(Method::GET, route(5));
-        assert_eq!(endpoint.get(&Method::GET), Some(route(5)));
+        endpoint.insert(&arena, &Method::GET, &first);
+        endpoint.insert(&arena, &Method::GET, &second);
+        assert!(is(endpoint.get(&Method::GET), &second));
     }
 
-    // -- Endpoint: extension methods --
+    // -- Extension methods --
 
     #[test]
     fn inserts_and_reads_back_extension_methods() {
+        let arena = Bump::new();
         let purge = Method::from_bytes(b"PURGE").unwrap();
+        let route = route();
+        let purged = entry(&route);
         let mut endpoint = empty();
-        endpoint.insert(purge.clone(), route(3));
+        endpoint.insert(&arena, &purge, &purged);
 
-        assert_eq!(endpoint.get(&purge), Some(route(3)));
-        assert_eq!(endpoint.get(&Method::GET), None);
+        assert!(is(endpoint.get(&purge), &purged));
+        assert!(endpoint.get(&Method::GET).is_none());
     }
 
-    // -- Endpoint: any-method route --
+    #[test]
+    fn insert_overwrites_the_same_extension_method() {
+        let arena = Bump::new();
+        let purge = Method::from_bytes(b"PURGE").unwrap();
+        let route = route();
+        let (first, second) = (entry(&route), entry(&route));
+        let mut endpoint = empty();
+        endpoint.insert(&arena, &purge, &first);
+        endpoint.insert(&arena, &purge, &second);
+
+        assert!(is(endpoint.get(&purge), &second));
+        // The method is still listed once.
+        assert_eq!(endpoint.methods().count(), 1);
+    }
+
+    // -- Any-method route --
 
     #[test]
     fn any_is_absent_by_default() {
         let endpoint = empty();
-        assert_eq!(endpoint.any(), None);
+        assert!(endpoint.any().is_none());
     }
 
     #[test]
     fn insert_any_does_not_affect_per_method_lookups() {
+        let route = route();
+        let any = entry(&route);
         let mut endpoint = empty();
-        endpoint.insert_any(route(7));
+        endpoint.insert_any(&any);
 
-        assert_eq!(endpoint.any(), Some(route(7)));
+        assert!(is(endpoint.any(), &any));
         // `get` and the `Allow`-header iterator only cover per-method
         // registrations.
-        assert_eq!(endpoint.get(&Method::GET), None);
+        assert!(endpoint.get(&Method::GET).is_none());
         assert_eq!(endpoint.methods().count(), 0);
     }
 
-    // -- Endpoint: HEAD aliasing --
+    // -- HEAD aliasing --
 
     #[test]
     fn alias_points_head_at_get() {
+        let arena = Bump::new();
+        let route = route();
+        let get = entry(&route);
         let mut endpoint = empty();
-        endpoint.insert(Method::GET, route(4));
+        endpoint.insert(&arena, &Method::GET, &get);
         endpoint.alias_head_to_get();
-        assert_eq!(endpoint.get(&Method::HEAD), Some(route(4)));
+        assert!(is(endpoint.get(&Method::HEAD), &get));
     }
 
     #[test]
     fn alias_does_not_override_explicit_head() {
+        let arena = Bump::new();
+        let route = route();
+        let (get, head) = (entry(&route), entry(&route));
         let mut endpoint = empty();
-        endpoint.insert(Method::GET, route(4));
-        endpoint.insert(Method::HEAD, route(9));
+        endpoint.insert(&arena, &Method::GET, &get);
+        endpoint.insert(&arena, &Method::HEAD, &head);
         endpoint.alias_head_to_get();
-        assert_eq!(endpoint.get(&Method::HEAD), Some(route(9)));
+        assert!(is(endpoint.get(&Method::HEAD), &head));
     }
 
     #[test]
     fn alias_without_get_leaves_head_absent() {
         let mut endpoint = empty();
         endpoint.alias_head_to_get();
-        assert_eq!(endpoint.get(&Method::HEAD), None);
+        assert!(endpoint.get(&Method::HEAD).is_none());
     }
 
-    // -- Endpoint: methods iterator --
+    // -- Methods iterator --
 
     #[test]
     fn methods_lists_standard_then_extension() {
+        let arena = Bump::new();
         let purge = Method::from_bytes(b"PURGE").unwrap();
+        let route = route();
+        let entry = entry(&route);
         let mut endpoint = empty();
-        endpoint.insert(Method::POST, route(1));
-        endpoint.insert(Method::GET, route(0));
-        endpoint.insert(purge.clone(), route(2));
+        endpoint.insert(&arena, &Method::POST, &entry);
+        endpoint.insert(&arena, &Method::GET, &entry);
+        endpoint.insert(&arena, &purge, &entry);
 
         let methods: Vec<&Method> = endpoint.methods().collect();
         // Standard methods come first, in `STANDARD_METHODS` order, regardless of
@@ -345,50 +344,18 @@ mod tests {
         assert_eq!(methods, vec![&Method::GET, &Method::POST, &purge]);
     }
 
-    // -- Endpoints --
-
-    fn endpoint_at(path: &'static str) -> (Cow<'static, str>, Endpoint) {
-        let path = Path::new(path);
-        (path.to_matchit_path(), Endpoint::new(path))
-    }
+    // -- Serving another path --
 
     #[test]
-    fn push_assigns_sequential_indices() {
-        let mut endpoints = Endpoints::default();
-        let (path_x, x) = endpoint_at("/x");
-        let (path_y, y) = endpoint_at("/y");
-        assert_eq!(endpoints.push(path_x, x), EndpointIndex(0));
-        assert_eq!(endpoints.push(path_y, y), EndpointIndex(1));
-    }
+    fn with_path_keeps_the_routes_and_changes_the_path() {
+        let arena = Bump::new();
+        let route = route();
+        let get = entry(&route);
+        let mut endpoint = empty();
+        endpoint.insert(&arena, &Method::GET, &get);
 
-    #[test]
-    fn at_matches_a_url_to_its_endpoint() {
-        let mut endpoints = Endpoints::default();
-        let (path, endpoint) = endpoint_at("/users/{id}");
-        let pushed = endpoints.push(path, endpoint);
-
-        let (index, endpoint, params) = endpoints.at("/users/42").unwrap();
-        assert_eq!(index, pushed);
-        assert_eq!(endpoint.path(), Path::new("/users/{id}"));
-        assert_eq!(params.get("id"), Some("42"));
-        assert_eq!(endpoints[index].path(), Path::new("/users/{id}"));
-    }
-
-    #[test]
-    fn at_returns_none_for_an_unmatched_url() {
-        let mut endpoints = Endpoints::default();
-        let (path, endpoint) = endpoint_at("/x");
-        endpoints.push(path, endpoint);
-        assert!(endpoints.at("/missing").is_none());
-    }
-
-    #[test]
-    #[should_panic(expected = "failed to register route")]
-    fn push_rejects_conflicting_paths() {
-        let mut endpoints = Endpoints::default();
-        let (path, endpoint) = endpoint_at("/users/{id}");
-        endpoints.push(path, endpoint);
-        let (path, endpoint) = endpoint_at("/users/{user_id}");
-        endpoints.push(path, endpoint);
+        let twin = endpoint.with_path(Path::new("/x/"));
+        assert_eq!(twin.path(), Path::new("/x/"));
+        assert!(is(twin.get(&Method::GET), &get));
     }
 }

@@ -4,9 +4,6 @@ mod directory;
 use std::{
     any::Any,
     borrow::Cow,
-    collections::HashMap,
-    num::NonZeroUsize,
-    ops::Index,
     pin::Pin,
     sync::{
         Arc, LazyLock,
@@ -14,6 +11,7 @@ use std::{
     },
 };
 
+use bumpalo::Bump;
 #[cfg(feature = "fs")]
 pub use directory::*;
 use topcoat_core::{
@@ -22,8 +20,8 @@ use topcoat_core::{
 };
 
 use crate::{
-    Body, Endpoint, EndpointIndex, HrefTarget, IntoPath, Layer, Methods, Next, OwnedMethods, Path,
-    Terminal, response::Response, route, route_endpoint,
+    Body, HrefTarget, IntoPath, Layer, Layout, Methods, OwnedMethods, Page, Path,
+    response::Response, route, route_path,
 };
 
 /// The future returned by [`Route::handle`]: a boxed, `Send` future borrowing
@@ -46,6 +44,11 @@ impl RouteId {
     pub fn new() -> Self {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
         Self(NEXT.fetch_add(1, Ordering::Relaxed))
+    }
+
+    /// Returns how many ids were drawn before this one.
+    pub(crate) fn number(self) -> usize {
+        self.0
     }
 }
 
@@ -211,8 +214,8 @@ impl Route for RouteFn {
 impl HrefTarget for RouteFn {
     #[track_caller]
     fn path<'cx>(&self, cx: &'cx Cx) -> &'cx Path {
-        match route_endpoint(cx, self.id) {
-            Some(endpoint) => endpoint.path(),
+        match route_path(cx, self.id) {
+            Some(path) => path,
             None => panic!(
                 "route `{}` is not registered on the router serving this request",
                 self.path
@@ -221,95 +224,93 @@ impl HrefTarget for RouteFn {
     }
 }
 
-/// The position of a route in a router's [`Routes`] table.
+/// What a request needs from the route it matched.
 ///
-/// Stored offset by one in a [`NonZeroUsize`] so that `Option<RouteIndex>`
-/// occupies a single word, keeping an endpoint's per-method table dense.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct RouteIndex(NonZeroUsize);
+/// A route entry borrows from the router it belongs to.
+pub(crate) struct RouteEntry<'r> {
+    /// What produces the response once the layers have run.
+    pub(crate) handler: Handler<'r>,
+    /// The layers wrapping this route, ordered from least- to most-specific
+    /// so the outermost layer runs first.
+    pub(crate) layers: &'r [&'r dyn Layer],
+    /// The route's context: the values of the layers and layouts that wrap
+    /// it, followed by its own. `None` when it holds no values.
+    pub(crate) context: Option<&'r Arc<ContextMap>>,
+}
 
-impl RouteIndex {
-    /// Wraps a route's position in the table.
-    pub(crate) fn new(index: usize) -> Self {
-        Self(NonZeroUsize::new(index.wrapping_add(1)).expect("route index overflow"))
+/// What produces the response of a [`RouteEntry`].
+#[derive(Clone, Copy)]
+pub(crate) enum Handler<'r> {
+    /// A route, which produces the response itself.
+    Route(&'r dyn Route),
+    /// A page, rendered inside its layouts.
+    Page {
+        page: &'r dyn Page,
+        /// The layouts wrapping the page, outermost first.
+        layouts: &'r [&'r dyn Layout],
+    },
+    /// Redirects to the requested URL with its trailing slash added or removed.
+    Redirect {
+        id: RouteId,
+        /// The path this redirect is served at.
+        path: &'r Path,
+    },
+}
+
+impl<'r> Handler<'r> {
+    /// The identity of the route or page.
+    pub(crate) fn id(&self) -> RouteId {
+        match *self {
+            Self::Route(route) => route.id(),
+            Self::Page { page, .. } => page.id(),
+            Self::Redirect { id, .. } => id,
+        }
     }
 
-    /// Returns the wrapped position.
-    pub(crate) fn get(self) -> usize {
-        self.0.get() - 1
+    /// The path the route or page was registered at, group segments
+    /// included.
+    pub(crate) fn path(&self) -> &'r Path {
+        match *self {
+            Self::Route(route) => route.path(),
+            Self::Page { page, .. } => page.path(),
+            Self::Redirect { path, .. } => path,
+        }
+    }
+
+    /// The HTTP methods the route or page responds to.
+    pub(crate) fn methods(&self) -> Methods<'r> {
+        match *self {
+            Self::Route(route) => route.methods(),
+            Self::Page { page, .. } => page.methods(),
+            Self::Redirect { .. } => Methods::Any,
+        }
     }
 }
 
-/// A route paired with the layers that wrap it.
-pub(crate) struct RouteWithLayers {
-    /// The route itself.
-    route: Box<dyn Route>,
-    /// The layers wrapping this route, precomputed at build time from the
-    /// route's path (group segments included) and ordered from least- to
-    /// most-specific so the outermost layer runs first.
-    layers: Box<[Arc<dyn Layer>]>,
-    /// The route's context, built once when the router is built, or `None`
-    /// when it holds no values.
-    context: Option<Arc<ContextMap>>,
-    /// The endpoint serving this route.
-    endpoint: EndpointIndex,
-}
-
-impl RouteWithLayers {
-    /// Returns the endpoint serving this route.
-    pub(crate) fn endpoint(&self) -> EndpointIndex {
-        self.endpoint
-    }
-
-    /// Returns the route's context, or `None` when it holds no values.
-    pub(crate) fn shared_context(&self) -> Option<&Arc<ContextMap>> {
-        self.context.as_ref()
-    }
-}
-
-impl Route for RouteWithLayers {
-    fn id(&self) -> RouteId {
-        self.route.id()
-    }
-
-    fn methods(&self) -> Methods<'_> {
-        self.route.methods()
-    }
-
-    fn path(&self) -> &Path {
-        self.route.path()
-    }
-
-    fn context(&self) -> ContextMap {
-        self.context.as_deref().cloned().unwrap_or_default()
-    }
-
-    fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
-        Next::new(&self.layers, Terminal::Route(&*self.route)).run(cx, body)
-    }
-}
-
-/// A route registered on a [`Router`](crate::Router), as visited by
-/// [`Router::routes`](crate::Router::routes).
-///
-/// It describes the route without a request: the path and methods it is
-/// served at and the values attached to it.
+/// A route registered on a [`Router`](crate::Router), with the path and
+/// methods it is served at and the values attached to it.
 #[derive(Clone, Copy)]
 pub struct RegisteredRoute<'router> {
-    route: &'router RouteWithLayers,
-    endpoint: &'router Endpoint,
+    id: RouteId,
+    /// The URL path the route is served at.
+    path: &'router Path,
+    entry: &'router RouteEntry<'router>,
 }
 
 impl<'router> RegisteredRoute<'router> {
-    /// Pairs `route` with the endpoint serving it.
-    pub(crate) fn new(route: &'router RouteWithLayers, endpoint: &'router Endpoint) -> Self {
-        Self { route, endpoint }
+    /// Describes the route behind `entry`, which is served at `path`.
+    pub(crate) fn new(path: &'router Path, entry: &'router RouteEntry<'router>) -> Self {
+        Self {
+            id: entry.handler.id(),
+            path,
+            entry,
+        }
     }
 
     /// The identity of the route's handler.
     #[must_use]
     pub fn id(&self) -> RouteId {
-        self.route.id()
+        self.id
     }
 
     /// The URL path the route is served at.
@@ -318,13 +319,13 @@ impl<'router> RegisteredRoute<'router> {
     /// it, because they never reach the URL.
     #[must_use]
     pub fn path(&self) -> &'router Path {
-        self.endpoint.path()
+        self.path
     }
 
     /// The HTTP methods the route responds to.
     #[must_use]
     pub fn methods(&self) -> Methods<'router> {
-        self.route.methods()
+        self.entry.handler.methods()
     }
 
     /// The route's context: the values of the layers and layouts that wrap
@@ -335,98 +336,209 @@ impl<'router> RegisteredRoute<'router> {
     #[must_use]
     pub fn context(&self) -> &'router ContextMap {
         static EMPTY: LazyLock<ContextMap> = LazyLock::new(ContextMap::new);
-        match self.route.shared_context() {
+        match self.entry.context {
             Some(context) => context,
             None => &EMPTY,
         }
     }
 }
 
-/// The routes registered on a router, in registration order, indexed by
-/// [`RouteIndex`].
-///
-/// Routes are [`push`](Self::push)ed as the router is built, then only
-/// queried: [`endpoint`](Self::endpoint) resolves a route's [`RouteId`] to the
-/// endpoint serving it, and indexing by [`RouteIndex`] resolves a position
-/// back to the route and its layers.
+/// The routes an application registered on a router, found by id.
 #[derive(Default)]
-pub(crate) struct Routes {
-    routes: Vec<RouteWithLayers>,
-    endpoint_lookup: HashMap<RouteId, EndpointIndex>,
+pub(crate) struct Routes<'r> {
+    /// Every route, sorted by id.
+    sorted: &'r [RegisteredRoute<'r>],
+    /// The routes indexed by id, with one slot per id starting at the id
+    /// numbered `first`. Empty when the ids are too far apart for a table.
+    sequential: &'r [Option<&'r RegisteredRoute<'r>>],
+    /// The number of the id the first slot of `sequential` belongs to.
+    first: usize,
 }
 
-impl Routes {
-    /// Registers `route` as served by `endpoint`, wrapped by `layers` and
-    /// with the values of `context`, returning the [`RouteIndex`] that now
-    /// identifies the registration.
-    pub(crate) fn push(
-        &mut self,
-        route: Box<dyn Route>,
-        endpoint: EndpointIndex,
-        layers: Box<[Arc<dyn Layer>]>,
-        context: ContextMap,
-    ) -> RouteIndex {
-        let index = RouteIndex::new(self.routes.len());
-        self.endpoint_lookup.insert(route.id(), endpoint);
-        let context = (!context.is_empty()).then(|| Arc::new(context));
-        self.routes.push(RouteWithLayers {
-            route,
-            layers,
-            context,
-            endpoint,
-        });
-        index
+impl<'r> Routes<'r> {
+    /// The most slots `sequential` may have for each route it holds.
+    const MAX_SLOTS_PER_ROUTE: usize = 4;
+
+    /// Stores `routes` in `arena`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message if two routes have the same id.
+    pub(crate) fn new(
+        arena: &'r Bump,
+        mut routes: Vec<RegisteredRoute<'r>>,
+    ) -> Result<Self, String> {
+        routes.sort_unstable_by_key(|route| route.id().number());
+        if let Some(pair) = routes.windows(2).find(|pair| pair[0].id() == pair[1].id()) {
+            return Err(format!(
+                "routes `{}` and `{}` share an identity",
+                pair[0].path(),
+                pair[1].path()
+            ));
+        }
+        let sorted: &'r [RegisteredRoute<'r>] = arena.alloc_slice_copy(&routes);
+        let (Some(lowest), Some(highest)) = (sorted.first(), sorted.last()) else {
+            return Ok(Self::default());
+        };
+
+        // The table has one slot per id from the lowest to the highest, so
+        // it is only built when few of its slots would stay empty.
+        let first = lowest.id().number();
+        let slots = highest.id().number() - first + 1;
+        let sequential: &'r [Option<&'r RegisteredRoute<'r>>] =
+            if slots <= Self::MAX_SLOTS_PER_ROUTE * sorted.len() {
+                let sequential = arena.alloc_slice_fill_copy(slots, None);
+                for route in sorted {
+                    sequential[route.id().number() - first] = Some(route);
+                }
+                sequential
+            } else {
+                &[]
+            };
+
+        Ok(Self {
+            sorted,
+            sequential,
+            first,
+        })
     }
 
-    /// Returns the endpoint serving the route registered under `id`, or `None` if
-    /// this router holds no route with that identity.
-    pub(crate) fn endpoint(&self, id: RouteId) -> Option<EndpointIndex> {
-        self.endpoint_lookup.get(&id).copied()
+    /// Returns the route registered under `id`, or `None` if there is none.
+    pub(crate) fn get(&self, id: RouteId) -> Option<RegisteredRoute<'r>> {
+        let number = id.number();
+        let slot = number
+            .checked_sub(self.first)
+            .and_then(|position| self.sequential.get(position));
+        if let Some(slot) = slot {
+            return slot.copied();
+        }
+        let position = self
+            .sorted
+            .binary_search_by_key(&number, |route| route.id().number())
+            .ok()?;
+        Some(self.sorted[position])
     }
 
-    /// Returns the number of routes registered so far.
-    pub(crate) fn len(&self) -> usize {
-        self.routes.len()
-    }
-
-    /// Iterates over the routes in registration order.
-    pub(crate) fn iter(&self) -> impl Iterator<Item = &RouteWithLayers> {
-        self.routes.iter()
-    }
-}
-
-impl Index<RouteIndex> for Routes {
-    type Output = RouteWithLayers;
-
-    fn index(&self, index: RouteIndex) -> &Self::Output {
-        &self.routes[index.get()]
+    /// Iterates over the routes in the order of their ids.
+    pub(crate) fn iter(&self) -> impl Iterator<Item = RegisteredRoute<'r>> {
+        self.sorted.iter().copied()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Method;
 
-    // -- RouteIndex --
+    fn unused(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        unreachable!()
+    }
 
-    #[test]
-    fn route_index_wraps_and_unwraps() {
-        let index = RouteIndex::new(7);
-        assert_eq!(index.get(), 7);
+    /// The route every registered route in these tests runs. The tests give
+    /// each registered route its own id and path.
+    fn handler() -> RouteFn {
+        RouteFn::new(Method::GET, "/", unused)
+    }
+
+    fn entry(route: &RouteFn) -> RouteEntry<'_> {
+        RouteEntry {
+            handler: Handler::Route(route),
+            layers: &[],
+            context: None,
+        }
+    }
+
+    /// A route for each id number in `numbers`, served at a path spelling
+    /// out that number.
+    fn registered<'r>(
+        arena: &'r Bump,
+        entry: &'r RouteEntry<'r>,
+        numbers: &[usize],
+    ) -> Vec<RegisteredRoute<'r>> {
+        numbers
+            .iter()
+            .map(|&number| RegisteredRoute {
+                id: RouteId(number),
+                path: Path::new(arena.alloc_str(&format!("/{number}"))),
+                entry,
+            })
+            .collect()
+    }
+
+    /// Stores a route for each id number in `numbers`.
+    fn routes<'r>(arena: &'r Bump, entry: &'r RouteEntry<'r>, numbers: &[usize]) -> Routes<'r> {
+        Routes::new(arena, registered(arena, entry, numbers)).unwrap()
+    }
+
+    /// The path of the route `routes` finds under the id numbered `number`.
+    fn found<'r>(routes: &Routes<'r>, number: usize) -> Option<&'r str> {
+        routes
+            .get(RouteId(number))
+            .map(|route| route.path().as_str())
     }
 
     #[test]
-    fn route_index_zero_is_a_real_index() {
-        // The offset keeps index 0 representable despite the non-zero backing.
-        let index = RouteIndex::new(0);
-        assert_eq!(index.get(), 0);
+    fn ids_close_together_are_found_through_the_table() {
+        let arena = Bump::new();
+        let handler = handler();
+        let entry = entry(&handler);
+        let routes = routes(&arena, &entry, &[103, 100, 101]);
+        assert!(!routes.sequential.is_empty());
+
+        assert_eq!(found(&routes, 100), Some("/100"));
+        assert_eq!(found(&routes, 101), Some("/101"));
+        assert_eq!(found(&routes, 103), Some("/103"));
+        // An id between the registered ones, and ids on either side of them.
+        assert_eq!(found(&routes, 102), None);
+        assert_eq!(found(&routes, 99), None);
+        assert_eq!(found(&routes, 104), None);
     }
 
     #[test]
-    fn option_route_index_stays_one_word() {
-        assert_eq!(
-            std::mem::size_of::<Option<RouteIndex>>(),
-            std::mem::size_of::<usize>()
-        );
+    fn ids_far_apart_are_found_without_a_table() {
+        let arena = Bump::new();
+        let handler = handler();
+        let entry = entry(&handler);
+        let routes = routes(&arena, &entry, &[90_000, 5, 5_000]);
+        assert!(routes.sequential.is_empty());
+
+        assert_eq!(found(&routes, 5), Some("/5"));
+        assert_eq!(found(&routes, 5_000), Some("/5000"));
+        assert_eq!(found(&routes, 90_000), Some("/90000"));
+        assert_eq!(found(&routes, 6), None);
+        assert_eq!(found(&routes, 0), None);
+        assert_eq!(found(&routes, 90_001), None);
+    }
+
+    #[test]
+    fn routes_are_listed_in_id_order() {
+        let arena = Bump::new();
+        let handler = handler();
+        let entry = entry(&handler);
+        let routes = routes(&arena, &entry, &[7, 3, 5]);
+
+        let paths: Vec<&str> = routes.iter().map(|route| route.path().as_str()).collect();
+        assert_eq!(paths, ["/3", "/5", "/7"]);
+    }
+
+    #[test]
+    fn two_routes_with_one_id_are_rejected() {
+        let arena = Bump::new();
+        let handler = handler();
+        let entry = entry(&handler);
+        let routes = Routes::new(&arena, registered(&arena, &entry, &[4, 9, 4]));
+
+        assert!(routes.is_err());
+    }
+
+    #[test]
+    fn no_routes_find_nothing() {
+        let arena = Bump::new();
+        let handler = handler();
+        let entry = entry(&handler);
+        let routes = routes(&arena, &entry, &[]);
+
+        assert_eq!(found(&routes, 0), None);
+        assert_eq!(routes.iter().count(), 0);
     }
 }

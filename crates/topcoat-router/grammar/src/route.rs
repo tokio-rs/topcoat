@@ -247,8 +247,8 @@ impl ToTokens for Route {
 
             impl #topcoat_router::HrefTarget for #ident {
                 fn path<'cx>(&self, cx: &'cx #topcoat_context::Cx) -> &'cx #topcoat_router::Path {
-                    match #topcoat_router::route_endpoint(cx, *ID) {
-                        ::core::option::Option::Some(endpoint) => endpoint.path(),
+                    match #topcoat_router::route_path(cx, *ID) {
+                        ::core::option::Option::Some(path) => path,
                         ::core::option::Option::None => ::core::panic!(::core::concat!(
                             "route `",
                             ::core::stringify!(#ident),
