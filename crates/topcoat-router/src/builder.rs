@@ -5,11 +5,14 @@ use std::{
     sync::Arc,
 };
 
+use bumpalo::Bump;
 use topcoat_core::context::{ContextMap, ContextValues};
 
 use crate::{
-    Endpoint, EndpointIndex, Endpoints, Layer, Layout, Methods, Page, PageWithLayouts, Path, Route,
-    Router, RouterInner, Routes, TrailingSlash, TrustedProxies, layers_for_path, layouts_for_path,
+    Endpoint, Handler, Layer, Layout, Methods, Page, Path, RegisteredRoute, Route, RouteEntry,
+    Router, TrailingSlash, TrustedProxies,
+    arena::{Objects, RouterCell, Staged, Tables},
+    layers_for_path, layouts_for_path,
 };
 
 /// Builds a [`Router`] for a Topcoat application.
@@ -40,10 +43,9 @@ use crate::{
 /// }
 /// ```
 pub struct RouterBuilder {
-    routes: Vec<Box<dyn Route>>,
-    pages: Vec<Box<dyn Page>>,
-    layouts: Vec<Arc<dyn Layout>>,
-    layers: Vec<Arc<dyn Layer>>,
+    /// The router's arena, holding the routes, pages, layouts and layers
+    /// registered so far.
+    staged: Staged,
     context: ContextMap,
     trusted_proxies: TrustedProxies,
     trailing_slash: TrailingSlash,
@@ -54,10 +56,7 @@ impl RouterBuilder {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            routes: Vec::new(),
-            pages: Vec::new(),
-            layouts: Vec::new(),
-            layers: Vec::new(),
+            staged: Staged::default(),
             context: ContextMap::new(),
             trusted_proxies: TrustedProxies::new(),
             trailing_slash: TrailingSlash::default(),
@@ -67,7 +66,8 @@ impl RouterBuilder {
     /// Returns `true` if no routes, pages, or layouts have been registered.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.routes.is_empty() && self.pages.is_empty() && self.layouts.is_empty()
+        let objects = self.staged.borrow_dependent();
+        objects.routes.is_empty() && objects.pages.is_empty() && objects.layouts.is_empty()
     }
 
     /// Registers a [`Route`], an HTTP handler bound to a set of methods and a
@@ -79,7 +79,8 @@ impl RouterBuilder {
     /// method wins at dispatch.
     #[must_use]
     pub fn route(mut self, route: impl Route) -> Self {
-        self.routes.push(Box::new(route));
+        self.staged
+            .with_dependent_mut(|arena, objects| objects.routes.push(arena, route));
         self
     }
 
@@ -102,7 +103,8 @@ impl RouterBuilder {
     /// the page opts into others).
     #[must_use]
     pub fn page(mut self, page: impl Page) -> Self {
-        self.pages.push(Box::new(page));
+        self.staged
+            .with_dependent_mut(|arena, objects| objects.pages.push(arena, page));
         self
     }
 
@@ -122,7 +124,8 @@ impl RouterBuilder {
     /// prefix.
     #[must_use]
     pub fn layout(mut self, layout: impl Layout) -> Self {
-        self.layouts.push(Arc::new(layout));
+        self.staged
+            .with_dependent_mut(|arena, objects| objects.layouts.push(arena, layout));
         self
     }
 
@@ -166,7 +169,8 @@ impl RouterBuilder {
     /// path.
     #[must_use]
     pub fn layer(mut self, layer: impl Layer) -> Self {
-        self.layers.push(Arc::new(layer));
+        self.staged
+            .with_dependent_mut(|arena, objects| objects.layers.push(arena, layer));
         self
     }
 
@@ -335,130 +339,209 @@ impl RouterBuilder {
     /// set, since it could never be dispatched to.
     #[must_use]
     #[track_caller]
-    pub fn build(self) -> Router {
-        // Each route's context is built here, so it is built once per router.
-        let mut registrations: Vec<(Box<dyn Route>, ContextMap)> = self
-            .routes
-            .into_iter()
-            .map(|route| {
-                let context = route.context();
-                (route, context)
-            })
-            .collect();
-        // Each layout's values are built once and shared by every page it wraps.
-        let layouts: Vec<(Arc<dyn Layout>, ContextMap)> = self
-            .layouts
-            .into_iter()
-            .map(|layout| {
-                let context = layout.context();
-                (layout, context)
-            })
-            .collect();
-        // Each layer's values are built once and shared by every route it wraps.
-        let layers: Vec<(Arc<dyn Layer>, ContextMap)> = self
-            .layers
-            .into_iter()
-            .map(|layer| {
-                let context = layer.context();
-                (layer, context)
-            })
-            .collect();
-        // Wire each page to the layouts whose path is a prefix of the page's,
-        // ordered from least- to most-specific so the page nests innermost.
-        for page in self.pages {
-            let matching = layouts_for_path(&layouts, page.path());
+    pub fn build(mut self) -> Router {
+        // The contexts are created first, because the tables point at them.
+        let plan = self
+            .staged
+            .with_dependent_mut(|_, objects| Plan::new(objects));
+        let cell = RouterCell::build(self.staged, |arena, objects| {
+            plan.into_tables(
+                arena,
+                objects,
+                self.context,
+                self.trusted_proxies,
+                self.trailing_slash,
+            )
+        });
+        Router::new(cell)
+    }
+}
 
-            // Outermost layout first and the page last, so each level shadows
-            // the levels around it.
-            let mut layouts = Vec::with_capacity(matching.len());
+impl Default for RouterBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// The layers, layouts and context selected for one route or page, as
+/// positions in the lists of [`Objects`].
+struct Selection {
+    /// The layers wrapping it, outermost first.
+    layers: Vec<usize>,
+    /// The layouts wrapping it, outermost first. Empty for a route.
+    layouts: Vec<usize>,
+    /// Its context, or `None` when it holds no values.
+    context: Option<usize>,
+}
+
+/// What [`RouterBuilder::build`] decides before the tables exist: the
+/// selection of every route and of every page.
+struct Plan {
+    routes: Vec<Selection>,
+    pages: Vec<Selection>,
+}
+
+impl Plan {
+    /// Selects the layers and layouts of every route and page, and stores the
+    /// context of each in `objects`.
+    fn new(objects: &mut Objects<'_>) -> Self {
+        let all_layers: Vec<&dyn Layer> = objects.layers.iter().collect();
+        let all_layouts: Vec<&dyn Layout> = objects.layouts.iter().collect();
+        // Each layer's and layout's values are built once and shared by
+        // everything it wraps.
+        let layer_contexts: Vec<ContextMap> =
+            all_layers.iter().map(|&layer| layer.context()).collect();
+        let layout_contexts: Vec<ContextMap> =
+            all_layouts.iter().map(|&layout| layout.context()).collect();
+
+        let contexts = &mut objects.contexts;
+        let mut select = |path: &Path, own_context: ContextMap, layouts: Vec<usize>| {
+            // The layers wrapping a route are selected against its own path,
+            // group segments included, so a layer inside a group wraps only
+            // the routes registered through that group.
+            let layers = layers_for_path(&all_layers, path);
+
+            // Outermost layer first and the route last, so each level shadows
+            // the levels around it. Layers run outside layouts, so a route's
+            // layout values shadow its layer values.
             let mut context = ContextMap::new();
-            for (layout, layout_context) in matching {
-                layouts.push(Arc::clone(layout));
-                layout_context.clone().install(&mut context);
+            for &layer in &layers {
+                layer_contexts[layer].clone().install(&mut context);
             }
-            page.context().install(&mut context);
+            for &layout in &layouts {
+                layout_contexts[layout].clone().install(&mut context);
+            }
+            own_context.install(&mut context);
+            let context = (!context.is_empty()).then(|| {
+                contexts.push(Arc::new(context));
+                contexts.len() - 1
+            });
 
-            registrations.push((Box::new(PageWithLayouts::new(page, layouts)), context));
-        }
+            Selection {
+                layers,
+                layouts,
+                context,
+            }
+        };
+
+        let routes = objects
+            .routes
+            .iter()
+            .map(|route| select(route.path(), route.context(), Vec::new()))
+            .collect();
+        let pages = objects
+            .pages
+            .iter()
+            .map(|page| {
+                let layouts = layouts_for_path(&all_layouts, page.path());
+                select(page.path(), page.context(), layouts)
+            })
+            .collect();
+        Self { routes, pages }
+    }
+
+    /// Builds the tables in `arena`, pointing at the values in `objects`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if two routes are ambiguous, if a route declares no methods, if
+    /// two paths conflict, or if a layer wraps no route.
+    fn into_tables<'r>(
+        self,
+        arena: &'r Bump,
+        objects: &'r Objects<'r>,
+        context: ContextMap,
+        trusted_proxies: TrustedProxies,
+        trailing_slash: TrailingSlash,
+    ) -> Tables<'r> {
+        let all_layers: Vec<&'r dyn Layer> = objects.layers.iter().collect();
+        let all_layouts: Vec<&'r dyn Layout> = objects.layouts.iter().collect();
+
+        // Each distinct layer stack and layout list is stored once and shared
+        // by the routes that use it.
+        let mut layer_stacks: HashMap<Vec<usize>, &'r [&'r dyn Layer]> = HashMap::new();
+        let mut layout_lists: HashMap<Vec<usize>, &'r [&'r dyn Layout]> = HashMap::new();
+        let mut layers_used = vec![false; all_layers.len()];
 
         // Group routes that share a path onto a single endpoint. Two routes
         // that resolve to the same path *and* method are ambiguous, so reject
         // them here. The grouping map keys endpoints by their matchit path so
         // that routes differing only in their group segments agree on the one
         // their endpoint serves.
-        let mut routes = Routes::default();
-        let mut endpoints = Endpoints::default();
-        let mut grouped: HashMap<Cow<'static, str>, EndpointIndex> = HashMap::new();
-        let mut layers_used = vec![false; layers.len()];
-        for (route, route_context) in registrations {
-            // The layers wrapping a route are selected against its own path,
-            // group segments included, so a layer inside a group wraps only
-            // the routes registered through that group.
-            let matching = layers_for_path(&layers, route.path());
+        let mut endpoints: Vec<(Cow<'static, str>, Endpoint<'r>)> = Vec::new();
+        let mut grouped: HashMap<Cow<'static, str>, usize> = HashMap::new();
+        let mut declared = Vec::new();
 
-            // Outermost layer first and the route last, so each level shadows
-            // the levels around it. Layers run outside layouts, so a route's
-            // layout values shadow its layer values.
-            let mut layer_stack = Vec::with_capacity(matching.len());
-            let mut context = ContextMap::new();
-            for (layer, layer_context) in matching {
-                layer_stack.push(Arc::clone(layer));
-                layer_context.clone().install(&mut context);
+        let mut add = |handler: Handler<'r>, layers: Vec<usize>, context: Option<usize>| {
+            let path = handler.path();
+            for &layer in &layers {
+                layers_used[layer] = true;
             }
-            route_context.install(&mut context);
+            let layers = *layer_stacks.entry(layers).or_insert_with_key(|layers| {
+                &*arena.alloc_slice_fill_iter(layers.iter().map(|&layer| all_layers[layer]))
+            });
+            let entry: &'r RouteEntry<'r> = arena.alloc(RouteEntry {
+                handler,
+                layers,
+                context: context.map(|context| &objects.contexts[context]),
+            });
 
-            // Mark layers as used, with the same prefix rule the selection
-            // applies.
-            for ((layer, _), used) in layers.iter().zip(&mut layers_used) {
-                *used |= layer
-                    .path()
-                    .is_none_or(|prefix| route.path().starts_with(prefix));
-            }
-
-            let endpoint_index = *grouped
-                .entry(route.path().to_matchit_path())
-                .or_insert_with_key(|key| {
-                    endpoints.push(key.clone(), Endpoint::new(Path::new(key)))
+            let index = *grouped
+                .entry(path.to_matchit_path())
+                .or_insert_with_key(|served| {
+                    let served_path = Path::new(arena.alloc_str(served));
+                    endpoints.push((served.clone(), Endpoint::new(served_path)));
+                    endpoints.len() - 1
                 });
-
-            let route_index = routes.push(route, endpoint_index, layer_stack.into(), context);
-            let route = &routes[route_index];
-            let endpoint = &mut endpoints[endpoint_index];
+            let endpoint = &mut endpoints[index].1;
 
             // An any-method route shares its path with specific-method routes
             // (which win at dispatch), so the two kinds are checked for
             // duplicates independently.
-            match route.methods() {
+            match handler.methods() {
                 Methods::Any => {
                     assert!(
                         endpoint.any().is_none(),
                         "duplicate any-method route registered for `{}`",
-                        route.path().to_matchit_path()
+                        endpoint.path()
                     );
-                    endpoint.insert_any(route_index);
+                    endpoint.insert_any(entry);
                 }
                 Methods::Only(methods) => {
-                    assert!(
-                        !methods.is_empty(),
-                        "route `{}` registers no methods",
-                        route.path()
-                    );
+                    assert!(!methods.is_empty(), "route `{path}` registers no methods");
                     for method in methods {
                         assert!(
                             endpoint.get(method).is_none(),
                             "duplicate route registered for `{method} {}`",
-                            route.path().to_matchit_path()
+                            endpoint.path()
                         );
-                        endpoint.insert(method.clone(), route_index);
+                        endpoint.insert(arena, method, entry);
                     }
                 }
             }
+            declared.push(RegisteredRoute::new(endpoint.path(), entry));
+        };
+
+        for (route, selection) in objects.routes.iter().zip(self.routes) {
+            add(Handler::Route(route), selection.layers, selection.context);
+        }
+        for (page, selection) in objects.pages.iter().zip(self.pages) {
+            let layouts = *layout_lists
+                .entry(selection.layouts)
+                .or_insert_with_key(|layouts| {
+                    &*arena.alloc_slice_fill_iter(layouts.iter().map(|&layout| all_layouts[layout]))
+                });
+            add(
+                Handler::Page { page, layouts },
+                selection.layers,
+                selection.context,
+            );
         }
 
         // Sanity check for unused layers. Layers without a path always run,
         // and the root path prefixes every route path, so neither can be a
         // mistyped path; only narrower paths can go unused.
-        for ((layer, _), used) in layers.iter().zip(layers_used) {
+        for (&layer, used) in all_layers.iter().zip(layers_used) {
             if let Some(path) = layer.path() {
                 assert!(
                     used || path == Path::ROOT,
@@ -467,39 +550,40 @@ impl RouterBuilder {
             }
         }
 
-        for &endpoint_index in grouped.values() {
-            endpoints[endpoint_index].alias_head_to_get();
-        }
-
         // Layers without a path wrap every request, so requests that matched
         // no route still run them. Among them the most recently registered
         // runs first, like layers sharing a path.
-        let always_layers: Box<[Arc<dyn Layer>]> = layers
+        let always_layers: Vec<&'r dyn Layer> = all_layers
             .iter()
-            .filter(|(layer, _)| layer.path().is_none())
+            .copied()
+            .filter(|&layer| layer.path().is_none())
             .rev()
-            .map(|(layer, _)| Arc::clone(layer))
             .collect();
+        let always_layers: &'r [&'r dyn Layer] = arena.alloc_slice_copy(&always_layers);
 
-        // The routes registered from here on are the router's own.
-        let declared_routes = routes.len();
-        self.trailing_slash
-            .register_twins(&mut endpoints, &mut routes, &always_layers);
+        let mut matcher = matchit::Router::new();
+        let mut served = Vec::with_capacity(endpoints.len());
+        for (path, mut endpoint) in endpoints {
+            endpoint.alias_head_to_get();
+            match matcher.insert(path, endpoint) {
+                Ok(()) => served.push(endpoint),
+                Err(matchit::InsertError::Conflict { with }) => {
+                    panic!("failed to register route: conflicts with registered route `{with}`")
+                }
+                Err(error) => panic!("failed to register route: {error}"),
+            }
+        }
 
-        Router::new(RouterInner {
-            routes,
-            declared_routes,
-            endpoints,
+        // The twins are the router's own routes, so they are not declared.
+        trailing_slash.register_twins(arena, &mut matcher, &served, always_layers);
+
+        Tables {
+            matcher,
             always_layers,
-            context: Arc::new(self.context),
-            trusted_proxies: self.trusted_proxies,
-        })
-    }
-}
-
-impl Default for RouterBuilder {
-    fn default() -> Self {
-        Self::new()
+            declared: arena.alloc_slice_copy(&declared),
+            context: Arc::new(context),
+            trusted_proxies,
+        }
     }
 }
 

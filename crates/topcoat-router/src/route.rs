@@ -243,6 +243,12 @@ pub(crate) enum Handler<'r> {
         /// The layouts wrapping the page, outermost first.
         layouts: &'r [&'r dyn Layout],
     },
+    /// Redirects to the requested URL with its trailing slash added or removed.
+    Redirect {
+        id: RouteId,
+        /// The path this redirect is served at.
+        path: &'r Path,
+    },
 }
 
 impl<'r> Handler<'r> {
@@ -251,6 +257,17 @@ impl<'r> Handler<'r> {
         match *self {
             Self::Route(route) => route.id(),
             Self::Page { page, .. } => page.id(),
+            Self::Redirect { id, .. } => id,
+        }
+    }
+
+    /// The path the route or page was registered at, group segments
+    /// included.
+    pub(crate) fn path(&self) -> &'r Path {
+        match *self {
+            Self::Route(route) => route.path(),
+            Self::Page { page, .. } => page.path(),
+            Self::Redirect { path, .. } => path,
         }
     }
 
@@ -259,6 +276,7 @@ impl<'r> Handler<'r> {
         match *self {
             Self::Route(route) => route.methods(),
             Self::Page { page, .. } => page.methods(),
+            Self::Redirect { .. } => Methods::Any,
         }
     }
 }

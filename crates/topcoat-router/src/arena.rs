@@ -80,6 +80,11 @@ impl<'r, D: ?Sized + 'static> ArenaSlots<'r, D> {
         self.slots.push(arena.alloc(Some(value)));
     }
 
+    /// Returns `true` if no value was added.
+    pub(crate) fn is_empty(&self) -> bool {
+        self.slots.is_empty()
+    }
+
     /// Iterates over the values in the order they were added.
     pub(crate) fn iter(&self) -> impl ExactSizeIterator<Item = &D> {
         self.slots.iter().map(|slot| slot.get())
@@ -107,6 +112,7 @@ pub(crate) struct Objects<'r> {
     pub(crate) pages: ArenaSlots<'r, dyn Page>,
     pub(crate) layouts: ArenaSlots<'r, dyn Layout>,
     pub(crate) layers: ArenaSlots<'r, dyn Layer>,
+    pub(crate) contexts: Vec<Arc<ContextMap>>,
 }
 
 self_cell!(

@@ -1,10 +1,9 @@
-use std::sync::Arc;
-
-use topcoat_core::context::{ContextMap, Cx};
+use bumpalo::Bump;
+use topcoat_core::{context::Cx, error::Result};
 
 use crate::{
-    Body, Endpoint, Endpoints, Layer, Methods, Path, PathBuf, PathSegment, Route, RouteFuture,
-    RouteId, Routes, error::redirect_permanent, request::uri,
+    Endpoint, Handler, Layer, Path, PathBuf, PathSegment, RouteEntry, RouteId,
+    error::redirect_permanent, request::uri, response::Response,
 };
 
 /// How the router treats a request for the other trailing-slash form of a
@@ -51,33 +50,41 @@ impl TrailingSlash {
     /// route claims for itself is left to that route.
     ///
     /// Call this once every route is registered.
-    pub(crate) fn register_twins(
+    pub(crate) fn register_twins<'r>(
         self,
-        endpoints: &mut Endpoints,
-        routes: &mut Routes,
-        always_layers: &[Arc<dyn Layer>],
+        arena: &'r Bump,
+        matcher: &mut matchit::Router<Endpoint<'r>>,
+        endpoints: &[Endpoint<'r>],
+        always_layers: &'r [&'r dyn Layer],
     ) {
         if self == Self::Strict {
             return;
         }
-        // The indices are taken up front, so the twins pushed along the way
-        // are not visited themselves.
-        for index in endpoints.indices() {
-            let endpoint = &endpoints[index];
+        for endpoint in endpoints {
             let Some(path) = twin(endpoint.path()) else {
                 continue;
             };
+            let matchit_path = path.to_matchit_path();
+            let path: &'r Path = Path::new_unchecked(arena.alloc_str(path.as_str()));
             let twin = match self {
-                Self::Serve => endpoint.with_path(&path),
-                _ => Endpoint::new(&path),
+                Self::Serve => endpoint.with_path(path),
+                _ => {
+                    let mut twin = Endpoint::new(path);
+                    twin.insert_any(arena.alloc(RouteEntry {
+                        handler: Handler::Redirect {
+                            id: RouteId::new(),
+                            path,
+                        },
+                        layers: always_layers,
+                        context: None,
+                    }));
+                    twin
+                }
             };
-            let Ok(twin_index) = endpoints.try_push(path.to_matchit_path(), twin) else {
-                continue;
-            };
-            if self == Self::Redirect {
-                let route = Box::new(RedirectRoute::new(path));
-                let route = routes.push(route, twin_index, always_layers.into(), ContextMap::new());
-                endpoints[twin_index].insert_any(route);
+            // A form a route claims for itself is left to that route.
+            match matcher.insert(matchit_path, twin) {
+                Ok(()) | Err(matchit::InsertError::Conflict { .. }) => {}
+                Err(error) => panic!("failed to register route: {error}"),
             }
         }
     }
@@ -99,52 +106,23 @@ fn twin(path: &Path) -> Option<PathBuf> {
     }
 }
 
-/// The route serving the other trailing-slash form of an endpoint's path
-/// under [`TrailingSlash::Redirect`], redirecting to the declared form.
-struct RedirectRoute {
-    id: RouteId,
-    /// The other form, which this route is registered at.
-    path: PathBuf,
-}
-
-impl RedirectRoute {
-    fn new(path: PathBuf) -> Self {
-        Self {
-            id: RouteId::new(),
-            path,
-        }
+/// Redirects a request that matched `path` to the same URL with its trailing
+/// slash added or removed, keeping the query string.
+pub(crate) fn redirect_to_twin(cx: &Cx, path: &Path) -> Result<Response> {
+    // The request path matched `path`, so it has a trailing slash exactly
+    // when `path` does.
+    let request = uri(cx);
+    let mut target = request.path().to_owned();
+    if path.has_trailing_slash() {
+        target.pop();
+    } else {
+        target.push('/');
     }
-}
-
-impl Route for RedirectRoute {
-    fn id(&self) -> RouteId {
-        self.id
+    if let Some(query) = request.query() {
+        target.push('?');
+        target.push_str(query);
     }
-
-    fn methods(&self) -> Methods<'_> {
-        Methods::Any
-    }
-
-    fn path(&self) -> &Path {
-        &self.path
-    }
-
-    fn handle<'cx>(&'cx self, cx: &'cx Cx, _body: Body) -> RouteFuture<'cx> {
-        // The request path matched this route's path, so it has a trailing
-        // slash exactly when the declared form does not.
-        let request = uri(cx);
-        let mut target = request.path().to_owned();
-        if self.path.has_trailing_slash() {
-            target.pop();
-        } else {
-            target.push('/');
-        }
-        if let Some(query) = request.query() {
-            target.push('?');
-            target.push_str(query);
-        }
-        Box::pin(async move { Err(redirect_permanent(target).into()) })
-    }
+    Err(redirect_permanent(target).into())
 }
 
 #[cfg(test)]

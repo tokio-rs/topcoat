@@ -168,20 +168,19 @@ impl Layer for LayerFn {
 /// the least specific of all; among layers that share a path, the later one
 /// in `layers` runs first.
 ///
-/// Each layer is paired with its context, so the context is built once and
-/// shared by every route the layer wraps.
-pub(crate) fn layers_for_path<'a>(
-    layers: &'a [(Arc<dyn Layer>, ContextMap)],
-    path: &Path,
-) -> Vec<&'a (Arc<dyn Layer>, ContextMap)> {
-    let mut matching: Vec<_> = layers
-        .iter()
-        .filter(|(layer, _)| layer.path().is_none_or(|prefix| path.starts_with(prefix)))
+/// Returns the positions of the selected layers in `layers`.
+pub(crate) fn layers_for_path(layers: &[&dyn Layer], path: &Path) -> Vec<usize> {
+    let mut matching: Vec<usize> = (0..layers.len())
+        .filter(|&layer| {
+            layers[layer]
+                .path()
+                .is_none_or(|prefix| path.starts_with(prefix))
+        })
         .rev()
         .collect();
     // The root path's backing string is empty, so its length is offset to
     // keep a pathless layer strictly less specific than a layer at `/`.
-    matching.sort_by_key(|(layer, _)| layer.path().map_or(0, |path| path.len() + 1));
+    matching.sort_by_key(|&layer| layers[layer].path().map_or(0, |path| path.len() + 1));
     matching
 }
 
@@ -278,29 +277,32 @@ mod tests {
         Cow::Borrowed(Path::new(s))
     }
 
-    /// A layer whose path is all a test cares about, paired with an empty
-    /// context; its handler just forwards to the rest of the chain and never
-    /// runs in the selection tests.
-    fn layer_at(p: &'static str) -> (Arc<dyn Layer>, ContextMap) {
-        let layer: Arc<dyn Layer> = Arc::new(LayerFn::new(Some(path(p)), noop_layer));
-        (layer, ContextMap::new())
+    /// A layer whose path is all a test cares about; its handler just
+    /// forwards to the rest of the chain and never runs in the selection
+    /// tests.
+    fn layer_at(p: &'static str) -> LayerFn {
+        LayerFn::new(Some(path(p)), noop_layer)
     }
 
     /// A layer without a path, wrapping every request in the selection tests.
-    fn layer_always() -> (Arc<dyn Layer>, ContextMap) {
-        let layer: Arc<dyn Layer> = Arc::new(LayerFn::new(None::<&Path>, noop_layer));
-        (layer, ContextMap::new())
+    fn layer_always() -> LayerFn {
+        LayerFn::new(None::<&Path>, noop_layer)
+    }
+
+    /// Returns the positions in `layers` that `layers_for_path` selects for
+    /// a route at `p`, in order.
+    fn select(layers: &[LayerFn], p: &'static str) -> Vec<usize> {
+        let layers: Vec<&dyn Layer> = layers.iter().map(|layer| layer as &dyn Layer).collect();
+        layers_for_path(&layers, Path::new(p))
     }
 
     /// Asserts that `layers_for_path` selects the layers at the `expected`
     /// paths (`None` for a layer without one), in order.
-    fn assert_selects(
-        layers: &[(Arc<dyn Layer>, ContextMap)],
-        p: &'static str,
-        expected: &[Option<&'static str>],
-    ) {
-        let selected = layers_for_path(layers, Path::new(p));
-        let paths: Vec<Option<&Path>> = selected.iter().map(|(layer, _)| layer.path()).collect();
+    fn assert_selects(layers: &[LayerFn], p: &'static str, expected: &[Option<&'static str>]) {
+        let paths: Vec<Option<&Path>> = select(layers, p)
+            .into_iter()
+            .map(|layer| layers[layer].path())
+            .collect();
         let expected: Vec<Option<&Path>> = expected.iter().map(|e| e.map(Path::new)).collect();
         assert_eq!(paths, expected);
     }
@@ -386,16 +388,13 @@ mod tests {
     #[test]
     fn for_path_runs_the_later_of_a_shared_path_first() {
         let layers = [layer_at("/admin"), layer_at("/admin")];
-        let selected = layers_for_path(&layers, Path::new("/admin/users"));
-        assert_eq!(selected.len(), 2);
-        assert!(Arc::ptr_eq(&selected[0].0, &layers[1].0));
-        assert!(Arc::ptr_eq(&selected[1].0, &layers[0].0));
+        assert_eq!(select(&layers, "/admin/users"), [1, 0]);
     }
 
     #[test]
     fn for_path_rejects_partial_segments() {
         let layers = [layer_at("/admin")];
-        assert!(layers_for_path(&layers, Path::new("/administrator")).is_empty());
+        assert!(select(&layers, "/administrator").is_empty());
     }
 
     #[test]

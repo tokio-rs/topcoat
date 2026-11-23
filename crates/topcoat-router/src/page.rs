@@ -274,17 +274,12 @@ impl Layout for LayoutFn {
 /// outermost layout comes first. Among layouts that share a path, the earlier
 /// one in `layouts` is outside the later one.
 ///
-/// Each layout is paired with its context, so the context is built once and
-/// shared by every page the layout wraps.
-pub(crate) fn layouts_for_path<'a>(
-    layouts: &'a [(Arc<dyn Layout>, ContextMap)],
-    path: &Path,
-) -> Vec<&'a (Arc<dyn Layout>, ContextMap)> {
-    let mut matching: Vec<_> = layouts
-        .iter()
-        .filter(|(layout, _)| path.starts_with(layout.path()))
+/// Returns the positions of the selected layouts in `layouts`.
+pub(crate) fn layouts_for_path(layouts: &[&dyn Layout], path: &Path) -> Vec<usize> {
+    let mut matching: Vec<usize> = (0..layouts.len())
+        .filter(|&layout| path.starts_with(layouts[layout].path()))
         .collect();
-    matching.sort_by_key(|(layout, _)| layout.path().len());
+    matching.sort_by_key(|&layout| layouts[layout].path().len());
     matching
 }
 
@@ -372,11 +367,20 @@ impl Route for PageWithLayouts {
 mod tests {
     use super::*;
 
-    /// A layout whose path is all a test cares about, paired with an empty
-    /// context; it never renders in the selection tests.
-    fn layout_at(path: &'static str) -> (Arc<dyn Layout>, ContextMap) {
-        let layout: Arc<dyn Layout> = Arc::new(LayoutFn::new(path, unreachable_layout));
-        (layout, ContextMap::new())
+    /// A layout whose path is all a test cares about; it never renders in
+    /// the selection tests.
+    fn layout_at(path: &'static str) -> LayoutFn {
+        LayoutFn::new(path, unreachable_layout)
+    }
+
+    /// Returns the positions in `layouts` that `layouts_for_path` selects
+    /// for a page at `path`, in order.
+    fn select(layouts: &[LayoutFn], path: &'static str) -> Vec<usize> {
+        let layouts: Vec<&dyn Layout> = layouts
+            .iter()
+            .map(|layout| layout as &dyn Layout)
+            .collect();
+        layouts_for_path(&layouts, Path::new(path))
     }
 
     fn unreachable_layout<'a>(_cx: &'a Cx, _slot: Slot<'a>) -> BoxView<'a> {
@@ -385,13 +389,11 @@ mod tests {
 
     /// Asserts that `layouts_for_path` selects the layouts at the `expected`
     /// paths, in order.
-    fn assert_selects(
-        layouts: &[(Arc<dyn Layout>, ContextMap)],
-        path: &'static str,
-        expected: &[&'static str],
-    ) {
-        let selected = layouts_for_path(layouts, Path::new(path));
-        let paths: Vec<&Path> = selected.iter().map(|(layout, _)| layout.path()).collect();
+    fn assert_selects(layouts: &[LayoutFn], path: &'static str, expected: &[&'static str]) {
+        let paths: Vec<&Path> = select(layouts, path)
+            .into_iter()
+            .map(|layout| layouts[layout].path())
+            .collect();
         let expected: Vec<&Path> = expected.iter().copied().map(Path::new).collect();
         assert_eq!(paths, expected);
     }
@@ -410,15 +412,12 @@ mod tests {
     #[test]
     fn for_path_keeps_the_earlier_of_a_shared_path_outside() {
         let layouts = [layout_at("/admin"), layout_at("/admin")];
-        let selected = layouts_for_path(&layouts, Path::new("/admin/users"));
-        assert_eq!(selected.len(), 2);
-        assert!(Arc::ptr_eq(&selected[0].0, &layouts[0].0));
-        assert!(Arc::ptr_eq(&selected[1].0, &layouts[1].0));
+        assert_eq!(select(&layouts, "/admin/users"), [0, 1]);
     }
 
     #[test]
     fn for_path_rejects_partial_segments() {
         let layouts = [layout_at("/admin")];
-        assert!(layouts_for_path(&layouts, Path::new("/administrator")).is_empty());
+        assert!(select(&layouts, "/administrator").is_empty());
     }
 }
