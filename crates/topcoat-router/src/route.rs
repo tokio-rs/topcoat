@@ -448,18 +448,26 @@ mod tests {
         }
     }
 
-    /// Stores a route for each id number in `numbers`, served at a path
-    /// spelling out that number.
-    fn routes<'r>(arena: &'r Bump, entry: &'r RouteEntry<'r>, numbers: &[usize]) -> Routes<'r> {
-        let routes = numbers
+    /// A route for each id number in `numbers`, served at a path spelling
+    /// out that number.
+    fn registered<'r>(
+        arena: &'r Bump,
+        entry: &'r RouteEntry<'r>,
+        numbers: &[usize],
+    ) -> Vec<RegisteredRoute<'r>> {
+        numbers
             .iter()
             .map(|&number| RegisteredRoute {
                 id: RouteId(number),
                 path: Path::new(arena.alloc_str(&format!("/{number}"))),
                 entry,
             })
-            .collect();
-        Routes::new(arena, routes)
+            .collect()
+    }
+
+    /// Stores a route for each id number in `numbers`.
+    fn routes<'r>(arena: &'r Bump, entry: &'r RouteEntry<'r>, numbers: &[usize]) -> Routes<'r> {
+        Routes::new(arena, registered(arena, entry, numbers)).unwrap()
     }
 
     /// The path of the route `routes` finds under the id numbered `number`.
@@ -511,6 +519,16 @@ mod tests {
 
         let paths: Vec<&str> = routes.iter().map(|route| route.path().as_str()).collect();
         assert_eq!(paths, ["/3", "/5", "/7"]);
+    }
+
+    #[test]
+    fn two_routes_with_one_id_are_rejected() {
+        let arena = Bump::new();
+        let handler = handler();
+        let entry = entry(&handler);
+        let routes = Routes::new(&arena, registered(&arena, &entry, &[4, 9, 4]));
+
+        assert!(routes.is_err());
     }
 
     #[test]
