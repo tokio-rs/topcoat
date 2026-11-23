@@ -6091,6 +6091,7 @@ dependencies = [
  "topcoat-view",
  "tower",
  "tower-http",
+ "yoke",
 ]
 
 [[package]]

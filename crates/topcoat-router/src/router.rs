@@ -10,10 +10,11 @@ use topcoat_core::{
     context::{ContextMap, ContextValues, Cx, try_context, with_identity},
     error::Result,
 };
+use yoke::{Yoke, Yokeable};
 
 use crate::{
     Body, Endpoint, EndpointIndex, Endpoints, Layer, Next, RawPathParams, RegisteredRoute, Route,
-    RouteId, RouteIndex, RouterBuilder, Routes, Terminal, TrustedProxies,
+    RouteEntry, RouteId, RouteIndex, RouterBuilder, Routes, Terminal, TrustedProxies,
     arena::RouterCell,
     error::{RewriteChain, RewriteError, internal_server_response, respond},
     origin_policy,
@@ -253,15 +254,20 @@ impl Router {
     }
 }
 
-/// What a request was dispatched to, stored on its context.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct Matched {
-    /// The endpoint the request's path matched.
-    endpoint: EndpointIndex,
-    /// The route serving the request, or `None` when the path matched but no
-    /// route accepts the method (a 405).
-    route: Option<RouteIndex>,
+/// What a request was dispatched to, as references into the router.
+#[derive(Clone, Copy, Yokeable)]
+pub(crate) struct Match<'r> {
+    /// The endpoint the request's path matched, or `None` when it matched
+    /// none (a 404).
+    pub(crate) endpoint: Option<&'r Endpoint<'r>>,
+    /// The route serving the request, or `None` when no route accepts the
+    /// method (a 405) or the path matched no endpoint.
+    pub(crate) route: Option<&'r RouteEntry<'r>>,
 }
+
+/// A [`Match`] together with the router handle that keeps its references
+/// alive. It has no lifetime, so it can be stored on the request context.
+pub(crate) type Matched = Yoke<Match<'static>, Arc<RouterCell>>;
 
 /// Returns the router handling this request.
 ///

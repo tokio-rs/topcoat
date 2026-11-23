@@ -97,6 +97,7 @@ tower-http = { workspace = true, optional = true, features = [
 	"compression-br",
 	"compression-gzip",
 ] }
+yoke = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
 topcoat = { workspace = true, features = ["compression", "fs", "router", "sitemap", "sse", "tower", "websocket"] }
