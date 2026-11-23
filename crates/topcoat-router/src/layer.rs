@@ -412,7 +412,7 @@ mod tests {
     #[test]
     fn for_path_rejects_partial_segments() {
         let layers = [layer_at("/admin")];
-        assert!(select(&layers, "/administrator").is_empty());
+        assert_eq!(select(&layers, "/administrator"), [] as [usize; 0]);
     }
 
     #[test]

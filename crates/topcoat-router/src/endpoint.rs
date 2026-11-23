@@ -116,18 +116,17 @@ impl<'r> Endpoint<'r> {
         method: &'r Method,
         entry: &'r RouteEntry<'r>,
     ) {
-        match standard_slot(method) {
-            Some(slot) => self.standard[slot] = Some(entry),
-            None => {
-                let mut other: Vec<_> = self
-                    .other
-                    .iter()
-                    .copied()
-                    .filter(|(registered, _)| *registered != method)
-                    .collect();
-                other.push((method, entry));
-                self.other = arena.alloc_slice_copy(&other);
-            }
+        if let Some(slot) = standard_slot(method) {
+            self.standard[slot] = Some(entry);
+        } else {
+            let mut other: Vec<_> = self
+                .other
+                .iter()
+                .copied()
+                .filter(|(registered, _)| *registered != method)
+                .collect();
+            other.push((method, entry));
+            self.other = arena.alloc_slice_copy(&other);
         }
     }
 

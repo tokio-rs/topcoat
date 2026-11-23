@@ -382,6 +382,6 @@ mod tests {
     #[test]
     fn for_path_rejects_partial_segments() {
         let layouts = [layout_at("/admin")];
-        assert!(select(&layouts, "/administrator").is_empty());
+        assert_eq!(select(&layouts, "/administrator"), [] as [usize; 0]);
     }
 }

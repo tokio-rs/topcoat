@@ -66,20 +66,19 @@ impl TrailingSlash {
             };
             let matchit_path = path.to_matchit_path();
             let path: &'r Path = Path::new_unchecked(arena.alloc_str(path.as_str()));
-            let twin = match self {
-                Self::Serve => endpoint.with_path(path),
-                _ => {
-                    let mut twin = Endpoint::new(path);
-                    twin.insert_any(arena.alloc(RouteEntry {
-                        handler: Handler::Redirect {
-                            id: RouteId::new(),
-                            path,
-                        },
-                        layers: always_layers,
-                        context: None,
-                    }));
-                    twin
-                }
+            let twin = if self == Self::Serve {
+                endpoint.with_path(path)
+            } else {
+                let mut twin = Endpoint::new(path);
+                twin.insert_any(arena.alloc(RouteEntry {
+                    handler: Handler::Redirect {
+                        id: RouteId::new(),
+                        path,
+                    },
+                    layers: always_layers,
+                    context: None,
+                }));
+                twin
             };
             // A form a route claims for itself is left to that route.
             match matcher.insert(matchit_path, twin) {
