@@ -531,10 +531,18 @@ fn tables<'r>(
     // The twins are the router's own routes, so they are not declared.
     trailing_slash.register_twins(arena, &mut matcher, &served, always_layers);
 
+    declared.sort_unstable_by_key(|route| route.id().number());
+    let declared: &'r [RegisteredRoute<'r>] = arena.alloc_slice_copy(&declared);
+    // The id table has one slot per id up to the highest, so it is only
+    // built when the ids leave few of the slots empty.
+    let highest = declared.last().map_or(0, |route| route.id().number());
+    let by_id = (highest < 4 * declared.len()).then(|| Tables::index_by_id(arena, declared));
+
     Tables {
         matcher,
         always_layers,
-        declared: arena.alloc_slice_copy(&declared),
+        declared,
+        by_id,
         context: Arc::new(context),
         trusted_proxies,
     }

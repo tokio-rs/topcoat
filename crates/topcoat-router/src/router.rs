@@ -406,6 +406,7 @@ pub(crate) fn test_matched_cx(path: &Path) -> Cx {
             matcher,
             always_layers: &[],
             declared: &[],
+            by_id: None,
             context: Arc::new(ContextMap::new()),
             trusted_proxies: TrustedProxies::new(),
         }

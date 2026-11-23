@@ -44,6 +44,11 @@ impl RouteId {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
         Self(NEXT.fetch_add(1, Ordering::Relaxed))
     }
+
+    /// Returns how many ids were drawn before this one.
+    pub(crate) fn number(self) -> usize {
+        self.0
+    }
 }
 
 /// A single routable endpoint: a set of HTTP methods, a URL path, and a
