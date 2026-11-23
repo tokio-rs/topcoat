@@ -11,6 +11,7 @@ use std::{
     },
 };
 
+use bumpalo::Bump;
 #[cfg(feature = "fs")]
 pub use directory::*;
 use topcoat_core::{
@@ -343,9 +344,172 @@ impl<'router> RegisteredRoute<'router> {
             None => &EMPTY,
         }
     }
+}
 
-    /// Returns what a request to this route runs.
-    pub(crate) fn entry(&self) -> &'router RouteEntry<'router> {
-        self.entry
+/// The routes an application registered on a router, found by id.
+#[derive(Default)]
+pub(crate) struct Routes<'r> {
+    /// Every route, sorted by id.
+    sorted: &'r [RegisteredRoute<'r>],
+    /// The routes indexed by id, with one slot per id starting at the id
+    /// numbered `first`. Empty when the ids are too far apart for a table.
+    sequential: &'r [Option<&'r RegisteredRoute<'r>>],
+    /// The number of the id the first slot of `sequential` belongs to.
+    first: usize,
+}
+
+impl<'r> Routes<'r> {
+    /// The most slots `sequential` may have for each route it holds.
+    const MAX_SLOTS_PER_ROUTE: usize = 4;
+
+    /// Stores `routes` in `arena`.
+    pub(crate) fn new(arena: &'r Bump, mut routes: Vec<RegisteredRoute<'r>>) -> Self {
+        routes.sort_unstable_by_key(|route| route.id().number());
+        let sorted: &'r [RegisteredRoute<'r>] = arena.alloc_slice_copy(&routes);
+        let (Some(lowest), Some(highest)) = (sorted.first(), sorted.last()) else {
+            return Self::default();
+        };
+
+        // The table has one slot per id from the lowest to the highest, so
+        // it is only built when few of its slots would stay empty.
+        let first = lowest.id().number();
+        let slots = highest.id().number() - first + 1;
+        let sequential: &'r [Option<&'r RegisteredRoute<'r>>] =
+            if slots <= Self::MAX_SLOTS_PER_ROUTE * sorted.len() {
+                let sequential = arena.alloc_slice_fill_copy(slots, None);
+                for route in sorted {
+                    sequential[route.id().number() - first] = Some(route);
+                }
+                sequential
+            } else {
+                &[]
+            };
+
+        Self {
+            sorted,
+            sequential,
+            first,
+        }
+    }
+
+    /// Returns the route registered under `id`, or `None` if there is none.
+    pub(crate) fn get(&self, id: RouteId) -> Option<RegisteredRoute<'r>> {
+        let number = id.number();
+        let slot = number
+            .checked_sub(self.first)
+            .and_then(|position| self.sequential.get(position));
+        if let Some(slot) = slot {
+            return slot.copied();
+        }
+        let position = self
+            .sorted
+            .binary_search_by_key(&number, |route| route.id().number())
+            .ok()?;
+        Some(self.sorted[position])
+    }
+
+    /// Iterates over the routes in the order of their ids.
+    pub(crate) fn iter(&self) -> impl Iterator<Item = RegisteredRoute<'r>> {
+        self.sorted.iter().copied()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Method;
+
+    fn unused(_cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        unreachable!()
+    }
+
+    /// The route every registered route in these tests runs. The tests give
+    /// each registered route its own id and path.
+    fn handler() -> RouteFn {
+        RouteFn::new(Method::GET, "/", unused)
+    }
+
+    fn entry(route: &RouteFn) -> RouteEntry<'_> {
+        RouteEntry {
+            handler: Handler::Route(route),
+            layers: &[],
+            context: None,
+        }
+    }
+
+    /// Stores a route for each id number in `numbers`, served at a path
+    /// spelling out that number.
+    fn routes<'r>(arena: &'r Bump, entry: &'r RouteEntry<'r>, numbers: &[usize]) -> Routes<'r> {
+        let routes = numbers
+            .iter()
+            .map(|&number| RegisteredRoute {
+                id: RouteId(number),
+                path: Path::new(arena.alloc_str(&format!("/{number}"))),
+                entry,
+            })
+            .collect();
+        Routes::new(arena, routes)
+    }
+
+    /// The path of the route `routes` finds under the id numbered `number`.
+    fn found<'r>(routes: &Routes<'r>, number: usize) -> Option<&'r str> {
+        routes
+            .get(RouteId(number))
+            .map(|route| route.path().as_str())
+    }
+
+    #[test]
+    fn ids_close_together_are_found_through_the_table() {
+        let arena = Bump::new();
+        let handler = handler();
+        let entry = entry(&handler);
+        let routes = routes(&arena, &entry, &[103, 100, 101]);
+        assert!(!routes.sequential.is_empty());
+
+        assert_eq!(found(&routes, 100), Some("/100"));
+        assert_eq!(found(&routes, 101), Some("/101"));
+        assert_eq!(found(&routes, 103), Some("/103"));
+        // An id between the registered ones, and ids on either side of them.
+        assert_eq!(found(&routes, 102), None);
+        assert_eq!(found(&routes, 99), None);
+        assert_eq!(found(&routes, 104), None);
+    }
+
+    #[test]
+    fn ids_far_apart_are_found_without_a_table() {
+        let arena = Bump::new();
+        let handler = handler();
+        let entry = entry(&handler);
+        let routes = routes(&arena, &entry, &[90_000, 5, 5_000]);
+        assert!(routes.sequential.is_empty());
+
+        assert_eq!(found(&routes, 5), Some("/5"));
+        assert_eq!(found(&routes, 5_000), Some("/5000"));
+        assert_eq!(found(&routes, 90_000), Some("/90000"));
+        assert_eq!(found(&routes, 6), None);
+        assert_eq!(found(&routes, 0), None);
+        assert_eq!(found(&routes, 90_001), None);
+    }
+
+    #[test]
+    fn routes_are_listed_in_id_order() {
+        let arena = Bump::new();
+        let handler = handler();
+        let entry = entry(&handler);
+        let routes = routes(&arena, &entry, &[7, 3, 5]);
+
+        let paths: Vec<&str> = routes.iter().map(|route| route.path().as_str()).collect();
+        assert_eq!(paths, ["/3", "/5", "/7"]);
+    }
+
+    #[test]
+    fn no_routes_find_nothing() {
+        let arena = Bump::new();
+        let handler = handler();
+        let entry = entry(&handler);
+        let routes = routes(&arena, &entry, &[]);
+
+        assert_eq!(found(&routes, 0), None);
+        assert_eq!(routes.iter().count(), 0);
     }
 }

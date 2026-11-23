@@ -136,7 +136,7 @@ impl Router {
     /// assert_eq!(paths, ["/health"]);
     /// ```
     pub fn routes(&self) -> impl Iterator<Item = RegisteredRoute<'_>> {
-        self.inner.declared().iter().copied()
+        self.inner.routes().iter()
     }
 
     /// Returns the values registered on the router builder.
@@ -385,7 +385,7 @@ pub fn try_route(cx: &Cx) -> Option<RegisteredRoute<'_>> {
 #[must_use]
 pub fn route_path(cx: &Cx, id: RouteId) -> Option<&Path> {
     let matched = try_context::<Matched>(cx)?;
-    Some(matched.backing_cart().route(id)?.path())
+    Some(matched.backing_cart().routes().get(id)?.path())
 }
 
 /// Builds the request context of a request matched to an endpoint at `path`,
@@ -393,7 +393,7 @@ pub fn route_path(cx: &Cx, id: RouteId) -> Option<&Path> {
 #[cfg(test)]
 pub(crate) fn test_matched_cx(path: &Path) -> Cx {
     use crate::{
-        TrustedProxies,
+        Routes, TrustedProxies,
         arena::{Staged, Tables},
     };
 
@@ -405,8 +405,7 @@ pub(crate) fn test_matched_cx(path: &Path) -> Cx {
         Tables {
             matcher,
             always_layers: &[],
-            declared: &[],
-            by_id: None,
+            routes: Routes::default(),
             context: Arc::new(ContextMap::new()),
             trusted_proxies: TrustedProxies::new(),
         }
@@ -445,8 +444,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        Body, HrefTarget, LayerFn, LayerFuture, LayoutFn, Method, Methods, PageFn, Path,
-        RemoteAddr, Route, RouteFn, RouteFuture, Slot, TrailingSlash,
+        Body, HrefTarget, Layer, LayerFn, LayerFuture, LayoutFn, Method, Methods, PageFn, Path,
+        RemoteAddr, Route, RouteFn, RouteFuture, Slot, TrailingSlash, TrustedProxies,
         error::rewrite,
         raw_path_params,
         request::{Bytes, client_ip, method, original_method, original_uri, uri},

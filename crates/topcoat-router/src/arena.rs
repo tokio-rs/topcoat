@@ -4,7 +4,7 @@ use bumpalo::Bump;
 use self_cell::{MutBorrow, self_cell};
 use topcoat_core::context::ContextMap;
 
-use crate::{Endpoint, Layer, Layout, Page, RegisteredRoute, Route, RouteId, TrustedProxies};
+use crate::{Endpoint, Layer, Layout, Page, Route, Routes, TrustedProxies};
 
 /// An arena slot that owns a value and can drop it in place.
 ///
@@ -139,34 +139,12 @@ pub(crate) struct Tables<'r> {
     pub(crate) matcher: matchit::Router<Endpoint<'r>>,
     /// The layers that run around requests matching no route.
     pub(crate) always_layers: &'r [&'r dyn Layer],
-    /// Every route the application registered, sorted by id.
-    pub(crate) declared: &'r [RegisteredRoute<'r>],
-    /// `declared` indexed by id, or `None` when the ids are too sparse for a table.
-    pub(crate) by_id: Option<&'r [Option<&'r RegisteredRoute<'r>>]>,
+    /// Every route the application registered.
+    pub(crate) routes: Routes<'r>,
     /// The values registered on the router builder.
     pub(crate) context: Arc<ContextMap>,
     /// The proxies trusted to report the client's address.
     pub(crate) trusted_proxies: TrustedProxies,
-}
-
-impl<'r> Tables<'r> {
-    /// Returns `declared` as a table with one slot per id, up to the highest
-    /// id in it. The slot of an id that no declared route has is empty.
-    pub(crate) fn index_by_id(
-        arena: &'r Bump,
-        declared: &'r [RegisteredRoute<'r>],
-    ) -> &'r [Option<&'r RegisteredRoute<'r>>] {
-        let len = declared
-            .iter()
-            .map(|route| route.id().number() + 1)
-            .max()
-            .unwrap_or(0);
-        let slots = arena.alloc_slice_fill_copy(len, None);
-        for route in declared {
-            slots[route.id().number()] = Some(route);
-        }
-        slots
-    }
 }
 
 /// Everything the [`Tables`] of a built router point at.
@@ -227,26 +205,9 @@ impl RouterCell {
         self.with_dependent(|_, tables| tables.always_layers)
     }
 
-    /// Returns every route the application registered, sorted by id.
-    pub(crate) fn declared(&self) -> &[RegisteredRoute<'_>] {
-        self.with_dependent(|_, tables| tables.declared)
-    }
-
-    /// Returns the route registered under `id`, or `None` if the application
-    /// registered no route with that identity.
-    pub(crate) fn route(&self, id: RouteId) -> Option<RegisteredRoute<'_>> {
-        if let Some(by_id) = self.by_id() {
-            return by_id.get(id.number()).copied().flatten().copied();
-        }
-        let declared = self.declared();
-        let position = declared
-            .binary_search_by_key(&id.number(), |route| route.id().number())
-            .ok()?;
-        Some(declared[position])
-    }
-
-    fn by_id(&self) -> Option<&[Option<&RegisteredRoute<'_>>]> {
-        self.with_dependent(|_, tables| tables.by_id)
+    /// Returns every route the application registered.
+    pub(crate) fn routes(&self) -> &Routes<'_> {
+        self.with_dependent(|_, tables| &tables.routes)
     }
 
     /// Returns the values registered on the router builder.
@@ -275,8 +236,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        Body, Handler, LayerFn, LayerFuture, LayoutFn, Method, Next, PageFn, Path, RouteEntry,
-        RouteFn, RouteFuture, Slot,
+        Body, LayerFn, LayerFuture, LayoutFn, Method, Next, PageFn, Path, RouteFn, RouteFuture,
+        Slot,
     };
 
     /// Counts how many guards were dropped.
@@ -339,8 +300,7 @@ mod tests {
         Tables {
             matcher: matchit::Router::new(),
             always_layers: &[],
-            declared: &[],
-            by_id: None,
+            routes: Routes::default(),
             context: Arc::new(ContextMap::new()),
             trusted_proxies: TrustedProxies::new(),
         }
@@ -417,59 +377,6 @@ mod tests {
         assert_eq!(endpoint.path(), Path::new("/users/{id}"));
         assert_eq!(params.get("id"), Some("42"));
         assert!(router.at("/missing").is_none());
-    }
-
-    #[test]
-    fn a_route_is_found_by_its_id_with_and_without_the_id_table() {
-        for indexed in [true, false] {
-            let first = RouteFn::new(Method::GET, "/first", unused_route);
-            let second = RouteFn::new(Method::GET, "/second", unused_route);
-            // An id between those of the routes that belongs to none of them.
-            let unregistered = RouteId::new();
-            let third = RouteFn::new(Method::GET, "/third", unused_route);
-            let ids = [first.id(), second.id(), third.id()];
-
-            let mut staged = Staged::default();
-            staged.with_dependent_mut(|arena, objects| {
-                for route in [first, second, third] {
-                    objects.routes.push(arena, route);
-                }
-            });
-            let router = RouterCell::build(staged, |arena, objects, _| {
-                // Ids are drawn in order, so the routes are sorted by id.
-                let declared: Vec<RegisteredRoute<'_>> = objects
-                    .routes
-                    .iter()
-                    .map(|route| {
-                        let entry = arena.alloc(RouteEntry {
-                            handler: Handler::Route(route),
-                            layers: &[],
-                            context: None,
-                        });
-                        RegisteredRoute::new(route.path(), entry)
-                    })
-                    .collect();
-                let declared = arena.alloc_slice_copy(&declared);
-                Tables {
-                    declared,
-                    by_id: indexed.then(|| Tables::index_by_id(arena, declared)),
-                    ..empty_tables()
-                }
-            });
-
-            let paths: Vec<Option<&str>> = ids
-                .iter()
-                .map(|&id| router.route(id).map(|route| route.path().as_str()))
-                .collect();
-            assert_eq!(
-                paths,
-                [Some("/first"), Some("/second"), Some("/third")],
-                "indexed: {indexed}"
-            );
-            assert!(router.route(unregistered).is_none(), "indexed: {indexed}");
-            // An id drawn after every route is past the end of the table.
-            assert!(router.route(RouteId::new()).is_none(), "indexed: {indexed}");
-        }
     }
 
     #[test]
