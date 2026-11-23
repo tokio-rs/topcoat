@@ -4,9 +4,6 @@ mod directory;
 use std::{
     any::Any,
     borrow::Cow,
-    collections::HashMap,
-    num::NonZeroUsize,
-    ops::Index,
     pin::Pin,
     sync::{
         Arc, LazyLock,
@@ -22,8 +19,8 @@ use topcoat_core::{
 };
 
 use crate::{
-    Body, Endpoint, EndpointIndex, HrefTarget, IntoPath, Layer, Methods, Next, OwnedMethods, Path,
-    Terminal, response::Response, route, route_endpoint,
+    Body, HrefTarget, IntoPath, Layer, Layout, Methods, OwnedMethods, Page, Path,
+    response::Response, route, route_endpoint,
 };
 
 /// The future returned by [`Route::handle`]: a boxed, `Send` future borrowing
@@ -221,71 +218,48 @@ impl HrefTarget for RouteFn {
     }
 }
 
-/// The position of a route in a router's [`Routes`] table.
+/// What a request needs from the route it matched.
 ///
-/// Stored offset by one in a [`NonZeroUsize`] so that `Option<RouteIndex>`
-/// occupies a single word, keeping an endpoint's per-method table dense.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct RouteIndex(NonZeroUsize);
-
-impl RouteIndex {
-    /// Wraps a route's position in the table.
-    pub(crate) fn new(index: usize) -> Self {
-        Self(NonZeroUsize::new(index.wrapping_add(1)).expect("route index overflow"))
-    }
-
-    /// Returns the wrapped position.
-    pub(crate) fn get(self) -> usize {
-        self.0.get() - 1
-    }
+/// A route entry borrows from the router it belongs to.
+pub(crate) struct RouteEntry<'r> {
+    /// What produces the response once the layers have run.
+    pub(crate) handler: Handler<'r>,
+    /// The layers wrapping this route, ordered from least- to most-specific
+    /// so the outermost layer runs first.
+    pub(crate) layers: &'r [&'r dyn Layer],
+    /// The route's context: the values of the layers and layouts that wrap
+    /// it, followed by its own. `None` when it holds no values.
+    pub(crate) context: Option<&'r Arc<ContextMap>>,
 }
 
-/// A route paired with the layers that wrap it.
-pub(crate) struct RouteWithLayers {
-    /// The route itself.
-    route: Box<dyn Route>,
-    /// The layers wrapping this route, precomputed at build time from the
-    /// route's path (group segments included) and ordered from least- to
-    /// most-specific so the outermost layer runs first.
-    layers: Box<[Arc<dyn Layer>]>,
-    /// The route's context, built once when the router is built, or `None`
-    /// when it holds no values.
-    context: Option<Arc<ContextMap>>,
-    /// The endpoint serving this route.
-    endpoint: EndpointIndex,
+/// What produces the response of a [`RouteEntry`].
+#[derive(Clone, Copy)]
+pub(crate) enum Handler<'r> {
+    /// A route, which produces the response itself.
+    Route(&'r dyn Route),
+    /// A page, rendered inside its layouts.
+    Page {
+        page: &'r dyn Page,
+        /// The layouts wrapping the page, outermost first.
+        layouts: &'r [&'r dyn Layout],
+    },
 }
 
-impl RouteWithLayers {
-    /// Returns the endpoint serving this route.
-    pub(crate) fn endpoint(&self) -> EndpointIndex {
-        self.endpoint
+impl<'r> Handler<'r> {
+    /// The identity of the route or page.
+    pub(crate) fn id(&self) -> RouteId {
+        match *self {
+            Self::Route(route) => route.id(),
+            Self::Page { page, .. } => page.id(),
+        }
     }
 
-    /// Returns the route's context, or `None` when it holds no values.
-    pub(crate) fn shared_context(&self) -> Option<&Arc<ContextMap>> {
-        self.context.as_ref()
-    }
-}
-
-impl Route for RouteWithLayers {
-    fn id(&self) -> RouteId {
-        self.route.id()
-    }
-
-    fn methods(&self) -> Methods<'_> {
-        self.route.methods()
-    }
-
-    fn path(&self) -> &Path {
-        self.route.path()
-    }
-
-    fn context(&self) -> ContextMap {
-        self.context.as_deref().cloned().unwrap_or_default()
-    }
-
-    fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
-        Next::new(&self.layers, Terminal::Route(&*self.route)).run(cx, body)
+    /// The HTTP methods the route or page responds to.
+    pub(crate) fn methods(&self) -> Methods<'r> {
+        match *self {
+            Self::Route(route) => route.methods(),
+            Self::Page { page, .. } => page.methods(),
+        }
     }
 }
 
@@ -296,20 +270,26 @@ impl Route for RouteWithLayers {
 /// served at and the values attached to it.
 #[derive(Clone, Copy)]
 pub struct RegisteredRoute<'router> {
-    route: &'router RouteWithLayers,
-    endpoint: &'router Endpoint,
+    id: RouteId,
+    /// The URL path the route is served at.
+    path: &'router Path,
+    entry: &'router RouteEntry<'router>,
 }
 
 impl<'router> RegisteredRoute<'router> {
-    /// Pairs `route` with the endpoint serving it.
-    pub(crate) fn new(route: &'router RouteWithLayers, endpoint: &'router Endpoint) -> Self {
-        Self { route, endpoint }
+    /// Describes the route behind `entry`, which is served at `path`.
+    pub(crate) fn new(path: &'router Path, entry: &'router RouteEntry<'router>) -> Self {
+        Self {
+            id: entry.handler.id(),
+            path,
+            entry,
+        }
     }
 
     /// The identity of the route's handler.
     #[must_use]
     pub fn id(&self) -> RouteId {
-        self.route.id()
+        self.id
     }
 
     /// The URL path the route is served at.
@@ -318,13 +298,13 @@ impl<'router> RegisteredRoute<'router> {
     /// it, because they never reach the URL.
     #[must_use]
     pub fn path(&self) -> &'router Path {
-        self.endpoint.path()
+        self.path
     }
 
     /// The HTTP methods the route responds to.
     #[must_use]
     pub fn methods(&self) -> Methods<'router> {
-        self.route.methods()
+        self.entry.handler.methods()
     }
 
     /// The route's context: the values of the layers and layouts that wrap
@@ -335,98 +315,14 @@ impl<'router> RegisteredRoute<'router> {
     #[must_use]
     pub fn context(&self) -> &'router ContextMap {
         static EMPTY: LazyLock<ContextMap> = LazyLock::new(ContextMap::new);
-        match self.route.shared_context() {
+        match self.entry.context {
             Some(context) => context,
             None => &EMPTY,
         }
     }
-}
 
-/// The routes registered on a router, in registration order, indexed by
-/// [`RouteIndex`].
-///
-/// Routes are [`push`](Self::push)ed as the router is built, then only
-/// queried: [`endpoint`](Self::endpoint) resolves a route's [`RouteId`] to the
-/// endpoint serving it, and indexing by [`RouteIndex`] resolves a position
-/// back to the route and its layers.
-#[derive(Default)]
-pub(crate) struct Routes {
-    routes: Vec<RouteWithLayers>,
-    endpoint_lookup: HashMap<RouteId, EndpointIndex>,
-}
-
-impl Routes {
-    /// Registers `route` as served by `endpoint`, wrapped by `layers` and
-    /// with the values of `context`, returning the [`RouteIndex`] that now
-    /// identifies the registration.
-    pub(crate) fn push(
-        &mut self,
-        route: Box<dyn Route>,
-        endpoint: EndpointIndex,
-        layers: Box<[Arc<dyn Layer>]>,
-        context: ContextMap,
-    ) -> RouteIndex {
-        let index = RouteIndex::new(self.routes.len());
-        self.endpoint_lookup.insert(route.id(), endpoint);
-        let context = (!context.is_empty()).then(|| Arc::new(context));
-        self.routes.push(RouteWithLayers {
-            route,
-            layers,
-            context,
-            endpoint,
-        });
-        index
-    }
-
-    /// Returns the endpoint serving the route registered under `id`, or `None` if
-    /// this router holds no route with that identity.
-    pub(crate) fn endpoint(&self, id: RouteId) -> Option<EndpointIndex> {
-        self.endpoint_lookup.get(&id).copied()
-    }
-
-    /// Returns the number of routes registered so far.
-    pub(crate) fn len(&self) -> usize {
-        self.routes.len()
-    }
-
-    /// Iterates over the routes in registration order.
-    pub(crate) fn iter(&self) -> impl Iterator<Item = &RouteWithLayers> {
-        self.routes.iter()
-    }
-}
-
-impl Index<RouteIndex> for Routes {
-    type Output = RouteWithLayers;
-
-    fn index(&self, index: RouteIndex) -> &Self::Output {
-        &self.routes[index.get()]
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // -- RouteIndex --
-
-    #[test]
-    fn route_index_wraps_and_unwraps() {
-        let index = RouteIndex::new(7);
-        assert_eq!(index.get(), 7);
-    }
-
-    #[test]
-    fn route_index_zero_is_a_real_index() {
-        // The offset keeps index 0 representable despite the non-zero backing.
-        let index = RouteIndex::new(0);
-        assert_eq!(index.get(), 0);
-    }
-
-    #[test]
-    fn option_route_index_stays_one_word() {
-        assert_eq!(
-            std::mem::size_of::<Option<RouteIndex>>(),
-            std::mem::size_of::<usize>()
-        );
+    /// Returns what a request to this route runs.
+    pub(crate) fn entry(&self) -> &'router RouteEntry<'router> {
+        self.entry
     }
 }

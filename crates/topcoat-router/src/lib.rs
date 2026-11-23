@@ -1,5 +1,6 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+mod arena;
 mod body;
 mod body_limit;
 mod builder;
