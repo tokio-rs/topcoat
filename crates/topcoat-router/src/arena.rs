@@ -1,7 +1,10 @@
+use std::sync::Arc;
+
 use bumpalo::Bump;
 use self_cell::{MutBorrow, self_cell};
+use topcoat_core::context::ContextMap;
 
-use crate::{Layer, Layout, Page, Route};
+use crate::{Endpoint, Layer, Layout, Page, RegisteredRoute, Route, TrustedProxies};
 
 /// An arena slot that owns a value and can drop it in place.
 ///
@@ -127,8 +130,16 @@ impl Default for Staged {
 /// The references point into the arena of the [`RouterCell`] that owns these
 /// tables.
 pub(crate) struct Tables<'r> {
+    /// Resolves a request path to its endpoint.
+    pub(crate) matcher: matchit::Router<Endpoint<'r>>,
     /// The layers that run around requests matching no route.
     pub(crate) always_layers: &'r [&'r dyn Layer],
+    /// Every route the application registered, sorted by id.
+    pub(crate) declared: &'r [RegisteredRoute<'r>],
+    /// The values registered on the router builder.
+    pub(crate) context: Arc<ContextMap>,
+    /// The proxies trusted to report the client's address.
+    pub(crate) trusted_proxies: TrustedProxies,
 }
 
 self_cell!(
@@ -156,9 +167,36 @@ impl RouterCell {
         })
     }
 
+    /// Matches a request path to its endpoint and the path parameters it
+    /// captured, or returns `None` if no endpoint serves the path.
+    pub(crate) fn at<'s, 'p>(
+        &'s self,
+        path: &'p str,
+    ) -> Option<(&'s Endpoint<'s>, matchit::Params<'s, 'p>)> {
+        self.with_dependent(|_, tables| {
+            let matched = tables.matcher.at(path).ok()?;
+            Some((matched.value, matched.params))
+        })
+    }
+
     /// Returns the layers that run around requests matching no route.
     pub(crate) fn always_layers(&self) -> &[&dyn Layer] {
         self.with_dependent(|_, tables| tables.always_layers)
+    }
+
+    /// Returns every route the application registered, sorted by id.
+    pub(crate) fn declared(&self) -> &[RegisteredRoute<'_>] {
+        self.with_dependent(|_, tables| tables.declared)
+    }
+
+    /// Returns the values registered on the router builder.
+    pub(crate) fn context(&self) -> &Arc<ContextMap> {
+        self.with_dependent(|_, tables| &tables.context)
+    }
+
+    /// Returns the proxies trusted to report the client's address.
+    pub(crate) fn trusted_proxies(&self) -> &TrustedProxies {
+        self.with_dependent(|_, tables| &tables.trusted_proxies)
     }
 }
 
@@ -236,9 +274,21 @@ mod tests {
         staged
     }
 
+    /// Tables with no endpoints and no routes.
+    fn empty_tables<'r>() -> Tables<'r> {
+        Tables {
+            matcher: matchit::Router::new(),
+            always_layers: &[],
+            declared: &[],
+            context: Arc::new(ContextMap::new()),
+            trusted_proxies: TrustedProxies::new(),
+        }
+    }
+
     fn build_with_all_layers(staged: Staged) -> RouterCell {
         RouterCell::build(staged, |arena, objects| Tables {
             always_layers: arena.alloc_slice_fill_iter(objects.layers.iter()),
+            ..empty_tables()
         })
     }
 
@@ -288,6 +338,24 @@ mod tests {
             .map(Path::as_str)
             .collect();
         assert_eq!(paths, ["/first", "/second", "/third"]);
+    }
+
+    #[test]
+    fn a_path_matches_its_endpoint_and_captures_its_params() {
+        let router = RouterCell::build(Staged::default(), |arena, _| {
+            let path = Path::new(arena.alloc_str("/users/{id}"));
+            let mut matcher = matchit::Router::new();
+            matcher.insert(path.as_str(), Endpoint::new(path)).unwrap();
+            Tables {
+                matcher,
+                ..empty_tables()
+            }
+        });
+
+        let (endpoint, params) = router.at("/users/42").unwrap();
+        assert_eq!(endpoint.path(), Path::new("/users/{id}"));
+        assert_eq!(params.get("id"), Some("42"));
+        assert!(router.at("/missing").is_none());
     }
 
     #[test]
