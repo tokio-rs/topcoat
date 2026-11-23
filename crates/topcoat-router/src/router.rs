@@ -7,7 +7,7 @@ use std::{
 };
 
 use topcoat_core::{
-    context::{ContextMap, ContextValues, Cx, try_context, with_identity},
+    context::{ContextMap, ContextValues, Cx, context, try_context, with_identity},
     error::Result,
 };
 use yoke::{Yoke, Yokeable};
@@ -151,10 +151,9 @@ impl Router {
     /// Handles a request using the context values in `chain`.
     /// The caller catches panics from this future.
     async fn handle_inner(&self, request: Request, mut chain: RewriteChain) -> Response {
-        let inner = &*self.inner;
         // Resolve the client's address once from the original request,
         // before any rewrite can replace its headers.
-        let client_ip = ClientIp(inner.trusted_proxies.resolve(&request));
+        let client_ip = ClientIp(self.inner.trusted_proxies().resolve(&request));
         let (mut parts, mut body) = request.into_parts();
         let original = OriginalParts(Arc::new(parts.clone()));
 
@@ -163,10 +162,9 @@ impl Router {
             // passed by the caller or a rewrite, and discard any other
             // request state. Add the router's values last so they win.
             let cx = Cx::new()
-                .with_shared(Arc::clone(&inner.context))
+                .with_shared(Arc::clone(self.inner.context()))
                 .with_many(chain.context().clone())
                 .with_many((
-                    Arc::clone(&self.inner),
                     ResponseHeaders::new(),
                     RawPathParams::default(),
                     original.clone(),
@@ -212,35 +210,45 @@ impl Router {
 
     /// Matches and runs one dispatch, retaining its context for the response.
     async fn dispatch(&self, cx: Cx, body: Body) -> (Cx, Result<Response>) {
-        let inner = &*self.inner;
+        // The match is made inside the `Yoke`, which ties its references to
+        // the router handle, so the request context can own them.
         let parts = crate::request::parts(&cx);
-        let (cx, next) = match inner.endpoints.at(parts.uri.path()) {
-            Some((endpoint_index, endpoint, params)) => {
-                let path_params = RawPathParams::from_match(
-                    endpoint.path(),
-                    params.iter().map(|(_, value)| value),
-                );
-                let route_index = endpoint.get(&parts.method).or_else(|| endpoint.any());
-                let matched = Matched {
-                    endpoint: endpoint_index,
-                    route: route_index,
+        let mut path_params = RawPathParams::default();
+        let matched: Matched = Yoke::attach_to_cart(Arc::clone(&self.inner), |router| {
+            let Some((endpoint, params)) = router.at(parts.uri.path()) else {
+                return Match {
+                    endpoint: None,
+                    route: None,
                 };
-                let mut matched_cx = cx.with_many((matched, path_params));
-                let next = match route_index {
-                    Some(index) => {
-                        let route = &inner.routes[index];
-                        // The route's values sit between the router's values
-                        // and the request's, so request values shadow them.
-                        if let Some(context) = route.shared_context() {
-                            matched_cx = matched_cx.with_shared(Arc::clone(context));
-                        }
-                        Next::new(&[], Terminal::Route(route))
-                    }
-                    None => Next::new(&inner.always_layers, Terminal::MethodNotAllowed(endpoint)),
-                };
-                (matched_cx, next)
+            };
+            path_params =
+                RawPathParams::from_match(endpoint.path(), params.iter().map(|(_, value)| value));
+            Match {
+                endpoint: Some(endpoint),
+                route: endpoint.get(&parts.method).or_else(|| endpoint.any()),
             }
-            None => (cx, Next::new(&inner.always_layers, Terminal::NotFound)),
+        });
+
+        // The route's values sit between the router's values and the
+        // request's, so request values shadow them.
+        let route_context = matched
+            .get()
+            .route
+            .and_then(|route| route.context)
+            .cloned();
+        let mut cx = cx.with_many((matched, path_params));
+        if let Some(route_context) = route_context {
+            cx = cx.with_shared(route_context);
+        }
+
+        let found = *context::<Matched>(&cx).get();
+        let always_layers = self.inner.always_layers();
+        let next = match (found.endpoint, found.route) {
+            (_, Some(route)) => Next::new(route.layers, Terminal::Route(route)),
+            (Some(endpoint), None) => {
+                Next::new(always_layers, Terminal::MethodNotAllowed(endpoint))
+            }
+            (None, None) => Next::new(always_layers, Terminal::NotFound),
         };
 
         // The origin check precedes all route and pathless layers. It reads
