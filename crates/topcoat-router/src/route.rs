@@ -360,11 +360,25 @@ impl<'r> Routes<'r> {
     const MAX_SLOTS_PER_ROUTE: usize = 4;
 
     /// Stores `routes` in `arena`.
-    pub(crate) fn new(arena: &'r Bump, mut routes: Vec<RegisteredRoute<'r>>) -> Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns a message if two routes have the same id.
+    pub(crate) fn new(
+        arena: &'r Bump,
+        mut routes: Vec<RegisteredRoute<'r>>,
+    ) -> Result<Self, String> {
         routes.sort_unstable_by_key(|route| route.id().number());
+        if let Some(pair) = routes.windows(2).find(|pair| pair[0].id() == pair[1].id()) {
+            return Err(format!(
+                "routes `{}` and `{}` share an identity",
+                pair[0].path(),
+                pair[1].path()
+            ));
+        }
         let sorted: &'r [RegisteredRoute<'r>] = arena.alloc_slice_copy(&routes);
         let (Some(lowest), Some(highest)) = (sorted.first(), sorted.last()) else {
-            return Self::default();
+            return Ok(Self::default());
         };
 
         // The table has one slot per id from the lowest to the highest, so
@@ -382,11 +396,11 @@ impl<'r> Routes<'r> {
                 &[]
             };
 
-        Self {
+        Ok(Self {
             sorted,
             sequential,
             first,
-        }
+        })
     }
 
     /// Returns the route registered under `id`, or `None` if there is none.

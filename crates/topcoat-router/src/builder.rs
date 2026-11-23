@@ -368,8 +368,8 @@ impl Default for RouterBuilder {
 ///
 /// # Errors
 ///
-/// Returns a message if two routes are ambiguous, if a route declares no
-/// methods, if two paths conflict, or if a layer wraps no route.
+/// Returns a message if two routes are ambiguous or share an id, if a route
+/// declares no methods, if two paths conflict, or if a layer wraps no route.
 fn tables<'r>(
     arena: &'r Bump,
     objects: &'r Objects<'r>,
@@ -545,7 +545,7 @@ fn tables<'r>(
     Ok(Tables {
         matcher,
         always_layers,
-        routes: Routes::new(arena, declared),
+        routes: Routes::new(arena, declared)?,
         context: Arc::new(context),
         trusted_proxies,
     })
