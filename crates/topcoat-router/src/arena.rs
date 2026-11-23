@@ -169,19 +169,24 @@ impl RouterCell {
     /// `tables` receives the arena, the registered values and an empty list
     /// of contexts. It can allocate in the arena and push to the list, and
     /// the tables it returns can point at anything in either.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error of `tables` if it fails. The arena and every value
+    /// in it are dropped.
     pub(crate) fn build(
         staged: Staged,
         tables: impl for<'r> FnOnce(
             &'r Bump,
             &'r Objects<'r>,
             &'r mut Vec<Arc<ContextMap>>,
-        ) -> Tables<'r>,
-    ) -> Self {
+        ) -> Result<Tables<'r>, String>,
+    ) -> Result<Self, String> {
         let owner = Owner {
             staged,
             contexts: Vec::new(),
         };
-        Self::new(MutBorrow::new(owner), |owner| {
+        Self::try_new(MutBorrow::new(owner), |owner| {
             let Owner { staged, contexts } = owner.borrow_mut();
             let staged: &Staged = staged;
             tables(staged.borrow_owner(), staged.borrow_dependent(), contexts)
@@ -307,10 +312,13 @@ mod tests {
     }
 
     fn build_with_all_layers(staged: Staged) -> RouterCell {
-        RouterCell::build(staged, |arena, objects, _| Tables {
-            always_layers: arena.alloc_slice_fill_iter(objects.layers.iter()),
-            ..empty_tables()
+        RouterCell::build(staged, |arena, objects, _| {
+            Ok(Tables {
+                always_layers: arena.alloc_slice_fill_iter(objects.layers.iter()),
+                ..empty_tables()
+            })
         })
+        .unwrap()
     }
 
     #[test]
@@ -320,6 +328,16 @@ mod tests {
         assert_eq!(drops.count(), 0);
 
         drop(staged);
+        assert_eq!(drops.count(), 4);
+    }
+
+    #[test]
+    fn a_failed_build_drops_its_values() {
+        let drops = Drops::default();
+        let staged = staged_with_guards(&drops);
+
+        let router = RouterCell::build(staged, |_, _, _| Err("rejected".to_owned()));
+        assert!(router.is_err());
         assert_eq!(drops.count(), 4);
     }
 
@@ -367,11 +385,12 @@ mod tests {
             let path = Path::new(arena.alloc_str("/users/{id}"));
             let mut matcher = matchit::Router::new();
             matcher.insert(path.as_str(), Endpoint::new(path)).unwrap();
-            Tables {
+            Ok(Tables {
                 matcher,
                 ..empty_tables()
-            }
-        });
+            })
+        })
+        .unwrap();
 
         let (endpoint, params) = router.at("/users/42").unwrap();
         assert_eq!(endpoint.path(), Path::new("/users/{id}"));

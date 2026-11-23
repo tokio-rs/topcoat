@@ -50,15 +50,19 @@ impl TrailingSlash {
     /// route claims for itself is left to that route.
     ///
     /// Call this once every route is registered.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message if the matcher rejects one of the paths.
     pub(crate) fn register_twins<'r>(
         self,
         arena: &'r Bump,
         matcher: &mut matchit::Router<Endpoint<'r>>,
         endpoints: &[Endpoint<'r>],
         always_layers: &'r [&'r dyn Layer],
-    ) {
+    ) -> Result<(), String> {
         if self == Self::Strict {
-            return;
+            return Ok(());
         }
         for endpoint in endpoints {
             let Some(path) = twin(endpoint.path()) else {
@@ -83,9 +87,10 @@ impl TrailingSlash {
             // A form a route claims for itself is left to that route.
             match matcher.insert(matchit_path, twin) {
                 Ok(()) | Err(matchit::InsertError::Conflict { .. }) => {}
-                Err(error) => panic!("failed to register route: {error}"),
+                Err(error) => return Err(format!("failed to register route: {error}")),
             }
         }
+        Ok(())
     }
 }
 

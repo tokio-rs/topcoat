@@ -402,14 +402,15 @@ pub(crate) fn test_matched_cx(path: &Path) -> Cx {
         let mut matcher = matchit::Router::new();
         let endpoint = Endpoint::new(Path::new(arena.alloc_str(&served)));
         matcher.insert(served.clone(), endpoint).unwrap();
-        Tables {
+        Ok(Tables {
             matcher,
             always_layers: &[],
             routes: Routes::default(),
             context: Arc::new(ContextMap::new()),
             trusted_proxies: TrustedProxies::new(),
-        }
-    });
+        })
+    })
+    .unwrap();
     let cell = Arc::new(cell);
     // The path pattern matches itself, with each parameter capturing its own
     // name.

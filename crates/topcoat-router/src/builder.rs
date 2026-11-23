@@ -350,7 +350,10 @@ impl RouterBuilder {
                 self.trailing_slash,
             )
         });
-        Router::new(cell)
+        match cell {
+            Ok(cell) => Router::new(cell),
+            Err(error) => panic!("{error}"),
+        }
     }
 }
 
@@ -363,10 +366,10 @@ impl Default for RouterBuilder {
 /// Builds the tables of a router in `arena`, pointing at the values in
 /// `objects`. The context of each route and page is pushed to `contexts`.
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics if two routes are ambiguous, if a route declares no methods, if
-/// two paths conflict, or if a layer wraps no route.
+/// Returns a message if two routes are ambiguous, if a route declares no
+/// methods, if two paths conflict, or if a layer wraps no route.
 fn tables<'r>(
     arena: &'r Bump,
     objects: &'r Objects<'r>,
@@ -374,7 +377,7 @@ fn tables<'r>(
     context: ContextMap,
     trusted_proxies: TrustedProxies,
     trailing_slash: TrailingSlash,
-) -> Tables<'r> {
+) -> Result<Tables<'r>, String> {
     let all_layers: Vec<&'r dyn Layer> = objects.layers.iter().collect();
     let all_layouts: Vec<&'r dyn Layout> = objects.layouts.iter().collect();
     // Each layer's and layout's values are built once and shared by
@@ -470,21 +473,25 @@ fn tables<'r>(
         // duplicates independently.
         match handler.methods() {
             Methods::Any => {
-                assert!(
-                    endpoint.any().is_none(),
-                    "duplicate any-method route registered for `{}`",
-                    endpoint.path()
-                );
+                if endpoint.any().is_some() {
+                    return Err(format!(
+                        "duplicate any-method route registered for `{}`",
+                        endpoint.path()
+                    ));
+                }
                 endpoint.insert_any(entry);
             }
             Methods::Only(methods) => {
-                assert!(!methods.is_empty(), "route `{path}` registers no methods");
+                if methods.is_empty() {
+                    return Err(format!("route `{path}` registers no methods"));
+                }
                 for method in methods {
-                    assert!(
-                        endpoint.get(method).is_none(),
-                        "duplicate route registered for `{method} {}`",
-                        endpoint.path()
-                    );
+                    if endpoint.get(method).is_some() {
+                        return Err(format!(
+                            "duplicate route registered for `{method} {}`",
+                            endpoint.path()
+                        ));
+                    }
                     endpoint.insert(arena, method, entry);
                 }
             }
@@ -496,11 +503,13 @@ fn tables<'r>(
     // the root path prefixes every route path, so neither can be a mistyped
     // path; only narrower paths can go unused.
     for (&layer, used) in all_layers.iter().zip(layers_used) {
-        if let Some(path) = layer.path() {
-            assert!(
-                used || path == Path::ROOT,
+        if let Some(path) = layer.path()
+            && !used
+            && path != Path::ROOT
+        {
+            return Err(format!(
                 "layer with path `{path}` did not match any route, this is likely a mistake"
-            );
+            ));
         }
     }
 
@@ -522,22 +531,24 @@ fn tables<'r>(
         match matcher.insert(path, endpoint) {
             Ok(()) => served.push(endpoint),
             Err(matchit::InsertError::Conflict { with }) => {
-                panic!("failed to register route: conflicts with registered route `{with}`")
+                return Err(format!(
+                    "failed to register route: conflicts with registered route `{with}`"
+                ));
             }
-            Err(error) => panic!("failed to register route: {error}"),
+            Err(error) => return Err(format!("failed to register route: {error}")),
         }
     }
 
     // The twins are the router's own routes, so they are not declared.
-    trailing_slash.register_twins(arena, &mut matcher, &served, always_layers);
+    trailing_slash.register_twins(arena, &mut matcher, &served, always_layers)?;
 
-    Tables {
+    Ok(Tables {
         matcher,
         always_layers,
         routes: Routes::new(arena, declared),
         context: Arc::new(context),
         trusted_proxies,
-    }
+    })
 }
 
 #[cfg(test)]
