@@ -14,6 +14,7 @@ use topcoat_core::{
 use crate::{
     Body, Endpoint, EndpointIndex, Endpoints, Layer, Next, RawPathParams, RegisteredRoute, Route,
     RouteId, RouteIndex, RouterBuilder, Routes, Terminal, TrustedProxies,
+    arena::RouterCell,
     error::{RewriteChain, RewriteError, internal_server_response, respond},
     origin_policy,
     proxy::ClientIp,
@@ -43,9 +44,9 @@ use crate::{
 /// Clones share the same routing tables, so cloning is cheap.
 #[derive(Clone)]
 pub struct Router {
-    /// The routing tables, shared with every request context this router
-    /// creates.
-    inner: Arc<RouterInner>,
+    /// The arena and routing tables, shared with every request context this
+    /// router creates.
+    inner: Arc<RouterCell>,
 }
 
 impl Router {
@@ -56,9 +57,9 @@ impl Router {
     }
 
     /// Wraps finalized routing tables into a router.
-    pub(crate) fn new(inner: RouterInner) -> Self {
+    pub(crate) fn new(cell: RouterCell) -> Self {
         Self {
-            inner: Arc::new(inner),
+            inner: Arc::new(cell),
         }
     }
 
@@ -134,12 +135,7 @@ impl Router {
     /// assert_eq!(paths, ["/health"]);
     /// ```
     pub fn routes(&self) -> impl Iterator<Item = RegisteredRoute<'_>> {
-        let inner = &*self.inner;
-        inner
-            .routes
-            .iter()
-            .take(inner.declared_routes)
-            .map(|route| RegisteredRoute::new(route, &inner.endpoints[route.endpoint()]))
+        self.inner.declared().iter().copied()
     }
 
     /// Returns the values registered on the router builder.
@@ -148,7 +144,7 @@ impl Router {
     /// [`RegisteredRoute::context`], shadow them.
     #[must_use]
     pub fn context(&self) -> &ContextMap {
-        &self.inner.context
+        self.inner.context()
     }
 
     /// Handles a request using the context values in `chain`.
@@ -255,31 +251,6 @@ impl Router {
         };
         (cx, result)
     }
-}
-
-/// The routing tables behind a [`Router`].
-///
-/// Every request carries a shared handle to these tables on its context, so
-/// request-time accessors like [`endpoint`] resolve through the router that
-/// dispatched the request.
-pub(crate) struct RouterInner {
-    /// The registered routes, indexed by the endpoints' method tables.
-    pub(crate) routes: Routes,
-    /// The number of routes the application registered. They come first in
-    /// `routes`, followed by the routes the router adds itself.
-    pub(crate) declared_routes: usize,
-    /// The registered endpoints and the matcher resolving a request URL to
-    /// one of them.
-    pub(crate) endpoints: Endpoints,
-    /// The layers registered without a path, wrapping every request. A
-    /// request matched to a route runs them as part of the route's own stack;
-    /// this stack wraps requests that matched no route.
-    pub(crate) always_layers: Box<[Arc<dyn Layer>]>,
-    /// Shared values registered on the router builder and read with
-    /// [`context`](topcoat_core::context::context).
-    pub(crate) context: Arc<ContextMap>,
-    /// The proxies trusted to report the client's address.
-    pub(crate) trusted_proxies: TrustedProxies,
 }
 
 /// What a request was dispatched to, stored on its context.
