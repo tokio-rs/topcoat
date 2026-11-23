@@ -20,7 +20,7 @@ use topcoat_core::{
 
 use crate::{
     Body, HrefTarget, IntoPath, Layer, Layout, Methods, OwnedMethods, Page, Path,
-    response::Response, route, route_endpoint,
+    response::Response, route, route_path,
 };
 
 /// The future returned by [`Route::handle`]: a boxed, `Send` future borrowing
@@ -208,8 +208,8 @@ impl Route for RouteFn {
 impl HrefTarget for RouteFn {
     #[track_caller]
     fn path<'cx>(&self, cx: &'cx Cx) -> &'cx Path {
-        match route_endpoint(cx, self.id) {
-            Some(endpoint) => endpoint.path(),
+        match route_path(cx, self.id) {
+            Some(path) => path,
             None => panic!(
                 "route `{}` is not registered on the router serving this request",
                 self.path

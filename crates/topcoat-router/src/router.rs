@@ -13,8 +13,8 @@ use topcoat_core::{
 use yoke::{Yoke, Yokeable};
 
 use crate::{
-    Body, Endpoint, Next, RawPathParams, RegisteredRoute, RouteEntry, RouteId, RouterBuilder,
-    Terminal,
+    Body, Endpoint, Next, Path, RawPathParams, RegisteredRoute, RouteEntry, RouteId,
+    RouterBuilder, Terminal,
     arena::RouterCell,
     error::{RewriteChain, RewriteError, internal_server_response, respond},
     origin_policy,
@@ -378,42 +378,48 @@ pub fn try_route(cx: &Cx) -> Option<RegisteredRoute<'_>> {
     ))
 }
 
-/// Returns the endpoint serving the route registered under `id` on the router
-/// the current request was dispatched through, or `None` if the context
-/// carries no router or the router holds no route with that identity.
+/// Returns the path the route registered under `id` is served at on the
+/// router the current request was dispatched through, or `None` if the
+/// context carries no router or the router holds no route with that identity.
 #[doc(hidden)]
 #[must_use]
-pub fn route_endpoint(cx: &Cx, id: RouteId) -> Option<&Endpoint> {
-    let router = try_context::<Arc<RouterInner>>(cx)?;
-    let index = router.routes.endpoint(id)?;
-    Some(&router.endpoints[index])
+pub fn route_path(cx: &Cx, id: RouteId) -> Option<&Path> {
+    let matched = try_context::<Matched>(cx)?;
+    Some(matched.backing_cart().route(id)?.path())
 }
 
 /// Builds the request context of a request matched to an endpoint at `path`,
 /// as the router assembles one, for tests elsewhere in this crate.
 #[cfg(test)]
-pub(crate) fn test_matched_cx(path: &crate::Path) -> Cx {
-    use std::borrow::Cow;
-
-    let mut endpoints = Endpoints::default();
-    let endpoint = endpoints.push(Cow::Owned(path.as_str().to_owned()), Endpoint::new(path));
-    let inner = RouterInner {
-        routes: Routes::default(),
-        declared_routes: 0,
-        endpoints,
-        always_layers: Box::new([]),
-        context: Arc::new(ContextMap::new()),
-        trusted_proxies: TrustedProxies::new(),
+pub(crate) fn test_matched_cx(path: &Path) -> Cx {
+    use crate::{
+        TrustedProxies,
+        arena::{Staged, Tables},
     };
+
+    let served = path.to_matchit_path();
+    let cell = RouterCell::build(Staged::default(), |arena, _, _| {
+        let mut matcher = matchit::Router::new();
+        let endpoint = Endpoint::new(Path::new(arena.alloc_str(&served)));
+        matcher.insert(served.clone(), endpoint).unwrap();
+        Tables {
+            matcher,
+            always_layers: &[],
+            declared: &[],
+            context: Arc::new(ContextMap::new()),
+            trusted_proxies: TrustedProxies::new(),
+        }
+    });
+    let cell = Arc::new(cell);
+    // The path pattern matches itself, with each parameter capturing its own
+    // name.
+    let matched: Matched = Yoke::attach_to_cart(Arc::clone(&cell), |router| Match {
+        endpoint: router.at(&served).map(|(endpoint, _)| endpoint),
+        route: None,
+    });
     Cx::new()
-        .with_shared(Arc::clone(&inner.context))
-        .with_many((
-            Arc::new(inner),
-            Matched {
-                endpoint,
-                route: None,
-            },
-        ))
+        .with_shared(Arc::clone(cell.context()))
+        .with(matched)
 }
 
 #[cfg(test)]

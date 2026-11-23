@@ -4,7 +4,7 @@ use bumpalo::Bump;
 use self_cell::{MutBorrow, self_cell};
 use topcoat_core::context::ContextMap;
 
-use crate::{Endpoint, Layer, Layout, Page, RegisteredRoute, Route, TrustedProxies};
+use crate::{Endpoint, Layer, Layout, Page, RegisteredRoute, Route, RouteId, TrustedProxies};
 
 /// An arena slot that owns a value and can drop it in place.
 ///
@@ -208,6 +208,15 @@ impl RouterCell {
     /// Returns every route the application registered, sorted by id.
     pub(crate) fn declared(&self) -> &[RegisteredRoute<'_>] {
         self.with_dependent(|_, tables| tables.declared)
+    }
+
+    /// Returns the route registered under `id`, or `None` if the application
+    /// registered no route with that identity.
+    pub(crate) fn route(&self, id: RouteId) -> Option<RegisteredRoute<'_>> {
+        self.declared()
+            .iter()
+            .copied()
+            .find(|route| route.id() == id)
     }
 
     /// Returns the values registered on the router builder.
