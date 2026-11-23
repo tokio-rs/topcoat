@@ -1,14 +1,14 @@
-use std::{any::Any, borrow::Cow, sync::Arc};
+use std::{any::Any, borrow::Cow};
 
-use topcoat_core::context::{ContextMap, ContextValues, Cx};
+use topcoat_core::context::{ContextMap, Cx};
 use topcoat_view::{
     BoxView, Child,
     internal::{MoveView, ScopeView},
 };
 
 use crate::{
-    Body, IntoPath, Methods, OwnedMethods, Path, Route, RouteFuture, RouteId,
-    response::AsyncIntoResponse, route,
+    Body, Handler, IntoPath, Methods, OwnedMethods, Path, RouteFuture, RouteId,
+    response::AsyncIntoResponse, route, try_matched,
 };
 
 /// A page handler that renders a [`View`](topcoat_view::View) for a specific
@@ -283,84 +283,48 @@ pub(crate) fn layouts_for_path(layouts: &[&dyn Layout], path: &Path) -> Vec<usiz
     matching
 }
 
-/// A [`Page`] paired with the [`Layout`]s that wrap it.
-pub struct PageWithLayouts {
-    inner: Arc<PageWithLayoutsInner>,
+/// Composes `page` with `layouts`: the page is the innermost slot, each layout
+/// wraps the slot beneath it, and the outermost layout is the view.
+///
+/// `layouts` must be ordered from least- to most-specific, outermost first.
+fn render<'a>(
+    page: &'a dyn Page,
+    layouts: &'a [&'a dyn Layout],
+    cx: &'a Cx,
+    body: Body,
+) -> BoxView<'a> {
+    let mut view = page.render(cx, body);
+    for &layout in layouts.iter().rev() {
+        view = layout.render(cx, Slot::new(view));
+    }
+    view
 }
 
-/// The pair behind one shared handle, so the response can own it past the
-/// handler.
-struct PageWithLayoutsInner {
-    page: Box<dyn Page>,
-    /// The matching layouts, ordered by ascending path length (outermost first).
-    layouts: Vec<Arc<dyn Layout>>,
-}
-
-impl PageWithLayoutsInner {
-    /// Composes the page with its layouts: the page is the innermost slot,
-    /// each layout wraps the slot beneath it, and the outermost layout is
-    /// the view.
-    fn render<'a>(&'a self, cx: &'a Cx, body: Body) -> BoxView<'a> {
-        let mut view = self.page.render(cx, body);
-        for layout in self.layouts.iter().rev() {
-            view = layout.render(cx, Slot::new(view));
-        }
-        view
-    }
-}
-
-impl PageWithLayouts {
-    /// Pairs `page` with the `layouts` that wrap it.
-    ///
-    /// `layouts` must be ordered from least- to most-specific (ascending path
-    /// length); they are applied from the innermost (most specific) outward.
-    #[must_use]
-    pub fn new(page: Box<dyn Page>, layouts: Vec<Arc<dyn Layout>>) -> Self {
-        Self {
-            inner: Arc::new(PageWithLayoutsInner { page, layouts }),
-        }
-    }
-}
-
-impl Route for PageWithLayouts {
-    fn id(&self) -> RouteId {
-        self.inner.page.id()
-    }
-
-    fn methods(&self) -> Methods<'_> {
-        self.inner.page.methods()
-    }
-
-    fn path(&self) -> &Path {
-        self.inner.page.path()
-    }
-
-    /// Combines the values of the layouts and the page into one map. Each
-    /// level shadows the levels around it, so a page value shadows a layout
-    /// value of the same type and an inner layout shadows an outer one.
-    fn context(&self) -> ContextMap {
-        let mut context = ContextMap::new();
-        for layout in &self.inner.layouts {
-            layout.context().install(&mut context);
-        }
-        self.inner.page.context().install(&mut context);
-        context
-    }
-
-    fn handle<'cx>(&'cx self, cx: &'cx Cx, body: Body) -> RouteFuture<'cx> {
-        // The response body outlives the handler, so the view owns the pair
-        // and a copy of the request context, and drives itself in place as
-        // the outermost view of the build.
-        let inner = Arc::clone(&self.inner);
-        let owned = cx.clone();
-        Box::pin(async move {
-            let view = MoveView::new(async move {
-                let view = inner.render(&owned, body);
-                MoveView::drive(ScopeView::new(view)).await
-            });
-            view.async_into_response(cx).await
-        })
-    }
+/// Responds to a request that matched a page by rendering the page inside
+/// its layouts.
+///
+/// # Panics
+///
+/// The response panics while rendering if the request of `cx` did not match
+/// a page.
+pub(crate) fn respond_with_page(cx: &Cx, body: Body) -> RouteFuture<'_> {
+    // The response body outlives the handler, so the view owns a copy of the
+    // request context and reads its page from it. It drives itself in place
+    // as the outermost view of the build.
+    let owned = cx.clone();
+    Box::pin(async move {
+        let view = MoveView::new(async move {
+            let handler = try_matched(&owned)
+                .and_then(|matched| matched.route)
+                .map(|route| route.handler);
+            let Some(Handler::Page { page, layouts }) = handler else {
+                panic!("the request did not match a page");
+            };
+            let view = render(page, layouts, &owned, body);
+            MoveView::drive(ScopeView::new(view)).await
+        });
+        view.async_into_response(cx).await
+    })
 }
 
 #[cfg(test)]

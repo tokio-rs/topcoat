@@ -13,8 +13,8 @@ use topcoat_core::{
 use yoke::{Yoke, Yokeable};
 
 use crate::{
-    Body, Endpoint, EndpointIndex, Endpoints, Layer, Next, RawPathParams, RegisteredRoute, Route,
-    RouteEntry, RouteId, RouteIndex, RouterBuilder, Routes, Terminal, TrustedProxies,
+    Body, Endpoint, Next, RawPathParams, RegisteredRoute, RouteEntry, RouteId, RouterBuilder,
+    Terminal,
     arena::RouterCell,
     error::{RewriteChain, RewriteError, internal_server_response, respond},
     origin_policy,
@@ -299,17 +299,17 @@ pub fn router(cx: &Cx) -> Router {
 /// not belong to a router request.
 #[must_use]
 pub fn try_router(cx: &Cx) -> Option<Router> {
-    let inner = try_context::<Arc<RouterInner>>(cx)?;
+    let matched = try_context::<Matched>(cx)?;
     Some(Router {
-        inner: Arc::clone(inner),
+        inner: Arc::clone(matched.backing_cart()),
     })
 }
 
-/// Reads the router and dispatch record off a matched request's context.
-fn try_matched(cx: &Cx) -> Option<(&RouterInner, Matched)> {
-    let router = try_context::<Arc<RouterInner>>(cx)?;
+/// Reads what a request was dispatched to off its context, or returns `None`
+/// if no router dispatched it.
+pub(crate) fn try_matched(cx: &Cx) -> Option<Match<'_>> {
     let matched = try_context::<Matched>(cx)?;
-    Some((router, *matched))
+    Some(*matched.get())
 }
 
 /// Returns the endpoint the current request matched.
@@ -335,7 +335,7 @@ fn try_matched(cx: &Cx) -> Option<(&RouterInner, Matched)> {
 /// ```
 #[must_use]
 #[track_caller]
-pub fn endpoint(cx: &Cx) -> &Endpoint {
+pub fn endpoint(cx: &Cx) -> &Endpoint<'_> {
     match try_endpoint(cx) {
         Some(endpoint) => endpoint,
         None => panic!("this request matched no endpoint"),
@@ -347,9 +347,8 @@ pub fn endpoint(cx: &Cx) -> &Endpoint {
 ///
 /// See [`endpoint`] for what the match holds.
 #[must_use]
-pub fn try_endpoint(cx: &Cx) -> Option<&Endpoint> {
-    let (router, matched) = try_matched(cx)?;
-    Some(&router.endpoints[matched.endpoint])
+pub fn try_endpoint(cx: &Cx) -> Option<&Endpoint<'_>> {
+    try_matched(cx)?.endpoint
 }
 
 /// Returns the route handling the current request.
@@ -360,7 +359,7 @@ pub fn try_endpoint(cx: &Cx) -> Option<&Endpoint> {
 /// endpoint, or the endpoint holds no route for the request's method.
 #[must_use]
 #[track_caller]
-pub fn route(cx: &Cx) -> &dyn Route {
+pub fn route(cx: &Cx) -> RegisteredRoute<'_> {
     match try_route(cx) {
         Some(route) => route,
         None => panic!("this request matched no route"),
@@ -371,9 +370,12 @@ pub fn route(cx: &Cx) -> &dyn Route {
 /// the path matched no endpoint (a 404), the endpoint holds no route for the
 /// request's method (a 405), or no router dispatched the request.
 #[must_use]
-pub fn try_route(cx: &Cx) -> Option<&dyn Route> {
-    let (router, matched) = try_matched(cx)?;
-    Some(&router.routes[matched.route?])
+pub fn try_route(cx: &Cx) -> Option<RegisteredRoute<'_>> {
+    let matched = try_matched(cx)?;
+    Some(RegisteredRoute::new(
+        matched.endpoint?.path(),
+        matched.route?,
+    ))
 }
 
 /// Returns the endpoint serving the route registered under `id` on the router

@@ -11,7 +11,7 @@ use topcoat_core::{
 use crate::{
     Body, Endpoint, Handler, IntoPath, Path, RouteEntry,
     error::{method_not_allowed, not_found},
-    redirect_to_twin,
+    redirect_to_twin, respond_with_page,
     response::Response,
 };
 
@@ -240,9 +240,7 @@ impl<'a> Next<'a> {
             None => match self.terminal {
                 Terminal::Route(entry) => match entry.handler {
                     Handler::Route(route) => route.handle(cx, body),
-                    Handler::Page { .. } => {
-                        todo!("render the page, found through the match in the request context")
-                    }
+                    Handler::Page { .. } => respond_with_page(cx, body),
                     Handler::Redirect { path, .. } => {
                         let result = redirect_to_twin(cx, path);
                         Box::pin(async move { result })
