@@ -287,11 +287,8 @@ impl<'r> Handler<'r> {
     }
 }
 
-/// A route registered on a [`Router`](crate::Router), as visited by
-/// [`Router::routes`](crate::Router::routes).
-///
-/// It describes the route without a request: the path and methods it is
-/// served at and the values attached to it.
+/// A route registered on a [`Router`](crate::Router), with the path and
+/// methods it is served at and the values attached to it.
 #[derive(Clone, Copy)]
 pub struct RegisteredRoute<'router> {
     id: RouteId,
