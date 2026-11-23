@@ -635,6 +635,17 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "conflicts with registered route")]
+    fn paths_matching_the_same_urls_panic_on_build() {
+        // The patterns differ only in the parameter's name, so every URL
+        // that matches one also matches the other.
+        let _ = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/users/{id}"), handler))
+            .route(RouteFn::new(Method::GET, path("/users/{name}"), handler))
+            .build();
+    }
+
+    #[test]
     fn layer_wrapping_a_route_builds() {
         let _ = RouterBuilder::new()
             .route(RouteFn::new(Method::GET, path("/admin/users"), handler))

@@ -435,7 +435,7 @@ mod tests {
     };
 
     use http::{HeaderMap, StatusCode};
-    use topcoat::view::{DynViewPart, HtmlWriter, NodeViewParts, PartsWriter, view};
+    use topcoat::view::{DynViewPart, HtmlWriter, NodeViewParts, PartsWriter, emit, live, view};
     use topcoat_core::{
         base_url::BaseUrl,
         context::{Cx, context, iter_context},
@@ -524,6 +524,11 @@ mod tests {
         Box::pin(async move { format!("{:?}", route(cx).id()).into_response(cx) })
     }
 
+    /// Echoes the path of the route handling the request.
+    fn echo_route_path(cx: &Cx, _body: Body) -> RouteFuture<'_> {
+        Box::pin(async move { route(cx).path().to_string().into_response(cx) })
+    }
+
     /// Returns the router's greeting as the response body.
     struct Greeting(&'static str);
 
@@ -597,6 +602,18 @@ mod tests {
 
     fn render_panicking_page(cx: &Cx, _body: Body) -> BoxView<'_> {
         view! { (Panicking) }.boxed()
+    }
+
+    /// A region that emits twice, so the second emission is rendered by the
+    /// response body after the handler returned.
+    fn render_live_page(cx: &Cx, _body: Body) -> BoxView<'_> {
+        view! {
+            (live! {
+                emit! { "first" }?;
+                emit! { "second" }
+            })
+        }
+        .boxed()
     }
 
     /// Wraps the child content in `R[ ... ]` so layout nesting is observable.
@@ -1399,6 +1416,21 @@ mod tests {
     }
 
     #[test]
+    fn the_matched_route_reports_the_path_it_is_served_at() {
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(
+                Method::GET,
+                path("/(auth)/users/{id}"),
+                echo_route_path,
+            ))
+            .build();
+
+        // The group is not part of the URL, and the parameter keeps its name.
+        let (_, _, body) = send(&router, Method::GET, "/users/7");
+        assert_eq!(&body[..], b"/users/{id}");
+    }
+
+    #[test]
     #[should_panic(expected = "matched no route")]
     fn route_panics_without_a_matched_route() {
         // The context of a 405: an endpoint matched, but no route did.
@@ -2072,6 +2104,54 @@ mod tests {
         // The `/admin` layout does not apply to a page at `/p`.
         let (_, _, body) = send(&router, Method::GET, "/p");
         assert_eq!(&body[..], b"page");
+    }
+
+    #[test]
+    fn a_page_keeps_rendering_after_its_router_is_dropped() {
+        let router = RouterBuilder::new()
+            .page(PageFn::new(Method::GET, path("/p"), render_live_page))
+            .layout(LayoutFn::new(path("/"), layout_root))
+            .build();
+
+        let response = block_on(router.handle(request(Method::GET, "/p")));
+        // The body still renders the page inside its layout, and both are
+        // owned by the router.
+        drop(router);
+        let body = block_on(to_bytes(response.into_body(), usize::MAX)).unwrap();
+        let body = String::from_utf8_lossy(&body);
+        assert!(body.contains("first"), "{body}");
+        assert!(body.contains("second"), "{body}");
+    }
+
+    // -- Router: dropping --
+
+    /// Counts its drops in the shared counter.
+    struct DropGuard(Arc<AtomicUsize>);
+
+    impl Drop for DropGuard {
+        fn drop(&mut self) {
+            self.0.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    #[test]
+    fn dropping_the_router_drops_the_values_attached_to_its_handlers() {
+        let drops = Arc::new(AtomicUsize::new(0));
+        let guard = || DropGuard(Arc::clone(&drops));
+        let router = RouterBuilder::new()
+            .route(RouteFn::new(Method::GET, path("/x"), say_route).with(guard()))
+            .page(PageFn::new(Method::GET, path("/p"), render_page).with(guard()))
+            .layout(LayoutFn::new(path("/"), layout_root).with(guard()))
+            .layer(LayerFn::new(Some(path("/")), pass_through).with(guard()))
+            .build();
+
+        // A served request holds no value once its response is read.
+        send(&router, Method::GET, "/x");
+        send(&router, Method::GET, "/p");
+        assert_eq!(drops.load(Ordering::Relaxed), 0);
+
+        drop(router);
+        assert_eq!(drops.load(Ordering::Relaxed), 4);
     }
 
     // -- Router::handle: contexts that outlive the handler --
