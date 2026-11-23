@@ -13,8 +13,8 @@ use topcoat_core::{
 use yoke::{Yoke, Yokeable};
 
 use crate::{
-    Body, Endpoint, Next, Path, RawPathParams, RegisteredRoute, RouteEntry, RouteId,
-    RouterBuilder, Terminal,
+    Body, Endpoint, Next, Path, RawPathParams, RegisteredRoute, RouteEntry, RouteId, RouterBuilder,
+    Terminal,
     arena::RouterCell,
     error::{RewriteChain, RewriteError, internal_server_response, respond},
     origin_policy,
@@ -231,11 +231,7 @@ impl Router {
 
         // The route's values sit between the router's values and the
         // request's, so request values shadow them.
-        let route_context = matched
-            .get()
-            .route
-            .and_then(|route| route.context)
-            .cloned();
+        let route_context = matched.get().route.and_then(|route| route.context).cloned();
         let mut cx = cx.with_many((matched, path_params));
         if let Some(route_context) = route_context {
             cx = cx.with_shared(route_context);

@@ -340,10 +340,8 @@ mod tests {
     /// Returns the positions in `layouts` that `layouts_for_path` selects
     /// for a page at `path`, in order.
     fn select(layouts: &[LayoutFn], path: &'static str) -> Vec<usize> {
-        let layouts: Vec<&dyn Layout> = layouts
-            .iter()
-            .map(|layout| layout as &dyn Layout)
-            .collect();
+        let layouts: Vec<&dyn Layout> =
+            layouts.iter().map(|layout| layout as &dyn Layout).collect();
         layouts_for_path(&layouts, Path::new(path))
     }
 

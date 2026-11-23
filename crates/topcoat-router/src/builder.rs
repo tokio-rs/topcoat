@@ -383,10 +383,8 @@ fn tables<'r>(
     // Each layer's and layout's values are built once and shared by
     // everything it wraps.
     let layer_contexts: Vec<ContextMap> = all_layers.iter().map(|&layer| layer.context()).collect();
-    let layout_contexts: Vec<ContextMap> = all_layouts
-        .iter()
-        .map(|&layout| layout.context())
-        .collect();
+    let layout_contexts: Vec<ContextMap> =
+        all_layouts.iter().map(|&layout| layout.context()).collect();
 
     // Each distinct layer stack and layout list is stored once and shared by
     // the routes that use it.
