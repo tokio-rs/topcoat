@@ -10,11 +10,12 @@ impl Expr {
         expr: &ExprContinue,
         rust: &mut TokenStream,
         js: &mut Js,
-        _names: &mut NameResolver,
+        names: &mut NameResolver,
     ) -> syn::Result<()> {
         if let Some(label) = &expr.label {
             return Err(syn::Error::new_spanned(label, "labels are not supported"));
         }
+        names.check_jump(expr)?;
         js.push_str("continue");
         expr.to_tokens(rust);
         Ok(())

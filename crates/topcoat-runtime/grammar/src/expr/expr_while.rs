@@ -4,7 +4,7 @@ use syn::ExprWhile;
 use topcoat_core_grammar::common::paths::topcoat_runtime;
 
 use super::js::Js;
-use crate::expr::{Expr, NameResolver};
+use crate::expr::{Expr, NameResolver, name_resolver::JumpScope};
 
 impl Expr {
     pub(super) fn expr_while(
@@ -15,11 +15,15 @@ impl Expr {
     ) -> syn::Result<()> {
         let mut cond = TokenStream::new();
         js.push_str("while (");
-        Self::dispatch(&expr.cond, &mut cond, js, names)?;
+        names.within(JumpScope::Function, |names| {
+            Self::dispatch(&expr.cond, &mut cond, js, names)
+        })?;
         js.push_str(".dehydrate()) ");
         quote! { while #topcoat_runtime::Surrogate::into_real(#cond) }.to_tokens(rust);
 
-        Self::block(&expr.body, rust, js, names)?;
+        names.within(JumpScope::Loop, |names| {
+            Self::block(&expr.body, rust, js, names)
+        })?;
         Ok(())
     }
 }

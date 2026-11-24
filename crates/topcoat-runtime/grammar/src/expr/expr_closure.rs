@@ -5,7 +5,7 @@ use syn::{Expr as SynExpr, ExprClosure};
 use super::js::Js;
 use crate::expr::{
     Expr,
-    name_resolver::{LocalBindingKind, NameResolver},
+    name_resolver::{JumpScope, LocalBindingKind, NameResolver},
 };
 
 impl Expr {
@@ -35,12 +35,12 @@ impl Expr {
         js.push_str(") => ");
 
         let mut body = TokenStream::new();
-        match &*closure.body {
+        names.within(JumpScope::Function, |names| match &*closure.body {
             // A block body maps directly onto the arrow function body without
             // the IIFE wrapper that a block expression would need.
-            SynExpr::Block(block) => Self::block(&block.block, &mut body, js, names)?,
-            other => Self::dispatch(other, &mut body, js, names)?,
-        }
+            SynExpr::Block(block) => Self::block(&block.block, &mut body, js, names),
+            other => Self::dispatch(other, &mut body, js, names),
+        })?;
         names.pop_scope();
 
         let output = &closure.output;

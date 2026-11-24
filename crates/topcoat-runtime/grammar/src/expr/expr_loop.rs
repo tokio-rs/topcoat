@@ -3,7 +3,7 @@ use quote::{ToTokens, quote};
 use syn::ExprLoop;
 
 use super::js::Js;
-use crate::expr::{Expr, NameResolver};
+use crate::expr::{Expr, NameResolver, name_resolver::JumpScope};
 
 impl Expr {
     pub(super) fn expr_loop(
@@ -14,7 +14,9 @@ impl Expr {
     ) -> syn::Result<()> {
         js.push_str("while (true) ");
         quote! { loop }.to_tokens(rust);
-        Self::block(&expr.body, rust, js, names)?;
+        names.within(JumpScope::Loop, |names| {
+            Self::block(&expr.body, rust, js, names)
+        })?;
         Ok(())
     }
 }

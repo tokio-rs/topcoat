@@ -26,12 +26,22 @@ pub(super) struct ExternalBinding {
     pub(super) rust_ident: Ident,
 }
 
+/// A construct that `break` and `continue` see in the JavaScript output.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum JumpScope {
+    /// A loop, which they can target.
+    Loop,
+    /// A generated function, which they cannot cross.
+    Function,
+}
+
 #[derive(Default)]
 pub(super) struct NameResolver {
     scopes: Vec<HashMap<String, LocalBinding>>,
     externals: Vec<ExternalBinding>,
     external_by_name: HashMap<String, usize>,
     next_local: usize,
+    jumps: Vec<JumpScope>,
 }
 
 impl NameResolver {
@@ -41,6 +51,34 @@ impl NameResolver {
 
     pub(super) fn pop_scope(&mut self) {
         self.scopes.pop();
+    }
+
+    /// Lowers `body` inside a loop or a generated function.
+    pub(super) fn within<T>(
+        &mut self,
+        scope: JumpScope,
+        body: impl FnOnce(&mut Self) -> syn::Result<T>,
+    ) -> syn::Result<T> {
+        self.jumps.push(scope);
+        let result = body(self);
+        self.jumps.pop();
+        result
+    }
+
+    /// Rejects a `break` or `continue` whose loop lies outside the generated
+    /// function it lowers into.
+    ///
+    /// JavaScript rejects such a jump as a syntax error, so the expression
+    /// would compile in Rust and then fail in the browser.
+    pub(super) fn check_jump(&self, jump: &impl quote::ToTokens) -> syn::Result<()> {
+        if self.jumps.last() == Some(&JumpScope::Loop) {
+            return Ok(());
+        }
+        Err(syn::Error::new_spanned(
+            jump,
+            "a runtime expression cannot jump out of an `if` or block expression \
+             to its loop; move the condition into the loop's condition instead",
+        ))
     }
 
     pub(super) fn allocate_local(&mut self) -> String {
