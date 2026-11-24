@@ -86,6 +86,7 @@ pub fn init(
         name: theme.name.clone(),
         registry: theme.registry.clone(),
         hash: theme.hash,
+        version: theme.version,
         file: theme.file.clone(),
     });
     state.save(package)?;
@@ -114,7 +115,8 @@ fn plan_theme(
         .map_err(|error| format!("cannot install a theme: {error}"))?;
     let registry = Registry::load(dir)
         .map_err(|error| format!("failed to load registry `{DEFAULT_REGISTRY}`: {error}"))?;
-    ThemePlan::select(&registry, requested, choose)
+    let version = workspace.registry_version(DEFAULT_REGISTRY);
+    ThemePlan::select(&registry, version, requested, choose)
 }
 
 /// A theme resolved and read but not yet written.
@@ -122,6 +124,8 @@ pub(super) struct ThemePlan {
     pub name: String,
     pub registry: String,
     pub hash: String,
+    /// The published version of the registry crate, if it has one.
+    pub version: Option<String>,
     /// Package-relative destination of the stylesheet.
     pub file: PathBuf,
     /// The stylesheet's CSS, read from the registry.
@@ -131,10 +135,12 @@ pub(super) struct ThemePlan {
 impl ThemePlan {
     /// Reads the selected theme from the default registry and plans its destination.
     /// Uses the sole theme if none is named, or calls `choose` when several are
-    /// available.
+    /// available. `version` is the published version of the registry crate, if it has
+    /// one.
     #[track_caller]
     pub(super) fn select(
         registry: &Registry,
+        version: Option<&str>,
         requested: Option<&str>,
         choose: &mut ChooseTheme<'_>,
     ) -> Result<Self, String> {
@@ -171,6 +177,7 @@ impl ThemePlan {
             name: chosen,
             registry: registry_name.to_string(),
             hash: content_hash(&contents),
+            version: version.map(str::to_string),
             // Installed at the package root by default, alongside `components.toml`.
             file: PathBuf::from(theme.file_name()),
             contents,

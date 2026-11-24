@@ -2,6 +2,7 @@ mod add;
 mod init;
 mod list;
 mod remove;
+mod update;
 
 use clap::{Args, Subcommand};
 
@@ -21,6 +22,8 @@ enum UiSubcommand {
     List(list::ListCommand),
     /// Remove a previously added UI component from your package
     Remove(remove::RemoveCommand),
+    /// Update installed UI components and the theme, keeping your changes
+    Update(update::UpdateCommand),
 }
 
 impl UiCommand {
@@ -30,6 +33,7 @@ impl UiCommand {
             UiSubcommand::Add(cmd) => cmd.run(),
             UiSubcommand::List(cmd) => cmd.run(),
             UiSubcommand::Remove(cmd) => cmd.run(),
+            UiSubcommand::Update(cmd) => cmd.run(),
         }
     }
 }

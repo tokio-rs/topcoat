@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use super::{
     package::Package,
-    state::{InstallState, RegistryState},
+    state::{InstallState, InstalledTheme, RegistryState},
     workspace::Workspace,
 };
 use crate::Registry;
@@ -10,7 +10,16 @@ use crate::Registry;
 /// A registry name and its component statuses or load error.
 pub struct RegistryListing {
     pub name: String,
+    /// The status of the installed theme, if it was installed from this registry.
+    pub theme: Option<ThemeStatus>,
     pub outcome: Result<Vec<ComponentStatus>, String>,
+}
+
+/// The installed theme's name and its install status, which is never
+/// [`InstallStatus::Available`].
+pub struct ThemeStatus {
+    pub name: String,
+    pub status: InstallStatus,
 }
 
 /// A component's name and its install status within a registry.
@@ -19,7 +28,7 @@ pub struct ComponentStatus {
     pub status: InstallStatus,
 }
 
-/// The install status of a registry component in the package.
+/// The install status of a registry component or theme in the package.
 pub enum InstallStatus {
     /// Offered by the registry but not installed; carries the latest hash.
     Available { hash: String },
@@ -35,8 +44,9 @@ pub enum InstallStatus {
 ///
 /// Includes registries recorded in the install state even if they are no longer
 /// dependencies. Pass `selected` to list just one registry. A component is installed
-/// only under the registry recorded for it. An unavailable registry produces orphaned
-/// statuses for tracked components, or a load error if none are tracked.
+/// only under the registry recorded for it, and so is the theme. An unavailable
+/// registry produces orphaned statuses for the tracked theme and components, and a
+/// load error if no components are tracked.
 ///
 /// # Errors
 ///
@@ -53,6 +63,7 @@ pub fn list(package: &Package, selected: Option<&str>) -> Result<Vec<RegistryLis
         .available_registries()
         .into_iter()
         .chain(state.registries.keys().cloned())
+        .chain(state.theme.iter().map(|theme| theme.registry.clone()))
         .collect();
 
     if let Some(name) = selected
@@ -67,27 +78,79 @@ pub fn list(package: &Package, selected: Option<&str>) -> Result<Vec<RegistryLis
         .filter(|name| selected.is_none_or(|chosen| chosen == name.as_str()))
         .map(|name| {
             let tracked = state.registries.get(name).unwrap_or(&empty);
-            listing_for(&workspace, name, tracked)
+            let theme = state.theme.as_ref().filter(|theme| theme.registry == *name);
+            listing_for(&workspace, name, tracked, theme)
         })
         .collect();
 
     Ok(listings)
 }
 
-/// Loads a registry and classifies its components. If loading fails, reports tracked
-/// components as orphaned, or returns the load error when none are tracked.
-fn listing_for(workspace: &Workspace, name: &str, state: &RegistryState) -> RegistryListing {
-    let outcome = match workspace.registry_dir(name).and_then(|dir| {
+/// Loads a registry and classifies its components and the `theme` installed from it.
+/// If loading fails, reports the theme and tracked components as orphaned, and returns
+/// the load error when no components are tracked.
+fn listing_for(
+    workspace: &Workspace,
+    name: &str,
+    state: &RegistryState,
+    theme: Option<&InstalledTheme>,
+) -> RegistryListing {
+    let registry = workspace.registry_dir(name).and_then(|dir| {
         Registry::load(dir).map_err(|error| format!("failed to load registry `{name}`: {error}"))
-    }) {
-        Ok(registry) => statuses(&registry, state),
-        Err(error) if state.components.is_empty() => Err(error),
-        Err(_) => Ok(orphaned(state)),
+    });
+    let (theme, outcome) = match registry {
+        Ok(registry) => match theme
+            .map(|theme| theme_status(Some(&registry), theme))
+            .transpose()
+        {
+            Ok(theme) => (theme, statuses(&registry, state)),
+            Err(error) => (None, Err(error)),
+        },
+        Err(error) => (
+            theme.and_then(|theme| theme_status(None, theme).ok()),
+            if state.components.is_empty() {
+                Err(error)
+            } else {
+                Ok(orphaned(state))
+            },
+        ),
     };
     RegistryListing {
         name: name.to_string(),
+        theme,
         outcome,
     }
+}
+
+/// Compares the hash recorded for the installed theme with the registry's current
+/// one. The theme is orphaned if `registry` is `None` or no longer offers it. Fails if
+/// the theme's source cannot be read.
+fn theme_status(
+    registry: Option<&Registry>,
+    installed: &InstalledTheme,
+) -> Result<ThemeStatus, String> {
+    let status = match registry.and_then(|registry| registry.theme(&installed.name)) {
+        None => InstallStatus::Orphaned {
+            installed: installed.hash.clone(),
+        },
+        Some(theme) => {
+            let latest = theme
+                .hash()
+                .map_err(|error| format!("failed to hash theme `{}`: {error}", installed.name))?;
+            if installed.hash == latest {
+                InstallStatus::UpToDate { hash: latest }
+            } else {
+                InstallStatus::Update {
+                    installed: installed.hash.clone(),
+                    latest,
+                }
+            }
+        }
+    };
+    Ok(ThemeStatus {
+        name: installed.name.clone(),
+        status,
+    })
 }
 
 /// Compares current component hashes with install-state hashes, including installed
