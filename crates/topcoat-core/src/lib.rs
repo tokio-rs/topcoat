@@ -7,7 +7,6 @@ pub mod cache;
 pub mod context;
 pub mod cursor;
 pub mod error;
-pub mod fnv1a;
 pub mod identity;
 pub mod internal;
 pub mod memoize;

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use http::Uri;
 use memchr::memmem;
 use serde::{Deserialize, Serialize};
-use topcoat_core::fnv1a::Fnv1a;
+use xxhash_rust::const_xxh3::xxh3_64_with_seed;
 
 use crate::{AssetOptions, ConstReader, ConstWriter, Source};
 
@@ -69,11 +69,9 @@ impl AssetId {
     /// can get the ID directly from [`Asset::id`].
     #[must_use]
     pub const fn new(crate_name: &str, location: &str, options: &AssetOptions) -> Self {
-        let h = Fnv1a::<u64>::new()
-            .write(crate_name.as_bytes())
-            .write(b"\0")
-            .write(location.as_bytes());
-        Self(options.hash_into(h).finish())
+        let h = xxh3_64_with_seed(crate_name.as_bytes(), 0);
+        let h = xxh3_64_with_seed(location.as_bytes(), h);
+        Self(options.hash_into(h))
     }
 
     /// The raw `u64` backing this ID.

@@ -2,7 +2,8 @@
 
 use std::{fmt::Write, ops::Deref};
 
-use topcoat_core::{context::Cx, fnv1a::Fnv1a};
+use topcoat_core::context::Cx;
+use xxhash_rust::const_xxh3::xxh3_64_with_seed;
 
 use crate::{CssString, FontDisplay, FontSources, FontStyle, FontWeightRange, UnicodeRanges};
 
@@ -99,24 +100,24 @@ impl FontFace {
     }
 
     /// Folds this face into a running content hash.
-    pub(crate) fn hash(&self, h: Fnv1a<u64>) -> Fnv1a<u64> {
-        let h = h.write(self.family.as_bytes());
+    pub(crate) fn hash(&self, h: u64) -> u64 {
+        let h = xxh3_64_with_seed(self.family.as_bytes(), h);
         let h = self.src.hash(h);
         let h = match self.weight {
-            Some(weight) => weight.hash(h.write(&[1])),
-            None => h.write(&[0]),
+            Some(weight) => weight.hash(xxh3_64_with_seed(&[1], h)),
+            None => xxh3_64_with_seed(&[0], h),
         };
         let h = match self.style {
-            Some(style) => style.hash(h.write(&[1])),
-            None => h.write(&[0]),
+            Some(style) => style.hash(xxh3_64_with_seed(&[1], h)),
+            None => xxh3_64_with_seed(&[0], h),
         };
         let h = match self.display {
-            Some(display) => display.hash(h.write(&[1])),
-            None => h.write(&[0]),
+            Some(display) => display.hash(xxh3_64_with_seed(&[1], h)),
+            None => xxh3_64_with_seed(&[0], h),
         };
         match self.unicode_range {
-            Some(unicode_range) => unicode_range.hash(h.write(&[1])),
-            None => h.write(&[0]),
+            Some(unicode_range) => unicode_range.hash(xxh3_64_with_seed(&[1], h)),
+            None => xxh3_64_with_seed(&[0], h),
         }
     }
 
@@ -178,7 +179,7 @@ impl FontFaces {
     }
 
     /// Folds these faces into a running content hash.
-    pub(crate) fn hash(&self, mut h: Fnv1a<u64>) -> Fnv1a<u64> {
+    pub(crate) fn hash(&self, mut h: u64) -> u64 {
         for face in &self.0 {
             h = face.hash(h);
         }

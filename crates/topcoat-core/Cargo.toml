@@ -25,6 +25,7 @@ pin-project-lite.workspace = true
 siphasher.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["sync"] }
+xxhash-rust = { workspace = true, features = ["const_xxh3", "xxh3"] }
 
 [dev-dependencies]
 topcoat.workspace = true

@@ -2,7 +2,8 @@
 
 use std::{fmt::Write, ops::Deref};
 
-use topcoat_core::{context::Cx, fnv1a::Fnv1a};
+use topcoat_core::context::Cx;
+use xxhash_rust::const_xxh3::xxh3_64_with_seed;
 
 use crate::{CssString, FontFormat, FontTech};
 
@@ -79,11 +80,14 @@ impl FontSourceUrl {
     }
 
     /// Folds this URL into a running content hash.
-    pub(crate) fn hash(&self, h: Fnv1a<u64>) -> Fnv1a<u64> {
+    pub(crate) fn hash(&self, h: u64) -> u64 {
         match self {
-            Self::Str(inner) => h.write(b"s").write(inner.as_bytes()),
+            Self::Str(inner) => xxh3_64_with_seed(inner.as_bytes(), xxh3_64_with_seed(b"s", h)),
             #[cfg(feature = "asset")]
-            Self::Asset(inner) => h.write(b"a").write(&inner.id().as_u64().to_le_bytes()),
+            Self::Asset(inner) => {
+                let h = xxh3_64_with_seed(b"a", h);
+                xxh3_64_with_seed(&inner.id().as_u64().to_le_bytes(), h)
+            }
         }
     }
 }
@@ -219,20 +223,20 @@ impl FontSource {
     }
 
     /// Folds this source into a running content hash.
-    pub(crate) fn hash(&self, h: Fnv1a<u64>) -> Fnv1a<u64> {
+    pub(crate) fn hash(&self, h: u64) -> u64 {
         match self {
             Self::Url { url, format, tech } => {
-                let h = url.hash(h.write(b"u"));
+                let h = url.hash(xxh3_64_with_seed(b"u", h));
                 let h = match format {
-                    Some(format) => format.hash(h.write(&[1])),
-                    None => h.write(&[0]),
+                    Some(format) => format.hash(xxh3_64_with_seed(&[1], h)),
+                    None => xxh3_64_with_seed(&[0], h),
                 };
                 match tech {
-                    Some(tech) => tech.hash(h.write(&[1])),
-                    None => h.write(&[0]),
+                    Some(tech) => tech.hash(xxh3_64_with_seed(&[1], h)),
+                    None => xxh3_64_with_seed(&[0], h),
                 }
             }
-            Self::Local { name } => h.write(b"l").write(name.as_bytes()),
+            Self::Local { name } => xxh3_64_with_seed(name.as_bytes(), xxh3_64_with_seed(b"l", h)),
         }
     }
 }
@@ -261,7 +265,7 @@ impl FontSources {
     }
 
     /// Folds these sources into a running content hash.
-    pub(crate) fn hash(&self, mut h: Fnv1a<u64>) -> Fnv1a<u64> {
+    pub(crate) fn hash(&self, mut h: u64) -> u64 {
         for source in &self.0 {
             h = source.hash(h);
         }

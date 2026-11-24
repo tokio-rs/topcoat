@@ -45,6 +45,7 @@ inventory = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"], optional = true }
 serde_json = { workspace = true, optional = true }
 ureq = { workspace = true, optional = true }
+xxhash-rust = { workspace = true, features = ["const_xxh3"] }
 
 [build-dependencies]
 heck.workspace = true

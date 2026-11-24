@@ -3,7 +3,7 @@
 
 use std::ops::Deref;
 
-use topcoat_core::fnv1a::Fnv1a;
+use xxhash_rust::const_xxh3::xxh3_64_with_seed;
 
 /// A Unicode code point: an integer in `U+0000..=U+10FFFF`.
 ///
@@ -30,8 +30,8 @@ impl UnicodeCodePoint {
     }
 
     /// Folds this code point into a running content hash.
-    pub(crate) const fn hash(self, h: Fnv1a<u64>) -> Fnv1a<u64> {
-        h.write(&self.0.to_le_bytes())
+    pub(crate) const fn hash(self, h: u64) -> u64 {
+        xxh3_64_with_seed(&self.0.to_le_bytes(), h)
     }
 }
 
@@ -120,7 +120,7 @@ impl UnicodeRange {
     }
 
     /// Folds this range into a running content hash.
-    pub(crate) const fn hash(self, h: Fnv1a<u64>) -> Fnv1a<u64> {
+    pub(crate) const fn hash(self, h: u64) -> u64 {
         self.end.hash(self.start.hash(h))
     }
 }
@@ -152,7 +152,7 @@ impl UnicodeRanges {
     }
 
     /// Folds these ranges into a running content hash.
-    pub(crate) const fn hash(self, mut h: Fnv1a<u64>) -> Fnv1a<u64> {
+    pub(crate) const fn hash(self, mut h: u64) -> u64 {
         let mut i = 0;
         while i < self.0.len() {
             h = self.0[i].hash(h);

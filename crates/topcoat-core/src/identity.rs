@@ -9,8 +9,6 @@ use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 pub use key::*;
 pub use site::*;
 
-use crate::fnv1a::Fnv1a;
-
 /// Tag byte separating the parent hash from an unkeyed site.
 const TAG_SITE: u8 = 0;
 /// Tag byte separating the parent hash from a keyed site.
@@ -53,7 +51,7 @@ impl Identity {
     ///
     /// An ambiguity on `self` carries over to the child.
     #[must_use]
-    pub const fn child(self, site: SiteKey) -> Self {
+    pub fn child(self, site: SiteKey) -> Self {
         Self {
             hash: self.derive(TAG_SITE, site).finish(),
             ambiguity: self.ambiguity,
@@ -71,9 +69,7 @@ impl Identity {
     #[must_use]
     pub fn keyed_child(self, site: SiteKey, key: impl IdentityKey) -> Self {
         Self {
-            hash: key
-                .write(KeyHasher::new(self.derive(TAG_KEYED, site)))
-                .finish(),
+            hash: key.write(self.derive(TAG_KEYED, site)).finish(),
             ambiguity: self.ambiguity,
         }
     }
@@ -84,7 +80,7 @@ impl Identity {
     /// Derivation succeeds, but checking this identity or any descendant
     /// reports the ambiguity. An ambiguity already on the parent wins.
     #[must_use]
-    pub const fn ambiguous_child(self, site: SiteKey, label: &'static str) -> Self {
+    pub fn ambiguous_child(self, site: SiteKey, label: &'static str) -> Self {
         Self {
             hash: self.derive(TAG_SITE, site).finish(),
             ambiguity: match self.ambiguity {
@@ -94,16 +90,12 @@ impl Identity {
         }
     }
 
-    /// Starts a child derivation: the parent hash, a tag byte telling keyed
-    /// and unkeyed derivations apart, then the site.
+    /// Starts a child derivation: the site folded into the parent hash, with
+    /// a tag telling keyed and unkeyed derivations apart.
     ///
-    /// Every segment is fixed-width, so no delimiters are needed; a keyed
-    /// derivation folds the variable-width key in last.
-    const fn derive(self, tag: u8, site: SiteKey) -> Fnv1a<u128> {
-        Fnv1a::<u128>::new()
-            .write(&self.hash.to_le_bytes())
-            .write(&[tag])
-            .write(&site.0.to_le_bytes())
+    /// A keyed derivation folds the key in afterwards.
+    fn derive(self, tag: u8, site: SiteKey) -> KeyHasher {
+        KeyHasher::new(self.hash).mix(tag, u128::from(site.0))
     }
 }
 

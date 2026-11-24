@@ -56,11 +56,8 @@ impl FontDisplay {
     }
 
     /// Folds this strategy into a running content hash.
-    pub(crate) const fn hash(
-        self,
-        h: topcoat_core::fnv1a::Fnv1a<u64>,
-    ) -> topcoat_core::fnv1a::Fnv1a<u64> {
-        h.write(self.keyword().as_bytes())
+    pub(crate) const fn hash(self, h: u64) -> u64 {
+        xxhash_rust::const_xxh3::xxh3_64_with_seed(self.keyword().as_bytes(), h)
     }
 }
 

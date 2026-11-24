@@ -12,7 +12,7 @@ impl RegionId {
     /// Derives a region id at `site` below `identity`.
     #[doc(hidden)]
     #[must_use]
-    pub const fn new(identity: Identity, site: SiteKey) -> Self {
+    pub fn new(identity: Identity, site: SiteKey) -> Self {
         Self(identity.child(site).hash())
     }
 }

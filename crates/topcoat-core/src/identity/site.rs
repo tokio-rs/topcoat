@@ -1,6 +1,6 @@
 use std::panic::Location;
 
-use crate::fnv1a::Fnv1a;
+use xxhash_rust::{const_xxh3, xxh3};
 
 /// A key for one source location that derives an identity.
 ///
@@ -20,24 +20,24 @@ impl SiteKey {
     /// literals from `file!`, `line!`, and `column!`.
     #[must_use]
     pub const fn new(file: &str, line: u32, column: u32, ordinal: u32) -> Self {
-        Self(
-            Fnv1a::<u64>::new()
-                .write(file.as_bytes())
-                .write(b"\0")
-                .write(&line.to_le_bytes())
-                .write(&column.to_le_bytes())
-                .write(&ordinal.to_le_bytes())
-                .finish(),
-        )
+        let h = const_xxh3::xxh3_64_with_seed(file.as_bytes(), 0);
+        let h = const_xxh3::xxh3_64_with_seed(&line.to_le_bytes(), h);
+        let h = const_xxh3::xxh3_64_with_seed(&column.to_le_bytes(), h);
+        Self(const_xxh3::xxh3_64_with_seed(&ordinal.to_le_bytes(), h))
     }
 
     /// Creates a site key from a runtime source location, such as the one
     /// `Location::caller` reports inside a `#[track_caller]` function.
     ///
     /// The ordinal is zero: a call expression has one position in source.
+    /// The key equals the one [`new`](Self::new) creates from the same
+    /// coordinates.
     #[must_use]
-    pub const fn from_location(location: &Location<'_>) -> Self {
-        Self::new(location.file(), location.line(), location.column(), 0)
+    pub fn from_location(location: &Location<'_>) -> Self {
+        let h = xxh3::xxh3_64_with_seed(location.file().as_bytes(), 0);
+        let h = xxh3::xxh3_64_with_seed(&location.line().to_le_bytes(), h);
+        let h = xxh3::xxh3_64_with_seed(&location.column().to_le_bytes(), h);
+        Self(xxh3::xxh3_64_with_seed(&0u32.to_le_bytes(), h))
     }
 }
 

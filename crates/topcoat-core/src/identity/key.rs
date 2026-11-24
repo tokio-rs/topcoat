@@ -1,6 +1,6 @@
 use std::panic::Location;
 
-use crate::fnv1a::Fnv1a;
+use xxhash_rust::xxh3::{xxh3_128, xxh3_128_with_seed};
 
 /// A value that distinguishes identities at one source location.
 ///
@@ -46,12 +46,6 @@ const TAG_TUPLE: u8 = b'(';
 /// Tag byte starting a source location.
 const TAG_LOCATION: u8 = b'l';
 
-/// Terminator ending a string write.
-///
-/// `0xFF` never appears in UTF-8 encoded text, so it marks the end of a
-/// string without escaping.
-const STR_END: u8 = 0xFF;
-
 /// The hasher a [`IdentityKey`] folds itself into.
 ///
 /// Wraps the running identity hash during key derivation. Every write is
@@ -61,27 +55,39 @@ const STR_END: u8 = 0xFF;
 /// threading through a chain of calls, and only the derivation that created
 /// it can take the final value out.
 #[derive(Default)]
-pub struct KeyHasher(Fnv1a<u128>);
+pub struct KeyHasher(u128);
 
 impl KeyHasher {
     /// Wraps the running hash of a keyed derivation.
     #[doc(hidden)]
     #[must_use]
-    pub fn new(hash: Fnv1a<u128>) -> Self {
+    pub const fn new(hash: u128) -> Self {
         Self(hash)
     }
 
     /// Takes the derived hash value out.
     #[doc(hidden)]
     #[must_use]
-    pub fn finish(self) -> u128 {
-        self.0.finish()
+    pub const fn finish(self) -> u128 {
+        self.0
+    }
+
+    /// Folds `word` into the running hash, tagged with the kind of data it
+    /// is.
+    #[inline]
+    #[must_use]
+    pub(super) fn mix(self, tag: u8, word: u128) -> Self {
+        let mut input = [0; 32];
+        let (state, rest) = input.split_at_mut(16);
+        state.copy_from_slice(&self.0.to_le_bytes());
+        rest.copy_from_slice(&word.to_le_bytes());
+        Self(xxh3_128_with_seed(&input, u64::from(tag)))
     }
 
     /// Writes an unsigned integer by value.
     #[must_use]
     pub fn write_u128(self, value: u128) -> Self {
-        Self(self.0.write(&[TAG_UNSIGNED]).write(&value.to_le_bytes()))
+        self.mix(TAG_UNSIGNED, value)
     }
 
     /// Writes a signed integer by mathematical value: a non-negative value
@@ -91,53 +97,38 @@ impl KeyHasher {
         if value >= 0 {
             self.write_u128(value.cast_unsigned())
         } else {
-            Self(self.0.write(&[TAG_NEGATIVE]).write(&value.to_le_bytes()))
+            self.mix(TAG_NEGATIVE, value.cast_unsigned())
         }
     }
 
     /// Writes a boolean.
     #[must_use]
     pub fn write_bool(self, value: bool) -> Self {
-        Self(self.0.write(&[TAG_BOOL, u8::from(value)]))
+        self.mix(TAG_BOOL, u128::from(value))
     }
 
     /// Writes a character by code point.
     #[must_use]
     pub fn write_char(self, value: char) -> Self {
-        Self(
-            self.0
-                .write(&[TAG_CHAR])
-                .write(&u32::from(value).to_le_bytes()),
-        )
+        self.mix(TAG_CHAR, u128::from(u32::from(value)))
     }
 
     /// Writes a string.
     #[must_use]
     pub fn write_str(self, value: &str) -> Self {
-        Self(
-            self.0
-                .write(&[TAG_STR])
-                .write(value.as_bytes())
-                .write(&[STR_END]),
-        )
+        self.mix(TAG_STR, xxh3_128(value.as_bytes()))
     }
 
-    /// Writes raw bytes, length-prefixed since any byte value can occur in
-    /// them.
+    /// Writes raw bytes.
     #[must_use]
     pub fn write_bytes(self, value: &[u8]) -> Self {
-        Self(
-            self.0
-                .write(&[TAG_BYTES])
-                .write(&(value.len() as u64).to_le_bytes())
-                .write(value),
-        )
+        self.mix(TAG_BYTES, xxh3_128(value))
     }
 
     /// Frames a tuple of `len` elements, so a nested tuple never writes the
     /// same sequence as its flattened elements.
     fn tuple(self, len: u8) -> Self {
-        Self(self.0.write(&[TAG_TUPLE, len]))
+        self.mix(TAG_TUPLE, u128::from(len))
     }
 }
 
@@ -155,7 +146,7 @@ impl IdentityKey for () {
 
 impl IdentityKey for Location<'_> {
     fn write(&self, hasher: KeyHasher) -> KeyHasher {
-        (self.file(), self.line(), self.column()).write(KeyHasher(hasher.0.write(&[TAG_LOCATION])))
+        (self.file(), self.line(), self.column()).write(hasher.mix(TAG_LOCATION, 0))
     }
 }
 
@@ -271,7 +262,7 @@ mod tests {
 
     /// Hashes a key standalone, outside any derivation.
     fn hash(key: impl IdentityKey) -> u128 {
-        key.write(KeyHasher::new(Fnv1a::<u128>::new())).finish()
+        key.write(KeyHasher::default()).finish()
     }
 
     #[test]

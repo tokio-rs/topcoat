@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 
-use topcoat_core::fnv1a::Fnv1a;
+use xxhash_rust::const_xxh3::xxh3_64_with_seed;
 
 use crate::FontFaces;
 
@@ -25,8 +25,7 @@ impl FontData {
         let faces = faces
             .try_into()
             .unwrap_or_else(|_| panic!("font faces must not be empty"));
-        let h = Fnv1a::<u64>::new().write(family.as_bytes()).write(b"\0");
-        let hash = faces.hash(h).finish();
+        let hash = faces.hash(xxh3_64_with_seed(family.as_bytes(), 0));
         Self {
             family,
             faces,
