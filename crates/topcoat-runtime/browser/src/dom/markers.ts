@@ -18,7 +18,7 @@ export type CommentMarker =
 			 */
 			kind: "connect";
 	  }
-	| { kind: "expr-start"; js: string }
+	| { kind: "expr-start"; js: string; sync: boolean }
 	| { kind: "expr-end" }
 	| {
 			/**
@@ -47,7 +47,8 @@ export type CommentMarker =
 const SIGNAL_RE = /^\s*::topcoat::signal\(([\s\S]*)\)\s*$/;
 const DEP_RE = /^\s*::topcoat::dep\("([0-9a-f]+)"\)\s*$/;
 const CONNECT_RE = /^\s*::topcoat::connect\s*$/;
-const EXPR_START_RE = /^\s*::topcoat::expr::start\("([^"]*)"\)\s*$/;
+const EXPR_START_RE =
+	/^\s*::topcoat::expr::start\("([^"]*)"(?:, (true))?\)\s*$/;
 const EXPR_END_RE = /^\s*::topcoat::expr::end\s*$/;
 const REGION_START_RE = /^\s*::topcoat::region::start\(([0-9a-f]+)\)\s*$/;
 const REGION_END_RE = /^\s*::topcoat::region::end\(([0-9a-f]+)\)\s*$/;
@@ -93,6 +94,7 @@ export function parseComment(node: Comment): CommentMarker | null {
 		return {
 			kind: "expr-start",
 			js,
+			sync: exprStart[2] === "true",
 		};
 	}
 
