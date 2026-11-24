@@ -29,12 +29,6 @@ smallvec.workspace = true
 [dev-dependencies]
 topcoat = { workspace = true, features = ["view"] }
 
-criterion = { workspace = true }
-
-[[bench]]
-name = "render"
-harness = false
-
 [lints]
 workspace = true
 
