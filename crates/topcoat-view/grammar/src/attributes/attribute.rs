@@ -44,7 +44,10 @@ impl LowerView for Attribute {
                 if matches!(key, AttributeKey::Expr(..)) {
                     builder.expr(ExprKind::Attribute, quote! { (#key, #value) });
                 } else {
-                    builder.expr(ExprKind::AttributeUnescaped, quote! { (#key, #value) });
+                    builder.expr(
+                        ExprKind::AttributeUnescaped,
+                        quote! { (#topcoat_view::PromotedStr(&#key), #value) },
+                    );
                 }
             }
         }

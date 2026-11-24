@@ -2,7 +2,7 @@ use topcoat_core::context::Cx;
 
 use crate::{
     Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts, HtmlContext,
-    NodeViewParts, PartsWriter, Unescaped, ViewHandle, buffer::ViewBufferScope,
+    NodeViewParts, PartsWriter, PromotedStr, Unescaped, ViewHandle, buffer::ViewBufferScope,
     html::ElementNameViewParts,
 };
 
@@ -99,7 +99,7 @@ impl<'a, 'b, 'c> Builder<'a, 'b, 'c> {
     #[inline]
     pub fn attribute_unescaped(
         &mut self,
-        (key, value): (&'static str, impl AttributeValueViewParts),
+        (key, value): (PromotedStr, impl AttributeValueViewParts),
     ) {
         self.attributes(Attribute::new(Unescaped::new_unchecked(key), value));
     }
