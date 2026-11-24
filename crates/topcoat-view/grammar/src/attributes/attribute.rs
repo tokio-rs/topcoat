@@ -39,15 +39,21 @@ impl LowerView for Attribute {
                 builder.str_unescaped("\"");
             }
             AttributeValue::Expr(_) => {
-                let key = &self.key;
                 let value = &self.value;
-                if matches!(key, AttributeKey::Expr(..)) {
-                    builder.expr(ExprKind::Attribute, quote! { (#key, #value) });
-                } else {
-                    builder.expr(
-                        ExprKind::AttributeUnescaped,
-                        quote! { (#topcoat_view::PromotedStr(&#key), #value) },
-                    );
+                match &self.key {
+                    key @ AttributeKey::Expr(_) => {
+                        builder.expr(ExprKind::Attribute, quote! { (#key, #value) });
+                    }
+                    AttributeKey::Ident(ident) => {
+                        // The value decides at run time whether the attribute
+                        // is present, so its opening cannot join the markup
+                        // around it. It is still a single literal.
+                        let opening = format!(" {ident}=\"");
+                        builder.expr(
+                            ExprKind::AttributeUnescaped,
+                            quote! { (#topcoat_view::PromotedStr(&#opening), #value) },
+                        );
+                    }
                 }
             }
         }
@@ -155,6 +161,21 @@ mod tests {
         let mut builder = AttributeBuilder::new();
         LowerAttribute::lower(attr, &mut builder);
         builder.finish().emit().to_string()
+    }
+
+    fn lowered_view(attr: &Attribute) -> String {
+        let mut builder = ViewBuilder::new();
+        LowerView::lower(attr, &mut builder);
+        builder.finish().emit_view().to_string()
+    }
+
+    #[test]
+    fn literal_key_with_expression_value_has_one_opening_literal() {
+        let out = lowered_view(&parse("data-post-id=(id)"));
+        assert!(
+            out.contains(r#"PromotedStr (& " data-post-id=\"")"#),
+            "{out}"
+        );
     }
 
     #[test]

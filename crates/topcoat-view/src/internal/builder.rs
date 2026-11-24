@@ -2,7 +2,7 @@ use topcoat_core::context::Cx;
 
 use crate::{
     Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts, HtmlContext,
-    NodeViewParts, PartsWriter, PromotedStr, Unescaped, ViewHandle, buffer::ViewBufferScope,
+    NodeViewParts, PartsWriter, PromotedStr, ViewHandle, buffer::ViewBufferScope,
     html::ElementNameViewParts,
 };
 
@@ -95,13 +95,24 @@ impl<'a, 'b, 'c> Builder<'a, 'b, 'c> {
         self.attributes(Attribute::new(key, value));
     }
 
-    /// Appends a whole attribute from a trusted literal key and a value.
+    /// Appends a whole attribute from its trusted literal opening and a
+    /// value.
+    ///
+    /// The opening is the attribute's leading space, its name and `="`.
+    /// Nothing is appended if the value marks the attribute as absent.
     #[inline]
     pub fn attribute_unescaped(
         &mut self,
-        (key, value): (PromotedStr, impl AttributeValueViewParts),
+        (opening, value): (PromotedStr, impl AttributeValueViewParts),
     ) {
-        self.attributes(Attribute::new(Unescaped::new_unchecked(key), value));
+        if value.attribute_present() {
+            let cx = self.cx;
+            self.parts.push_promoted_str_unescaped(opening.0);
+            self.parts.in_context(HtmlContext::AttributeValue, |parts| {
+                value.into_view_parts(cx, parts);
+            });
+            self.parts.push_promoted_str_unescaped(&"\"");
+        }
     }
 
     /// Appends a value covering whole attributes, keys and values.
@@ -124,5 +135,27 @@ impl<'a, 'b, 'c> Builder<'a, 'b, 'c> {
     #[inline]
     pub fn view(&mut self, view: ViewHandle) {
         self.parts.push_view_handle(view);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn render(f: impl FnOnce(&mut Builder<'_, '_, '_>)) -> String {
+        let cx = Cx::new();
+        Builder::build(&cx, f).render(&cx)
+    }
+
+    #[test]
+    fn attribute_unescaped_escapes_only_the_value() {
+        let rendered = render(|b| b.attribute_unescaped((PromotedStr(&" data-x=\""), "a\"b")));
+        assert_eq!(rendered, " data-x=\"a&quot;b\"");
+    }
+
+    #[test]
+    fn attribute_unescaped_omits_an_absent_value() {
+        let rendered = render(|b| b.attribute_unescaped((PromotedStr(&" disabled=\""), false)));
+        assert_eq!(rendered, "");
     }
 }
