@@ -42,8 +42,16 @@ impl Asset {
                 #(#fields,)*
                 ..#topcoat_asset::AssetOptions::NONE
             };
+            const crate_name: Option<&'static str> = option_env!("CARGO_CRATE_NAME");
+            const pkg_name: Option<&'static str> = option_env!("CARGO_PKG_NAME");
+            const namespace: &'static str = if crate_name.is_some() {
+                crate_name.unwrap()
+            } else {
+                pkg_name
+                    .expect("CARGO_CRATE_NAME or CARGO_PKG_NAME environment variable is expected to be set")
+            };
             const ID: #topcoat_asset::AssetId = #topcoat_asset::AssetId::new(
-                ::core::env!("CARGO_CRATE_NAME"),
+                namespace,
                 #location,
                 &OPTIONS,
             );
