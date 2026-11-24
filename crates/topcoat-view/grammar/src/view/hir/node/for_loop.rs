@@ -75,7 +75,12 @@ impl Emit for ForLoop {
                 let #ident = {
                     let mut __iterations = ::std::vec::Vec::new();
                     for #pat in #expr {
-                        __iterations.push(::std::boxed::Box::pin(#body));
+                        // The box is allocated before the body is built, so
+                        // the body is written into it directly. `Box::pin`
+                        // builds the body first and then copies all of it.
+                        __iterations.push(::std::boxed::Box::into_pin(
+                            ::std::boxed::Box::write(::std::boxed::Box::new_uninit(), #body),
+                        ));
                     }
                     #topcoat_view::internal::LoopView::new(__iterations)
                 };

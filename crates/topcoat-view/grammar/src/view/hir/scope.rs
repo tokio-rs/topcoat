@@ -535,7 +535,9 @@ mod tests {
         );
         let out = rendered(builder);
         assert!(
-            out.contains("__iterations . push (:: std :: boxed :: Box :: pin ("),
+            out.contains(
+                "__iterations . push (:: std :: boxed :: Box :: into_pin (:: std :: boxed :: Box :: write (:: std :: boxed :: Box :: new_uninit () ,"
+            ),
             "{out}"
         );
         assert!(out.contains("LoopView :: new (__iterations)"), "{out}");
