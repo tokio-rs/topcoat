@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0](https://github.com/tokio-rs/topcoat/compare/topcoat-ui-registry-v0.12.1...topcoat-ui-registry-v0.13.0) - 2026-11-24
+
+### Added
+
+- *(ui)* add `ui update` CLI command to merge registry updates into local changes ([#621](https://github.com/tokio-rs/topcoat/pull/621))
+
 ## [0.12.0](https://github.com/tokio-rs/topcoat/compare/topcoat-ui-registry-v0.11.0...topcoat-ui-registry-v0.12.0) - 2026-11-09
 
 ### Added

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0](https://github.com/tokio-rs/topcoat/compare/v0.12.1...v0.13.0) - 2026-11-24
+
+### Added
+
+- *(ui)* add `ui update` CLI command to merge registry updates into local changes ([#621](https://github.com/tokio-rs/topcoat/pull/621))
+- *(cookie)* make `CookieStore.remove()` return the value ([#606](https://github.com/tokio-rs/topcoat/pull/606))
+
+### Other
+
+- rewrite benchmarks with new frameworks and visualization ([#613](https://github.com/tokio-rs/topcoat/pull/613))
+- *(router)* [**breaking**] arena-style router allocator and faster timers ([#620](https://github.com/tokio-rs/topcoat/pull/620))
+
 ## [0.12.1](https://github.com/tokio-rs/topcoat/compare/v0.12.0...v0.12.1) - 2026-11-10
 
 ### Added
