@@ -14,8 +14,9 @@ use topcoat::{
 /// ```ignore
 /// view! {
 ///     radio_group(
+///         #[key(value)]
 ///         for (value, text) in [("weekly", "Weekly"), ("monthly", "Monthly")] {
-///             let id = element_id(&cx.keyed(value));
+///             let id = element_id(cx);
 ///             <div class="flex items-center gap-2">
 ///                 radio_group_item(
 ///                     attrs: attributes! { id=(&id) name="billing" value=(value) }

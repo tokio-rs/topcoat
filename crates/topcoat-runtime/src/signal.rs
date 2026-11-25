@@ -288,8 +288,10 @@ where
 ///
 /// For ordinary helpers called more than once, pass a context derived with
 /// [`Cx::keyed`]. Separate `cx.keyed(())` calls distinguish source locations;
-/// repeated calls at one location need distinct keys. Template loops do not
-/// rebind context variables used in ordinary Rust expressions.
+/// repeated calls at one location need distinct keys. Inside a template loop,
+/// `cx` is the iteration's context: in a keyed loop, `signal(cx, ...)` gets one
+/// signal per iteration. In an unkeyed loop, `cx` and contexts derived from it
+/// are ambiguous.
 ///
 /// # Panics
 ///
