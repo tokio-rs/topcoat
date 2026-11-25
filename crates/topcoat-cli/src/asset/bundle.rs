@@ -7,12 +7,15 @@ use clap::Args;
 use console::style;
 
 use super::{CACHE_SCOPE, OUT_SUBDIR};
-use crate::common::cargo::{BuildFlags, BuildOpts, Metadata};
+use crate::common::cargo::{BuildError, BuildFlags, BuildOpts, Metadata};
 
 #[derive(Args)]
 pub(super) struct BundleArgs {
     #[command(flatten)]
     build: BuildFlags,
+    /// Executable to use instead of building
+    #[arg(short, long)]
+    exe: Option<PathBuf>,
     /// Output directory for the bundle (defaults to an `assets` directory
     /// next to the built executable)
     #[arg(short, long)]
@@ -20,10 +23,16 @@ pub(super) struct BundleArgs {
 }
 
 pub(super) async fn run(args: BundleArgs) {
-    let (exe, bytes) = BuildOpts::from(args.build)
-        .build_and_read(|_, _| {})
-        .await
-        .unwrap_or_else(|e| e.print_and_exit());
+    let (exe, bytes) = if args.exe.is_some() {
+        let path = args.exe.unwrap();
+        let bytes = std::fs::read(&path).map_err(BuildError::Read).unwrap();
+        (path, bytes)
+    } else {
+        BuildOpts::from(args.build)
+            .build_and_read(|_, _| {})
+            .await
+            .unwrap_or_else(|e| e.print_and_exit())
+    };
 
     let out_dir = match run_bundle(&exe, &bytes, args.out).await {
         Ok(path) => path,
