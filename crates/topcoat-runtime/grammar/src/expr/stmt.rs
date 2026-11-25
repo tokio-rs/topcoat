@@ -9,12 +9,17 @@ use crate::expr::{
 };
 
 impl Expr {
+    /// Lowers one statement. `is_last` marks the block's trailing statement
+    /// and `value_used` reports whether the surrounding block's JavaScript
+    /// value is used. The Rust tokens always follow the source expression's
+    /// value.
     pub(super) fn stmt(
         stmt: &Stmt,
         rust: &mut TokenStream,
         js: &mut Js,
         names: &mut NameResolver,
         is_last: bool,
+        value_used: bool,
     ) -> syn::Result<()> {
         match stmt {
             Stmt::Local(local) => {
@@ -40,28 +45,54 @@ impl Expr {
                 quote! { let #pat = #value; }.to_tokens(rust);
             }
             Stmt::Expr(expr, semi) => {
-                // A trailing expression (no semicolon) is the block's value, so
-                // it becomes the JavaScript `return`.
-                let returns = is_last && semi.is_none();
-                if returns {
+                // A trailing expression (no semicolon) is the Rust block's
+                // value. It becomes the JavaScript `return` only when the
+                // surrounding block's JavaScript value is used.
+                let rust_value = is_last && semi.is_none();
+                let js_value = value_used && rust_value;
+                let mut tokens = TokenStream::new();
+                if js_value {
                     js.push_str("return ");
-                }
-
-                let mut value = TokenStream::new();
-                Self::dispatch(expr, &mut value, js, names)?;
-
-                if returns {
+                    Self::dispatch(expr, &mut tokens, js, names)?;
                     js.push(';');
-                    value.to_tokens(rust);
+                    tokens.to_tokens(rust);
                 } else {
+                    Self::stmt_expr(expr, &mut tokens, js, names)?;
                     js.push_str("; ");
-                    quote! { #value; }.to_tokens(rust);
+                    if rust_value {
+                        tokens.to_tokens(rust);
+                    } else {
+                        quote! { #tokens; }.to_tokens(rust);
+                    }
                 }
             }
             Stmt::Macro(stmt_macro) => Self::stmt_macro(stmt_macro, rust, js, names)?,
             other @ Stmt::Item(_) => {
                 return Err(syn::Error::new_spanned(other, "unsupported statement"));
             }
+        }
+        Ok(())
+    }
+
+    /// Lowers an expression whose JavaScript value is discarded.
+    ///
+    /// `if` and block expressions are emitted without the IIFE used in
+    /// expression position, so `return`, `break`, and `continue` keep their
+    /// enclosing function or loop. Their trailing value is discarded in
+    /// JavaScript but kept as the Rust block's value, matching the type
+    /// checking of the source expression.
+    fn stmt_expr(
+        expr: &syn::Expr,
+        rust: &mut TokenStream,
+        js: &mut Js,
+        names: &mut NameResolver,
+    ) -> syn::Result<()> {
+        match expr {
+            syn::Expr::If(if_expr) => {
+                Self::expr_if_inner(if_expr, js, names, false)?.to_tokens(rust);
+            }
+            syn::Expr::Block(block) => Self::block_stmt(&block.block, rust, js, names)?,
+            _ => Self::dispatch(expr, rust, js, names)?,
         }
         Ok(())
     }
