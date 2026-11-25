@@ -47,5 +47,5 @@ In this form, each [`FontFace`] must already have the matching family name.
 [`Font`]: struct.Font.html
 [`FontFace`]: struct.FontFace.html
 [`FontFaces`]: struct.FontFaces.html
-[`discover_fonts`]: trait.RouterBuilderFontExt.html#method.discover_fonts
-[`RouterBuilder::font`]: trait.RouterBuilderFontExt.html#method.font
+[`discover_fonts`]: trait.RouterBuilderFontExt.html#tymethod.discover_fonts
+[`RouterBuilder::font`]: trait.RouterBuilderFontExt.html#tymethod.font

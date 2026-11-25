@@ -1,0 +1,73 @@
+# Summary
+
+# Start here
+
+- [Getting started](getting_started.md)
+- [Manual setup](manual_setup.md)
+- [`topcoat new`](cli/new.md)
+- [`topcoat fmt`](cli/fmt.md)
+
+# Core concepts
+
+- [Router](router.md)
+  - [Module routing](router/module.md)
+  - [`#[page]`](router/page.md)
+  - [`#[layout]`](router/layout.md)
+  - [`#[layer]`](router/layer.md)
+  - [`#[route]`](router/route.md)
+  - [`path_param!`](router/path_param.md)
+  - [`module_param!`](router/module_param.md)
+  - [`segment!`](router/segment.md)
+  - [`#[query_params]`](router/query_params.md)
+  - [`href!`](router/href.md)
+  - [Errors](router/error.md)
+  - [`not_found!`](router/not_found.md)
+  - [Request and response content](router/content.md)
+    - [Multipart](router/content/multipart.md)
+    - [Server-sent events](router/content/sse.md)
+    - [WebSocket](router/content/websocket.md)
+    - [Sitemap](router/content/sitemap.md)
+  - [Tower](router/tower.md)
+- [Views](view.md)
+  - [`view!`](view/view.md)
+  - [`#[component]`](view/component.md)
+  - [`#[derive(Props)]`](view/props.md)
+  - [`class!`](view/class.md)
+  - [`attributes!`](view/attributes.md)
+  - [`live!` and `emit!`](view/live.md)
+- [Context](context.md)
+  - [`#[memoize]`](context/memoize.md)
+- [Runtime](runtime.md)
+  - [Expressions](runtime/expr.md)
+  - [`#[record]`](runtime/record.md)
+  - [`#[procedure]`](runtime/procedure.md)
+  - [`#[shard]`](runtime/shard.md)
+  - [Client-side navigation](runtime/link.md)
+  - [Coherence tests](runtime/coherence.md)
+
+# Features
+
+- [Assets](asset.md)
+- [Fonts](font.md)
+  - [`font!`](font/font.md)
+  - [`font_face!`](font/font_face.md)
+  - [`fontsource_font!`](font/fontsource/fontsource_font.md)
+  - [`fontsource_font_face!`](font/fontsource/fontsource_font_face.md)
+- [Icons](icon.md)
+  - [`iconify::include!`](icon/iconify/include.md)
+  - [`iconify_icon!`](icon/iconify/iconify_icon.md)
+- [Page metadata](metadata.md)
+- [Cookies](cookie.md)
+- [Sessions](session.md)
+- [Localization](l10n.md)
+  - [Fluent `messages!`](l10n/fluent/messages.md)
+- [Mail](mail.md)
+- [OpenAPI](openapi.md)
+- [Topcoat UI](ui.md)
+
+# Integrations
+
+- [Tailwind](tailwind.md)
+- [htmx](htmx.md)
+- [Alpine AJAX](alpine_ajax.md)
+- [Datastar](datastar.md)

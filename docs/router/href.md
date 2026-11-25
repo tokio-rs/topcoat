@@ -63,7 +63,7 @@ pub mod post_id {
 
 Inside the module that declares a parameter, use its plain name. From the parent of a `module_param!` module, the plain name works too, as in `posts` above. Anywhere else, name the parameter by its path, such as `crate::app::posts::post_id`.
 
-Each value is written with [`Display`](core::fmt::Display) and percent-encoded, so `slug: "a/b"` stays inside its own segment as `a%2Fb`. See [`path_param!`](macro.path_param.html) for the values each kind of parameter accepts, including lists for catch-all parameters.
+Each value is written with [`Display`](https://doc.rust-lang.org/core/fmt/trait.Display.html) and percent-encoded, so `slug: "a/b"` stays inside its own segment as `a%2Fb`. See [`path_param!`](macro.path_param.html) for the values each kind of parameter accepts, including lists for catch-all parameters.
 
 Building the URL panics if a parameter of the path gets no value, or if an argument names a parameter the path does not have.
 
