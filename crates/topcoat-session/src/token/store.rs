@@ -23,8 +23,16 @@ pub trait TokenStore: Send + Sync {
 
     /// Issues `token` to the client with the given time to live, replacing
     /// any previously issued token.
-    fn write<'a>(&'a self, cx: &'a Cx, token: Token, max_age: Duration)
-    -> TokenStoreFuture<'a, ()>;
+    ///
+    /// The time to live is the [`SessionLifetime`](crate::SessionLifetime)
+    /// rounded up to whole seconds. Issue the token for at least that long, so
+    /// the session record does not outlive it.
+    fn write<'a>(
+        &'a self,
+        cx: &'a Cx,
+        token: Token,
+        time_to_live: Duration,
+    ) -> TokenStoreFuture<'a, ()>;
 
     /// Instructs the client to discard its token.
     fn delete<'a>(&'a self, cx: &'a Cx) -> TokenStoreFuture<'a, ()>;
@@ -150,10 +158,10 @@ pub mod cookie {
             &'a self,
             cx: &'a Cx,
             token: Token,
-            max_age: Duration,
+            time_to_live: Duration,
         ) -> TokenStoreFuture<'a, ()> {
             Box::pin(async move {
-                let max_age = topcoat_cookie::time::Duration::try_from(max_age)?;
+                let max_age = topcoat_cookie::time::Duration::try_from(time_to_live)?;
                 cookies(cx)
                     .override_max_age(max_age)
                     .add(Cookie::new(self.name.clone(), token.encode()));

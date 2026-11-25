@@ -1,7 +1,7 @@
 use topcoat_core::{context::Cx, error::Result};
 use web_time::SystemTime;
 
-use crate::{TokenHash, lifetime, state::state, token::Token, token_store};
+use crate::{TokenHash, state::state, time_to_live, token::Token, token_store};
 
 /// A session record to persist in application storage.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,7 +38,7 @@ pub async fn start(cx: &Cx) -> Result<Session> {
         expires_at: expires_at(cx),
     };
     token_store(cx)
-        .write(cx, token.clone(), lifetime(cx))
+        .write(cx, token.clone(), time_to_live(cx))
         .await?;
     state(cx).set(Some(token)).await;
     Ok(session)
@@ -77,7 +77,7 @@ pub async fn refresh(cx: &Cx) -> Result<Option<Session>> {
         token_hash: token.hash(),
         expires_at: expires_at(cx),
     };
-    token_store(cx).write(cx, token, lifetime(cx)).await?;
+    token_store(cx).write(cx, token, time_to_live(cx)).await?;
     Ok(Some(session))
 }
 
@@ -103,7 +103,7 @@ pub async fn rotate(cx: &Cx) -> Result<Option<Rotation>> {
         },
     };
     token_store(cx)
-        .write(cx, token.clone(), lifetime(cx))
+        .write(cx, token.clone(), time_to_live(cx))
         .await?;
     state(cx).set(Some(token)).await;
     Ok(Some(rotation))
@@ -123,7 +123,7 @@ pub async fn token_hash(cx: &Cx) -> Result<Option<TokenHash>> {
 }
 
 fn expires_at(cx: &Cx) -> SystemTime {
-    SystemTime::now() + lifetime(cx)
+    SystemTime::now() + time_to_live(cx)
 }
 
 #[cfg(test)]
@@ -164,9 +164,9 @@ mod tests {
             &'a self,
             _cx: &'a Cx,
             _token: Token,
-            max_age: Duration,
+            time_to_live: Duration,
         ) -> TokenStoreFuture<'a, ()> {
-            self.writes.lock().unwrap().push(max_age);
+            self.writes.lock().unwrap().push(time_to_live);
             Box::pin(async { Ok(()) })
         }
 
@@ -206,6 +206,23 @@ mod tests {
         assert_eq!(*store.writes.lock().unwrap(), [lifetime, lifetime]);
         assert!(session.expires_at >= before + lifetime);
         assert!(session.expires_at < before + SessionLifetime::DEFAULT.0);
+        Ok(())
+    }
+
+    /// A cookie's `Max-Age` carries whole seconds, so a fractional lifetime is
+    /// rounded up for the token store and the record alike.
+    #[tokio::test]
+    async fn a_fractional_lifetime_is_rounded_up_to_whole_seconds() -> Result<()> {
+        let store = FixedTokenStore::new();
+        let cx = Cx::new()
+            .with(SessionTokenStore::new(store.clone()))
+            .with(SessionLifetime(Duration::from_millis(1100)));
+
+        let before = SystemTime::now();
+        let session = start(&cx).await?;
+
+        assert_eq!(*store.writes.lock().unwrap(), [Duration::from_secs(2)]);
+        assert!(session.expires_at >= before + Duration::from_secs(2));
         Ok(())
     }
 }
