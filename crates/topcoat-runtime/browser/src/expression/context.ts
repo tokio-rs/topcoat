@@ -39,6 +39,16 @@ export class Context {
 		return new Record(Object.entries(fields));
 	}
 
+	/** Struct update syntax: `base` supplies the fields `fields` omits. */
+	recordWith(fields: { [field: string]: unknown }, base: Record): Record {
+		return new Record(
+			Object.entries(base).map(([name, value]) => [
+				name,
+				Object.hasOwn(fields, name) ? fields[name] : value,
+			]),
+		);
+	}
+
 	tuple(items: readonly unknown[]): Tuple {
 		return new Tuple(items);
 	}
