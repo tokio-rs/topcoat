@@ -50,4 +50,8 @@ impl<J: Cookies> Cookies for SignedJar<'_, J> {
         // Removal cookies match by name only; the signature is irrelevant.
         self.inner.remove(cookie);
     }
+
+    fn normalize_name(&self, cookie: &mut Cookie<'static>) {
+        self.inner.normalize_name(cookie);
+    }
 }

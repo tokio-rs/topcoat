@@ -131,4 +131,10 @@ impl<J: Cookies> Cookies for Prefixed<J> {
         // `__Host-`) so the browser matches and clears it.
         self.inner.remove(self.prepare(cookie, Conform::Override));
     }
+
+    fn normalize_name(&self, cookie: &mut Cookie<'static>) {
+        self.prefix.apply_name(cookie);
+        self.inner.normalize_name(cookie);
+        self.prefix.strip_name(cookie);
+    }
 }
