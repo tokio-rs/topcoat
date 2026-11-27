@@ -6,7 +6,7 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
-use crate::{RegionId, View, ViewBufferScope, ViewFirst, ViewSwap, internal::ScopeView};
+use crate::{RegionId, View, ViewFirst, ViewScope, ViewSwap};
 
 pin_project! {
     /// A [`View`] that shows a fallback until its child content is ready.
@@ -26,7 +26,10 @@ pin_project! {
         #[pin]
         fallback: F,
         #[pin]
-        child: ScopeView<C>,
+        child: C,
+        // The child can finish after the surrounding first content has
+        // gone out, so it is a build of its own with its own scope.
+        child_scope: ViewScope,
         region: RegionId,
         wait: bool,
         state: State,
@@ -56,9 +59,8 @@ impl<F, C> SuspenseView<F, C> {
     pub fn new(region: RegionId, fallback: F, child: C, wait: bool) -> Self {
         Self {
             fallback,
-            // The child can finish after the surrounding first content
-            // has gone out, so it must keep its own rendering buffer.
-            child: ScopeView::self_contained(|| child),
+            child,
+            child_scope: ViewScope::new(),
             region,
             wait,
             state: State::Start,
@@ -71,36 +73,41 @@ where
     F: View,
     C: View,
 {
-    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
+    fn poll_first(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<ViewFirst>> {
         let this = self.project();
         assert!(
             *this.state == State::Start,
             "polled a suspense view's first content after it resolved"
         );
 
-        match this.child.poll_first(cx) {
+        match this.child.poll_first(cx, this.child_scope) {
             Poll::Ready(Ok(first)) => {
                 *this.state = if first.live {
                     State::Child
                 } else {
                     State::Done
                 };
-                return Poll::Ready(Ok(first));
+                return Poll::Ready(Ok(ViewFirst {
+                    content: this.child_scope.seal(first.content),
+                    live: first.live,
+                }));
             }
             Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
             Poll::Pending if *this.wait => return Poll::Pending,
             Poll::Pending => {}
         }
 
-        match this.fallback.poll_first(cx) {
+        match this.fallback.poll_first(cx, scope) {
             Poll::Ready(Ok(first)) => {
                 *this.state = State::Fallback { live: first.live };
-                let content = ViewBufferScope::with(|buffer| {
-                    buffer.block(|parts| {
-                        parts.push_region_start(*this.region);
-                        parts.push_view_handle(first.content);
-                        parts.push_region_end(*this.region);
-                    })
+                let content = scope.block(|parts| {
+                    parts.push_region_start(*this.region);
+                    parts.push_view_handle(first.content);
+                    parts.push_region_end(*this.region);
                 });
                 Poll::Ready(Ok(ViewFirst {
                     content,
@@ -112,7 +119,11 @@ where
         }
     }
 
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
+    fn poll_swap(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<Option<ViewSwap>>> {
         let this = self.project();
 
         let live = match *this.state {
@@ -120,11 +131,15 @@ where
                 panic!("polled a suspense view for swaps before its first content resolved")
             }
             State::Child => {
-                return match this.child.poll_swap(cx) {
+                return match this.child.poll_swap(cx, this.child_scope) {
                     Poll::Ready(Ok(None)) => {
                         *this.state = State::Done;
                         Poll::Ready(Ok(None))
                     }
+                    Poll::Ready(Ok(Some(swap))) => Poll::Ready(Ok(Some(ViewSwap {
+                        region: swap.region,
+                        replacement: this.child_scope.seal(swap.replacement),
+                    }))),
                     poll => poll,
                 };
             }
@@ -133,7 +148,7 @@ where
         };
 
         // Only replace the suspense region when its fallback went out.
-        match this.child.poll_first(cx) {
+        match this.child.poll_first(cx, this.child_scope) {
             Poll::Ready(Ok(first)) => {
                 *this.state = if first.live {
                     State::Child
@@ -142,7 +157,7 @@ where
                 };
                 return Poll::Ready(Ok(Some(ViewSwap {
                     region: *this.region,
-                    replacement: first.content,
+                    replacement: this.child_scope.seal(first.content),
                 })));
             }
             Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
@@ -151,7 +166,7 @@ where
 
         // The child is still pending, so the fallback can keep streaming.
         if live {
-            match this.fallback.poll_swap(cx) {
+            match this.fallback.poll_swap(cx, scope) {
                 Poll::Ready(Ok(None)) => {
                     *this.state = State::Fallback { live: false };
                     Poll::Pending

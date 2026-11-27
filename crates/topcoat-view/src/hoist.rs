@@ -21,7 +21,7 @@ use pin_project_lite::pin_project;
 use siphasher::sip128::{Hasher128, SipHasher13};
 use topcoat_core::error::Result;
 
-use crate::{PartsWriter, View, ViewBuffer, ViewBufferScope, ViewFirst, ViewHandle, ViewSwap};
+use crate::{PartsWriter, View, ViewFirst, ViewHandle, ViewScope, ViewSwap};
 
 /// A hoisted part, pushed through the writer of the content it lands in.
 type HoistedPart = Box<dyn FnOnce(&mut PartsWriter<'_>) + Send>;
@@ -169,26 +169,34 @@ impl<V: View> HoistView<V> {
 }
 
 impl<V: View> View for HoistView<V> {
-    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
+    fn poll_first(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<ViewFirst>> {
         let this = self.project();
         let poll = {
             let _guard = HoistGuard::install(this.hoisted);
-            this.view.poll_first(cx)
+            this.view.poll_first(cx, scope)
         };
         match poll {
             Poll::Ready(Ok(ViewFirst { content, live })) => Poll::Ready(Ok(ViewFirst {
-                content: prepend(this.hoisted, content),
+                content: prepend(this.hoisted, content, scope),
                 live,
             })),
             poll => poll,
         }
     }
 
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
+    fn poll_swap(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<Option<ViewSwap>>> {
         let this = self.project();
         let poll = {
             let _guard = HoistGuard::install(this.hoisted);
-            this.view.poll_swap(cx)
+            this.view.poll_swap(cx, scope)
         };
         match poll {
             Poll::Ready(Ok(Some(ViewSwap {
@@ -196,7 +204,7 @@ impl<V: View> View for HoistView<V> {
                 replacement,
             }))) => Poll::Ready(Ok(Some(ViewSwap {
                 region,
-                replacement: prepend(this.hoisted, replacement),
+                replacement: prepend(this.hoisted, replacement, scope),
             }))),
             poll => poll,
         }
@@ -207,26 +215,18 @@ impl<V: View> View for HoistView<V> {
 /// collection empty.
 ///
 /// Content with nothing hoisted passes through untouched, so a view that
-/// never hoists costs no block in the buffer. Inside a running build the
-/// block joins that build's buffer; outside one, as when a swap resolves
-/// after the first content was sealed, the block is self-contained.
-fn prepend(hoisted: &mut Hoisted, content: ViewHandle) -> ViewHandle {
+/// never hoists costs no block in the buffer.
+fn prepend(hoisted: &mut Hoisted, content: ViewHandle, scope: &mut ViewScope) -> ViewHandle {
     if hoisted.parts.is_empty() {
         return content;
     }
     let parts = hoisted.take();
-    let build = |writer: &mut PartsWriter<'_>| {
+    scope.block(|writer| {
         for part in parts {
             part(writer);
         }
         writer.push_view_handle(content);
-    };
-    if ViewBufferScope::is_active() {
-        ViewBufferScope::with(|buffer| buffer.block(build))
-    } else {
-        let mut buffer = ViewBuffer::new();
-        buffer.block(build).seal(buffer)
-    }
+    })
 }
 
 #[cfg(test)]
@@ -243,7 +243,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::{RegionId, internal::ScopeView};
+    use crate::{RegionId, ViewBuffer};
 
     /// Hoists a comment carrying `text`.
     fn hoist_comment(text: &'static str) {
@@ -276,14 +276,16 @@ mod tests {
     }
 
     impl View for Probe {
-        fn poll_first(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
+        fn poll_first(
+            mut self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            scope: &mut ViewScope,
+        ) -> Poll<Result<ViewFirst>> {
             hoist_comment(self.name);
             if std::mem::replace(&mut self.polled_first, true) {
                 Poll::Ready(Ok(ViewFirst {
-                    content: ViewBufferScope::with(|buffer| {
-                        buffer.block(|writer| {
-                            writer.push_static_str("content");
-                        })
+                    content: scope.block(|writer| {
+                        writer.push_static_str("content");
                     }),
                     live: true,
                 }))
@@ -295,6 +297,7 @@ mod tests {
         fn poll_swap(
             mut self: Pin<&mut Self>,
             _cx: &mut Context<'_>,
+            _scope: &mut ViewScope,
         ) -> Poll<Result<Option<ViewSwap>>> {
             if std::mem::replace(&mut self.polled_swap, true) {
                 return Poll::Ready(Ok(None));
@@ -313,11 +316,12 @@ mod tests {
 
     /// Drives `view` to its first content and renders it.
     fn render_first(view: impl View) -> String {
-        let mut view = pin!(ScopeView::new(view));
+        let mut view = pin!(view);
         let mut cx = Context::from_waker(Waker::noop());
+        let mut scope = ViewScope::new();
         loop {
-            if let Poll::Ready(first) = view.as_mut().poll_first(&mut cx) {
-                return first.unwrap().content.render(&Cx::new());
+            if let Poll::Ready(first) = view.as_mut().poll_first(&mut cx, &mut scope) {
+                return scope.seal(first.unwrap().content).render(&Cx::new());
             }
         }
     }
@@ -338,21 +342,20 @@ mod tests {
 
     #[test]
     fn hoisted_parts_render_ahead_of_the_next_swap() {
-        let mut view = pin!(ScopeView::self_contained(|| HoistView::new(Probe::new(
-            "a"
-        ))));
+        let mut view = pin!(HoistView::new(Probe::new("a")));
         let mut cx = Context::from_waker(Waker::noop());
-        while view.as_mut().poll_first(&mut cx).is_pending() {}
+        let mut scope = ViewScope::new();
+        while view.as_mut().poll_first(&mut cx, &mut scope).is_pending() {}
 
-        let Poll::Ready(Ok(Some(swap))) = view.as_mut().poll_swap(&mut cx) else {
+        let Poll::Ready(Ok(Some(swap))) = view.as_mut().poll_swap(&mut cx, &mut scope) else {
             panic!("expected a swap");
         };
         assert_eq!(
-            swap.replacement.render(&Cx::new()),
+            scope.seal(swap.replacement).render(&Cx::new()),
             "<!--swap-->replacement"
         );
         assert!(matches!(
-            view.as_mut().poll_swap(&mut cx),
+            view.as_mut().poll_swap(&mut cx, &mut scope),
             Poll::Ready(Ok(None))
         ));
     }
@@ -362,7 +365,11 @@ mod tests {
         struct Plain;
 
         impl View for Plain {
-            fn poll_first(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
+            fn poll_first(
+                self: Pin<&mut Self>,
+                _cx: &mut Context<'_>,
+                _scope: &mut ViewScope,
+            ) -> Poll<Result<ViewFirst>> {
                 Poll::Ready(Ok(ViewFirst {
                     content: ViewHandle::empty(),
                     live: false,
@@ -372,6 +379,7 @@ mod tests {
             fn poll_swap(
                 self: Pin<&mut Self>,
                 _cx: &mut Context<'_>,
+                _scope: &mut ViewScope,
             ) -> Poll<Result<Option<ViewSwap>>> {
                 Poll::Ready(Ok(None))
             }
@@ -382,26 +390,40 @@ mod tests {
 
     #[test]
     fn interleaved_siblings_each_collect_their_own_parts() {
-        let mut first = pin!(ScopeView::self_contained(|| HoistView::new(Probe::new(
-            "a"
-        ))));
-        let mut second = pin!(ScopeView::self_contained(|| HoistView::new(Probe::new(
-            "b"
-        ))));
+        let mut first = pin!(HoistView::new(Probe::new("a")));
+        let mut second = pin!(HoistView::new(Probe::new("b")));
         let mut cx = Context::from_waker(Waker::noop());
+        let mut first_scope = ViewScope::new();
+        let mut second_scope = ViewScope::new();
 
         // Interleave the two views across their pending polls.
-        assert!(first.as_mut().poll_first(&mut cx).is_pending());
-        assert!(second.as_mut().poll_first(&mut cx).is_pending());
-        let Poll::Ready(Ok(first)) = first.as_mut().poll_first(&mut cx) else {
+        assert!(
+            first
+                .as_mut()
+                .poll_first(&mut cx, &mut first_scope)
+                .is_pending()
+        );
+        assert!(
+            second
+                .as_mut()
+                .poll_first(&mut cx, &mut second_scope)
+                .is_pending()
+        );
+        let Poll::Ready(Ok(first)) = first.as_mut().poll_first(&mut cx, &mut first_scope) else {
             panic!("expected content");
         };
-        let Poll::Ready(Ok(second)) = second.as_mut().poll_first(&mut cx) else {
+        let Poll::Ready(Ok(second)) = second.as_mut().poll_first(&mut cx, &mut second_scope) else {
             panic!("expected content");
         };
 
-        assert_eq!(first.content.render(&Cx::new()), "<!--a--><!--a-->content");
-        assert_eq!(second.content.render(&Cx::new()), "<!--b--><!--b-->content");
+        assert_eq!(
+            first_scope.seal(first.content).render(&Cx::new()),
+            "<!--a--><!--a-->content"
+        );
+        assert_eq!(
+            second_scope.seal(second.content).render(&Cx::new()),
+            "<!--b--><!--b-->content"
+        );
     }
 
     #[test]
@@ -415,17 +437,16 @@ mod tests {
             fn poll_first(
                 mut self: Pin<&mut Self>,
                 cx: &mut Context<'_>,
+                scope: &mut ViewScope,
             ) -> Poll<Result<ViewFirst>> {
                 hoist_comment("outer");
-                let inner = std::task::ready!(self.inner.as_mut().poll_first(cx))?;
+                let inner = std::task::ready!(self.inner.as_mut().poll_first(cx, scope))?;
                 hoist_comment("outer again");
                 Poll::Ready(Ok(ViewFirst {
-                    content: ViewBufferScope::with(|buffer| {
-                        buffer.block(|writer| {
-                            writer.push_static_str("[");
-                            writer.push_view_handle(inner.content);
-                            writer.push_static_str("]");
-                        })
+                    content: scope.block(|writer| {
+                        writer.push_static_str("[");
+                        writer.push_view_handle(inner.content);
+                        writer.push_static_str("]");
                     }),
                     live: false,
                 }))
@@ -434,6 +455,7 @@ mod tests {
             fn poll_swap(
                 self: Pin<&mut Self>,
                 _cx: &mut Context<'_>,
+                _scope: &mut ViewScope,
             ) -> Poll<Result<Option<ViewSwap>>> {
                 Poll::Ready(Ok(None))
             }
@@ -455,7 +477,11 @@ mod tests {
         struct Boom;
 
         impl View for Boom {
-            fn poll_first(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
+            fn poll_first(
+                self: Pin<&mut Self>,
+                _cx: &mut Context<'_>,
+                _scope: &mut ViewScope,
+            ) -> Poll<Result<ViewFirst>> {
                 hoist_comment("lost");
                 panic!("boom")
             }
@@ -463,6 +489,7 @@ mod tests {
             fn poll_swap(
                 self: Pin<&mut Self>,
                 _cx: &mut Context<'_>,
+                _scope: &mut ViewScope,
             ) -> Poll<Result<Option<ViewSwap>>> {
                 panic!("boom")
             }
@@ -471,7 +498,8 @@ mod tests {
         let mut view = pin!(HoistView::new(Boom));
         let result = catch_unwind(AssertUnwindSafe(|| {
             let mut cx = Context::from_waker(Waker::noop());
-            let _ = view.as_mut().poll_first(&mut cx);
+            let mut scope = ViewScope::new();
+            let _ = view.as_mut().poll_first(&mut cx, &mut scope);
         }));
         assert!(result.is_err());
         // Nothing is collecting any more, so hoisting panics again rather
@@ -501,14 +529,16 @@ mod tests {
     }
 
     impl View for OnceProbe {
-        fn poll_first(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
+        fn poll_first(
+            mut self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            scope: &mut ViewScope,
+        ) -> Poll<Result<ViewFirst>> {
             Self::hoist_twice();
             if std::mem::replace(&mut self.resolved_first, true) {
                 Poll::Ready(Ok(ViewFirst {
-                    content: ViewBufferScope::with(|buffer| {
-                        buffer.block(|writer| {
-                            writer.push_static_str("content");
-                        })
+                    content: scope.block(|writer| {
+                        writer.push_static_str("content");
                     }),
                     live: true,
                 }))
@@ -520,6 +550,7 @@ mod tests {
         fn poll_swap(
             mut self: Pin<&mut Self>,
             _cx: &mut Context<'_>,
+            _scope: &mut ViewScope,
         ) -> Poll<Result<Option<ViewSwap>>> {
             if std::mem::replace(&mut self.resolved_swap, true) {
                 return Poll::Ready(Ok(None));
@@ -536,26 +567,30 @@ mod tests {
 
     #[test]
     fn a_keyed_part_renders_once_per_content() {
-        let mut view = pin!(ScopeView::self_contained(|| HoistView::new(OnceProbe {
+        let mut view = pin!(HoistView::new(OnceProbe {
             resolved_first: false,
             resolved_swap: false,
-        })));
+        }));
         let mut cx = Context::from_waker(Waker::noop());
+        let mut scope = ViewScope::new();
 
         // Two polls, each hoisting both keys twice: one part per key.
         let first = loop {
-            if let Poll::Ready(first) = view.as_mut().poll_first(&mut cx) {
+            if let Poll::Ready(first) = view.as_mut().poll_first(&mut cx, &mut scope) {
                 break first.unwrap();
             }
         };
-        assert_eq!(first.content.render(&Cx::new()), "<!--a--><!--b-->content");
+        assert_eq!(
+            scope.seal(first.content).render(&Cx::new()),
+            "<!--a--><!--b-->content"
+        );
 
         // The swap's replacement is fresh content, so the keys hoist again.
-        let Poll::Ready(Ok(Some(swap))) = view.as_mut().poll_swap(&mut cx) else {
+        let Poll::Ready(Ok(Some(swap))) = view.as_mut().poll_swap(&mut cx, &mut scope) else {
             panic!("expected a swap");
         };
         assert_eq!(
-            swap.replacement.render(&Cx::new()),
+            scope.seal(swap.replacement).render(&Cx::new()),
             "<!--a--><!--b-->replacement"
         );
     }

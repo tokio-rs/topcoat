@@ -1,16 +1,12 @@
-use std::{
-    future::poll_fn,
-    io,
-    pin::{Pin, pin},
-    sync::Arc,
-    task::Poll,
-};
+use std::{future::poll_fn, io, pin::Pin, sync::Arc, task::Poll};
 
 use tokio::sync::oneshot;
 use topcoat::{
     Result,
     context::{ContextMap, Cx},
-    view::{SuspenseMode, View, ViewFirst, ViewSwap, component, emit, live, suspense, view},
+    view::{
+        SuspenseMode, View, ViewFirst, ViewScope, ViewSwap, component, emit, live, suspense, view,
+    },
 };
 
 /// Renders the label the channel delivers, or fails with its error.
@@ -20,21 +16,45 @@ async fn slow(cx: &Cx, rx: oneshot::Receiver<Result<&'static str>>) -> Result<im
     Ok(view! { <i>(label)</i> })
 }
 
-/// Polls `view` for its first content.
-async fn first<V: View>(view: &mut Pin<&mut V>) -> Result<ViewFirst> {
-    poll_fn(|cx| view.as_mut().poll_first(cx)).await
+/// A view polled as the outermost view of a build, together with the scope
+/// it is polled with.
+struct Root<V> {
+    view: Pin<Box<V>>,
+    scope: ViewScope,
+}
+
+impl<V: View> Root<V> {
+    fn new(view: V) -> Self {
+        Self {
+            view: Box::pin(view),
+            scope: ViewScope::new(),
+        }
+    }
+}
+
+/// Polls `root` for its first content.
+async fn first<V: View>(root: &mut Root<V>) -> Result<ViewFirst> {
+    let first = poll_fn(|cx| root.view.as_mut().poll_first(cx, &mut root.scope)).await?;
+    Ok(ViewFirst {
+        content: root.scope.seal(first.content),
+        live: first.live,
+    })
 }
 
 /// Polls for initial content once and returns the result, including `Pending`.
-async fn poll_first_once<V: View>(view: &mut Pin<&mut V>) -> Poll<Result<ViewFirst>> {
-    poll_fn(|cx| Poll::Ready(view.as_mut().poll_first(cx))).await
+async fn poll_first_once<V: View>(root: &mut Root<V>) -> Poll<Result<ViewFirst>> {
+    let poll = poll_fn(|cx| Poll::Ready(root.view.as_mut().poll_first(cx, &mut root.scope))).await;
+    poll.map_ok(|first| ViewFirst {
+        content: root.scope.seal(first.content),
+        live: first.live,
+    })
 }
 
 /// Returns whether a boundary with this context and mode shows its fallback
 /// while the child is pending.
 async fn streams_fallback(cx: &Cx, mode: Option<SuspenseMode>) -> bool {
     let (_tx, rx) = oneshot::channel();
-    let mut view = pin!(view! {
+    let mut view = Root::new(view! {
         suspense(
             fallback: view! { <p>"loading"</p> },
             mode: mode,
@@ -51,16 +71,20 @@ async fn streams_fallback(cx: &Cx, mode: Option<SuspenseMode>) -> bool {
     }
 }
 
-/// Polls `view` for its next swap.
-async fn next_swap<V: View>(view: &mut Pin<&mut V>) -> Result<Option<ViewSwap>> {
-    poll_fn(|cx| view.as_mut().poll_swap(cx)).await
+/// Polls `root` for its next swap.
+async fn next_swap<V: View>(root: &mut Root<V>) -> Result<Option<ViewSwap>> {
+    let swap = poll_fn(|cx| root.view.as_mut().poll_swap(cx, &mut root.scope)).await?;
+    Ok(swap.map(|swap| ViewSwap {
+        region: swap.region,
+        replacement: root.scope.seal(swap.replacement),
+    }))
 }
 
 #[tokio::test]
 async fn suspense_shows_the_fallback_until_the_child_is_ready() {
     let cx = &Cx::new();
     let (tx, rx) = oneshot::channel();
-    let mut view = pin!(view! {
+    let mut view = Root::new(view! {
         suspense(
             fallback: view! { <p>"loading"</p> },
             (view! { <b>"prefix"</b> })
@@ -83,7 +107,7 @@ async fn suspense_shows_the_fallback_until_the_child_is_ready() {
 #[tokio::test]
 async fn suspense_renders_a_ready_child_in_place() {
     let cx = &Cx::new();
-    let mut view = pin!(view! {
+    let mut view = Root::new(view! {
         suspense(
             fallback: view! { <p>"loading"</p> },
             <p>"content"</p>
@@ -101,7 +125,7 @@ async fn suspense_renders_a_ready_child_in_place() {
 #[tokio::test]
 async fn suspense_forwards_a_ready_childs_swaps() {
     let cx = &Cx::new();
-    let mut view = pin!(view! {
+    let mut view = Root::new(view! {
         suspense(
             fallback: view! { <p>"loading"</p> },
             (live! {
@@ -130,7 +154,7 @@ async fn suspense_forwards_a_ready_childs_swaps() {
 async fn suspense_forwards_child_swaps_after_replacing_the_fallback() {
     let cx = &Cx::new();
     let (tx, rx) = oneshot::channel::<()>();
-    let mut view = pin!(view! {
+    let mut view = Root::new(view! {
         suspense(
             fallback: view! { <p>"loading"</p> },
             (live! {
@@ -172,7 +196,7 @@ async fn suspense_forwards_child_swaps_after_replacing_the_fallback() {
 async fn suspense_propagates_a_child_error() {
     let cx = &Cx::new();
     let (tx, rx) = oneshot::channel();
-    let mut view = pin!(view! {
+    let mut view = Root::new(view! {
         suspense(
             fallback: view! { <p>"loading"</p> },
             slow(rx: rx)
@@ -195,7 +219,7 @@ async fn suspense_streams_by_default() {
 async fn waiting_suspense_holds_its_first_content_until_the_child_is_ready() {
     let cx = &Cx::new();
     let (tx, rx) = oneshot::channel();
-    let mut view = pin!(view! {
+    let mut view = Root::new(view! {
         suspense(
             fallback: view! { <p>"loading"</p> },
             mode: SuspenseMode::Wait,
@@ -217,7 +241,7 @@ async fn waiting_suspense_holds_its_first_content_until_the_child_is_ready() {
 async fn waiting_suspense_forwards_a_live_childs_swaps() {
     let cx = &Cx::new();
     let (tx, rx) = oneshot::channel::<()>();
-    let mut view = pin!(view! {
+    let mut view = Root::new(view! {
         suspense(
             fallback: view! { <p>"loading"</p> },
             mode: SuspenseMode::Wait,
@@ -251,7 +275,7 @@ async fn waiting_suspense_forwards_a_live_childs_swaps() {
 async fn waiting_suspense_propagates_a_child_error() {
     let cx = &Cx::new();
     let (tx, rx) = oneshot::channel();
-    let mut view = pin!(view! {
+    let mut view = Root::new(view! {
         suspense(
             fallback: view! { <p>"loading"</p> },
             mode: SuspenseMode::Wait,

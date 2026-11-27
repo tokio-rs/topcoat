@@ -194,11 +194,9 @@ impl ToTokens for Shard {
                         let __owned = cx.clone();
                         let __view = #topcoat_view::internal::MoveView::new(async move {
                             let cx = &__owned;
-                            let __view = #topcoat_view::internal::ScopeView::new(
-                                #topcoat_view::HoistView::new(
-                                    #topcoat_view::internal::ThenView::new(
-                                        #ident::handler(cx, #(#value_idents),*),
-                                    ),
+                            let __view = #topcoat_view::HoistView::new(
+                                #topcoat_view::internal::ThenView::new(
+                                    #ident::handler(cx, #(#value_idents),*),
                                 ),
                             );
                             #topcoat_view::internal::MoveView::drive(__view).await

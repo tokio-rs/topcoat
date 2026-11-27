@@ -6,7 +6,7 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
-use crate::{View, ViewFirst, ViewSwap};
+use crate::{View, ViewFirst, ViewScope, ViewSwap};
 
 pin_project! {
     /// A [`View`] built from a [`Future`] that resolves to one.
@@ -36,24 +36,36 @@ where
     F: Future<Output = Result<V>> + Send,
     V: View,
 {
-    fn poll_first(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
+    fn poll_first(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<ViewFirst>> {
         loop {
             match self.as_mut().project() {
                 ThenViewProj::Future { future } => {
-                    let view = ready!(future.poll(cx))?;
+                    let poll = {
+                        let _installed = scope.install();
+                        future.poll(cx)
+                    };
+                    let view = ready!(poll)?;
                     self.as_mut().set(Self::View { view });
                 }
-                ThenViewProj::View { view } => return view.poll_first(cx),
+                ThenViewProj::View { view } => return view.poll_first(cx, scope),
             }
         }
     }
 
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
+    fn poll_swap(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<Option<ViewSwap>>> {
         match self.project() {
             ThenViewProj::Future { .. } => panic!(
                 "called `.poll_swap` on a `ThenView` that has not yet emitted any `First` content"
             ),
-            ThenViewProj::View { view } => view.poll_swap(cx),
+            ThenViewProj::View { view } => view.poll_swap(cx, scope),
         }
     }
 }

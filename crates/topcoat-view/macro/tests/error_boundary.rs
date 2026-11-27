@@ -1,14 +1,12 @@
-use std::{
-    future::poll_fn,
-    io,
-    pin::{Pin, pin},
-};
+use std::{future::poll_fn, io, pin::Pin};
 
 use tokio::sync::oneshot;
 use topcoat::{
     Result,
     context::Cx,
-    view::{View, ViewExt, ViewFirst, ViewSwap, component, emit, error_boundary, live, view},
+    view::{
+        View, ViewExt, ViewFirst, ViewScope, ViewSwap, component, emit, error_boundary, live, view,
+    },
 };
 
 #[component]
@@ -19,14 +17,38 @@ async fn load(cx: &Cx, fail: bool) -> Result<impl View> {
     Ok(view! { <p>"loaded"</p> })
 }
 
-/// Polls `view` for its first content.
-async fn first<V: View>(view: &mut Pin<&mut V>) -> Result<ViewFirst> {
-    poll_fn(|cx| view.as_mut().poll_first(cx)).await
+/// A view polled as the outermost view of a build, together with the scope
+/// it is polled with.
+struct Root<V> {
+    view: Pin<Box<V>>,
+    scope: ViewScope,
 }
 
-/// Polls `view` for its next swap.
-async fn next_swap<V: View>(view: &mut Pin<&mut V>) -> Result<Option<ViewSwap>> {
-    poll_fn(|cx| view.as_mut().poll_swap(cx)).await
+impl<V: View> Root<V> {
+    fn new(view: V) -> Self {
+        Self {
+            view: Box::pin(view),
+            scope: ViewScope::new(),
+        }
+    }
+}
+
+/// Polls `root` for its first content.
+async fn first<V: View>(root: &mut Root<V>) -> Result<ViewFirst> {
+    let first = poll_fn(|cx| root.view.as_mut().poll_first(cx, &mut root.scope)).await?;
+    Ok(ViewFirst {
+        content: root.scope.seal(first.content),
+        live: first.live,
+    })
+}
+
+/// Polls `root` for its next swap.
+async fn next_swap<V: View>(root: &mut Root<V>) -> Result<Option<ViewSwap>> {
+    let swap = poll_fn(|cx| root.view.as_mut().poll_swap(cx, &mut root.scope)).await?;
+    Ok(swap.map(|swap| ViewSwap {
+        region: swap.region,
+        replacement: root.scope.seal(swap.replacement),
+    }))
 }
 
 #[tokio::test]
@@ -85,7 +107,7 @@ async fn error_boundary_rethrows_an_error_the_fallback_returns() {
 async fn error_boundary_replaces_streamed_content_on_a_late_error() {
     let cx = &Cx::new();
     let (tx, rx) = oneshot::channel::<()>();
-    let mut view = pin!(view! {
+    let mut view = Root::new(view! {
         error_boundary(
             fallback: |error| Ok(view! { <p class="error">(error.to_string())</p> }),
             (live! {
@@ -112,7 +134,7 @@ async fn error_boundary_replaces_streamed_content_on_a_late_error() {
 async fn error_boundary_finishes_after_a_single_emission_fallback() {
     let cx = &Cx::new();
     let (tx, rx) = oneshot::channel::<()>();
-    let mut view = pin!(view! {
+    let mut view = Root::new(view! {
         error_boundary(
             fallback: |error| Ok(live! {
                 emit! { <p class="error">(error.to_string())</p> }
@@ -139,7 +161,7 @@ async fn error_boundary_finishes_after_a_single_emission_fallback() {
 async fn error_boundary_streams_a_multi_emission_fallback_after_a_late_error() {
     let cx = &Cx::new();
     let (tx, rx) = oneshot::channel::<()>();
-    let mut view = pin!(view! {
+    let mut view = Root::new(view! {
         error_boundary(
             fallback: |error| Ok(live! {
                 emit! { <p class="error">(error.to_string())</p> }?;

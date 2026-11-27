@@ -39,32 +39,28 @@ impl Scope {
         }
     }
 
-    /// Emits a top-level view with a buffer scope and an `async move` body.
+    /// Emits a top-level view with an `async move` body.
     ///
     /// The body owns captured values and drives the view before dropping
     /// them, keeping the view's borrows valid.
     pub fn emit_view(&self) -> TokenStream {
         let inner = self.emit_driven();
         quote! {
-            #topcoat_view::internal::ScopeView::new(
-                #topcoat_view::internal::MoveView::new(async move {
-                    let cx: &#topcoat_context::Cx = &cx;
-                    #inner
-                })
-            )
+            #topcoat_view::internal::MoveView::new(async move {
+                let cx: &#topcoat_context::Cx = &cx;
+                #inner
+            })
         }
     }
 
-    /// Emits a view with its own buffer for an `emit!` invocation.
+    /// Emits a closure that builds the view of an `emit!` invocation.
     ///
-    /// Construction and polling use the same buffer, so emitted content
-    /// is self-contained. The caller awaits the view in place. Its
-    /// expressions can therefore borrow from the enclosing block.
+    /// The caller runs the closure once its own buffer is in place and
+    /// awaits the view there. The view's expressions can therefore borrow
+    /// from the enclosing block.
     pub fn emit_emit(&self) -> TokenStream {
         let inner = self.emit_inert();
-        quote! {
-            #topcoat_view::internal::ScopeView::self_contained(|| #inner)
-        }
+        quote! { || #inner }
     }
 
     /// Emits a block that evaluates expressions in source order and
@@ -127,24 +123,20 @@ mod tests {
     }
 
     #[test]
-    fn a_root_view_is_a_scoped_move_view_driving_its_body() {
+    fn a_root_view_is_a_move_view_driving_its_body() {
         let out = rendered(ViewBuilder::new());
         assert!(
-            out.starts_with(":: topcoat_view :: internal :: ScopeView :: new ("),
+            out.starts_with(":: topcoat_view :: internal :: MoveView :: new (async move"),
             "{out}"
         );
-        assert!(out.contains("MoveView :: new (async move"), "{out}");
         assert!(out.contains("MoveView :: drive ("), "{out}");
-        assert!(out.ends_with(". await } }))"), "{out}");
+        assert!(out.ends_with(". await } })"), "{out}");
     }
 
     #[test]
-    fn an_emitted_root_is_a_self_contained_scope_over_its_body() {
+    fn an_emitted_root_is_a_closure_over_its_body() {
         let out = ViewBuilder::new().finish().emit_emit().to_string();
-        assert!(
-            out.starts_with(":: topcoat_view :: internal :: ScopeView :: self_contained (||"),
-            "{out}"
-        );
+        assert!(out.starts_with("||"), "{out}");
         // The body is emitted inline, so it is neither moved into an async
         // block nor driven: the caller awaits it where it is emitted.
         assert!(!out.contains("MoveView"), "{out}");
@@ -162,7 +154,7 @@ mod tests {
         let block = out.find("{ let x = & value ()").expect(&out);
         let drive = out.find("MoveView :: drive (").expect(&out);
         assert!(block < drive, "{out}");
-        assert!(out.ends_with(". await } }))"), "{out}");
+        assert!(out.ends_with(". await } })"), "{out}");
     }
 
     #[test]

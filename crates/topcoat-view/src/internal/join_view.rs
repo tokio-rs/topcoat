@@ -7,7 +7,7 @@ use pin_project_lite::pin_project;
 use topcoat_core::{context::Cx, error::Result};
 
 use super::Builder;
-use crate::{View, ViewFirst, ViewHandle, ViewSwap};
+use crate::{View, ViewFirst, ViewHandle, ViewScope, ViewSwap};
 
 pin_project! {
     /// A [`View`] that renders dynamic nodes concurrently.
@@ -50,13 +50,17 @@ where
     U: JoinUnits + Send,
     F: FnOnce(&mut Builder<'_, '_, '_>, U::Contents) + Send,
 {
-    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
+    fn poll_first(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<ViewFirst>> {
         let mut this = self.project();
-        ready!(this.units.as_mut().poll_contents(cx))?;
+        ready!(this.units.as_mut().poll_contents(cx, scope))?;
 
         let contents = this.units.as_mut().take_contents();
         let burst = this.burst.take().expect("the burst runs once");
-        let content = Builder::block(this.cx, |builder| burst(builder, contents));
+        let content = Builder::block_in(scope, this.cx, |builder| burst(builder, contents));
 
         Poll::Ready(Ok(ViewFirst {
             content,
@@ -64,7 +68,11 @@ where
         }))
     }
 
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
+    fn poll_swap(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<Option<ViewSwap>>> {
         let mut this = self.project();
 
         // One full turn around the ring in two range scans, so every
@@ -73,7 +81,7 @@ where
         let start = *this.next_swap_index;
         let mut all_done = true;
         for (from, to) in [(start, len), (0, start)] {
-            match this.units.as_mut().poll_swap_range(cx, from, to) {
+            match this.units.as_mut().poll_swap_range(cx, scope, from, to) {
                 Poll::Pending => all_done = false,
                 Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
                 Poll::Ready(Ok(None)) => {}
@@ -109,7 +117,11 @@ pub trait JoinUnits {
     type Contents;
 
     /// Polls pending units until all have initial content or one fails.
-    fn poll_contents(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>>;
+    fn poll_contents(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<()>>;
 
     /// Takes the resolved contents out of the units.
     fn take_contents(self: Pin<&mut Self>) -> Self::Contents;
@@ -122,6 +134,7 @@ pub trait JoinUnits {
     fn poll_swap_range(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
+        scope: &mut ViewScope,
         from: usize,
         to: usize,
     ) -> Poll<Result<Option<(usize, ViewSwap)>>>;
@@ -132,7 +145,11 @@ impl JoinUnits for () {
 
     type Contents = ();
 
-    fn poll_contents(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<()>> {
+    fn poll_contents(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        _scope: &mut ViewScope,
+    ) -> Poll<Result<()>> {
         Poll::Ready(Ok(()))
     }
 
@@ -145,6 +162,7 @@ impl JoinUnits for () {
     fn poll_swap_range(
         self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
+        _scope: &mut ViewScope,
         _from: usize,
         _to: usize,
     ) -> Poll<Result<Option<(usize, ViewSwap)>>> {
@@ -186,13 +204,17 @@ where
 
     type Contents = ViewHandle;
 
-    fn poll_contents(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
+    fn poll_contents(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<()>> {
         let this = self.project();
         if this.content.is_some() {
             return Poll::Ready(Ok(()));
         }
 
-        let ViewFirst { content, live } = ready!(this.view.poll_first(cx))?;
+        let ViewFirst { content, live } = ready!(this.view.poll_first(cx, scope))?;
         *this.content = Some(content);
         *this.done = !live;
         Poll::Ready(Ok(()))
@@ -212,6 +234,7 @@ where
     fn poll_swap_range(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
+        scope: &mut ViewScope,
         from: usize,
         to: usize,
     ) -> Poll<Result<Option<(usize, ViewSwap)>>> {
@@ -220,7 +243,7 @@ where
             return Poll::Ready(Ok(None));
         }
 
-        let swap = ready!(this.view.poll_swap(cx))?;
+        let swap = ready!(this.view.poll_swap(cx, scope))?;
         if swap.is_none() {
             *this.done = true;
         }
@@ -259,12 +282,16 @@ where
 
     type Contents = (L::Contents, R::Contents);
 
-    fn poll_contents(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
+    fn poll_contents(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<()>> {
         let this = self.project();
         // Both sides are polled even if one is pending, so every unit makes
         // progress on each poll.
-        let left = this.left.poll_contents(cx)?;
-        let right = this.right.poll_contents(cx)?;
+        let left = this.left.poll_contents(cx, scope)?;
+        let right = this.right.poll_contents(cx, scope)?;
         ready!(left);
         right.map(Ok)
     }
@@ -281,6 +308,7 @@ where
     fn poll_swap_range(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
+        scope: &mut ViewScope,
         from: usize,
         to: usize,
     ) -> Poll<Result<Option<(usize, ViewSwap)>>> {
@@ -289,7 +317,7 @@ where
         let mut pending = false;
 
         if from < split {
-            match this.left.poll_swap_range(cx, from, to.min(split))? {
+            match this.left.poll_swap_range(cx, scope, from, to.min(split))? {
                 Poll::Ready(Some(swap)) => return Poll::Ready(Ok(Some(swap))),
                 Poll::Ready(None) => {}
                 Poll::Pending => pending = true,
@@ -299,7 +327,7 @@ where
         if to > split {
             match this
                 .right
-                .poll_swap_range(cx, from.saturating_sub(split), to - split)?
+                .poll_swap_range(cx, scope, from.saturating_sub(split), to - split)?
             {
                 Poll::Ready(Some((position, swap))) => {
                     return Poll::Ready(Ok(Some((position + split, swap))));
@@ -334,7 +362,11 @@ mod tests {
     }
 
     impl View for Ticker {
-        fn poll_first(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
+        fn poll_first(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            _scope: &mut ViewScope,
+        ) -> Poll<Result<ViewFirst>> {
             Poll::Ready(Ok(ViewFirst {
                 content: ViewHandle::empty(),
                 live: true,
@@ -344,6 +376,7 @@ mod tests {
         fn poll_swap(
             self: Pin<&mut Self>,
             _cx: &mut Context<'_>,
+            _scope: &mut ViewScope,
         ) -> Poll<Result<Option<ViewSwap>>> {
             let this = self.get_mut();
             if this.remaining == 0 {
@@ -375,9 +408,10 @@ mod tests {
         let mut view = std::pin::pin!(JoinView::new(&cx, units, |_, _| ()));
 
         let mut task_cx = Context::from_waker(Waker::noop());
+        let mut scope = ViewScope::new();
         let mut order = Vec::new();
         loop {
-            match view.as_mut().poll_swap(&mut task_cx) {
+            match view.as_mut().poll_swap(&mut task_cx, &mut scope) {
                 Poll::Ready(Ok(Some(swap))) => order.push(swap.region),
                 Poll::Ready(Ok(None)) => break,
                 Poll::Ready(Err(_)) => panic!("the tickers never fail"),

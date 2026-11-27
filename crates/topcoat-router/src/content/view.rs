@@ -15,7 +15,8 @@ use topcoat_core::{
     error::Result,
 };
 use topcoat_view::{
-    BoxView, Formatter, RegionId, View, ViewExt, ViewHandle, ViewSwap, internal::MoveView,
+    BoxView, Formatter, RegionId, View, ViewExt, ViewHandle, ViewScope, ViewSwap,
+    internal::MoveView,
 };
 
 use crate::{
@@ -210,8 +211,9 @@ where
 async fn stream<V: View + Unpin + 'static>(mut view: V, cx: &Cx) -> Result<Response> {
     let delivery = view_response_delivery(cx);
     let mut pinned_view = Pin::new(&mut view);
-    let first = poll_fn(|cx| pinned_view.as_mut().poll_first(cx)).await?;
-    let rendered = first.content.render_response(cx);
+    let mut scope = ViewScope::new();
+    let first = poll_fn(|cx| pinned_view.as_mut().poll_first(cx, &mut scope)).await?;
+    let rendered = scope.seal(first.content).render_response(cx);
     let first_content = delivery.first(rendered.html);
     if first.live {
         let body = ViewBody {
@@ -220,6 +222,7 @@ async fn stream<V: View + Unpin + 'static>(mut view: V, cx: &Cx) -> Result<Respo
             script: (delivery == ViewResponseDelivery::Html).then_some(SWAP_SCRIPT),
             delivery,
             done: false,
+            scope,
             view,
         };
         view_response(
@@ -328,6 +331,8 @@ pin_project! {
         // Whether the view has reported it has no further swaps. Polling a
         // view past that point resumes a future that already completed.
         done: bool,
+        // The scope the first content was polled with, kept for the swaps.
+        scope: ViewScope,
         #[pin]
         view: V,
     }
@@ -348,8 +353,12 @@ impl<V: View + 'static> http_body::Body for ViewBody<V> {
         if *this.done {
             return Poll::Ready(None);
         }
-        match this.view.poll_swap(cx) {
+        match this.view.poll_swap(cx, this.scope) {
             Poll::Ready(Ok(Some(swap))) => {
+                let swap = ViewSwap {
+                    region: swap.region,
+                    replacement: this.scope.seal(swap.replacement),
+                };
                 let chunk = this.delivery.swap(this.cx, swap, this.script.take());
                 Poll::Ready(Some(Ok(Frame::data(chunk.into()))))
             }

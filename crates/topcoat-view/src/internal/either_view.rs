@@ -6,7 +6,7 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
-use crate::{View, ViewFirst, ViewSwap};
+use crate::{View, ViewFirst, ViewScope, ViewSwap};
 
 pin_project! {
     /// Unifies the branch values of an `if`/`else` or `match` in node
@@ -39,17 +39,25 @@ where
     A: View,
     B: View,
 {
-    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
+    fn poll_first(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<ViewFirst>> {
         match self.project() {
-            EitherViewProj::Left { view } => view.poll_first(cx),
-            EitherViewProj::Right { view } => view.poll_first(cx),
+            EitherViewProj::Left { view } => view.poll_first(cx, scope),
+            EitherViewProj::Right { view } => view.poll_first(cx, scope),
         }
     }
 
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
+    fn poll_swap(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<Option<ViewSwap>>> {
         match self.project() {
-            EitherViewProj::Left { view } => view.poll_swap(cx),
-            EitherViewProj::Right { view } => view.poll_swap(cx),
+            EitherViewProj::Left { view } => view.poll_swap(cx, scope),
+            EitherViewProj::Right { view } => view.poll_swap(cx, scope),
         }
     }
 }

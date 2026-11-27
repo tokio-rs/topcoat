@@ -128,9 +128,12 @@ mod tests {
     }
 
     #[test]
-    fn an_emitted_view_is_self_contained() {
+    fn an_emitted_view_is_built_by_its_drive() {
         let tokens = emit("<div></div>");
-        assert!(tokens.contains("ScopeView :: self_contained ("), "{tokens}");
+        assert!(
+            tokens.contains("LiveView :: drive (__region , ||"),
+            "{tokens}"
+        );
     }
 
     #[test]

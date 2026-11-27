@@ -2,8 +2,7 @@ use topcoat_core::context::Cx;
 
 use crate::{
     Attribute, AttributeKeyViewParts, AttributeValueViewParts, AttributeViewParts, HtmlContext,
-    NodeViewParts, PartsWriter, PromotedStr, ViewHandle, buffer::ViewBufferScope,
-    html::ElementNameViewParts,
+    NodeViewParts, PartsWriter, PromotedStr, ViewHandle, ViewScope, html::ElementNameViewParts,
 };
 
 /// The handle a template's burst pushes its parts through.
@@ -39,7 +38,19 @@ impl<'a, 'b, 'c> Builder<'a, 'b, 'c> {
     ///
     /// Panics if no view is building on the current task.
     pub fn block(cx: &Cx, f: impl FnOnce(&mut Builder<'_, '_, '_>)) -> ViewHandle {
-        ViewBufferScope::with(|buffer| buffer.block(|parts| f(&mut Builder::new(cx, parts))))
+        let mut scope = ViewScope::reclaim().expect("no view is building on the current task");
+        Self::block_in(&mut scope, cx, f)
+    }
+
+    /// Appends one view's instruction block to the buffer of `scope`, like
+    /// [`block`](Self::block) does for the build running on the current
+    /// task.
+    pub fn block_in(
+        scope: &mut ViewScope,
+        cx: &Cx,
+        f: impl FnOnce(&mut Builder<'_, '_, '_>),
+    ) -> ViewHandle {
+        scope.block(|parts| f(&mut Builder::new(cx, parts)))
     }
     /// Appends a literal markup segment, verbatim.
     ///

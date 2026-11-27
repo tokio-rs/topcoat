@@ -6,8 +6,8 @@ use std::{
 use topcoat_core::error::Result;
 
 use crate::{
-    BoxView, View, ViewFirst, ViewSwap,
-    internal::{LiveView, MoveView, ScopeView},
+    BoxView, View, ViewFirst, ViewScope, ViewSwap,
+    internal::{LiveView, MoveView},
 };
 
 /// Child content passed to a component.
@@ -61,27 +61,30 @@ macro_rules! child_from_view {
 }
 
 child_from_view! {
-    /// A `view!` template passes as child content.
-    impl<V> for ScopeView<V>
-}
-
-child_from_view! {
     /// A `live!` region passes as child content.
     impl<Fut> for LiveView<Fut>
 }
 
 child_from_view! {
-    /// A captured view block passes as child content.
+    /// A `view!` template passes as child content.
     impl<Fut> for MoveView<Fut>
 }
 
 /// The children's view polls through in place.
 impl View for Child<'_> {
-    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
-        self.get_mut().view.as_mut().poll_first(cx)
+    fn poll_first(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<ViewFirst>> {
+        self.get_mut().view.as_mut().poll_first(cx, scope)
     }
 
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
-        self.get_mut().view.as_mut().poll_swap(cx)
+    fn poll_swap(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<Option<ViewSwap>>> {
+        self.get_mut().view.as_mut().poll_swap(cx, scope)
     }
 }

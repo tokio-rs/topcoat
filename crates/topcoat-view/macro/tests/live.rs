@@ -1,13 +1,9 @@
-use std::{
-    future::poll_fn,
-    io,
-    pin::{Pin, pin},
-};
+use std::{future::poll_fn, io, pin::Pin};
 
 use topcoat::{
     Result,
     context::Cx,
-    view::{View, ViewExt, ViewFirst, ViewSwap, component, emit, live, view},
+    view::{View, ViewExt, ViewFirst, ViewScope, ViewSwap, component, emit, live, view},
 };
 
 #[component]
@@ -18,14 +14,38 @@ async fn load(cx: &Cx, fail: bool) -> Result<impl View> {
     Ok(view! { <p>"loaded"</p> })
 }
 
-/// Polls `view` for its first content.
-async fn first<V: View>(view: &mut Pin<&mut V>) -> Result<ViewFirst> {
-    poll_fn(|cx| view.as_mut().poll_first(cx)).await
+/// A view polled as the outermost view of a build, together with the scope
+/// it is polled with.
+struct Root<V> {
+    view: Pin<Box<V>>,
+    scope: ViewScope,
 }
 
-/// Polls `view` for its next swap.
-async fn next_swap<V: View>(view: &mut Pin<&mut V>) -> Result<Option<ViewSwap>> {
-    poll_fn(|cx| view.as_mut().poll_swap(cx)).await
+impl<V: View> Root<V> {
+    fn new(view: V) -> Self {
+        Self {
+            view: Box::pin(view),
+            scope: ViewScope::new(),
+        }
+    }
+}
+
+/// Polls `root` for its first content.
+async fn first<V: View>(root: &mut Root<V>) -> Result<ViewFirst> {
+    let first = poll_fn(|cx| root.view.as_mut().poll_first(cx, &mut root.scope)).await?;
+    Ok(ViewFirst {
+        content: root.scope.seal(first.content),
+        live: first.live,
+    })
+}
+
+/// Polls `root` for its next swap.
+async fn next_swap<V: View>(root: &mut Root<V>) -> Result<Option<ViewSwap>> {
+    let swap = poll_fn(|cx| root.view.as_mut().poll_swap(cx, &mut root.scope)).await?;
+    Ok(swap.map(|swap| ViewSwap {
+        region: swap.region,
+        replacement: root.scope.seal(swap.replacement),
+    }))
 }
 
 #[tokio::test]
@@ -43,7 +63,7 @@ async fn region_emitting_once_renders_as_plain_content() {
 #[tokio::test]
 async fn region_emitting_once_is_not_live() {
     let cx = &Cx::new();
-    let mut view = pin!(view! { <main>(live! { emit! { load(fail: false) } })</main> });
+    let mut view = Root::new(view! { <main>(live! { emit! { load(fail: false) } })</main> });
 
     assert!(!first(&mut view).await.unwrap().live);
     assert!(next_swap(&mut view).await.unwrap().is_none());
@@ -156,7 +176,7 @@ async fn region_hoisting_sync_control_flow_renders() {
 #[tokio::test]
 async fn swapped_emission_hoisting_sync_control_flow_renders() {
     let cx = &Cx::new();
-    let mut view = pin!(view! {
+    let mut view = Root::new(view! {
         <main>
             (live! {
                 emit! { <p>"first"</p> }?;
@@ -183,7 +203,7 @@ async fn swapped_emission_hoisting_sync_control_flow_renders() {
 #[tokio::test]
 async fn region_emitting_twice_swaps_its_content() {
     let cx = &Cx::new();
-    let mut view = pin!(view! {
+    let mut view = Root::new(view! {
         <main>
             (live! {
                 emit! { <p>"first"</p> }?;
@@ -216,7 +236,7 @@ async fn region_ids_are_stable_across_root_views() {
     let mut previous = None;
     for _ in 0..2 {
         let cx = &Cx::new();
-        let mut view = pin!(view! {
+        let mut view = Root::new(view! {
             <main>
                 (live! {
                     emit! { <p>"first"</p> }?;
@@ -247,7 +267,7 @@ async fn region_ids_are_stable_across_root_views() {
 #[tokio::test]
 async fn region_emitting_three_times_swaps_its_content_twice() {
     let cx = &Cx::new();
-    let mut view = pin!(view! {
+    let mut view = Root::new(view! {
         <main>
             (live! {
                 emit! { <p>"one"</p> }?;
@@ -268,7 +288,7 @@ async fn region_emitting_three_times_swaps_its_content_twice() {
 #[tokio::test]
 async fn first_loop_iteration_delivers_its_swap() {
     let cx = &Cx::new();
-    let mut view = pin!(view! {
+    let mut view = Root::new(view! {
         <ul>
             #[key(label)]
             for label in ["only"] {
@@ -289,7 +309,7 @@ async fn first_loop_iteration_delivers_its_swap() {
 #[tokio::test]
 async fn live_loop_iterations_take_turns_swapping() {
     let cx = &Cx::new();
-    let mut view = pin!(view! {
+    let mut view = Root::new(view! {
         <ul>
             #[key(label)]
             for label in ["a", "b"] {
@@ -330,7 +350,7 @@ async fn single_panics_on_a_region_that_may_update() {
 #[tokio::test]
 async fn joined_emissions_all_reach_the_region() {
     let cx = &Cx::new();
-    let mut view = pin!(view! {
+    let mut view = Root::new(view! {
         <main>
             (live! {
                 let (a, b) = tokio::join!(
@@ -363,7 +383,7 @@ async fn joined_emissions_all_reach_the_region() {
 #[tokio::test]
 async fn joined_emissions_deliver_the_swaps_of_a_nested_region() {
     let cx = &Cx::new();
-    let mut view = pin!(view! {
+    let mut view = Root::new(view! {
         <main>
             (live! {
                 let (a, b) = tokio::join!(

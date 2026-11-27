@@ -7,7 +7,7 @@ use std::{
 
 use topcoat_core::error::Result;
 
-use crate::{RegionId, buffer::ViewHandle};
+use crate::{RegionId, ViewScope, buffer::ViewHandle};
 
 /// The initial content returned by [`View::poll_first`].
 #[derive(Debug)]
@@ -41,18 +41,29 @@ pub struct EmitToken;
 /// If it is live, call [`poll_swap`](Self::poll_swap) for region updates
 /// until it returns `None`.
 ///
+/// Both methods take the [`ViewScope`] of the build the view takes part in.
+/// A view passes it on to every view it polls.
+///
 /// The `view!` and `live!` macros build implementations of this trait;
 /// application code composes those rather than implementing it by hand.
 pub trait View: Send {
     /// Resolves the view's first content.
-    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>>;
+    fn poll_first(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<ViewFirst>>;
 
     /// Yields the next replacement for a region of the first content, or
     /// `None` when the view is done changing.
     ///
     /// Only meaningful after [`poll_first`](Self::poll_first) resolved to
     /// live content.
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>>;
+    fn poll_swap(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<Option<ViewSwap>>>;
 }
 
 /// Methods available on every [`View`].
@@ -66,8 +77,9 @@ pub trait ViewExt: View {
     {
         async move {
             let mut view = pin!(self);
-            let first = poll_fn(|cx| view.as_mut().poll_first(cx)).await?;
-            Ok(first.content)
+            let mut scope = ViewScope::new();
+            let first = poll_fn(|cx| view.as_mut().poll_first(cx, &mut scope)).await?;
+            Ok(scope.seal(first.content))
         }
     }
 
@@ -82,9 +94,10 @@ pub trait ViewExt: View {
     {
         async move {
             let mut view = pin!(self);
-            let first = poll_fn(|cx| view.as_mut().poll_first(cx)).await?;
+            let mut scope = ViewScope::new();
+            let first = poll_fn(|cx| view.as_mut().poll_first(cx, &mut scope)).await?;
             assert!(!first.live, "used `.single()` on a View that is live");
-            Ok(first.content)
+            Ok(scope.seal(first.content))
         }
     }
 
@@ -104,14 +117,22 @@ impl<V: View + ?Sized> ViewExt for V {}
 
 /// The empty view: renders nothing and never changes.
 impl View for () {
-    fn poll_first(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
+    fn poll_first(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        _scope: &mut ViewScope,
+    ) -> Poll<Result<ViewFirst>> {
         Poll::Ready(Ok(ViewFirst {
             content: ViewHandle::empty(),
             live: false,
         }))
     }
 
-    fn poll_swap(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
+    fn poll_swap(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        _scope: &mut ViewScope,
+    ) -> Poll<Result<Option<ViewSwap>>> {
         Poll::Ready(Ok(None))
     }
 }
@@ -125,11 +146,19 @@ where
     P: DerefMut + Unpin + Send,
     P::Target: View,
 {
-    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
-        self.get_mut().as_mut().poll_first(cx)
+    fn poll_first(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<ViewFirst>> {
+        self.get_mut().as_mut().poll_first(cx, scope)
     }
 
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
-        self.get_mut().as_mut().poll_swap(cx)
+    fn poll_swap(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<Option<ViewSwap>>> {
+        self.get_mut().as_mut().poll_swap(cx, scope)
     }
 }

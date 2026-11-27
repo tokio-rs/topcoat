@@ -5,7 +5,7 @@ use std::{
 
 use topcoat_core::error::Result;
 
-use crate::{View, ViewBufferScope, ViewFirst, ViewSwap};
+use crate::{View, ViewFirst, ViewScope, ViewSwap};
 
 /// The bodies of a `for` loop in node position, as one [`View`].
 ///
@@ -50,14 +50,18 @@ impl<V> View for LoopView<V>
 where
     V: View + Unpin,
 {
-    fn poll_first(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
+    fn poll_first(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<ViewFirst>> {
         let mut all_ready = true;
         for body in &mut self.bodies {
             if body.ready.is_some() {
                 continue;
             }
 
-            match Pin::new(&mut body.view).poll_first(cx) {
+            match Pin::new(&mut body.view).poll_first(cx, scope) {
                 Poll::Pending => all_ready = false,
                 Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
                 Poll::Ready(Ok(first)) => {
@@ -69,14 +73,12 @@ where
 
         if all_ready {
             let mut live = false;
-            let handle = ViewBufferScope::with(|buffer| {
-                buffer.block(|parts| {
-                    for body in &mut self.bodies {
-                        let first = body.ready.take().expect("all loop bodies are ready");
-                        parts.push_view_handle(first.content);
-                        live |= first.live;
-                    }
-                })
+            let handle = scope.block(|parts| {
+                for body in &mut self.bodies {
+                    let first = body.ready.take().expect("all loop bodies are ready");
+                    parts.push_view_handle(first.content);
+                    live |= first.live;
+                }
             });
             Poll::Ready(Ok(ViewFirst {
                 content: handle,
@@ -87,7 +89,11 @@ where
         }
     }
 
-    fn poll_swap(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
+    fn poll_swap(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<Option<ViewSwap>>> {
         // One full turn around the ring, so every waiting body is polled
         // before this view settles on pending.
         let len = self.bodies.len();
@@ -98,7 +104,7 @@ where
             if body.done {
                 continue;
             }
-            match Pin::new(&mut body.view).poll_swap(cx) {
+            match Pin::new(&mut body.view).poll_swap(cx, scope) {
                 Poll::Pending => all_done = false,
                 Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
                 Poll::Ready(Ok(None)) => body.done = true,

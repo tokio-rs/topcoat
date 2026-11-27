@@ -10,6 +10,7 @@ mod hoist;
 mod html;
 mod props;
 mod region;
+mod scope;
 mod string;
 pub mod svg;
 mod view;
@@ -24,6 +25,7 @@ pub use hoist::*;
 pub use html::*;
 pub use props::*;
 pub use region::*;
+pub use scope::*;
 pub use string::*;
 pub use view::*;
 

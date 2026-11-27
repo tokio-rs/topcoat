@@ -7,10 +7,8 @@ mod live_view;
 mod loop_view;
 mod move_view;
 mod node_classify;
-mod scope_view;
 mod suspense_view;
 mod then_view;
-mod yielder;
 
 pub use builder::*;
 pub use capture::*;
@@ -21,6 +19,5 @@ pub use live_view::*;
 pub use loop_view::*;
 pub use move_view::*;
 pub use node_classify::*;
-pub use scope_view::*;
 pub use suspense_view::*;
 pub use then_view::*;

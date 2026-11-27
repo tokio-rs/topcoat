@@ -14,7 +14,7 @@ use topcoat::{
     context::Cx,
     router::{Body, Route, Router, request::IDENTITY_HEADER, response::Response, to_bytes},
     runtime::{Signal, shard, signal},
-    view::{View, ViewExt, component, emit, live, view},
+    view::{View, ViewExt, ViewScope, component, emit, live, view},
 };
 
 #[shard]
@@ -94,14 +94,19 @@ async fn region_probe(cx: &Cx) -> Result<impl View> {
 /// collects the region id and HTML of every update in order.
 async fn drive(cx: &Cx, view: impl View) -> (String, Vec<(String, String)>) {
     let mut view = pin!(view);
-    let first = poll_fn(|task| view.as_mut().poll_first(task))
+    let mut scope = ViewScope::new();
+    let first = poll_fn(|task| view.as_mut().poll_first(task, &mut scope))
         .await
         .unwrap();
-    let html = first.content.render(cx);
+    let html = scope.seal(first.content).render(cx);
     let mut swaps = Vec::new();
     if first.live {
-        while let Some(swap) = poll_fn(|task| view.as_mut().poll_swap(task)).await.unwrap() {
-            swaps.push((swap.region.to_string(), swap.replacement.render(cx)));
+        while let Some(swap) = poll_fn(|task| view.as_mut().poll_swap(task, &mut scope))
+            .await
+            .unwrap()
+        {
+            let replacement = scope.seal(swap.replacement);
+            swaps.push((swap.region.to_string(), replacement.render(cx)));
         }
     }
     (html, swaps)

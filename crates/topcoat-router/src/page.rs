@@ -1,10 +1,7 @@
 use std::{any::Any, borrow::Cow};
 
 use topcoat_core::context::{ContextMap, Cx};
-use topcoat_view::{
-    BoxView, Child,
-    internal::{MoveView, ScopeView},
-};
+use topcoat_view::{BoxView, Child, internal::MoveView};
 
 use crate::{
     Body, Handler, IntoPath, Methods, OwnedMethods, Path, RouteFuture, RouteId,
@@ -321,7 +318,7 @@ pub(crate) fn respond_with_page(cx: &Cx, body: Body) -> RouteFuture<'_> {
                 panic!("the request did not match a page");
             };
             let view = render(page, layouts, &owned, body);
-            MoveView::drive(ScopeView::new(view)).await
+            MoveView::drive(view).await
         });
         view.async_into_response(cx).await
     })

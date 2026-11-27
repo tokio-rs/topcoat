@@ -5,8 +5,8 @@ use http::{HeaderMap, StatusCode};
 use topcoat_core::context::Cx;
 
 use crate::{
-    Formatter,
-    buffer::{InstructionPtr, Renderer, ViewBuffer, ViewBufferId, ViewBufferScope},
+    Formatter, ViewScope,
+    buffer::{InstructionPtr, Renderer, ViewBuffer, ViewBufferId},
 };
 
 /// A handle to an HTML fragment.
@@ -98,6 +98,23 @@ impl ViewHandle {
         match &self.repr {
             ViewRepr::Static(body) => body.len(),
             ViewRepr::Scoped { size_hint, .. } | ViewRepr::Owned { size_hint, .. } => *size_hint,
+        }
+    }
+
+    /// Makes a nested handle self-contained by taking the buffer its
+    /// instructions were appended to out of `buffer`, which is left empty.
+    ///
+    /// A handle that is self-contained already passes through, and `buffer`
+    /// is left as it is.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the handle's instructions live in a different buffer.
+    #[must_use]
+    pub(crate) fn seal_from(self, buffer: &mut ViewBuffer) -> Self {
+        match self.repr {
+            ViewRepr::Static(_) | ViewRepr::Owned { .. } => self,
+            ViewRepr::Scoped { .. } => self.seal(std::mem::take(buffer)),
         }
     }
 
@@ -229,13 +246,16 @@ impl ViewHandle {
     pub fn render_into(self, cx: &Cx, f: &mut Formatter<'_>) {
         match self.repr {
             ViewRepr::Static(body) => f.write_str(body),
-            ViewRepr::Scoped { buffer, entry, .. } => ViewBufferScope::with(|active| {
+            ViewRepr::Scoped { buffer, entry, .. } => {
+                let mut scope = ViewScope::reclaim()
+                    .expect("tried to render a nested view handle outside of a build");
+                let active = scope.buffer();
                 assert!(
                     active.id() == buffer,
                     "tried to render a nested view handle outside the build it was built in",
                 );
                 Renderer::new(active, entry).execute(cx, f);
-            }),
+            }
             ViewRepr::Owned { buffer, entry, .. } => {
                 Renderer::new(&buffer, entry).execute(cx, f);
             }
@@ -280,14 +300,11 @@ mod tests {
     }
 
     /// Runs `f` with a build active on the current thread and returns its
-    /// output alongside the build's buffer.
-    fn in_scope<R>(f: impl FnOnce() -> R) -> (R, ViewBuffer) {
-        let mut slot = Some(Box::new(ViewBuffer::new()));
-        let output = {
-            let _buffer = ViewBufferScope::new(&mut slot);
-            f()
-        };
-        (output, *slot.expect("the buffer was swapped back on exit"))
+    /// output.
+    fn in_scope<R>(f: impl FnOnce() -> R) -> R {
+        let mut scope = ViewScope::new();
+        let _installed = scope.install();
+        f()
     }
 
     #[test]
@@ -388,19 +405,19 @@ mod tests {
 
     #[test]
     fn a_nested_view_renders_inside_its_build() {
-        let (rendered, _buffer) = in_scope(|| {
-            let view = ViewBufferScope::with(|buffer| {
-                buffer.block(|parts| {
+        let rendered = in_scope(|| {
+            let view = ViewScope::reclaim()
+                .expect("a build is active")
+                .block(|parts| {
                     parts.push_str("a < b");
-                })
-            });
+                });
             view.render(&Cx::new())
         });
         assert_eq!(rendered, "a &lt; b");
     }
 
     #[test]
-    #[should_panic(expected = "outside of a `ViewBufferScope`")]
+    #[should_panic(expected = "outside of a build")]
     fn rendering_a_nested_view_outside_any_build_panics() {
         let mut buffer = ViewBuffer::new();
         let view = nested(&mut buffer, |_parts| {});

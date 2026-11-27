@@ -5,7 +5,9 @@ use std::{
 
 use pin_project_lite::pin_project;
 use topcoat_core::{context::Cx, error::Result, identity::Identity};
-use topcoat_view::{NodeViewParts, PartsWriter, View, ViewFirst, ViewSwap, internal::Builder};
+use topcoat_view::{
+    NodeViewParts, PartsWriter, View, ViewFirst, ViewScope, ViewSwap, internal::Builder,
+};
 
 use crate::Js;
 
@@ -52,11 +54,15 @@ impl<'cx, V> ShardScope<'cx, V> {
 }
 
 impl<V: View> View for ShardScope<'_, V> {
-    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
+    fn poll_first(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<ViewFirst>> {
         let this = self.project();
-        let first = ready!(this.view.poll_first(cx))?;
+        let first = ready!(this.view.poll_first(cx, scope))?;
         let identity = serde_json::to_string(&this.identity.to_string()).unwrap();
-        let content = Builder::block(this.cx, |builder| {
+        let content = Builder::block_in(scope, this.cx, |builder| {
             builder.node(StartMarker {
                 url: this.url,
                 identity: &identity,
@@ -71,8 +77,12 @@ impl<V: View> View for ShardScope<'_, V> {
         }))
     }
 
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
-        self.project().view.poll_swap(cx)
+    fn poll_swap(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<Option<ViewSwap>>> {
+        self.project().view.poll_swap(cx, scope)
     }
 }
 

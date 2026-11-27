@@ -86,9 +86,8 @@ mod tests {
     #[test]
     fn the_view_takes_part_in_the_enclosing_build() {
         let tokens = parse("<div></div>").to_token_stream().to_string();
-        assert!(tokens.contains("ScopeView :: new ("), "{tokens}");
         assert!(tokens.contains("MoveView :: drive ("), "{tokens}");
-        assert!(!tokens.contains("self_contained"), "{tokens}");
+        assert!(!tokens.contains("LiveView :: drive ("), "{tokens}");
     }
 
     #[test]

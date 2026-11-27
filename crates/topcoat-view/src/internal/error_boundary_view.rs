@@ -6,10 +6,7 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::{Error, Result};
 
-use crate::{
-    RegionId, View, ViewBufferScope, ViewFirst, ViewSwap,
-    internal::{EmitView, ScopeView},
-};
+use crate::{RegionId, View, ViewFirst, ViewScope, ViewSwap, internal::EmitView};
 
 pin_project! {
     /// A [`View`] that replaces its child content with a fallback when any
@@ -34,7 +31,7 @@ pin_project! {
         /// The child failed and its fallback is rendering in its place.
         Fallback {
             #[pin]
-            view: EmitView<ScopeView<V>>,
+            view: EmitView<V>,
         },
     }
 }
@@ -59,56 +56,61 @@ where
     F: FnOnce(Error) -> Result<V> + Send,
     V: View,
 {
-    fn poll_first(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
+    fn poll_first(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<ViewFirst>> {
         loop {
             match self.as_mut().project() {
                 ErrorBoundaryViewProj::Child {
                     child,
                     fallback,
                     region,
-                } => match ready!(child.poll_first(cx)) {
+                } => match ready!(child.poll_first(cx, scope)) {
                     // A settled child cannot fail anymore, so it needs no
                     // region to swap the fallback into.
                     Ok(first) if !first.live => return Poll::Ready(Ok(first)),
                     Ok(first) => {
-                        let content = ViewBufferScope::with(|buffer| {
-                            buffer.block(|parts| {
-                                parts.push_region_start(*region);
-                                parts.push_view_handle(first.content);
-                                parts.push_region_end(*region);
-                            })
+                        let content = scope.block(|parts| {
+                            parts.push_region_start(*region);
+                            parts.push_view_handle(first.content);
+                            parts.push_region_end(*region);
                         });
                         return Poll::Ready(Ok(ViewFirst { content, ..first }));
                     }
                     Err(error) => {
                         let view = fallback.take().expect("the fallback runs once")(error)?;
-                        let view = EmitView::new(*region, ScopeView::new(view));
+                        let view = EmitView::new(*region, || view);
                         self.as_mut().set(Self::Fallback { view });
                     }
                 },
-                ErrorBoundaryViewProj::Fallback { view } => return view.poll_first(cx),
+                ErrorBoundaryViewProj::Fallback { view } => return view.poll_first(cx, scope),
             }
         }
     }
 
-    fn poll_swap(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
+    fn poll_swap(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<Option<ViewSwap>>> {
         loop {
             match self.as_mut().project() {
                 ErrorBoundaryViewProj::Child {
                     child,
                     fallback,
                     region,
-                } => match ready!(child.poll_swap(cx)) {
+                } => match ready!(child.poll_swap(cx, scope)) {
                     Ok(swap) => return Poll::Ready(Ok(swap)),
                     // The fallback replaces everything the child sent.
                     Err(error) => {
                         let view = fallback.take().expect("the fallback runs once")(error)?;
-                        let view = ScopeView::self_contained(|| view);
-                        let view = EmitView::new(*region, view);
+                        let view = EmitView::new(*region, || view);
                         self.as_mut().set(Self::Fallback { view });
                     }
                 },
-                ErrorBoundaryViewProj::Fallback { view } => return view.poll_swap(cx),
+                ErrorBoundaryViewProj::Fallback { view } => return view.poll_swap(cx, scope),
             }
         }
     }
@@ -137,7 +139,11 @@ mod tests {
     }
 
     impl View for LiveChild<'_> {
-        fn poll_first(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
+        fn poll_first(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            _scope: &mut ViewScope,
+        ) -> Poll<Result<ViewFirst>> {
             Poll::Ready(Ok(ViewFirst {
                 content: ViewHandle::empty(),
                 live: true,
@@ -147,6 +153,7 @@ mod tests {
         fn poll_swap(
             self: Pin<&mut Self>,
             _cx: &mut Context<'_>,
+            _scope: &mut ViewScope,
         ) -> Poll<Result<Option<ViewSwap>>> {
             Poll::Ready(self.get_mut().swap.take().transpose())
         }
@@ -175,26 +182,23 @@ mod tests {
             })),
             dropped: &dropped,
         };
-        let mut view = pin!(ScopeView::new(ErrorBoundaryView::new(
-            region(0),
-            |_| Ok(()),
-            child,
-        )));
+        let mut view = pin!(ErrorBoundaryView::new(region(0), |_| Ok(()), child));
         let mut cx = Context::from_waker(Waker::noop());
+        let mut scope = ViewScope::new();
 
-        let Poll::Ready(Ok(first)) = view.as_mut().poll_first(&mut cx) else {
+        let Poll::Ready(Ok(first)) = view.as_mut().poll_first(&mut cx, &mut scope) else {
             panic!("expected the child's first content");
         };
         assert!(first.live);
 
-        let Poll::Ready(Ok(Some(swap))) = view.as_mut().poll_swap(&mut cx) else {
+        let Poll::Ready(Ok(Some(swap))) = view.as_mut().poll_swap(&mut cx, &mut scope) else {
             panic!("expected the child's swap");
         };
         assert_eq!(swap.region, region(1));
         assert_eq!(swap.replacement.render(&Cx::new()), "<p>updated</p>");
         assert!(!dropped.load(Ordering::Relaxed));
         assert!(matches!(
-            view.as_mut().poll_swap(&mut cx),
+            view.as_mut().poll_swap(&mut cx, &mut scope),
             Poll::Ready(Ok(None))
         ));
     }
@@ -206,29 +210,30 @@ mod tests {
             swap: Some(Err(io::Error::other("late failure").into())),
             dropped: &dropped,
         };
-        let mut view = pin!(ScopeView::new(ErrorBoundaryView::new(
+        let mut view = pin!(ErrorBoundaryView::new(
             region(0),
             |error: Error| {
                 assert_eq!(error.to_string(), "late failure");
                 Ok(())
             },
             child,
-        )));
+        ));
         let mut cx = Context::from_waker(Waker::noop());
+        let mut scope = ViewScope::new();
 
-        let Poll::Ready(Ok(first)) = view.as_mut().poll_first(&mut cx) else {
+        let Poll::Ready(Ok(first)) = view.as_mut().poll_first(&mut cx, &mut scope) else {
             panic!("expected the child's first content");
         };
         assert!(first.live);
 
-        let Poll::Ready(Ok(Some(swap))) = view.as_mut().poll_swap(&mut cx) else {
+        let Poll::Ready(Ok(Some(swap))) = view.as_mut().poll_swap(&mut cx, &mut scope) else {
             panic!("expected the fallback to replace the boundary");
         };
         assert_eq!(swap.region, region(0));
         assert!(swap.replacement.is_empty());
         assert!(dropped.load(Ordering::Relaxed));
         assert!(matches!(
-            view.as_mut().poll_swap(&mut cx),
+            view.as_mut().poll_swap(&mut cx, &mut scope),
             Poll::Ready(Ok(None))
         ));
     }
@@ -237,8 +242,9 @@ mod tests {
     fn a_settled_child_needs_no_markers_or_swaps() {
         let mut view = pin!(ErrorBoundaryView::new(region(0), |_| Ok(()), ()));
         let mut cx = Context::from_waker(Waker::noop());
+        let mut scope = ViewScope::new();
 
-        let Poll::Ready(Ok(first)) = view.as_mut().poll_first(&mut cx) else {
+        let Poll::Ready(Ok(first)) = view.as_mut().poll_first(&mut cx, &mut scope) else {
             panic!("expected settled content");
         };
         assert!(!first.live);

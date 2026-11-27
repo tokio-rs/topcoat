@@ -7,11 +7,7 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
-use super::yielder::DriveFuture;
-use crate::{
-    View, ViewFirst, ViewSwap,
-    internal::yielder::{poll_first, poll_swap},
-};
+use crate::{DriveFuture, View, ViewFirst, ViewScope, ViewSwap};
 
 pin_project! {
     /// A [`View`] polled through an async body that owns data the view
@@ -19,7 +15,7 @@ pin_project! {
     ///
     /// The async body owns the captured values and drives the nested view
     /// while its borrows remain valid. Resolved content passes to the
-    /// enclosing poll through the yielder, one value per poll.
+    /// enclosing poll through the scope, one value per poll.
     pub struct MoveView<Fut> {
         #[pin]
         body: Fut,
@@ -49,10 +45,14 @@ impl<Fut> View for MoveView<Fut>
 where
     Fut: Future<Output = Result<()>> + Send,
 {
-    fn poll_first(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<ViewFirst>> {
+    fn poll_first(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<ViewFirst>> {
         let this = self.project();
 
-        match poll_first(this.body, cx) {
+        match scope.poll_first(this.body, cx) {
             (Poll::Pending, Some(first)) => Poll::Ready(Ok(first)),
             (Poll::Pending, None) => Poll::Pending,
             (Poll::Ready(_), Some(_)) => {
@@ -65,10 +65,14 @@ where
         }
     }
 
-    fn poll_swap(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<Option<ViewSwap>>> {
+    fn poll_swap(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        scope: &mut ViewScope,
+    ) -> Poll<Result<Option<ViewSwap>>> {
         let this = self.project();
 
-        match poll_swap(this.body, cx) {
+        match scope.poll_swap(this.body, cx) {
             (Poll::Pending, Some(swap)) => Poll::Ready(Ok(Some(swap))),
             (Poll::Pending, None) => Poll::Pending,
             (Poll::Ready(_), Some(_)) => {

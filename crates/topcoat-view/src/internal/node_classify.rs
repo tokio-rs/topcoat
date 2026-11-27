@@ -1,6 +1,6 @@
 use crate::{
     BoxView, Child, NodeViewParts, View,
-    internal::{LiveView, MoveView, ScopeView},
+    internal::{LiveView, MoveView},
 };
 
 /// Splits a node value into synchronous parts and a view to poll.
@@ -62,8 +62,4 @@ classify_view! {
 
 classify_view! {
     impl<Fut> for MoveView<Fut>
-}
-
-classify_view! {
-    impl<V> for ScopeView<V>
 }

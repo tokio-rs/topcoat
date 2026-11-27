@@ -5,7 +5,6 @@ mod instruction;
 mod instruction_buffer;
 mod part;
 mod renderer;
-mod scope;
 
 use core::fmt::NumBuffer;
 
@@ -18,16 +17,15 @@ use instruction::Instruction;
 use instruction_buffer::{InstructionBuffer, InstructionPtr};
 pub use part::*;
 use renderer::Renderer;
-pub(crate) use scope::*;
 
 use crate::{HtmlContext, RegionId};
 
 /// The instruction buffer of a build.
 ///
-/// The outermost view creates a buffer and installs it through
-/// [`ViewBufferScope`] during each poll. Nested views append instructions
-/// to it. When the outer view resolves, its handle takes ownership of the
-/// buffer. Rendering a [`ViewHandle`] executes its instructions.
+/// Every [`ViewScope`](crate::ViewScope) holds one. The views polled with
+/// that scope append instructions to it. When their content is sealed, its
+/// handle takes ownership of the buffer. Rendering a [`ViewHandle`] executes
+/// its instructions.
 ///
 /// # Contiguity
 ///

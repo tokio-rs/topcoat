@@ -3,7 +3,7 @@ use std::{collections::HashMap, future::poll_fn, pin::pin};
 use topcoat::{
     Result,
     context::{Cx, identity, try_identity},
-    view::{Child, View, ViewExt, component, emit, live, view},
+    view::{Child, View, ViewExt, ViewScope, component, emit, live, view},
 };
 
 fn empty_cx() -> Cx {
@@ -308,15 +308,22 @@ async fn sibling_region_ids_do_not_depend_on_completion_order() {
                 emit! { <p>"b updated"</p> }
             })
         });
-        let first = poll_fn(|cx| view.as_mut().poll_first(cx)).await.unwrap();
-        let html = first.content.render(cx);
+        let mut scope = ViewScope::new();
+        let first = poll_fn(|cx| view.as_mut().poll_first(cx, &mut scope))
+            .await
+            .unwrap();
+        let html = scope.seal(first.content).render(cx);
         let ids = region_ids(&html);
         assert_eq!(ids.len(), 2);
         assert_ne!(ids[0], ids[1]);
 
         let mut swaps = HashMap::new();
-        while let Some(swap) = poll_fn(|cx| view.as_mut().poll_swap(cx)).await.unwrap() {
-            swaps.insert(swap.region.to_string(), swap.replacement.render(cx));
+        while let Some(swap) = poll_fn(|cx| view.as_mut().poll_swap(cx, &mut scope))
+            .await
+            .unwrap()
+        {
+            let replacement = scope.seal(swap.replacement);
+            swaps.insert(swap.region.to_string(), replacement.render(cx));
         }
         assert_eq!(swaps.len(), 2);
         assert_eq!(swaps[ids[0]], "<p>a updated</p>");
