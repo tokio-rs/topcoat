@@ -76,7 +76,6 @@ impl InstructionBuffer {
                 Instruction::StaticStr { .. } => "StaticStr",
                 Instruction::Str { .. } => "Str",
                 Instruction::String { .. } => "String",
-                Instruction::Dyn { .. } => "Dyn",
                 Instruction::RegionStart { .. } => "RegionStart",
                 Instruction::RegionEnd { .. } => "RegionEnd",
                 #[cfg(feature = "http")]

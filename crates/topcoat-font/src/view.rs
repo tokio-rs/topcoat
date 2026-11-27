@@ -1,14 +1,7 @@
 use topcoat_core::context::{Cx, context};
-use topcoat_view::{AttributeValueViewParts, DynViewPart, HtmlWriter, PartsWriter};
+use topcoat_view::{AttributeValueViewParts, PartsWriter};
 
 use crate::{Font, FontResolver};
-
-impl DynViewPart for Font {
-    #[track_caller]
-    fn render(&self, cx: &Cx, w: &mut HtmlWriter<'_, '_>) {
-        let _ = context::<FontResolver>(cx).resolve(*self, w);
-    }
-}
 
 impl AttributeValueViewParts for Font {
     #[inline]
@@ -17,7 +10,9 @@ impl AttributeValueViewParts for Font {
     }
 
     #[inline]
-    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-        parts.push_dyn(Box::new(self));
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
+        let mut url = String::new();
+        let _ = context::<FontResolver>(cx).resolve(self, &mut url);
+        parts.push_string(url);
     }
 }

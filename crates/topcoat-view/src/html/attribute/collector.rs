@@ -2,7 +2,7 @@ use std::mem;
 
 use topcoat_core::context::Cx;
 
-use crate::{DynViewPart, Formatter, HtmlContext, ViewHandle};
+use crate::{Formatter, HtmlContext, ViewHandle};
 
 /// Collects the parts an attribute key or value pushes and turns them into
 /// a [`Captured`] type.
@@ -128,10 +128,6 @@ pub(crate) enum CollectedPart {
         value: String,
         context: HtmlContext,
     },
-    Dyn {
-        part: Box<dyn DynViewPart>,
-        context: HtmlContext,
-    },
     View(ViewHandle),
 }
 
@@ -151,7 +147,6 @@ impl CollectedPart {
             Self::PromotedStr { value, context } => context.writer(f).write_str(value),
             Self::StaticStr { value, context } => context.writer(f).write_str(value),
             Self::String { value, context } => context.writer(f).write_str(&value),
-            Self::Dyn { part, context } => part.render(cx, &mut context.writer(f)),
             Self::View(view) => view.render_into(cx, f),
         }
     }

@@ -2,7 +2,7 @@
 use crate::buffer::HeadersPtr;
 use crate::{
     HtmlContext,
-    buffer::{DynPtr, InstructionPtr, RegionPtr, StaticStrPtr, StringPtr, ViewPtr},
+    buffer::{InstructionPtr, RegionPtr, StaticStrPtr, StringPtr, ViewPtr},
 };
 
 #[derive(Debug, Clone)]
@@ -91,9 +91,6 @@ pub(super) enum Instruction {
         ptr: StringPtr,
         context: HtmlContext,
     },
-    /// A part that writes its output at render time, and its context.
-    Dyn { ptr: DynPtr, context: HtmlContext },
-
     /// The start of a region.
     RegionStart { ptr: RegionPtr },
     /// The end of a region.

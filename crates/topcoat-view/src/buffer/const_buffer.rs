@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    DynViewPart, RegionId,
+    RegionId,
     buffer::{InstructionPtr, ViewBuffer},
 };
 
@@ -19,10 +19,6 @@ pub(super) struct StrPtr {
     pub(super) offset: usize,
     pub(super) len: u32,
 }
-
-/// The index of a boxed [`DynViewPart`] in a [`ConstBuffer`].
-#[derive(Debug, Clone, Copy)]
-pub(super) struct DynPtr(usize);
 
 /// The index of an owned view's buffer and entry in a [`ConstBuffer`].
 #[derive(Debug, Clone, Copy)]
@@ -48,7 +44,6 @@ pub(super) struct ConstBuffer {
     static_strs: Vec<&'static str>,
     strings: Vec<String>,
     strs: String,
-    dyns: Vec<Box<dyn DynViewPart>>,
     views: Vec<(Arc<ViewBuffer>, InstructionPtr)>,
     regions: Vec<RegionId>,
     #[cfg(feature = "http")]
@@ -104,18 +99,6 @@ impl ConstBuffer {
         &self.strs[ptr.offset..ptr.offset + ptr.len as usize]
     }
 
-    #[inline]
-    pub(super) fn push_dyn(&mut self, value: Box<dyn DynViewPart>) -> DynPtr {
-        self.dyns.push(value);
-        DynPtr(self.dyns.len() - 1)
-    }
-
-    #[inline]
-    #[must_use]
-    pub(super) fn fetch_dyn(&self, ptr: DynPtr) -> &dyn DynViewPart {
-        &*self.dyns[ptr.0]
-    }
-
     /// Stores the buffer an owned view holds together with the entry of its
     /// instruction block.
     #[inline]
@@ -164,7 +147,6 @@ impl ConstBuffer {
         println!("  static_strs: {}", self.static_strs.len());
         println!("  strings: {}", self.strings.len());
         println!("  strs: {} bytes", self.strs.len());
-        println!("  dyns: {}", self.dyns.len());
         println!("  regions: {}", self.regions.len());
         #[cfg(feature = "http")]
         println!("  headers: {}", self.headers.len());

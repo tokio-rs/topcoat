@@ -1,33 +1,10 @@
-use core::fmt;
-
 #[cfg(feature = "http")]
 use http::{HeaderMap, StatusCode};
 use topcoat_core::context::Cx;
 
 use crate::{
-    AttributeCollector, CollectedPart, HtmlContext, HtmlWriter, RegionId, ViewHandle,
-    buffer::ViewBuffer,
+    AttributeCollector, CollectedPart, HtmlContext, RegionId, ViewHandle, buffer::ViewBuffer,
 };
-
-/// A boxed view part that writes its output at render time.
-///
-/// Implement this when output must be computed during rendering. The
-/// writer passed to [`render`](Self::render) escapes or validates output
-/// for the part's HTML position.
-pub trait DynViewPart: 'static + fmt::Debug + Send + Sync {
-    /// Writes this part's output into `w`.
-    #[track_caller]
-    fn render(&self, cx: &Cx, w: &mut HtmlWriter<'_, '_>);
-
-    /// Returns an estimate of the number of bytes this part will write.
-    ///
-    /// Used to pre-allocate the output buffer, so aim for a close estimate. A
-    /// slight over-estimate is usually preferable to an under-estimate.
-    #[inline]
-    fn size_hint(&self) -> usize {
-        0
-    }
-}
 
 macro_rules! impl_push_primitive {
     ($method:ident, $ty:ty, $size_hint:expr) => {
@@ -294,15 +271,6 @@ impl<'a> PartsWriter<'a> {
         self
     }
 
-    /// Appends a part that writes its output at render time, sealed with
-    /// this writer's context.
-    #[inline]
-    pub fn push_dyn(&mut self, part: Box<dyn DynViewPart>) -> &mut Self {
-        self.size_hint += part.size_hint();
-        self.sink.push_dyn(part, self.context);
-        self
-    }
-
     /// Appends a nested view.
     ///
     /// The view's content was already sealed with the contexts it was built
@@ -446,16 +414,6 @@ impl Sink<'_> {
         match self {
             Self::Buffer(buffer) => buffer.push_region_end(region),
             Self::Collector { .. } => panic!("tried to push a region into an attribute"),
-        }
-    }
-
-    #[inline]
-    fn push_dyn(&mut self, part: Box<dyn DynViewPart>, context: HtmlContext) {
-        match self {
-            Self::Buffer(buffer) => buffer.push_dyn(part, context),
-            Self::Collector { collector, cx } => {
-                collector.push(cx, CollectedPart::Dyn { part, context });
-            }
         }
     }
 

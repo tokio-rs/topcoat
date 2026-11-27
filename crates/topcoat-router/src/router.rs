@@ -431,7 +431,7 @@ mod tests {
     };
 
     use http::{HeaderMap, StatusCode};
-    use topcoat::view::{DynViewPart, HtmlWriter, NodeViewParts, PartsWriter, emit, live, view};
+    use topcoat::view::{NodeViewParts, PartsWriter, emit, live, view};
     use topcoat_core::{
         base_url::BaseUrl,
         context::{Cx, context, iter_context},
@@ -585,13 +585,7 @@ mod tests {
     struct Panicking;
 
     impl NodeViewParts for Panicking {
-        fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
-            parts.push_dyn(Box::new(self));
-        }
-    }
-
-    impl DynViewPart for Panicking {
-        fn render(&self, _cx: &Cx, _w: &mut HtmlWriter<'_, '_>) {
+        fn into_view_parts(self, _cx: &Cx, _parts: &mut PartsWriter<'_>) {
             panic!("view rendering panicked");
         }
     }

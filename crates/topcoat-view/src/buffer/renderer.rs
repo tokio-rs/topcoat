@@ -86,9 +86,6 @@ impl<'a> Renderer<'a> {
                 Instruction::String { ptr, context } => {
                     context.writer(f).write_str(consts.fetch_string(*ptr));
                 }
-                Instruction::Dyn { ptr, context } => {
-                    consts.fetch_dyn(*ptr).render(cx, &mut context.writer(f));
-                }
 
                 Instruction::RegionStart { ptr } => {
                     let region = consts.fetch_region(*ptr);
