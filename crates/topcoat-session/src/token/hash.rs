@@ -3,8 +3,8 @@ use std::ops::Deref;
 /// The SHA-256 hash of a [`Token`](crate::Token), identifying a session.
 ///
 /// Store this value as the session's lookup key. A hash cannot be presented
-/// as a session token. Obtain it from [`start`](crate::start) for a new session
-/// or [`token_hash`](crate::token_hash) for the current request.
+/// as a session token. The session functions return it, on its own or as a
+/// session's [`token_hash`](crate::Session::token_hash).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TokenHash([u8; 32]);
 

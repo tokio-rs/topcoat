@@ -15,6 +15,7 @@ Session functions take `cx: &Cx`:
 - [`stop`] instructs the client to discard its token and returns the hash so you can delete the record. Call it on logout.
 - [`refresh`] re-issues the current token with a full lifetime ahead of it, for sliding expiration.
 - [`rotate`] replaces the current token with a fresh one, for privilege changes.
+- [`prepare_start`] and [`prepare_rotate`] do the same as [`start`] and [`rotate`] but hold the token back until you [`commit`](Pending::commit) it, after your record is stored. [`prepare_start`] returns a [`Pending`] token; [`prepare_rotate`] returns a [`PendingRotation`] with the hash to revoke and the pending replacement.
 
 Topcoat reads the token once per request. Session changes update that cached value, so later code in the same request sees the new session.
 
@@ -179,6 +180,40 @@ async fn escalate(cx: &Cx) -> Result<()> {
 }
 ```
 
+## Issuing the token after the record moves
+
+[`rotate`] issues the new token before you have stored its record. If your write then fails, or loses a race against another request carrying the same token, the client already holds a token with no record. To avoid that, prepare the rotation, move the record, and commit the token only once the record is in place:
+
+```rust
+use topcoat::{Result, context::Cx, session};
+# /// Moves the record from `revoked` to the new session; `false` when no record was under `revoked`.
+# async fn rekey_session(_cx: &Cx, _revoked: &session::TokenHash, _session: &session::Session) -> Result<bool> { Ok(true) }
+# async fn delete_session(_cx: &Cx, _hash: &session::TokenHash) -> Result<()> { Ok(()) }
+
+async fn escalate(cx: &Cx) -> Result<()> {
+    let Some(rotation) = session::prepare_rotate(cx).await? else {
+        return Ok(());
+    };
+    if !rekey_session(cx, &rotation.revoked, rotation.pending.session()).await? {
+        // Another request already moved the record. Issue nothing.
+        return Ok(());
+    }
+    if let Err(error) = rotation.pending.commit().await {
+        // The record moved but the client did not get the token.
+        let (session, source) = error.into_parts();
+        delete_session(cx, &session.token_hash).await?;
+        return Err(source);
+    }
+    Ok(())
+}
+```
+
+[`prepare_rotate`] returns a [`PendingRotation`]: the hash to revoke and a [`Pending`] replacement. Nothing is sent to the client until [`Pending::commit`] runs. Commit only when your write actually moved the record. If it failed, or found no record because a concurrent request already moved it, return without committing: the pending token is dropped, the response carries no session change, and the client keeps the token it arrived with. [`prepare_start`] has the same shape for signing in.
+
+[`Pending::commit`] fails when the token store cannot issue the token. At that point the record has already moved, and the client may hold either token if the store failed after sending the new one. The [`CommitError`] carries the session you prepared; delete its record so neither token stays signed in. The example takes the session and the store's error out with [`CommitError::into_parts`] and returns the store's error itself, because `?` on the `CommitError` would wrap it and hide its type from your error handling.
+
+Commit before the response starts streaming. The default cookie store panics once the response headers have been sent. Unlike an error, a panic leaves the record you moved in place with no token issued and no [`CommitError`] to name it.
+
 # Configuration
 
 Add a [`SessionTokenStore`] or a [`SessionLifetime`] to the router's context to change the defaults. For example, this router changes the cookie name and sets a two-week lifetime:
@@ -199,7 +234,7 @@ let router = Router::builder()
     .build();
 ```
 
-Sessions last 30 days when the context has no [`SessionLifetime`]. The lifetime becomes both the `Max-Age` of the issued cookie and the `expires_at` handed to you by [`start`], [`refresh`], and [`rotate`], so the client's cookie and your record expire together.
+Sessions last 30 days when the context has no [`SessionLifetime`]. The lifetime, rounded up to whole seconds, is both the issued token's time to live and the `expires_at` on every [`Session`] the module hands you, so a token store that keeps that time to live does not expire the token before your record. Browsers limit how long a cookie may live, so with a very long lifetime the client can drop the cookie before the record expires.
 
 # Custom token stores
 
@@ -234,7 +269,7 @@ impl TokenStore for BearerTokenStore {
         &'a self,
         _cx: &'a Cx,
         _token: Token,
-        _max_age: Duration,
+        _time_to_live: Duration,
     ) -> TokenStoreFuture<'a, ()> {
         // API clients receive their token out of band; there is nothing to
         // send with the response.
@@ -248,6 +283,8 @@ impl TokenStore for BearerTokenStore {
 ```
 
 Add it to the router with `.with(SessionTokenStore::new(BearerTokenStore))`. Serialize the raw token with [`Token::encode`] and parse it back with [`Token::decode`]; both use URL-safe base64.
+
+A store that sends the token with an expiry must keep it valid for at least the time to live passed to `write`, which is a whole number of seconds. A shorter one lets your record outlive the token.
 
 # Security notes
 
