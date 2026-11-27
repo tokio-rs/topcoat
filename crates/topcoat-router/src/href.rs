@@ -427,15 +427,29 @@ impl_href_queries_tuples!(Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8);
 ///
 /// Panics if the item does not serialize to a URL query string.
 fn write_query<Q: Serialize>(query: &Q, separator: char, out: &mut String) -> bool {
-    let query = serde_urlencoded::to_string(query)
-        .unwrap_or_else(|error| panic!("query item does not serialize to a query string: {error}"));
-    if query.is_empty() {
+    let before = out.len();
+    out.push(separator);
+    let start = out.len();
+
+    {
+        let mut pairs = form_urlencoded::Serializer::for_suffix(&mut *out, start);
+        query
+            .serialize(serde_urlencoded::Serializer::new(&mut pairs))
+            .unwrap_or_else(|error| {
+                panic!("query item does not serialize to a query string: {error}")
+            });
+    }
+
+    if out.len() == start {
+        out.truncate(before);
         return false;
     }
-    out.push(separator);
-    out.push_str(&query);
     true
 }
+
+/// The capacity a resolved URL starts with, enough for most URLs to be
+/// written without growing the string.
+const URL_CAPACITY: usize = 64;
 
 /// A URL being built by `href!`.
 ///
@@ -566,7 +580,7 @@ where
     /// query item does not serialize to a URL query string.
     #[must_use]
     pub fn resolve(&self, cx: &Cx) -> String {
-        let mut buf = String::new();
+        let mut buf = String::with_capacity(URL_CAPACITY);
         match self.url_form.unwrap_or_else(|| url_form(cx)) {
             UrlForm::Absolute => buf += base_url(cx).as_str(),
             UrlForm::Relative => {}
