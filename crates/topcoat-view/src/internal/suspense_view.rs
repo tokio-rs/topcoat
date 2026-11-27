@@ -84,7 +84,7 @@ where
             "polled a suspense view's first content after it resolved"
         );
 
-        match this.child.poll_first(cx, this.child_scope) {
+        match scope.nested(this.child_scope, |inner| this.child.poll_first(cx, inner)) {
             Poll::Ready(Ok(first)) => {
                 *this.state = if first.live {
                     State::Child
@@ -131,7 +131,8 @@ where
                 panic!("polled a suspense view for swaps before its first content resolved")
             }
             State::Child => {
-                return match this.child.poll_swap(cx, this.child_scope) {
+                return match scope.nested(this.child_scope, |inner| this.child.poll_swap(cx, inner))
+                {
                     Poll::Ready(Ok(None)) => {
                         *this.state = State::Done;
                         Poll::Ready(Ok(None))
@@ -148,7 +149,7 @@ where
         };
 
         // Only replace the suspense region when its fallback went out.
-        match this.child.poll_first(cx, this.child_scope) {
+        match scope.nested(this.child_scope, |inner| this.child.poll_first(cx, inner)) {
             Poll::Ready(Ok(first)) => {
                 *this.state = if first.live {
                     State::Child

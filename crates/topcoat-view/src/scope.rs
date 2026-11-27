@@ -10,7 +10,7 @@ use std::{
 use pin_project_lite::pin_project;
 use topcoat_core::error::Result;
 
-use crate::{PartsWriter, View, ViewBuffer, ViewFirst, ViewHandle, ViewSwap};
+use crate::{Hoisted, PartsWriter, View, ViewBuffer, ViewFirst, ViewHandle, ViewSwap};
 
 thread_local! {
     /// The state of the scope installed on the current thread, if any.
@@ -113,6 +113,54 @@ impl ViewScope {
         content.seal_from(&mut self.state().buffer)
     }
 
+    /// Returns the collection of the view being polled, if one is
+    /// collecting hoisted parts.
+    pub(crate) fn hoisted(&mut self) -> Option<&mut Hoisted> {
+        self.state().hoisted.as_mut()
+    }
+
+    /// Runs `f` and collects the parts hoisted meanwhile into `hoisted`.
+    ///
+    /// A collection that received the parts before receives them again
+    /// afterwards.
+    pub(crate) fn collecting<R>(
+        &mut self,
+        hoisted: &mut Hoisted,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        let outer = self.state().hoisted.replace(mem::take(hoisted));
+        let result = f(self);
+        *hoisted = mem::replace(&mut self.state().hoisted, outer)
+            .expect("the collection stays in its scope while it collects");
+        result
+    }
+
+    /// Runs `f` with `inner`, the scope of a build nested in this one.
+    ///
+    /// Parts hoisted in the nested build land in the collection of this
+    /// scope.
+    pub(crate) fn nested<R>(&mut self, inner: &mut Self, f: impl FnOnce(&mut Self) -> R) -> R {
+        inner.state().hoisted = self.state().hoisted.take();
+        let result = f(inner);
+        self.state().hoisted = inner.state().hoisted.take();
+        result
+    }
+
+    /// Runs `f` with this scope installed on the current thread, as a build
+    /// nested in the one whose scope was installed before.
+    pub(crate) fn install_nested<R>(&mut self, f: impl FnOnce() -> R) -> R {
+        match Self::reclaim() {
+            Some(mut outer) => outer.nested(self, |inner| {
+                let _installed = inner.install();
+                f()
+            }),
+            None => {
+                let _installed = self.install();
+                f()
+            }
+        }
+    }
+
     /// Installs this scope on the current thread until the returned guard
     /// drops.
     ///
@@ -157,6 +205,8 @@ impl Default for ViewScope {
 struct ScopeState {
     /// The buffer the views of the build write into.
     buffer: ViewBuffer,
+    /// The parts hoisted into the view being polled, if one is collecting.
+    hoisted: Option<Hoisted>,
     /// The view method the drives of the innermost polled body call.
     input: Option<DriveInput>,
     /// First content yielded to the innermost first-content poll.

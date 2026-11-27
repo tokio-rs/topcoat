@@ -9,10 +9,9 @@
 //! collect each other's parts.
 
 use std::{
-    cell::Cell,
-    collections::HashSet,
+    fmt,
     hash::Hash,
-    marker::PhantomData,
+    mem,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -45,23 +44,73 @@ impl HoistKey {
 /// The parts hoisted into one piece of content, with the keys of those
 /// hoisted at most once.
 #[derive(Default)]
-struct Hoisted {
+pub(crate) struct Hoisted {
     parts: Vec<HoistedPart>,
-    keys: HashSet<HoistKey>,
+    keys: Vec<HoistKey>,
 }
 
 impl Hoisted {
-    /// Takes the parts collected so far, leaving the collection empty.
-    fn take(&mut self) -> Vec<HoistedPart> {
+    /// Runs `f` on the collection of the view polling on the current thread.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no view is collecting hoisted parts.
+    #[track_caller]
+    fn current(f: impl FnOnce(&mut Self)) {
+        let mut scope = ViewScope::reclaim();
+        let Some(hoisted) = scope.as_mut().and_then(|scope| scope.hoisted()) else {
+            panic!(
+                "no view is collecting hoisted parts: `hoist` must be called while a page, \
+                 layout, component, or shard body runs"
+            );
+        };
+        f(hoisted);
+    }
+
+    /// Adds a part to the collection.
+    fn push(&mut self, build: impl FnOnce(&mut PartsWriter<'_>) + Send + 'static) {
+        self.parts.push(Box::new(build));
+    }
+
+    /// Adds a part to the collection unless one with the same key is in it.
+    fn push_once(
+        &mut self,
+        key: HoistKey,
+        build: impl FnOnce(&mut PartsWriter<'_>) + Send + 'static,
+    ) {
+        if !self.keys.contains(&key) {
+            self.keys.push(key);
+            self.push(build);
+        }
+    }
+
+    /// Splices the parts collected so far ahead of `content`, leaving the
+    /// collection empty.
+    ///
+    /// Content with nothing hoisted passes through untouched, so a view that
+    /// never hoists costs no block in the buffer.
+    fn prepend(&mut self, content: ViewHandle, scope: &mut ViewScope) -> ViewHandle {
+        if self.parts.is_empty() {
+            return content;
+        }
         self.keys.clear();
-        std::mem::take(&mut self.parts)
+        let parts = mem::take(&mut self.parts);
+        scope.block(|writer| {
+            for part in parts {
+                part(writer);
+            }
+            writer.push_view_handle(content);
+        })
     }
 }
 
-thread_local! {
-    /// The parts hoisted so far into the view polling on the current
-    /// thread, if one is collecting.
-    static CURRENT: Cell<Option<Hoisted>> = const { Cell::new(None) };
+impl fmt::Debug for Hoisted {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Hoisted")
+            .field("parts", &self.parts.len())
+            .field("keys", &self.keys)
+            .finish()
+    }
 }
 
 /// Hoists a part into the content of the enclosing view.
@@ -76,7 +125,7 @@ thread_local! {
 /// inherit the collection.
 #[track_caller]
 pub fn hoist(build: impl FnOnce(&mut PartsWriter<'_>) + Send + 'static) {
-    with_collecting(|hoisted| hoisted.parts.push(Box::new(build)));
+    Hoisted::current(|hoisted| hoisted.push(build));
 }
 
 /// Hoists a part into the content of the enclosing view unless a part with
@@ -91,57 +140,7 @@ pub fn hoist(build: impl FnOnce(&mut PartsWriter<'_>) + Send + 'static) {
 /// Panics if no view is collecting hoisted parts, like [`hoist`].
 #[track_caller]
 pub fn hoist_once(key: HoistKey, build: impl FnOnce(&mut PartsWriter<'_>) + Send + 'static) {
-    with_collecting(|hoisted| {
-        if hoisted.keys.insert(key) {
-            hoisted.parts.push(Box::new(build));
-        }
-    });
-}
-
-/// Runs `f` on the collection of the view polling on the current thread.
-#[track_caller]
-fn with_collecting(f: impl FnOnce(&mut Hoisted)) {
-    let mut collected = CURRENT.take();
-    let Some(hoisted) = &mut collected else {
-        panic!(
-            "no view is collecting hoisted parts: `hoist` must be called while a page, layout, \
-             component, or shard body runs"
-        );
-    };
-    f(hoisted);
-    CURRENT.set(collected);
-}
-
-/// Makes `slot` the collection receiving hoisted parts for exactly the
-/// duration of a synchronous region.
-///
-/// Creating the guard moves the collection into the thread local, and
-/// dropping it moves the collection back into `slot`, also when the region
-/// panics. A collection installed before is restored at the same time.
-#[must_use = "the collection is uninstalled when the guard drops"]
-struct HoistGuard<'a> {
-    slot: &'a mut Hoisted,
-    prev: Option<Hoisted>,
-    /// The guard restores a thread local, so it must stay on the thread it
-    /// was created on.
-    _not_send: PhantomData<*const ()>,
-}
-
-impl<'a> HoistGuard<'a> {
-    fn install(slot: &'a mut Hoisted) -> Self {
-        let prev = CURRENT.replace(Some(std::mem::take(slot)));
-        Self {
-            slot,
-            prev,
-            _not_send: PhantomData,
-        }
-    }
-}
-
-impl Drop for HoistGuard<'_> {
-    fn drop(&mut self) {
-        *self.slot = CURRENT.replace(self.prev.take()).unwrap_or_default();
-    }
+    Hoisted::current(|hoisted| hoisted.push_once(key, build));
 }
 
 pin_project! {
@@ -175,13 +174,10 @@ impl<V: View> View for HoistView<V> {
         scope: &mut ViewScope,
     ) -> Poll<Result<ViewFirst>> {
         let this = self.project();
-        let poll = {
-            let _guard = HoistGuard::install(this.hoisted);
-            this.view.poll_first(cx, scope)
-        };
+        let poll = scope.collecting(this.hoisted, |scope| this.view.poll_first(cx, scope));
         match poll {
             Poll::Ready(Ok(ViewFirst { content, live })) => Poll::Ready(Ok(ViewFirst {
-                content: prepend(this.hoisted, content, scope),
+                content: this.hoisted.prepend(content, scope),
                 live,
             })),
             poll => poll,
@@ -194,48 +190,23 @@ impl<V: View> View for HoistView<V> {
         scope: &mut ViewScope,
     ) -> Poll<Result<Option<ViewSwap>>> {
         let this = self.project();
-        let poll = {
-            let _guard = HoistGuard::install(this.hoisted);
-            this.view.poll_swap(cx, scope)
-        };
+        let poll = scope.collecting(this.hoisted, |scope| this.view.poll_swap(cx, scope));
         match poll {
             Poll::Ready(Ok(Some(ViewSwap {
                 region,
                 replacement,
             }))) => Poll::Ready(Ok(Some(ViewSwap {
                 region,
-                replacement: prepend(this.hoisted, replacement, scope),
+                replacement: this.hoisted.prepend(replacement, scope),
             }))),
             poll => poll,
         }
     }
 }
 
-/// Splices the parts collected so far ahead of `content`, leaving the
-/// collection empty.
-///
-/// Content with nothing hoisted passes through untouched, so a view that
-/// never hoists costs no block in the buffer.
-fn prepend(hoisted: &mut Hoisted, content: ViewHandle, scope: &mut ViewScope) -> ViewHandle {
-    if hoisted.parts.is_empty() {
-        return content;
-    }
-    let parts = hoisted.take();
-    scope.block(|writer| {
-        for part in parts {
-            part(writer);
-        }
-        writer.push_view_handle(content);
-    })
-}
-
 #[cfg(test)]
 mod tests {
-    use std::{
-        panic::{AssertUnwindSafe, catch_unwind},
-        pin::pin,
-        task::Waker,
-    };
+    use std::{panic::catch_unwind, pin::pin, task::Waker};
 
     use topcoat_core::{
         context::Cx,
@@ -245,8 +216,10 @@ mod tests {
     use super::*;
     use crate::{RegionId, ViewBuffer};
 
-    /// Hoists a comment carrying `text`.
-    fn hoist_comment(text: &'static str) {
+    /// Hoists a comment carrying `text` the way code in a view's body does,
+    /// with `scope` installed.
+    fn hoist_comment(scope: &mut ViewScope, text: &'static str) {
+        let _installed = scope.install();
         hoist(move |writer| {
             writer.push_comment(|comment| {
                 comment.push_static_str(text);
@@ -281,7 +254,7 @@ mod tests {
             _cx: &mut Context<'_>,
             scope: &mut ViewScope,
         ) -> Poll<Result<ViewFirst>> {
-            hoist_comment(self.name);
+            hoist_comment(scope, self.name);
             if std::mem::replace(&mut self.polled_first, true) {
                 Poll::Ready(Ok(ViewFirst {
                     content: scope.block(|writer| {
@@ -297,12 +270,12 @@ mod tests {
         fn poll_swap(
             mut self: Pin<&mut Self>,
             _cx: &mut Context<'_>,
-            _scope: &mut ViewScope,
+            scope: &mut ViewScope,
         ) -> Poll<Result<Option<ViewSwap>>> {
             if std::mem::replace(&mut self.polled_swap, true) {
                 return Poll::Ready(Ok(None));
             }
-            hoist_comment("swap");
+            hoist_comment(scope, "swap");
             // A swap resolves after the first content was sealed, with no
             // build running, so its replacement is self-contained.
             Poll::Ready(Ok(Some(ViewSwap {
@@ -328,7 +301,7 @@ mod tests {
 
     #[test]
     fn hoisting_outside_a_collecting_view_panics() {
-        let panic = catch_unwind(|| hoist_comment("x")).unwrap_err();
+        let panic = catch_unwind(|| hoist_comment(&mut ViewScope::new(), "x")).unwrap_err();
         let message = panic.downcast::<&str>().expect("panics with a message");
         assert!(message.contains("no view is collecting hoisted parts"));
     }
@@ -439,9 +412,9 @@ mod tests {
                 cx: &mut Context<'_>,
                 scope: &mut ViewScope,
             ) -> Poll<Result<ViewFirst>> {
-                hoist_comment("outer");
+                hoist_comment(scope, "outer");
                 let inner = std::task::ready!(self.inner.as_mut().poll_first(cx, scope))?;
-                hoist_comment("outer again");
+                hoist_comment(scope, "outer again");
                 Poll::Ready(Ok(ViewFirst {
                     content: scope.block(|writer| {
                         writer.push_static_str("[");
@@ -473,17 +446,29 @@ mod tests {
     }
 
     #[test]
-    fn the_collection_is_restored_when_a_poll_panics() {
-        struct Boom;
+    fn a_part_hoisted_in_a_nested_build_reaches_the_enclosing_view() {
+        /// Polls its view with a scope of its own, as a build nested in the
+        /// one it is polled in.
+        struct Nested<V> {
+            view: Pin<Box<V>>,
+            scope: ViewScope,
+        }
 
-        impl View for Boom {
+        impl<V: View> View for Nested<V> {
             fn poll_first(
-                self: Pin<&mut Self>,
-                _cx: &mut Context<'_>,
-                _scope: &mut ViewScope,
+                mut self: Pin<&mut Self>,
+                cx: &mut Context<'_>,
+                scope: &mut ViewScope,
             ) -> Poll<Result<ViewFirst>> {
-                hoist_comment("lost");
-                panic!("boom")
+                let this = &mut *self;
+                let poll = scope.nested(&mut this.scope, |inner| {
+                    this.view.as_mut().poll_first(cx, inner)
+                });
+                let first = std::task::ready!(poll)?;
+                Poll::Ready(Ok(ViewFirst {
+                    content: this.scope.seal(first.content),
+                    live: first.live,
+                }))
             }
 
             fn poll_swap(
@@ -491,21 +476,15 @@ mod tests {
                 _cx: &mut Context<'_>,
                 _scope: &mut ViewScope,
             ) -> Poll<Result<Option<ViewSwap>>> {
-                panic!("boom")
+                Poll::Ready(Ok(None))
             }
         }
 
-        let mut view = pin!(HoistView::new(Boom));
-        let result = catch_unwind(AssertUnwindSafe(|| {
-            let mut cx = Context::from_waker(Waker::noop());
-            let mut scope = ViewScope::new();
-            let _ = view.as_mut().poll_first(&mut cx, &mut scope);
+        let html = render_first(HoistView::new(Nested {
+            view: Box::pin(Probe::new("a")),
+            scope: ViewScope::new(),
         }));
-        assert!(result.is_err());
-        // Nothing is collecting any more, so hoisting panics again rather
-        // than landing in the abandoned view's collection.
-        assert!(catch_unwind(|| hoist_comment("x")).is_err());
-        assert_eq!(view.hoisted.parts.len(), 1);
+        assert_eq!(html, "<!--a--><!--a-->content");
     }
 
     /// A view that hoists the comments `a` and `b` once each under their
@@ -517,7 +496,8 @@ mod tests {
     }
 
     impl OnceProbe {
-        fn hoist_twice() {
+        fn hoist_twice(scope: &mut ViewScope) {
+            let _installed = scope.install();
             for text in ["a", "b", "a", "b"] {
                 hoist_once(HoistKey::new(("comment", text)), move |writer| {
                     writer.push_comment(|comment| {
@@ -534,7 +514,7 @@ mod tests {
             _cx: &mut Context<'_>,
             scope: &mut ViewScope,
         ) -> Poll<Result<ViewFirst>> {
-            Self::hoist_twice();
+            Self::hoist_twice(scope);
             if std::mem::replace(&mut self.resolved_first, true) {
                 Poll::Ready(Ok(ViewFirst {
                     content: scope.block(|writer| {
@@ -550,12 +530,12 @@ mod tests {
         fn poll_swap(
             mut self: Pin<&mut Self>,
             _cx: &mut Context<'_>,
-            _scope: &mut ViewScope,
+            scope: &mut ViewScope,
         ) -> Poll<Result<Option<ViewSwap>>> {
             if std::mem::replace(&mut self.resolved_swap, true) {
                 return Poll::Ready(Ok(None));
             }
-            Self::hoist_twice();
+            Self::hoist_twice(scope);
             Poll::Ready(Ok(Some(ViewSwap {
                 region: RegionId::new(Identity::ROOT, SiteKey::new(file!(), line!(), column!(), 0)),
                 replacement: ViewBuffer::build(|writer| {

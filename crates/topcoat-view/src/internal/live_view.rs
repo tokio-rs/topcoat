@@ -153,10 +153,7 @@ impl<V> EmitView<V> {
     /// writes lands in the same buffer as what the view writes when polled.
     pub fn new(region: RegionId, build: impl FnOnce() -> V) -> Self {
         let mut scope = ViewScope::new();
-        let view = {
-            let _installed = scope.install();
-            build()
-        };
+        let view = scope.install_nested(build);
         Self {
             view,
             scope,
@@ -174,10 +171,10 @@ where
     fn poll_first(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        _scope: &mut ViewScope,
+        scope: &mut ViewScope,
     ) -> Poll<Result<ViewFirst>> {
         let this = self.project();
-        match this.view.poll_first(cx, this.scope) {
+        match scope.nested(this.scope, |inner| this.view.poll_first(cx, inner)) {
             Poll::Ready(Ok(first)) => {
                 *this.first = false;
                 *this.done = !first.live;
@@ -194,14 +191,14 @@ where
     fn poll_swap(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        _scope: &mut ViewScope,
+        scope: &mut ViewScope,
     ) -> Poll<Result<Option<ViewSwap>>> {
         let this = self.project();
         if *this.done {
             return Poll::Ready(Ok(None));
         }
         if *this.first {
-            match this.view.poll_first(cx, this.scope) {
+            match scope.nested(this.scope, |inner| this.view.poll_first(cx, inner)) {
                 Poll::Ready(Ok(first)) => {
                     *this.first = false;
                     *this.done = !first.live;
@@ -214,7 +211,7 @@ where
                 Poll::Pending => Poll::Pending,
             }
         } else {
-            match this.view.poll_swap(cx, this.scope) {
+            match scope.nested(this.scope, |inner| this.view.poll_swap(cx, inner)) {
                 Poll::Ready(Ok(None)) => {
                     *this.done = true;
                     Poll::Ready(Ok(None))

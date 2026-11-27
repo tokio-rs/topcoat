@@ -80,7 +80,11 @@ where
                         return Poll::Ready(Ok(ViewFirst { content, ..first }));
                     }
                     Err(error) => {
-                        let view = fallback.take().expect("the fallback runs once")(error)?;
+                        let fallback = fallback.take().expect("the fallback runs once");
+                        let view = {
+                            let _installed = scope.install();
+                            fallback(error)
+                        }?;
                         let view = EmitView::new(*region, || view);
                         self.as_mut().set(Self::Fallback { view });
                     }
@@ -105,7 +109,11 @@ where
                     Ok(swap) => return Poll::Ready(Ok(swap)),
                     // The fallback replaces everything the child sent.
                     Err(error) => {
-                        let view = fallback.take().expect("the fallback runs once")(error)?;
+                        let fallback = fallback.take().expect("the fallback runs once");
+                        let view = {
+                            let _installed = scope.install();
+                            fallback(error)
+                        }?;
                         let view = EmitView::new(*region, || view);
                         self.as_mut().set(Self::Fallback { view });
                     }
